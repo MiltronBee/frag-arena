@@ -119,6 +119,21 @@ copyrightable; assets and branding are.
   **separate parts** (riggable), itch license OK for commercial web. Convert to glTF/GLB.
   https://justcreate3d.itch.io/low-poly-fps-weapons-pack
 
+### Art direction — DECIDED (2026-07-06)
+- **Style/source: Synty POLYGON (paid, AAA-indie low-poly).** Coherent look across chars/env/weapons.
+- **Buy: [POLYGON — Sci-Fi Space Pack](https://syntystore.com/products/polygon-sci-fi-space-pack) ~$74.99**
+  (50% off $149.99). 660 assets = 20 characters (Space Soldiers, EVA, War Robot, aliens), 7 weapons
+  (pistol/rifle/shotgun/melee), + environment/props/FX/ships. One buy ≈ all third-person art.
+- **First-person viewmodel is NOT in Synty** (they're third-person). Cover with free
+  [PSX First Person Arms](https://rbgr.itch.io/psx-assets-first-person-arms) now, or a ~$15–20 paid animated
+  arms/rifle later.
+- **Format reality:** Synty ships FBX → convert only the handful we use to **GLB** (Blender/gltf tools).
+- **Pipeline built now with CC0 placeholders** so Synty is a drop-in swap. The ONE place art is wired is
+  `client/assets/assetManifest.js` (role → {url, scale, yOffset, animClips}). Character rendering =
+  `client/graphics/CharacterModel.js` + `createPlayerFactory` (attach visual to the invisible collision
+  proxy, animate idle/run by velocity — other players only, self stays first-person).
+  Placeholder character = RobotExpressive (CC0, Quaternius). Done + verified (client A sees client B as a robot).
+
 ### ⚠️ AVOID for web (Unreal Engine templates, not usable in Babylon/Three)
 - Low Poly Shooter Pack v6.0 (Fab) — https://www.fab.com/listings/90ba076a-dc9a-4782-9ac8-dc2ed4f06405
 - Low Poly Animated – Modern Guns Pack (Fab) — https://www.fab.com/listings/6914a185-4b14-475c-8f4f-cc0a6a3c589f

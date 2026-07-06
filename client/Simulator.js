@@ -24,6 +24,7 @@ class Simulator {
 		this.renderer = new BABYLONRenderer()
 		this.input = new InputSystem()
 		this.obstacles = new Map()
+		this.characterModels = new Map() // nid -> CharacterModel (other players' visuals)
 
 		this.myRawId = -1
 		this.mySmoothId = -1
@@ -137,6 +138,9 @@ class Simulator {
 				}
 			}
 		}
+
+		// drive other players' character visuals (position/yaw follow + idle/run anim)
+		this.characterModels.forEach(model => model.update(delta))
 
 		this.renderer.update()
 	}
