@@ -57,6 +57,10 @@ class Simulator {
 		})
 
 		client.on('predictionErrorFrame', predictionErrorFrame => {
+			// a reconcile frame can arrive during the connect race, before our own
+			// raw entity's create snapshot has been processed. Nothing to reconcile
+			// against yet, so skip until it exists (avoids a null deref on startup).
+			if (!this.myRawEntity) { return }
 			reconcilePlayer(predictionErrorFrame, this.client, this.myRawEntity)
 		})
 

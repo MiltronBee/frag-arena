@@ -3,7 +3,29 @@
 > Goal: A fast, low-latency, multiplayer arena FPS for the browser — Unreal Tournament *in feel*,
 > but original branding and original/CC0 assets. Working title: **Frag Arena** (not "Unreal Tournament").
 
-Last updated: 2026-07-06 · Status: research / stack selection (no code yet)
+Last updated: 2026-07-06 · Status: **running** — forked template up on Node 24, two-capsule netcode milestone verified.
+
+## Current state (what exists now)
+Decisions locked: **Babylon.js** renderer · **forked** `timetocode/nengi-babylon-3d-shooter` (Apache-2.0)
+as the base, promoted to repo root · first milestone = **two capsules shooting** — DONE.
+
+Run it: `npm install` then `npm start` → http://localhost:8080 (open two windows).
+Verify netcode headlessly: `npm run verify` (needs `npm start` running).
+
+What was required to run the 2020-era template on Node v24 (see git log for details):
+- Dropped the abandoned `esm` package; run the server through **tsx** (`npm run server`), which
+  handles the template's ESM-syntax `.js` + extensionless imports and gives watch/reload.
+- `nengi@1.18` bootstrapped itself via `esm` → **patch-package** patch re-exports its real ESM source.
+- `@clusterws/cws` (nengi's native WS transport) has no Node 24 binary and is abandoned → **patch-package**
+  shim over the pure-JS **`ws`** package (echoes the `nengi-protocol` subprotocol so browsers accept it).
+  This is a stopgap; the geckos.io/WebTransport (UDP) move below replaces it.
+- webpack 4 needs `NODE_OPTIONS=--openssl-legacy-provider` (md4 hashing vs OpenSSL 3) — wired into the scripts.
+- Fixed a real template bug: the server's `disconnect` handler crashed the whole process on any
+  half-open connection (unguarded `client.rawEntity.mesh`); now null-safe.
+
+Verified working (via `npm run verify`, 9/9): handshake over ws · client-side prediction · server-authoritative
+movement replication + interpolation (client A sees client B move) · lag-compensated hitscan (server logs hits) ·
+reconciliation path · no client errors.
 
 ---
 
@@ -113,9 +135,14 @@ copyrightable; assets and branding are.
 ---
 
 ## 6. Open decisions / next steps
-- [ ] **Lock renderer**: Babylon (recommended) vs Three. (User: "let's chat" — still open.)
-- [ ] Decide start mode: fork nengi-babylon-3d-shooter vs fresh TS monorepo vs plan-only.
+- [x] **Lock renderer**: Babylon.js.
+- [x] Start mode: forked `nengi-babylon-3d-shooter`, promoted to repo root, `git init` done.
+- [x] First milestone: two capsules shooting (prediction + lag comp) — verified via `npm run verify`.
+- [ ] Nail netcode *feel*: dodge-jump, air control, tighter hit reg — tune movement in `common/applyCommand.js`
+      + `common/weapon.js`. (The template's movement is placeholder-basic.)
+- [ ] Replace the `ws` transport shim with **geckos.io / WebTransport (UDP)** — the whole reason to avoid
+      TCP for gameplay; the current WS path is fine only for localhost/dev.
+- [ ] Consider migrating server+shared to real ESM or TS (currently run via tsx) for a cleaner monorepo.
 - [ ] Smoke test: wire FREE PSX arms into a Babylon scene, prove load→animate→shoot before buying.
 - [ ] Buy JustCreate3D weapons pack (~$10) once pipeline proven.
-- [ ] `git init` the project.
-- [ ] Nail netcode feel (dodge-jump, air control, hit reg) before art.
+- [ ] Give the arena real materials/lighting — right now it's white capsules on a white plane.

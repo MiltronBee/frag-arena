@@ -3,6 +3,8 @@ import GameClient from './GameClient';
 window.onload = function() {
     console.log('window loaded')
     const gameClient = new GameClient()
+    // dev/testing hook: lets headless harnesses & the console inspect/drive the client
+    window.gameClient = gameClient
     let tick = 0
     let previous = performance.now()
     const loop = function() {

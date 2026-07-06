@@ -1,0 +1,12 @@
+diff --git a/node_modules/nengi/index.js b/node_modules/nengi/index.js
+index 9e5ca4d..00f7362 100644
+--- a/node_modules/nengi/index.js
++++ b/node_modules/nengi/index.js
+@@ -1,2 +1,4 @@
+-require = require("esm")(module/*, options*/)
+-module.exports = require("./index-es6.js")
+\ No newline at end of file
++// Patched by Frag Arena: the original bootstrapped ESM via the `esm` package,
++// which is abandoned and crashes on Node 24. We run through tsx/webpack, both of
++// which consume ESM natively, so re-export the real source directly.
++export { default } from './index-es6.js'

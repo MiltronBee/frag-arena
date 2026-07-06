@@ -1,0 +1,36 @@
+diff --git a/node_modules/@clusterws/cws/dist/index.js b/node_modules/@clusterws/cws/dist/index.js
+index 9fc9891..5bd64d3 100644
+--- a/node_modules/@clusterws/cws/dist/index.js
++++ b/node_modules/@clusterws/cws/dist/index.js
+@@ -1,7 +1,27 @@
+ "use strict";
++// Patched by Frag Arena: the original @clusterws/cws is a native addon with no
++// prebuilt binary for Node 24 (and it's abandoned / won't compile against V8 in
++// Node 24). nengi only uses a WebSocket + WebSocketServer, so we shim those over
++// the pure-JS `ws` package. Fine for the local netcode milestone; a UDP/WebTransport
++// transport (geckos.io) is the eventual replacement per PROJECT_NOTES.
+ Object.defineProperty(exports, "__esModule", { value: true });
+-var client_1 = require("./client");
+-exports.WebSocket = client_1.WebSocket;
+-var server_1 = require("./server");
+-exports.WebSocketServer = server_1.WebSocketServer;
++var WS = require("ws");
++
++// nengi's browser client connects with the 'nengi-protocol' subprotocol. Browsers
++// abort the connection unless the server confirms the requested subprotocol, so we
++// echo back the first one the client offers.
++var OriginalServer = WS.WebSocketServer;
++function WebSocketServer(options, cb) {
++    var opts = Object.assign({
++        handleProtocols: function (protocols) {
++            var first = protocols && protocols.values ? protocols.values().next().value : undefined;
++            return first || false;
++        }
++    }, options);
++    return new OriginalServer(opts, cb);
++}
++WebSocketServer.prototype = OriginalServer.prototype;
++
++exports.WebSocket = WS.WebSocket;
++exports.WebSocketServer = WebSocketServer;
+ exports.secureProtocol = 'TLSv1_2_method';

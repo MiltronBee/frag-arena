@@ -75,12 +75,22 @@ class GameInstance {
 		})
 
 		this.instance.on('disconnect', client => {
-			// clean up per client state
-			client.rawEntity.mesh.dispose()			
-			client.smoothEntity.mesh.dispose()
-			this.instance.removeEntity(client.rawEntity)
-			this.instance.removeEntity(client.smoothEntity)
-			client.channel.destroy()
+			// clean up per client state.
+			// NOTE: a socket can connect and drop *before* completing nengi's handshake
+			// (never reaching the 'connect' handler that assigns these), so everything
+			// here may be undefined. Guard each cleanup — an unguarded throw in this
+			// handler would take down the whole server on any half-open connection.
+			if (client.rawEntity) {
+				client.rawEntity.mesh.dispose()
+				this.instance.removeEntity(client.rawEntity)
+			}
+			if (client.smoothEntity) {
+				client.smoothEntity.mesh.dispose()
+				this.instance.removeEntity(client.smoothEntity)
+			}
+			if (client.channel) {
+				client.channel.destroy()
+			}
 		})
 
 		this.instance.on('command::MoveCommand', ({ command, client, tick }) => {
