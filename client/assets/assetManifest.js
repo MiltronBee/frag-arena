@@ -19,6 +19,15 @@ export const assets = {
     yawOffset: Math.PI,
     anims: { idle: 'Idle', run: 'Running', jump: 'Jump' },
   },
+
+  // first-person weapon held in view (parented to the camera). position is in
+  // camera-local space: +x right, +y up, +z forward (into the screen).
+  viewmodel: {
+    url: '/assets/weapons/blaster.glb',
+    scale: 0.2,
+    position: { x: 0.28, y: -0.3, z: 0.7 },
+    rotation: { x: 0, y: Math.PI, z: 0 }, // face the muzzle away from the camera
+  },
 }
 
 export default assets

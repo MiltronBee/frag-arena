@@ -6,6 +6,8 @@ import createFactories from './factories/createFactories'
 import reconcilePlayer from './reconcilePlayer'
 import applyCommand from '../common/applyCommand'
 import { fire } from '../common/weapon'
+import Viewmodel from './graphics/Viewmodel'
+import { assets } from './assets/assetManifest'
 
 // ignoring certain data from the sever b/c we will be predicting these properties on the client
 const ignoreProps = ['x', 'y', 'z']
@@ -25,6 +27,7 @@ class Simulator {
 		this.input = new InputSystem()
 		this.obstacles = new Map()
 		this.characterModels = new Map() // nid -> CharacterModel (other players' visuals)
+		this.viewmodel = new Viewmodel(this.renderer.scene, this.renderer.camera, assets.viewmodel)
 
 		this.myRawId = -1
 		this.mySmoothId = -1
@@ -135,8 +138,14 @@ class Simulator {
 					}
 					// draw a predicted shot locally
 					this.renderer.drawHitscan(spec, new BABYLON.Color3(1, 0, 1))
+
+						// recoil the first-person weapon
+						this.viewmodel.kick()
 				}
 			}
+
+			// bob the first-person weapon each frame (based on movement)
+			this.viewmodel.update(delta, forwards || backwards || left || right)
 		}
 
 		// drive other players' character visuals (position/yaw follow + idle/run anim)
