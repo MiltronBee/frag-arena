@@ -134,6 +134,18 @@ copyrightable; assets and branding are.
   proxy, animate idle/run by velocity — other players only, self stays first-person).
   Placeholder character = RobotExpressive (CC0, Quaternius). Done + verified (client A sees client B as a robot).
 
+### Skinning progress (placeholders; Synty swaps in via manifest)
+- [x] **Characters** — other players render as animated GLB bodies (idle/run by velocity). `CharacterModel.js`.
+- [x] **First-person viewmodel** — blaster on the camera, idle bob + recoil kick. `Viewmodel.js`. Placeholder = Kenney blaster (CC0).
+- [x] **Effects & lighting** — directional light, equirect skybox (fog-excluded), subtle fog, muted ground,
+      crosshair, and **object-pooled** shot FX (tracer + muzzle flash + impact). `BABYLONRenderer.js`.
+      NOTE: FX pooling is mandatory — creating meshes/materials mid-frame crashes the GL bind on strict
+      drivers (SwiftShader). Dynamic **shadows dropped** for the same reason (skinned-mesh shadow depth);
+      revisit with a pre-warmed shadow path.
+- [ ] **Arena** — still placeholder white plane + yellow obstacle boxes. Next: modular environment GLB
+      (visual, client-only) + simple invisible collision primitives mirrored server-side.
+- [ ] Swap placeholders for real **Synty** GLBs once purchased (edit `assetManifest.js`).
+
 ### ⚠️ AVOID for web (Unreal Engine templates, not usable in Babylon/Three)
 - Low Poly Shooter Pack v6.0 (Fab) — https://www.fab.com/listings/90ba076a-dc9a-4782-9ac8-dc2ed4f06405
 - Low Poly Animated – Modern Guns Pack (Fab) — https://www.fab.com/listings/6914a185-4b14-475c-8f4f-cc0a6a3c589f
