@@ -28,10 +28,13 @@ class Simulator {
 		this.obstacles = new Map()
 		this.characterModels = new Map() // nid -> CharacterModel (other players' visuals)
 
-		// first-person weapons: preload all, show the equipped one, swap with 1-4 / Q / wheel
-		this.viewmodels = weapons.map(w => new Viewmodel(this.renderer.scene, this.renderer.camera, w))
+		// first-person weapon, swap with 1-4 / Q / wheel. Only the EQUIPPED weapon's
+		// rig lives in the scene: multiple copies of the same skeleton coexisting
+		// cross-wire each other's poses in Babylon 4.0.3, so we dispose + reload on
+		// switch (the .glb is browser-cached; the swap hitch is negligible).
 		this.weaponIndex = 0
-		this.viewmodels[0].setActive(true)
+		this.viewmodel = new Viewmodel(this.renderer.scene, this.renderer.camera, weapons[0])
+		this.viewmodel.setActive(true)
 		this._setupWeaponSwitching()
 
 		this.myRawId = -1
@@ -54,6 +57,9 @@ class Simulator {
 			// we receive these entities over the network (see: createPlayerFactory)
 			this.myRawId = message.rawId
 			this.mySmoothId = message.smoothId
+			// our own x/y/z updates are ignored (we predict them), so the server hands
+			// us the spawn point here; applied when the raw entity arrives
+			this.spawnPos = { x: message.x, z: message.z }
 			console.log('identified as', message)
 		})
 
@@ -91,12 +97,13 @@ class Simulator {
 
 	// equip weapon by index (wraps around); updates the on-screen weapon name
 	switchWeapon(index) {
-		const n = this.viewmodels.length
+		const n = weapons.length
 		index = ((index % n) + n) % n
 		if (index === this.weaponIndex) return
-		this.viewmodels[this.weaponIndex].setActive(false)
+		this.viewmodel.dispose()
 		this.weaponIndex = index
-		this.viewmodels[index].setActive(true)
+		this.viewmodel = new Viewmodel(this.renderer.scene, this.renderer.camera, weapons[index])
+		this.viewmodel.setActive(true)
 		const el = document.getElementById('weapon-name')
 		if (el) el.textContent = weapons[index].name
 	}
@@ -172,12 +179,12 @@ class Simulator {
 					this.renderer.drawHitscan(spec, new BABYLON.Color3(1, 0, 1))
 
 						// recoil the equipped weapon
-						this.viewmodels[this.weaponIndex].kick()
+						this.viewmodel.kick()
 				}
 			}
 
 			// bob the equipped weapon each frame (based on movement)
-			this.viewmodels[this.weaponIndex].update(delta, forwards || backwards || left || right)
+			this.viewmodel.update(delta, forwards || backwards || left || right)
 		}
 
 		// drive other players' character visuals (position/yaw follow + idle/run anim)

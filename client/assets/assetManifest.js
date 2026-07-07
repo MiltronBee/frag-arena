@@ -23,20 +23,22 @@ export const assets = {
 
 }
 
-// First-person weapons (parented to the camera). All four share the same FP arms
-// rig (Retro Weapon Pack, free/commercial-OK), each converted FBX->glTF with its own
-// gun on the hand_item_r socket + its own animation clips. Because every weapon is
-// recentered on the same 'camera' bone, one camera-local transform frames them all
-// (the gun sizes differ naturally in the same hands). Switch with 1-4 / Q / wheel.
-// Each weapon's idle animation holds the arms at a different distance from the eye,
-// so every weapon gets its own camera-local transform (tuned by hand) or it either
-// engulfs the camera or floats off-frame.
+// First-person weapons (parented to the camera). Converted from the Retro Weapon
+// Pack's own .blend rigs (scripts/blend-to-gltf.blender.py) — the vendor authored
+// every weapon around a camera at the origin looking down +X, with the arms' IK
+// evaluated by Blender at export. So ONE transform mounts them all: scale cm->game
+// units, yaw -90deg to map +X onto the camera's +Z. No per-weapon tuning.
+// Clips: idle (base hold), fire, reload — each drives arms + gun bones together.
+// Switch with 1-4 / Q / wheel.
+// note: +90 not -90 — the glTF loader's __root__ carries its own 180deg Y flip,
+// and the holder rotation composes with it.
+const authoredMount = { scale: 0.01, position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: Math.PI / 2, z: 0 }, anims: { idle: 'idle', fire: 'fire', reload: 'reload' } }
+
 export const weapons = [
-  { name: 'Rifle',   url: '/assets/weapons/retro_rifle_arms.glb',   scale: 0.016, position: { x: 0.14, y: -0.42, z: 0.50 }, rotation: { x: 0.12,  y: -1.62, z: 0 }, anims: { idle: 'idle', fire: 'fire' } },
-  { name: 'SMG',     url: '/assets/weapons/retro_smg_arms.glb',     scale: 0.022, position: { x: 0.15, y: -0.50, z: 1.00 }, rotation: { x: 0.105, y: -1.62, z: 0 }, anims: { idle: 'idle', fire: 'fire' } },
-  { name: 'Shotgun', url: '/assets/weapons/retro_shotgun_arms.glb', scale: 0.022, position: { x: 0.15, y: -0.50, z: 1.00 }, rotation: { x: 0.105, y: -1.62, z: 0 }, anims: { idle: 'idle', fire: 'fire' } },
-  // pistol's idle animation swings the arms a lot; this frame keeps it clear of the camera
-  { name: 'Pistol',  url: '/assets/weapons/retro_pistol_arms.glb',  scale: 0.022, position: { x: 0.16, y: -0.55, z: 0.90 }, rotation: { x: 0.10,  y: -1.62, z: 0 }, anims: { idle: 'idle', fire: 'fire' } },
+  { name: 'Rifle',   url: '/assets/weapons/retro_rifle_arms.glb',   ...authoredMount },
+  { name: 'SMG',     url: '/assets/weapons/retro_smg_arms.glb',     ...authoredMount },
+  { name: 'Shotgun', url: '/assets/weapons/retro_shotgun_arms.glb', ...authoredMount },
+  { name: 'Pistol',  url: '/assets/weapons/retro_pistol_arms.glb',  ...authoredMount },
 ]
 
 export default assets

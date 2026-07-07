@@ -37,6 +37,14 @@ class GameInstance {
 			const rawEntity = new PlayerCharacter()
 			rawEntity.mesh.checkCollisions = true
 
+			// spread spawns out — spawning everyone at the exact origin puts players
+			// INSIDE each other's collision boxes, and moveWithCollisions can't escape
+			// from inside a collider (you'd be frozen until the other player moves)
+			const spawnAngle = Math.random() * Math.PI * 2
+			const spawnRadius = 3 + Math.random() * 5
+			rawEntity.x = Math.cos(spawnAngle) * spawnRadius
+			rawEntity.z = Math.sin(spawnAngle) * spawnRadius
+
 			// make the raw entity only visible to this client
 			const channel = this.instance.createChannel()
 			channel.subscribe(client)
@@ -47,10 +55,12 @@ class GameInstance {
 			// smooth entity is visible to everyone
 			const smoothEntity = new PlayerCharacter()
 			smoothEntity.mesh.checkCollisions = false
+			smoothEntity.x = rawEntity.x
+			smoothEntity.z = rawEntity.z
 			this.instance.addEntity(smoothEntity)
 
-			// tell the client which entities it controls
-			this.instance.message(new Identity(rawEntity.nid, smoothEntity.nid), client)
+			// tell the client which entities it controls + where it spawned
+			this.instance.message(new Identity(rawEntity.nid, smoothEntity.nid, rawEntity.x, rawEntity.z), client)
 
 			// establish a relation between this entity and the client
 			rawEntity.client = client

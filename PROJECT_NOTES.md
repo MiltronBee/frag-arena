@@ -144,12 +144,20 @@ copyrightable; assets and branding are.
       socket bone) + merge the separate per-clip animation FBX as NLA tracks, recenter on the rig's
       `camera` bone, assign textures (nearest filter, roughness 1), and export one GLB.
       IQM (Xonotic) -> glTF converter also kept: `scripts/iqm-to-gltf.py`.
-- [x] **Weapon switching** — 4-weapon loadout (Rifle / SMG / Shotgun / Pistol), all from the Retro pack,
-      each its own converted GLB (gun + arms + idle/fire clips). Switch with **1-4 / Q / mouse-wheel**;
-      HUD shows the weapon name. All viewmodels preloaded, only the equipped one shown. The converter now
-      trims the upper-arm/shoulder geometry so the FP camera isn't inside the mesh, and a dedicated
-      viewmodel light keeps arms/gun lit. Each weapon has a hand-tuned camera-local transform (their idle
-      poses hold the arms at different distances). Pistol framing is the roughest (its idle swings a lot).
+- [x] **Weapon switching** — 4-weapon loadout (Rifle / SMG / Shotgun / Pistol) with **visible hands
+      gripping each gun** (the vendor's authored poses). Switch with **1-4 / Q / mouse-wheel**; HUD name.
+      **Convert from the vendor .BLEND files, not the FBX**: `scripts/blend-to-gltf.blender.py`. The FBX
+      clips only bake motion onto IK controller bones and the IK constraints live solely in the .blend
+      rigs — FBX-converted arms T-pose forever (this cost a day to find). The blend converter classifies
+      actions by which armature's bones they target, pads 1-frame pose clips (they sample wrong), purges
+      vendor NLA stashes, trims shoulder/upper-arm verts (ci match — the rig has mixed-case dup groups),
+      and everything is authored around a camera at origin looking +X → ONE mount constant in the manifest.
+      **Babylon 4.0.3 gotchas:** identically-named skeletons cross-wire poses → only the equipped weapon's
+      rig lives in the scene (dispose+reload on switch, browser-cached); dispose must drop skeletons too.
+- [x] **Spawn fix (real netcode bug):** players all spawned at the exact origin — inside each other's
+      collision boxes (frozen until someone moves). Server now spreads spawns (3-8m ring) and hands the
+      spawn point to the client via the Identity message (the client permanently ignores server x/y/z for
+      its own predicted entity, so it can't learn its spawn any other way).
 - [x] **Effects & lighting** — directional light, equirect skybox (fog-excluded), subtle fog, muted ground,
       crosshair, and **object-pooled** shot FX (tracer + muzzle flash + impact). `BABYLONRenderer.js`.
       NOTE: FX pooling is mandatory — creating meshes/materials mid-frame crashes the GL bind on strict

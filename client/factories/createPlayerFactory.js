@@ -9,6 +9,12 @@ export default ({ simulator }) => {
 				// this is *OUR* entity, enable collisions for it
 				// we'll be using these in clientside prediction
 				entity.mesh.checkCollisions = true
+				// place it at the server-assigned spawn (x/y/z updates for our own
+				// entity are ignored — we predict them — so this is the only handoff)
+				if (simulator.spawnPos) {
+					entity.x = simulator.spawnPos.x
+					entity.z = simulator.spawnPos.z
+				}
 				simulator.myRawEntity = entity
 				return
 			}

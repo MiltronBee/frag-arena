@@ -26,8 +26,14 @@ export default class Viewmodel {
   async _load() {
     const url = this.spec.url
     const slash = url.lastIndexOf('/') + 1
+    // Babylon 4.0.3's loader result has no transformNodes list, so snapshot the
+    // scene around the load to know which joint nodes are ours (dispose() needs
+    // them — leaking them piles up dead nodes on every weapon switch).
+    const beforeTN = new Set(this.scene.transformNodes)
     const result = await BABYLON.SceneLoader.ImportMeshAsync('', url.slice(0, slash), url.slice(slash), this.scene)
+    this._myTransformNodes = this.scene.transformNodes.filter((n) => !beforeTN.has(n))
 
+    this._result = result // kept so dispose() can drop EVERYTHING the load created
     this.meshes = result.meshes
     const root = result.meshes[0]
 
@@ -120,8 +126,15 @@ export default class Viewmodel {
   }
 
   dispose() {
-    Object.values(this.groups).forEach((g) => g.dispose())
-    if (this.meshes) this.meshes.forEach((m) => m.dispose())
+    // dispose EVERYTHING the load created — leaked skeletons/transform-nodes with
+    // identical bone names cross-wire the next rig's pose in Babylon 4.0.3.
+    if (this._result) {
+      this._result.animationGroups.forEach((g) => g.dispose())
+      this._result.meshes.forEach((m) => m.dispose())
+      ;(this._myTransformNodes || []).forEach((n) => n.dispose())
+      ;(this._result.skeletons || []).forEach((s) => s.dispose())
+      ;(this._result.particleSystems || []).forEach((p) => p.dispose())
+    }
     if (this.holder) this.holder.dispose()
   }
 }

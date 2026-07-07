@@ -102,6 +102,17 @@ try {
     })
     await sleep(50)
   }
+  // turn AWAY from A before running — players spawn apart now, and running into
+  // A's collision box would (correctly) stop us after a few centimeters
+  const bStart = await B.evaluate(() => {
+    const s = window.gameClient.simulator
+    const c = s.renderer.camera
+    // setTarget (aim phase) switched the camera to quaternion rotation, which makes
+    // euler .rotation writes silently ignored — convert back before turning
+    if (c.rotationQuaternion) { c.rotation = c.rotationQuaternion.toEulerAngles(); c.rotationQuaternion = null }
+    c.rotation.y += Math.PI
+    return { x: s.myRawEntity.x, z: s.myRawEntity.z }
+  })
   await B.evaluate(() => { window.gameClient.simulator.input._currentState.forwards = true })
   await sleep(1800)
   await B.evaluate(() => {
@@ -112,10 +123,13 @@ try {
 
   const bMoved = await B.evaluate(() => {
     const s = window.gameClient.simulator
-    return { z: +s.myRawEntity.z.toFixed(3), tick: window.gameClient.client.tick }
+    return { x: s.myRawEntity.x, z: s.myRawEntity.z, tick: window.gameClient.client.tick }
   })
+  // measure total horizontal displacement — spawn angle + aim direction are random,
+  // so the run direction is arbitrary (not necessarily along Z)
+  const bDist = Math.hypot(bMoved.x - bStart.x, bMoved.z - bStart.z)
   check('B game loop advanced', bMoved.tick - bTickBefore > 30, `+${bMoved.tick - bTickBefore} ticks`)
-  check('B predicted its own movement', Math.abs(bMoved.z) > 1, `z=${bMoved.z}`)
+  check('B predicted its own movement', bDist > 1, `moved=${bDist.toFixed(2)}`)
 
   await A.bringToFront()
   await sleep(300)
