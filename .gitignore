@@ -3,3 +3,6 @@ dist
 public/js/
 .claude/settings.local.json
 *.log
+.venv/
+_convert/
+_incoming/

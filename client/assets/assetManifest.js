@@ -10,23 +10,26 @@
 // so yOffset ~ -0.5 drops the feet to the bottom of the box. Tune per model.
 
 export const assets = {
-  // third-person body other players see (attached to their replicated entity)
+  // third-person body other players see (attached to their replicated entity).
+  // PROTOTYPE: Xonotic 'Erebus' (CC-BY-SA), converted IQM->glTF (static bind pose,
+  // no animation yet). Swap back to RobotExpressive by restoring the url/scale below.
   playerBody: {
-    url: '/assets/characters/RobotExpressive.glb',
-    scale: 0.22,
-    yOffset: -0.5,
-    // model's forward axis vs our yaw convention; tuned so it faces its aim
-    yawOffset: Math.PI,
-    anims: { idle: 'Idle', run: 'Running', jump: 'Jump' },
+    url: '/assets/characters/erebus.glb',
+    scale: 0.0274,
+    yOffset: 0.22,
+    yawOffset: 0,
+    anims: { idle: 'Idle', run: 'Running', jump: 'Jump' }, // absent in static glb -> stands still
   },
 
-  // first-person weapon held in view (parented to the camera). position is in
-  // camera-local space: +x right, +y up, +z forward (into the screen).
+  // first-person viewmodel parented to the camera. position is camera-local:
+  // +x right, +y up, +z forward (into the screen). PSX arms (drillimpact, CC0),
+  // authored around a camera node with finger-gun/knife/melee animation clips.
   viewmodel: {
-    url: '/assets/weapons/blaster.glb',
-    scale: 0.2,
-    position: { x: 0.28, y: -0.3, z: 0.7 },
-    rotation: { x: 0, y: Math.PI, z: 0 }, // face the muzzle away from the camera
+    url: '/assets/weapons/psx_arms.glb',
+    scale: 1.0,
+    position: { x: 0, y: -1.35, z: 0.75 }, // framed so the finger-gun hand sits near the crosshair
+    rotation: { x: 0.349, y: 0, z: 0 },     // ~20deg downward pitch
+    anims: { idle: 'finger_gun_idle', fire: 'finger_gun_fire' },
   },
 }
 

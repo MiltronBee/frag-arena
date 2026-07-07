@@ -1,9 +1,10 @@
 import * as BABYLON from 'babylonjs'
 import 'babylonjs-loaders' // registers the glTF/GLB loader with SceneLoader
 
-// First-person weapon locked to the camera. Parented to the camera node so it
-// renders in view space; adds a subtle idle/walk bob and a recoil kick on fire.
-// All placement comes from the manifest so a real animated arms+gun swaps in here.
+// First-person viewmodel locked to the camera. Parented to the camera node so it
+// renders in view space. If the model ships animation clips (per the manifest
+// `anims`), it plays an idle loop and a one-shot fire clip; otherwise it falls back
+// to a code-driven bob + recoil kick. Subtle positional bob is layered on either way.
 export default class Viewmodel {
   constructor(scene, camera, spec) {
     this.scene = scene
@@ -11,8 +12,11 @@ export default class Viewmodel {
     this.spec = spec
     this.ready = false
     this.holder = null
+    this.groups = {}
+    this.idleAnim = null
+    this.fireAnim = null
     this._t = 0
-    this._recoil = 0 // 0..1, decays each frame
+    this._recoil = 0 // 0..1, decays each frame (fallback recoil when un-animated)
     this._basePos = new BABYLON.Vector3(spec.position.x, spec.position.y, spec.position.z)
     this._baseRotX = (spec.rotation && spec.rotation.x) || 0
     this._load()
@@ -23,35 +27,58 @@ export default class Viewmodel {
     const slash = url.lastIndexOf('/') + 1
     const result = await BABYLON.SceneLoader.ImportMeshAsync('', url.slice(0, slash), url.slice(slash), this.scene)
 
+    this.meshes = result.meshes
+    const root = result.meshes[0]
+
+    // fine-tune offset holder, parented to the camera (bob is applied here too)
     this.holder = new BABYLON.TransformNode('viewmodel', this.scene)
     this.holder.parent = this.camera
-    result.meshes[0].parent = this.holder
-    this.meshes = result.meshes
-
     this.holder.position.copyFrom(this._basePos)
     const r = this.spec.rotation || {}
     this.holder.rotation = new BABYLON.Vector3(r.x || 0, r.y || 0, r.z || 0)
     this.holder.scaling.setAll(this.spec.scale)
 
+    root.parent = this.holder
+
     // it sits right on the camera; never cull it and keep it out of the near clip
     result.meshes.forEach((m) => { m.alwaysSelectAsActiveMesh = true })
+
+    // wire up animation clips if this model has them
+    const anims = this.spec.anims || {}
+    result.animationGroups.forEach((g) => { g.stop(); this.groups[g.name] = g })
+    this.idleAnim = this.groups[anims.idle]
+    this.fireAnim = this.groups[anims.fire]
+    if (this.idleAnim) this.idleAnim.start(true, 1.0) // loop idle
+
     this.ready = true
   }
 
   // called when the local player fires
-  kick() { this._recoil = 1 }
+  kick() {
+    if (this.fireAnim) {
+      // play the fire clip once, then hand back to idle
+      this.fireAnim.stop()
+      this.fireAnim.start(false, 1.0)
+      if (this.idleAnim) {
+        this.fireAnim.onAnimationGroupEndObservable.clear()
+        this.fireAnim.onAnimationGroupEndObservable.addOnce(() => this.idleAnim.start(true, 1.0))
+      }
+    } else {
+      this._recoil = 1 // fallback for un-animated models
+    }
+  }
 
   update(delta, moving) {
     if (!this.ready || !this.holder) return
     this._t += delta
 
-    // idle/walk bob
+    // subtle idle/walk bob layered on top of any skeletal animation
     const amp = moving ? 0.02 : 0.006
     const freq = moving ? 9 : 2.5
     const bobY = Math.sin(this._t * freq) * amp
     const bobX = Math.cos(this._t * freq * 0.5) * amp * 0.6
 
-    // recoil decays quickly; pushes the gun back (toward camera) and tilts it up
+    // fallback recoil (only used when there's no fire clip)
     this._recoil = Math.max(0, this._recoil - delta * 7)
     const k = this._recoil
 
@@ -64,6 +91,7 @@ export default class Viewmodel {
   }
 
   dispose() {
+    Object.values(this.groups).forEach((g) => g.dispose())
     if (this.meshes) this.meshes.forEach((m) => m.dispose())
     if (this.holder) this.holder.dispose()
   }
