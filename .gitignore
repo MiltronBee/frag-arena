@@ -6,3 +6,5 @@ public/js/
 .venv/
 _convert/
 _incoming/
+public/vendor/
+public/_modelview.html

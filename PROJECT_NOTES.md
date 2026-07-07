@@ -136,7 +136,14 @@ copyrightable; assets and branding are.
 
 ### Skinning progress (placeholders; Synty swaps in via manifest)
 - [x] **Characters** — other players render as animated GLB bodies (idle/run by velocity). `CharacterModel.js`.
-- [x] **First-person viewmodel** — blaster on the camera, idle bob + recoil kick. `Viewmodel.js`. Placeholder = Kenney blaster (CC0).
+- [x] **First-person viewmodel** — **animated FP arms holding an AR-style rifle** with idle + fire
+      clips (pack also has reload + walk). `Viewmodel.js` drives skinned anim clips. Source: "Retro Weapon
+      Pack" (free, commercial-OK, no attribution) — Unity FBX, converted to glTF in Blender.
+      **FBX->glTF pipeline** (reusable for the Synty packs): `scripts/fbx-to-gltf.blender.py` runs headless
+      Blender (`/tmp/blender-portable`) to import the arms mesh + rifle (parented to the `hand_item_r`
+      socket bone) + merge the separate per-clip animation FBX as NLA tracks, recenter on the rig's
+      `camera` bone, assign textures (nearest filter, roughness 1), and export one GLB.
+      IQM (Xonotic) -> glTF converter also kept: `scripts/iqm-to-gltf.py`.
 - [x] **Effects & lighting** — directional light, equirect skybox (fog-excluded), subtle fog, muted ground,
       crosshair, and **object-pooled** shot FX (tracer + muzzle flash + impact). `BABYLONRenderer.js`.
       NOTE: FX pooling is mandatory — creating meshes/materials mid-frame crashes the GL bind on strict

@@ -24,12 +24,14 @@ export const assets = {
   // first-person viewmodel parented to the camera. position is camera-local:
   // +x right, +y up, +z forward (into the screen). PSX arms (drillimpact, CC0),
   // authored around a camera node with finger-gun/knife/melee animation clips.
+  // Retro Weapon Pack (free, commercial-OK) FP arms holding an AR-style rifle,
+  // converted FBX->glTF in Blender (arms + rifle on hand_item_r + merged animations).
   viewmodel: {
-    url: '/assets/weapons/psx_arms.glb',
-    scale: 1.0,
-    position: { x: 0, y: -1.35, z: 0.75 }, // framed so the finger-gun hand sits near the crosshair
-    rotation: { x: 0.349, y: 0, z: 0 },     // ~20deg downward pitch
-    anims: { idle: 'finger_gun_idle', fire: 'finger_gun_fire' },
+    url: '/assets/weapons/retro_rifle_arms.glb',
+    scale: 0.018,
+    position: { x: 0.12, y: -0.35, z: 0.45 },
+    rotation: { x: 0.14, y: -1.745, z: 0 }, // barrel forward, rifle low-right
+    anims: { idle: 'idle', fire: 'fire' }, // pack also has reload + walk for later
   },
 }
 
