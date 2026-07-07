@@ -66,6 +66,7 @@ export default class Viewmodel {
     result.animationGroups.forEach((g) => { g.stop(); this.groups[g.name] = g })
     this.idleAnim = this.groups[anims.idle]
     this.fireAnim = this.groups[anims.fire]
+    this.reloadAnim = this.groups[anims.reload]
 
     this.ready = true
     this._applyActive() // show/hide + idle depending on whether we're equipped
@@ -83,20 +84,43 @@ export default class Viewmodel {
     if (this._wantActive) {
       if (this.idleAnim && !this.idleAnim.isPlaying) this.idleAnim.start(true, 1.0)
     } else {
+      this._reloading = false
       Object.values(this.groups).forEach((g) => g.stop())
     }
   }
 
+  get isReloading() { return !!this._reloading }
+
+  // play the reload clip once (arms + gun bones together: mag out, charge, etc.),
+  // then hand back to idle. Firing is blocked while it runs.
+  reload() {
+    if (!this._wantActive || !this.ready || this._reloading || !this.reloadAnim) return false
+    this._reloading = true
+    if (this.idleAnim) this.idleAnim.stop()
+    if (this.fireAnim) this.fireAnim.stop()
+    this.reloadAnim.stop()
+    this.reloadAnim.start(false, 1.0)
+    this.reloadAnim.onAnimationGroupEndObservable.clear()
+    this.reloadAnim.onAnimationGroupEndObservable.addOnce(() => {
+      this._reloading = false
+      if (this._wantActive && this.idleAnim) this.idleAnim.start(true, 1.0)
+    })
+    return true
+  }
+
   // called when the local player fires
   kick() {
-    if (!this._wantActive) return
+    if (!this._wantActive || this._reloading) return
     if (this.fireAnim) {
       // play the fire clip once, then hand back to idle
       this.fireAnim.stop()
       this.fireAnim.start(false, 1.0)
       if (this.idleAnim) {
         this.fireAnim.onAnimationGroupEndObservable.clear()
-        this.fireAnim.onAnimationGroupEndObservable.addOnce(() => this.idleAnim.start(true, 1.0))
+        this.fireAnim.onAnimationGroupEndObservable.addOnce(() => {
+          // stop() also fires this observable — don't restart idle mid-reload
+          if (!this._reloading && this._wantActive) this.idleAnim.start(true, 1.0)
+        })
       }
     } else {
       this._recoil = 1 // fallback for un-animated models

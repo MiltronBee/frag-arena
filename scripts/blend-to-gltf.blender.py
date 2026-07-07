@@ -138,24 +138,40 @@ for o in bpy.data.objects:
             o.animation_data.nla_tracks.remove(tr)
 
 used_actions = set()
+def reload_clips(cands):
+    """Single reload action, or the pump-action Start/Step/Step/End chain (loads two
+    shells) when the vendor authored the reload as segments (shotgun)."""
+    single = pick(cands, lambda n: n.endswith('reload'))
+    if single: return [single]
+    start = pick(cands, lambda n: n.endswith('reloadstart'))
+    step = pick(cands, lambda n: n.endswith('reloadstep'))
+    end = pick(cands, lambda n: n.endswith('reloadend'))
+    if start and step and end: return [start, step, step, end]
+    return [a for a in (start,) if a]
+
 for arm_obj, key in ((arms_arm, 'arms'), (gun_arm, 'gun')):
     cands = by_arm[key]
     clips = {
-        'idle':   pick(cands, lambda n: n.endswith('basepose')),
-        'fire':   pick(cands, lambda n: 'fire' in n and 'aim' not in n),
-        'reload': pick(cands, lambda n: n.endswith('reload'), lambda n: n.endswith('reloadstart')),
+        'idle':   [pick(cands, lambda n: n.endswith('basepose'))],
+        'fire':   [pick(cands, lambda n: 'fire' in n and 'aim' not in n)],
+        'reload': reload_clips(cands),
     }
+    clips = {k: [a for a in v if a] for k, v in clips.items()}
     if not arm_obj.animation_data:
         arm_obj.animation_data_create()
-    used_actions.update(a for a in clips.values() if a)
-    for track_name, act in clips.items():
-        if not act:
+    for acts in clips.values():
+        used_actions.update(acts)
+    for track_name, acts in clips.items():
+        if not acts:
             print(f'   ({arm_obj.name}: no {track_name})'); continue
-        pad_short(act)
+        for a in acts: pad_short(a)
         tr = arm_obj.animation_data.nla_tracks.new()
         tr.name = track_name
-        tr.strips.new(track_name, int(act.frame_range[0]), act)
-        print(f'++ {arm_obj.name}: {track_name} <- {act.name} ({act.frame_range[1]-act.frame_range[0]+1:.0f}f)')
+        cursor = int(acts[0].frame_range[0])
+        for a in acts:  # chained segments sit back-to-back on the one track
+            strip = tr.strips.new(a.name, cursor, a)
+            cursor = int(strip.frame_end) + 1
+        print(f'++ {arm_obj.name}: {track_name} <- {"+".join(a.name for a in acts)} ({cursor}f)')
 
 # --- ground truth: with idle (BasePose) active, where are hands vs gun? ---
 arms_arm.animation_data.action = pick(by_arm['arms'], lambda n: n.endswith('basepose'))

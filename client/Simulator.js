@@ -159,8 +159,14 @@ class Simulator {
 			// move the camera to our entity
 			Object.assign(this.renderer.camera.position, this.myRawEntity.mesh.position)
 
-			/* shooting */
-			if (input.mouseDown) {
+			/* reloading (R) — edge-triggered so holding the key doesn't restart it */
+			if (input.reload && !this._reloadHeld) {
+				this.viewmodel.reload()
+			}
+			this._reloadHeld = input.reload
+
+			/* shooting (blocked while the reload animation runs) */
+			if (input.mouseDown && !this.viewmodel.isReloading) {
 				const ray = fire(this.myRawEntity)
 				if (ray) {
 					// send shot to the server
