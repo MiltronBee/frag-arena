@@ -47,6 +47,13 @@ export default class Viewmodel {
 
     root.parent = this.holder
 
+    // barrel-tip socket (camera-local, from the manifest): muzzle flash + the local
+    // tracer originate here so shots visibly leave the gun
+    this.muzzle = new BABYLON.TransformNode('muzzle', this.scene)
+    this.muzzle.parent = this.camera
+    const mz = this.spec.muzzle || { x: 0.08, y: -0.14, z: 0.9 }
+    this.muzzle.position.set(mz.x, mz.y, mz.z)
+
     // it sits right on the camera; never cull it, and light it with the dedicated
     // viewmodel light so arms/gun stay legible regardless of where the player looks.
     const vmLight = this.scene.metadata && this.scene.metadata.viewmodelLight
@@ -67,6 +74,7 @@ export default class Viewmodel {
     this.idleAnim = this.groups[anims.idle]
     this.fireAnim = this.groups[anims.fire]
     this.reloadAnim = this.groups[anims.reload]
+    this.drawAnim = this.groups[anims.draw]
 
     this.ready = true
     this._applyActive() // show/hide + idle depending on whether we're equipped
@@ -82,19 +90,39 @@ export default class Viewmodel {
     if (!this.holder) return
     this.holder.setEnabled(this._wantActive)
     if (this._wantActive) {
-      if (this.idleAnim && !this.idleAnim.isPlaying) this.idleAnim.start(true, 1.0)
+      // equip: play the weapon-raise (draw) once, then settle into idle
+      if (this.drawAnim && !this._drawn) {
+        this._drawn = true
+        this._drawing = true
+        this.drawAnim.start(false, 1.0)
+        this.drawAnim.onAnimationGroupEndObservable.clear()
+        this.drawAnim.onAnimationGroupEndObservable.addOnce(() => {
+          this._drawing = false
+          if (this._wantActive && this.idleAnim) this.idleAnim.start(true, 1.0)
+        })
+      } else if (this.idleAnim && !this.idleAnim.isPlaying) {
+        this.idleAnim.start(true, 1.0)
+      }
     } else {
       this._reloading = false
+      this._drawing = false
       Object.values(this.groups).forEach((g) => g.stop())
     }
   }
 
   get isReloading() { return !!this._reloading }
 
+  // world-space barrel tip (for muzzle flash / tracer origin)
+  muzzleWorldPos() {
+    if (!this.muzzle) return null
+    this.muzzle.computeWorldMatrix(true)
+    return this.muzzle.getAbsolutePosition()
+  }
+
   // play the reload clip once (arms + gun bones together: mag out, charge, etc.),
   // then hand back to idle. Firing is blocked while it runs.
   reload() {
-    if (!this._wantActive || !this.ready || this._reloading || !this.reloadAnim) return false
+    if (!this._wantActive || !this.ready || this._reloading || this._drawing || !this.reloadAnim) return false
     this._reloading = true
     if (this.idleAnim) this.idleAnim.stop()
     if (this.fireAnim) this.fireAnim.stop()
@@ -110,7 +138,7 @@ export default class Viewmodel {
 
   // called when the local player fires
   kick() {
-    if (!this._wantActive || this._reloading) return
+    if (!this._wantActive || this._reloading || this._drawing) return
     if (this.fireAnim) {
       // play the fire clip once, then hand back to idle
       this.fireAnim.stop()
@@ -159,6 +187,7 @@ export default class Viewmodel {
       ;(this._result.skeletons || []).forEach((s) => s.dispose())
       ;(this._result.particleSystems || []).forEach((p) => p.dispose())
     }
+    if (this.muzzle) this.muzzle.dispose()
     if (this.holder) this.holder.dispose()
   }
 }

@@ -62,7 +62,9 @@ class BABYLONRenderer {
 		// + VAO compilation and crashes the GL bind on strict drivers (e.g. SwiftShader).
 		// So we build every FX mesh + material once here, force-compile their shaders,
 		// and at runtime only toggle visibility + transform. No allocation on fire.
-		this._muzzleMat = this._spriteMaterial('muzzleMat', '/assets/sprites/burst.png')
+		this._muzzleMat = this._spriteMaterial('muzzleMat', '/assets/sprites/retro_muzzleflash.png')
+		// the pack's flash texture is authored for additive blending (black background)
+		this._muzzleMat.alphaMode = BABYLON.Engine.ALPHA_ADD
 		this._impactMat = this._spriteMaterial('impactMat', '/assets/sprites/hit.png')
 		this._tracerMat = new BABYLON.StandardMaterial('tracerMat', this.scene)
 		this._tracerMat.disableLighting = true
@@ -127,9 +129,18 @@ class BABYLONRenderer {
 		return mesh
 	}
 
-	// draws a shot: a glowing tracer along the aim, a muzzle flash at the origin,
-	// and an impact spark where the ray first hits the world. All pooled.
-	drawHitscan(spec, color) {
+	// muzzle flash at an explicit world position (the local player's barrel tip)
+	flashMuzzle(pos) {
+		if (!pos) return
+		const muzzle = this._show('muzzle', 55)
+		muzzle.position.copyFrom(pos)
+		muzzle.scaling.setAll(0.35)
+	}
+
+	// draws a shot: a glowing tracer along the aim, a muzzle flash at the origin
+	// (unless opts.muzzle === false — the local player draws his own at the barrel
+	// tip via flashMuzzle), and an impact spark where the ray hits. All pooled.
+	drawHitscan(spec, color, opts) {
 		const { x, y, z, tx, ty, tz } = spec
 		const dir = new BABYLON.Vector3(tx, ty, tz)
 		if (!isFinite(dir.length()) || dir.length() < 1e-4) return // bad/zero aim
@@ -152,10 +163,12 @@ class BABYLONRenderer {
 		tracer.lookAt(end)
 		tracer.scaling.set(0.06, 0.06, length)
 
-		// muzzle flash at the origin
-		const muzzle = this._show('muzzle', 55)
-		muzzle.position.copyFrom(origin)
-		muzzle.scaling.setAll(0.6)
+		// muzzle flash at the origin (remote players' shots)
+		if (!opts || opts.muzzle !== false) {
+			const muzzle = this._show('muzzle', 55)
+			muzzle.position.copyFrom(origin)
+			muzzle.scaling.setAll(0.6)
+		}
 
 		// impact spark where it hit
 		if (hitValid) {

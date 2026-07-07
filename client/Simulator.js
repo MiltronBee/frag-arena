@@ -172,19 +172,24 @@ class Simulator {
 					// send shot to the server
 					this.client.addCommand(new FireCommand())
 
-					// defines the ray on our client in a format compatible with 'drawHitscan'
+					// our own tracer + flash originate at the BARREL TIP so the shot
+					// visibly leaves the gun (the ray itself — and the server's hit
+					// check — still starts at the entity; this is presentation only)
+					const muzzle = this.viewmodel.muzzleWorldPos()
 					const spec = {
-						x: this.myRawEntity.x,
-						y: this.myRawEntity.y,
-						z: this.myRawEntity.z,
+						x: muzzle ? muzzle.x : this.myRawEntity.x,
+						y: muzzle ? muzzle.y : this.myRawEntity.y,
+						z: muzzle ? muzzle.z : this.myRawEntity.z,
 						tx: ray.direction.x,
 						ty: ray.direction.y,
 						tz: ray.direction.z,
 					}
-					// draw a predicted shot locally
-					this.renderer.drawHitscan(spec, new BABYLON.Color3(1, 0, 1))
+					// draw a predicted shot locally (no center-screen flash — ours
+					// comes off the muzzle)
+					this.renderer.drawHitscan(spec, new BABYLON.Color3(1, 0.7, 0.2), { muzzle: false })
+					this.renderer.flashMuzzle(muzzle)
 
-						// recoil the equipped weapon
+						// play the pack's fire animation (arms recoil + gun action)
 						this.viewmodel.kick()
 				}
 			}

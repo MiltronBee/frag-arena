@@ -155,6 +155,7 @@ for arm_obj, key in ((arms_arm, 'arms'), (gun_arm, 'gun')):
         'idle':   [pick(cands, lambda n: n.endswith('basepose'))],
         'fire':   [pick(cands, lambda n: 'fire' in n and 'aim' not in n)],
         'reload': reload_clips(cands),
+        'draw':   [pick(cands, lambda n: 'draw' in n and 'aim' not in n)],
     }
     clips = {k: [a for a in v if a] for k, v in clips.items()}
     if not arm_obj.animation_data:
