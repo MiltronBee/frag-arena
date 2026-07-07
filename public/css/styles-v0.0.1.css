@@ -22,3 +22,30 @@ html, body {
     opacity: 0.85;
     image-rendering: pixelated;
 }
+
+#weapon-name {
+    position: absolute;
+    right: 24px;
+    bottom: 20px;
+    font-family: 'Courier New', monospace;
+    font-size: 26px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 6px #000, 0 2px 3px #000;
+    letter-spacing: 1px;
+    pointer-events: none;
+    user-select: none;
+}
+
+#weapon-hint {
+    position: absolute;
+    right: 24px;
+    bottom: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #ccd;
+    opacity: 0.6;
+    text-shadow: 0 1px 2px #000;
+    pointer-events: none;
+    user-select: none;
+}

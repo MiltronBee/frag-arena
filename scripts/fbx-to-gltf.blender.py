@@ -31,6 +31,21 @@ armature = next(o for o in bpy.data.objects if o.type == 'ARMATURE')
 arms_mesh = next(o for o in bpy.data.objects if o.type == 'MESH')
 apply_texture(arms_mesh, arms_tex)
 
+# Trim upper arms / shoulders so the first-person camera never sits inside the mesh
+# (only forearms + hands + gun should be visible, like a normal FP viewmodel). Delete
+# each vertex whose dominant bone weight is a shoulder/upper-arm/spine bone; the cut
+# lands cleanly around the elbow where forearm weights take over.
+import bmesh
+_cut = ('shoulder', 'upperArm', 'spine')
+_cut_idx = {vg.index for vg in arms_mesh.vertex_groups if any(k in vg.name for k in _cut)}
+if _cut_idx:
+    _bm = bmesh.new(); _bm.from_mesh(arms_mesh.data)
+    _dl = _bm.verts.layers.deform.active
+    _doomed = [v for v in _bm.verts if len(v[_dl]) and max(v[_dl].items(), key=lambda kv: kv[1])[0] in _cut_idx]
+    bmesh.ops.delete(_bm, geom=_doomed, context='VERTS')
+    _bm.to_mesh(arms_mesh.data); _bm.free()
+    print('trimmed upper-arm verts:', len(_doomed))
+
 # --- rifle mesh, attached to the hand_item_r weapon socket bone ---
 before = set(bpy.data.objects)
 bpy.ops.import_scene.fbx(filepath=rifle_fbx)

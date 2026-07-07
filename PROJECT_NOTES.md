@@ -144,6 +144,12 @@ copyrightable; assets and branding are.
       socket bone) + merge the separate per-clip animation FBX as NLA tracks, recenter on the rig's
       `camera` bone, assign textures (nearest filter, roughness 1), and export one GLB.
       IQM (Xonotic) -> glTF converter also kept: `scripts/iqm-to-gltf.py`.
+- [x] **Weapon switching** — 4-weapon loadout (Rifle / SMG / Shotgun / Pistol), all from the Retro pack,
+      each its own converted GLB (gun + arms + idle/fire clips). Switch with **1-4 / Q / mouse-wheel**;
+      HUD shows the weapon name. All viewmodels preloaded, only the equipped one shown. The converter now
+      trims the upper-arm/shoulder geometry so the FP camera isn't inside the mesh, and a dedicated
+      viewmodel light keeps arms/gun lit. Each weapon has a hand-tuned camera-local transform (their idle
+      poses hold the arms at different distances). Pistol framing is the roughest (its idle swings a lot).
 - [x] **Effects & lighting** — directional light, equirect skybox (fog-excluded), subtle fog, muted ground,
       crosshair, and **object-pooled** shot FX (tracer + muzzle flash + impact). `BABYLONRenderer.js`.
       NOTE: FX pooling is mandatory — creating meshes/materials mid-frame crashes the GL bind on strict

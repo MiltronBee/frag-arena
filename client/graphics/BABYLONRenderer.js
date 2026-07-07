@@ -7,6 +7,8 @@ class BABYLONRenderer {
 		this.scene = new BABYLON.Scene(this.engine)
 		this.scene.collisionsEnabled = true
 		this.scene.detachControl() // we're doing our own camera!
+		// sky-tinted clear so any area the skybox dome doesn't cover (corners) blends in
+		this.scene.clearColor = new BABYLON.Color3(0.78, 0.74, 0.9)
 
 		this.camera = new BABYLON.TargetCamera('camera', new BABYLON.Vector3(0, 0, -10), this.scene)
 		this.camera.fov = 1.0
@@ -24,8 +26,15 @@ class BABYLONRenderer {
 		this.shadowGenerator = new BABYLON.ShadowGenerator(1024, sun)
 		this.shadowGenerator.useBlurExponentialShadowMap = true
 		this.shadowGenerator.blurKernel = 16
-		// expose so character/other visuals can register themselves as shadow casters
-		this.scene.metadata = { shadowGenerator: this.shadowGenerator }
+		// a bright light that lights ONLY the first-person viewmodel (from the camera's
+		// side), so arms/gun are always legible even when the scene key light is behind
+		// them. Viewmodels register their meshes into includedOnlyMeshes.
+		this.viewmodelLight = new BABYLON.HemisphericLight('vmLight', new BABYLON.Vector3(0.1, 1, 0.6), this.scene)
+		this.viewmodelLight.intensity = 1.5
+		this.viewmodelLight.includedOnlyMeshes = []
+
+		// expose so character/other visuals can register themselves
+		this.scene.metadata = { shadowGenerator: this.shadowGenerator, viewmodelLight: this.viewmodelLight }
 
 		// --- equirectangular skybox (Kenney CC0) for depth + a horizon to read motion against
 		this.skydome = new BABYLON.PhotoDome('sky', '/assets/sprites/skybox.png',

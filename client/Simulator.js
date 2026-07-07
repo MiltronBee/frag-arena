@@ -7,7 +7,7 @@ import reconcilePlayer from './reconcilePlayer'
 import applyCommand from '../common/applyCommand'
 import { fire } from '../common/weapon'
 import Viewmodel from './graphics/Viewmodel'
-import { assets } from './assets/assetManifest'
+import { assets, weapons } from './assets/assetManifest'
 
 // ignoring certain data from the sever b/c we will be predicting these properties on the client
 const ignoreProps = ['x', 'y', 'z']
@@ -27,7 +27,12 @@ class Simulator {
 		this.input = new InputSystem()
 		this.obstacles = new Map()
 		this.characterModels = new Map() // nid -> CharacterModel (other players' visuals)
-		this.viewmodel = new Viewmodel(this.renderer.scene, this.renderer.camera, assets.viewmodel)
+
+		// first-person weapons: preload all, show the equipped one, swap with 1-4 / Q / wheel
+		this.viewmodels = weapons.map(w => new Viewmodel(this.renderer.scene, this.renderer.camera, w))
+		this.weaponIndex = 0
+		this.viewmodels[0].setActive(true)
+		this._setupWeaponSwitching()
 
 		this.myRawId = -1
 		this.mySmoothId = -1
@@ -82,6 +87,33 @@ class Simulator {
 				this.renderer.camera.rotation.x = -Math.PI * 0.499
 			}
 		}
+	}
+
+	// equip weapon by index (wraps around); updates the on-screen weapon name
+	switchWeapon(index) {
+		const n = this.viewmodels.length
+		index = ((index % n) + n) % n
+		if (index === this.weaponIndex) return
+		this.viewmodels[this.weaponIndex].setActive(false)
+		this.weaponIndex = index
+		this.viewmodels[index].setActive(true)
+		const el = document.getElementById('weapon-name')
+		if (el) el.textContent = weapons[index].name
+	}
+
+	_setupWeaponSwitching() {
+		document.addEventListener('keydown', (e) => {
+			if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3' || e.code === 'Digit4') {
+				this.switchWeapon(parseInt(e.code.slice(5), 10) - 1)
+			} else if (e.key === 'q' || e.key === 'Q') {
+				this.switchWeapon(this.weaponIndex + 1)
+			}
+		})
+		document.addEventListener('wheel', (e) => {
+			this.switchWeapon(this.weaponIndex + (e.deltaY > 0 ? 1 : -1))
+		})
+		const el = document.getElementById('weapon-name')
+		if (el) el.textContent = weapons[0].name
 	}
 
 	update(delta) {
@@ -139,13 +171,13 @@ class Simulator {
 					// draw a predicted shot locally
 					this.renderer.drawHitscan(spec, new BABYLON.Color3(1, 0, 1))
 
-						// recoil the first-person weapon
-						this.viewmodel.kick()
+						// recoil the equipped weapon
+						this.viewmodels[this.weaponIndex].kick()
 				}
 			}
 
-			// bob the first-person weapon each frame (based on movement)
-			this.viewmodel.update(delta, forwards || backwards || left || right)
+			// bob the equipped weapon each frame (based on movement)
+			this.viewmodels[this.weaponIndex].update(delta, forwards || backwards || left || right)
 		}
 
 		// drive other players' character visuals (position/yaw follow + idle/run anim)

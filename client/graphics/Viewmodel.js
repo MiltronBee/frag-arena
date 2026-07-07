@@ -19,6 +19,7 @@ export default class Viewmodel {
     this._recoil = 0 // 0..1, decays each frame (fallback recoil when un-animated)
     this._basePos = new BABYLON.Vector3(spec.position.x, spec.position.y, spec.position.z)
     this._baseRotX = (spec.rotation && spec.rotation.x) || 0
+    this._wantActive = false // shown only when this is the equipped weapon
     this._load()
   }
 
@@ -40,21 +41,49 @@ export default class Viewmodel {
 
     root.parent = this.holder
 
-    // it sits right on the camera; never cull it and keep it out of the near clip
-    result.meshes.forEach((m) => { m.alwaysSelectAsActiveMesh = true })
+    // it sits right on the camera; never cull it, and light it with the dedicated
+    // viewmodel light so arms/gun stay legible regardless of where the player looks.
+    const vmLight = this.scene.metadata && this.scene.metadata.viewmodelLight
+    result.meshes.forEach((m) => {
+      m.alwaysSelectAsActiveMesh = true
+      if (vmLight && m.getTotalVertices && m.getTotalVertices() > 0) vmLight.includedOnlyMeshes.push(m)
+      const mat = m.material
+      if (mat) {
+        // a touch of self-illumination on top so it never goes fully black
+        const tex = mat.albedoTexture || mat.diffuseTexture
+        if (tex) { mat.emissiveTexture = tex; mat.emissiveColor = new BABYLON.Color3(0.25, 0.25, 0.25) }
+      }
+    })
 
     // wire up animation clips if this model has them
     const anims = this.spec.anims || {}
     result.animationGroups.forEach((g) => { g.stop(); this.groups[g.name] = g })
     this.idleAnim = this.groups[anims.idle]
     this.fireAnim = this.groups[anims.fire]
-    if (this.idleAnim) this.idleAnim.start(true, 1.0) // loop idle
 
     this.ready = true
+    this._applyActive() // show/hide + idle depending on whether we're equipped
+  }
+
+  // equip/unequip this weapon: toggle visibility and idle animation
+  setActive(active) {
+    this._wantActive = active
+    if (this.ready) this._applyActive()
+  }
+
+  _applyActive() {
+    if (!this.holder) return
+    this.holder.setEnabled(this._wantActive)
+    if (this._wantActive) {
+      if (this.idleAnim && !this.idleAnim.isPlaying) this.idleAnim.start(true, 1.0)
+    } else {
+      Object.values(this.groups).forEach((g) => g.stop())
+    }
   }
 
   // called when the local player fires
   kick() {
+    if (!this._wantActive) return
     if (this.fireAnim) {
       // play the fire clip once, then hand back to idle
       this.fireAnim.stop()
