@@ -57,12 +57,20 @@ async function openClient() {
 
 const playerPositions = (page) => page.evaluate(() => {
   const out = []
+  const s = window.gameClient.simulator
   for (const e of window.gameClient.client.entities.values()) {
     if (e.protocol && e.protocol.name === 'PlayerCharacter') {
       out.push({ nid: e.nid, x: +e.x.toFixed(3), z: +e.z.toFixed(3) })
     }
   }
-  return { size: window.gameClient.client.entities.size, players: out }
+  return {
+    size: window.gameClient.client.entities.size,
+    players: out,
+    // own-entity presence by id — robust even when OTHER people are connected
+    // to the dev server (e.g. the developer's own browser tab)
+    hasOwnRaw: out.some((p) => p.nid === s.myRawId),
+    hasOwnSmooth: out.some((p) => p.nid === s.mySmoothId),
+  }
 })
 
 const checks = []
@@ -80,7 +88,7 @@ try {
 
   check('A completed handshake', !!A._connected)
   check('B completed handshake', !!B._connected)
-  check('A sees its own two entities when solo', aSolo.players.length === 2, `players=${aSolo.players.length}`)
+  check('A sees its own two entities', aSolo.hasOwnRaw && aSolo.hasOwnSmooth, `raw=${aSolo.hasOwnRaw} smooth=${aSolo.hasOwnSmooth} (${aSolo.players.length} players in room)`)
   check('A sees the new player after B joins', aWithB.players.length > aSolo.players.length, `${aSolo.players.length} -> ${aWithB.players.length}`)
   check('B sees other players', bWithA.players.length >= 2, `players=${bWithA.players.length}`)
 
