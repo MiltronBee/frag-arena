@@ -1,5 +1,6 @@
 import { update as updateWeapon } from './weapon'
 import { Vector3, Matrix, Axis } from 'babylonjs'
+import { weapons } from './weaponsConfig'
 
 /* UT99-style movement. Runs on BOTH the client (prediction) and the server
    (authoritative) — it must stay deterministic: same entity state + same
@@ -9,7 +10,8 @@ import { Vector3, Matrix, Axis } from 'babylonjs'
 export const GROUND_SPEED = 7.6   // GroundSpeed 400
 const GROUND_ACCEL = 10           // quake-style accel coefficient — snappy starts
 const FRICTION = 8                // quick stops (no ice skating)
-const AIR_CONTROL = 0.35          // UT99 AirControl: steer mid-air, can't stop
+const MAX_AIR_WISH_SPEED = 1.2    // quake-style air speed limit
+const AIR_ACCEL = 30              // quake-style air acceleration
 const JUMP_SPEED = 6.2            // JumpZ 325
 const GRAVITY = 18                // 950 uu/s²
 const TERMINAL_FALL = 30
@@ -99,8 +101,8 @@ export default (entity, command) => {
 			entity.grounded = false
 		}
 	} else if (wishLen > 0) {
-		// air control: steer toward the wish direction, but weakly
-		accelerate(entity, wishX, wishZ, GROUND_SPEED, GROUND_ACCEL * AIR_CONTROL, delta)
+		// Quake-style air acceleration / strafe jumping
+		accelerate(entity, wishX, wishZ, MAX_AIR_WISH_SPEED, AIR_ACCEL, delta)
 	}
 
 	entity.velY -= GRAVITY * delta
@@ -133,6 +135,50 @@ export default (entity, command) => {
 		entity.velY = 0
 	} else {
 		entity.grounded = false
+	}
+
+	// Apply weapon switching
+	if (command.weaponIndex !== undefined) {
+		entity.currentWeaponIndex = command.weaponIndex
+	}
+
+	// Modular weapons reload logic
+	if (entity.weaponsState) {
+		const index = entity.currentWeaponIndex || 0
+		const config = weapons[index]
+		const state = entity.weaponsState[index]
+
+		// Tick down active reload timer
+		if (state.reloading) {
+			// Interrupt reload if the player tries to fire and has bullets in the magazine
+			if (command.fireInput && state.magazineAmmo > 0) {
+				state.reloading = false
+				state.reloadTimer = 0
+			} else {
+				state.reloadTimer -= delta
+				if (state.reloadTimer <= 0) {
+					// Reload complete! Refill the magazine
+					const needed = config.magazineCapacity - state.magazineAmmo
+					const transfer = Math.min(needed, state.reserveAmmo)
+					state.magazineAmmo += transfer
+					state.reserveAmmo -= transfer
+					state.reloading = false
+					state.reloadTimer = 0
+				}
+			}
+		}
+
+		// Start reload (manual keypress)
+		if (command.reload && !state.reloading && state.magazineAmmo < config.magazineCapacity && state.reserveAmmo > 0) {
+			state.reloading = true
+			state.reloadTimer = Math.max(0.1, config.reloadTime - 0.15)
+		}
+
+		// Auto reload (trying to fire with empty magazine)
+		if (command.fireInput && !state.reloading && state.magazineAmmo === 0 && state.reserveAmmo > 0) {
+			state.reloading = true
+			state.reloadTimer = Math.max(0.1, config.reloadTime - 0.15)
+		}
 	}
 
 	// advances the weapon-related timer(s)

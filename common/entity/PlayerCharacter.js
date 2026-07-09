@@ -1,5 +1,6 @@
 import nengi from 'nengi'
 import * as BABYLON from 'babylonjs'
+import { weapons } from '../weaponsConfig'
 
 const red = new BABYLON.Color4(1, 0, 0)
 const blue = new BABYLON.Color4(0, 0, 1)
@@ -22,6 +23,16 @@ class PlayerCharacter {
 		this.grounded = false
 		this.dodgeTimer = 0
 
+		// Modular weapons state
+		this.currentWeaponIndex = 0
+		this.weaponsState = weapons.map(w => ({
+			magazineAmmo: w.magazineCapacity,
+			reserveAmmo: w.maxReserveAmmo,
+			cooldownTimer: 0,
+			onCooldown: false
+		}))
+
+		// Keep legacy weapon object for backward compatibility with template checks
 		this.weapon = {
 			onCooldown: false,
 			cooldown: 0.5,
@@ -59,7 +70,8 @@ PlayerCharacter.protocol = {
 	velY: nengi.Float32,
 	velZ: nengi.Float32,
 	isAlive: nengi.Boolean,
-	hitpoints: nengi.UInt8
+	hitpoints: nengi.UInt8,
+	currentWeaponIndex: nengi.UInt8
 }
 
 export default PlayerCharacter

@@ -17,6 +17,9 @@ MoveCommand.protocol = {
 	camRayX: nengi.Float32,
 	camRayY: nengi.Float32,
 	camRayZ: nengi.Float32,
+	weaponIndex: nengi.UInt8,
+	reload: nengi.Boolean,
+	fireInput: nengi.Boolean,
     delta: nengi.Float32
 }
 

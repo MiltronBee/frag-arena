@@ -32,15 +32,7 @@ export const assets = {
 // Switch with 1-4 / Q / wheel.
 // note: +90 not -90 — the glTF loader's __root__ carries its own 180deg Y flip,
 // and the holder rotation composes with it.
-// muzzle: camera-local barrel-tip position — muzzle flash + local tracer originate
-// here so shots visibly come out of the GUN, not the player's chest.
-const authoredMount = { scale: 0.01, position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: Math.PI / 2, z: 0 }, anims: { idle: 'idle', fire: 'fire', reload: 'reload', draw: 'draw' } }
+import { weapons } from '../../common/weaponsConfig'
 
-export const weapons = [
-  { name: 'Rifle',   url: '/assets/weapons/retro_rifle_arms.glb',   ...authoredMount, muzzle: { x: 0.08, y: -0.13, z: 1.05 } },
-  { name: 'SMG',     url: '/assets/weapons/retro_smg_arms.glb',     ...authoredMount, muzzle: { x: 0.08, y: -0.13, z: 0.90 } },
-  { name: 'Shotgun', url: '/assets/weapons/retro_shotgun_arms.glb', ...authoredMount, muzzle: { x: 0.08, y: -0.15, z: 1.05 } },
-  { name: 'Pistol',  url: '/assets/weapons/retro_pistol_arms.glb',  ...authoredMount, muzzle: { x: 0.08, y: -0.14, z: 0.70 } },
-]
-
+export { weapons }
 export default assets

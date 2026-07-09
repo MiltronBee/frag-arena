@@ -10,7 +10,63 @@
     <script src='js/app-v0.0.1.js'></script>
     <canvas id='main-canvas'></canvas>
     <img id='crosshair' src='assets/sprites/crosshair.png' alt=''>
+    <div id='ammo-counter'>30 / 90</div>
     <div id='weapon-name'>Rifle</div>
     <div id='weapon-hint'>1-4 / Q / scroll to switch &middot; R to reload</div>
+
+    <!-- Glassmorphic settings menu overlay -->
+    <div id="settings-menu" class="settings-closed">
+        <h3 class="settings-title">SETTINGS</h3>
+        <div class="settings-row">
+            <label for="fov-slider">FOV: <span id="fov-val">95</span>°</label>
+            <input type="range" id="fov-slider" min="70" max="120" value="95">
+        </div>
+        <div class="settings-row">
+            <label for="sens-slider">Sensitivity: <span id="sens-val">1.00</span></label>
+            <input type="range" id="sens-slider" min="0.1" max="5.0" step="0.05" value="1.00">
+        </div>
+        <div class="settings-hint">Press [ESC] to toggle settings</div>
+    </div>
+
+    <!-- Glassmorphic dev inspector panel -->
+    <div id="dev-inspector" class="dev-closed">
+        <h3 class="dev-title">DEV INSPECTOR</h3>
+        <div class="dev-row">
+            <label for="dev-weapon-type">Type</label>
+            <select id="dev-weapon-type">
+                <option value="0">Hitscan</option>
+                <option value="1">Projectile</option>
+            </select>
+        </div>
+        <div class="dev-row">
+            <label for="dev-fire-cooldown">Fire Cooldown (s)</label>
+            <input type="number" id="dev-fire-cooldown" step="0.01" min="0.01">
+        </div>
+        <div class="dev-row">
+            <label for="dev-reload-time">Reload Time (s)</label>
+            <input type="number" id="dev-reload-time" step="0.1" min="0.1">
+        </div>
+        <div class="dev-row">
+            <label for="dev-mag-capacity">Mag Capacity</label>
+            <input type="number" id="dev-mag-capacity" step="1" min="1">
+        </div>
+        <div class="dev-row">
+            <label for="dev-max-reserve">Max Reserve Ammo</label>
+            <input type="number" id="dev-max-reserve" step="1" min="0">
+        </div>
+        <div class="dev-row">
+            <label for="dev-damage">Damage</label>
+            <input type="number" id="dev-damage" step="1" min="0">
+        </div>
+        <div class="dev-row">
+            <label for="dev-range">Range</label>
+            <input type="number" id="dev-range" step="5" min="0">
+        </div>
+        <div class="dev-row">
+            <label for="dev-proj-speed">Proj Speed</label>
+            <input type="number" id="dev-proj-speed" step="1" min="0">
+        </div>
+        <div class="dev-hint">Press [F2] to toggle Dev Inspector</div>
+    </div>
 </body>
 </html>

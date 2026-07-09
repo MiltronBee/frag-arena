@@ -4,6 +4,14 @@ import createObstacleFactory from './createObstacleFactory'
 export default ({ simulator /* inject depenencies here */ }) => {
 	return {
 		'PlayerCharacter': createPlayerFactory({ simulator, /* inject depenencies here */ }),
-		'Obstacle': createObstacleFactory(/* inject depenencies here */)
+		'Obstacle': createObstacleFactory(/* inject depenencies here */),
+		'Projectile': () => {
+			return {
+				create({ data, entity }) {},
+				delete({ nid, entity }) {
+					if (entity.mesh) entity.mesh.dispose()
+				}
+			}
+		}
 	}
 }

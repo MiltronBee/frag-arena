@@ -10,6 +10,8 @@ import applyCommand, { MAX_SPEED } from '../common/applyCommand'
 import setupObstacles from './setupObstacles'
 import { fire } from '../common/weapon'
 import lagCompensatedHitscanCheck from './lagCompensatedHitscanCheck'
+import Projectile from '../common/entity/Projectile'
+import { weapons } from '../common/weaponsConfig'
 
 import * as BABYLON from 'babylonjs'
 //import 'babylonjs-loaders' // mutates something globally
@@ -28,6 +30,7 @@ class GameInstance {
 
 		// game-related state
 		this.obstacles = setupObstacles(this.instance)
+		this.projectiles = new Set()
 		// (the rest is just attached to client objects when they connect)
 
 		this.instance.on('connect', ({ client, callback }) => {
@@ -116,6 +119,40 @@ class GameInstance {
 			})
 		})
 
+		this.instance.on('command::SwitchWeaponCommand', ({ command, client, tick }) => {
+			const entity = client.rawEntity
+			if (entity && command.index !== undefined && command.index >= 0 && command.index < weapons.length) {
+				entity.currentWeaponIndex = command.index
+			}
+		})
+
+		this.instance.on('command::DevUpdateWeaponConfigCommand', ({ command, client, tick }) => {
+			if (command.index !== undefined && command.index >= 0 && command.index < weapons.length) {
+				const w = weapons[command.index]
+				w.type = command.type === 0 ? 'hitscan' : 'projectile'
+				w.fireCooldown = command.fireCooldown
+				w.reloadTime = command.reloadTime
+				w.magazineCapacity = command.magazineCapacity
+				w.maxReserveAmmo = command.maxReserveAmmo
+				w.damage = command.damage
+				w.range = command.range
+				w.projectileSpeed = command.projectileSpeed
+				console.log(`[DEV] Authoritative weapon config updated at runtime for index ${command.index} (${w.name}):`, w)
+
+				// Adjust the client's player entity weaponsState limits immediately
+				const entity = client.rawEntity
+				if (entity && entity.weaponsState && entity.weaponsState[command.index]) {
+					const state = entity.weaponsState[command.index]
+					if (state.magazineAmmo > w.magazineCapacity) {
+						state.magazineAmmo = w.magazineCapacity
+					}
+					if (state.reserveAmmo > w.maxReserveAmmo) {
+						state.reserveAmmo = w.maxReserveAmmo
+					}
+				}
+			}
+		})
+
 		this.instance.on('command::FireCommand', ({ command, client, tick }) => {
 			// shoot from the perspective of this client's entity
 			const entity = client.rawEntity
@@ -123,39 +160,148 @@ class GameInstance {
 
 			const ray = fire(entity)
 			if (ray) {
+				const config = ray.config
 				const timeAgo = client.latency + 100
-				const hits = lagCompensatedHitscanCheck(this.instance, ray, timeAgo)
 
-				hits.forEach(victim => {
-					// if the victim isn't ourself...
-					if (victim.nid !== entity.nid && victim.nid !== smoothEntity.nid) {
-						console.log('hit', victim.nid)
+				if (config.type === 'hitscan') {
+					if (config.name === 'Shotgun') {
+						// Shotgun: Multi-pellet hitscan check
+						const spread = config.spread || 0.08
+						for (let i = 0; i < config.pellets; i++) {
+							const offsetDir = ray.direction.clone()
+							offsetDir.x += (Math.random() - 0.5) * spread
+							offsetDir.y += (Math.random() - 0.5) * spread
+							offsetDir.z += (Math.random() - 0.5) * spread
+							offsetDir.normalize()
 
-						if (victim instanceof PlayerCharacter) {
-							console.log('you hit a player!')
+							const pelletRay = new BABYLON.Ray(ray.origin, offsetDir)
+							const hits = lagCompensatedHitscanCheck(this.instance, pelletRay, timeAgo)
+							hits.forEach(victim => {
+								if (victim.nid !== entity.nid && victim.nid !== smoothEntity.nid) {
+									if (victim instanceof PlayerCharacter && victim.isAlive) {
+										victim.hitpoints = Math.max(0, victim.hitpoints - config.damage)
+										console.log(`Shotgun pellet hit Player ${victim.nid}! HP: ${victim.hitpoints}`)
+										if (victim.hitpoints <= 0) {
+											victim.isAlive = false
+											console.log(`Player ${victim.nid} died from Shotgun!`)
+										}
+									}
+								}
+							})
 						}
+					} else {
+						// Standard Hitscan: Single trace check
+						const hits = lagCompensatedHitscanCheck(this.instance, ray, timeAgo)
+						hits.forEach(victim => {
+							if (victim.nid !== entity.nid && victim.nid !== smoothEntity.nid) {
+								if (victim instanceof PlayerCharacter && victim.isAlive) {
+									victim.hitpoints = Math.max(0, victim.hitpoints - config.damage)
+									console.log(`Player ${victim.nid} hit by ${config.name}! HP: ${victim.hitpoints}`)
+									if (victim.hitpoints <= 0) {
+										victim.isAlive = false
+										console.log(`Player ${victim.nid} died from ${config.name}!`)
+									}
+								}
+							}
+						})
 					}
-				})
 
-				// send a network message (causes all clients to draw the specified ray)
-				// NOTE: we fire the shot from the RAW entity for accuracy that matches 
-				// what the player experienced on their own screen. But for apperances, we 
-				// tell everyone that the shot came from the smooth entity's position.
-				this.instance.addLocalMessage(new WeaponFired(
-					smoothEntity.nid,
-					smoothEntity.x,
-					smoothEntity.y,
-					smoothEntity.z,
-					ray.direction.x,
-					ray.direction.y,
-					ray.direction.z,
-				))
+					// Send WeaponFired message to client to render tracers
+					this.instance.addLocalMessage(new WeaponFired(
+						smoothEntity.nid,
+						smoothEntity.x,
+						smoothEntity.y,
+						smoothEntity.z,
+						ray.direction.x,
+						ray.direction.y,
+						ray.direction.z,
+					))
+				} else if (config.type === 'projectile') {
+					// Projectile weapon: Spawn a Projectile entity
+					const proj = new Projectile(ray.origin.x, ray.origin.y, ray.origin.z)
+					proj.dirX = ray.direction.x
+					proj.dirY = ray.direction.y
+					proj.dirZ = ray.direction.z
+					proj.speed = config.projectileSpeed || 30
+					proj.damage = config.damage || 25
+					proj.ownerNid = entity.nid
+					proj.velocity = ray.direction.scale(proj.speed)
+					proj.lifeTime = 3.0 // 3 seconds max lifetime
+
+					this.instance.addEntity(proj)
+					this.projectiles.add(proj)
+					console.log(`Spawned projectile ${proj.nid} from player ${entity.nid}`);
+				}
 			}
 		})
 	}
 
 	update(delta, tick, now) {
 		this.instance.emitCommands()
+
+		// Update all active projectiles
+		this.projectiles.forEach(proj => {
+			proj.x += proj.velocity.x * delta
+			proj.y += proj.velocity.y * delta
+			proj.z += proj.velocity.z * delta
+			proj.lifeTime -= delta
+
+			// Check if out of lifetime
+			if (proj.lifeTime <= 0) {
+				this.instance.removeEntity(proj)
+				if (proj.mesh && proj.mesh.dispose) proj.mesh.dispose()
+				this.projectiles.delete(proj)
+				return
+			}
+
+			let hitOccurred = false
+
+			// Check collisions with players
+			this.instance.clients.forEach(c => {
+				if (hitOccurred) return
+				const target = c.rawEntity
+				if (target && target.isAlive && target.nid !== proj.ownerNid) {
+					const dx = target.x - proj.x
+					const dy = target.y - proj.y
+					const dz = target.z - proj.z
+					const dist = Math.hypot(dx, dy, dz)
+
+					// Collision cylinder check (height 1m, radius 0.75m)
+					if (dist < 0.75 && Math.abs(dy) < 1.0) {
+						target.hitpoints = Math.max(0, target.hitpoints - proj.damage)
+						console.log(`Player ${target.nid} was hit by projectile from ${proj.ownerNid}! HP: ${target.hitpoints}`)
+						
+						if (target.hitpoints <= 0) {
+							target.isAlive = false
+							console.log(`Player ${target.nid} was killed!`)
+						}
+
+						this.instance.removeEntity(proj)
+						if (proj.mesh && proj.mesh.dispose) proj.mesh.dispose()
+						this.projectiles.delete(proj)
+						hitOccurred = true
+					}
+				}
+			})
+
+			if (hitOccurred) return
+
+			// Check collisions with obstacles
+			for (const obstacle of this.obstacles.values()) {
+				const dx = obstacle.x - proj.x
+				const dy = obstacle.y - proj.y
+				const dz = obstacle.z - proj.z
+				const dist = Math.hypot(dx, dy, dz)
+				
+				// Obstacle is 3x3x3 size box, so bounding radius is ~2.0
+				if (dist < 2.0) {
+					this.instance.removeEntity(proj)
+					if (proj.mesh && proj.mesh.dispose) proj.mesh.dispose()
+					this.projectiles.delete(proj)
+					break
+				}
+			}
+		})
 
 		// for each player ...
 		this.instance.clients.forEach(client => {

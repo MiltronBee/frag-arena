@@ -107,8 +107,13 @@ class InputSystem {
 		})
 
 		document.addEventListener('pointerdown', event => {
+			if (event.target.closest('#settings-menu') || event.target.closest('#dev-inspector')) {
+				return // Let user click sliders and dev inspector inputs
+			}
+
 			if (!this.pointerLocked) {
 				_pointerLock(this.canvasEle)
+				return // Don't shoot on the lock click
 			}
 
 			this._currentState.mouseDown = true

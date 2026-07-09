@@ -14,6 +14,24 @@ class BABYLONRenderer {
 		this.camera.fov = 1.0
 		this.camera.minZ = 0.05
 		this.camera.maxZ = 2000
+		this.camera.layerMask = 0x0FFFFFFF // Renders everything except viewmodel
+
+		this.vmCamera = new BABYLON.TargetCamera('vmCamera', BABYLON.Vector3.Zero(), this.scene)
+		this.vmCamera.parent = this.camera
+		this.vmCamera.fov = 1.0 // Fixed viewmodel FOV
+		this.vmCamera.minZ = 0.01 // Prevent close clipping
+		this.vmCamera.maxZ = 10
+		this.vmCamera.layerMask = 0x10000000 // Renders only viewmodel meshes
+
+		// Clear depth buffer before rendering viewmodel so it doesn't clip through world geometry
+		this.scene.onBeforeCameraRenderObservable.add((cam) => {
+			if (cam === this.vmCamera) {
+				this.engine.clear(null, false, true, false)
+			}
+		})
+
+		this.scene.activeCameras = [this.camera, this.vmCamera]
+		this.scene.cameraToUseForPointers = this.camera // Route pointer events through main camera
 
 		// --- lighting: soft ambient fill + a directional key light that casts shadows
 		const ambient = new BABYLON.HemisphericLight('ambient', new BABYLON.Vector3(0, 1, 0.2), this.scene)

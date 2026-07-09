@@ -16,9 +16,25 @@
 //
 // Exit code 0 = all assertions passed, 1 = failure.
 import puppeteer from 'puppeteer-core'
+import os from 'os'
+import fs from 'fs'
 
 const URL = process.env.FRAG_URL || 'http://localhost:8080/'
-const CHROME = process.env.CHROME_BIN || '/usr/bin/google-chrome'
+
+let CHROME = process.env.CHROME_BIN
+if (!CHROME) {
+  if (os.platform() === 'win32') {
+    const paths = [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`
+    ]
+    CHROME = paths.find(p => fs.existsSync(p))
+  } else {
+    CHROME = '/usr/bin/google-chrome'
+  }
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const browser = await puppeteer.launch({
@@ -83,6 +99,7 @@ try {
   const B = await openClient()
   await sleep(2000)
   await A.bringToFront()
+  await sleep(500) // Settle: allow brought-to-front tab to process queue
   const aWithB = await playerPositions(A)
   const bWithA = await playerPositions(B)
 

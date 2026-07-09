@@ -4,7 +4,10 @@ import Identity from './message/Identity'
 import WeaponFired from './message/WeaponFired'
 import MoveCommand from './command/MoveCommand'
 import FireCommand from './command/FireCommand'
+import SwitchWeaponCommand from './command/SwitchWeaponCommand'
+import DevUpdateWeaponConfigCommand from './command/DevUpdateWeaponConfigCommand'
 import Obstacle from './entity/Obstacle'
+import Projectile from './entity/Projectile'
 
 const config = {
     UPDATE_RATE: 20, 
@@ -23,7 +26,8 @@ const config = {
     protocols: {
         entities: [
             ['PlayerCharacter', PlayerCharacter],
-            ['Obstacle', Obstacle]
+            ['Obstacle', Obstacle],
+            ['Projectile', Projectile]
         ],
         localMessages: [],
         messages: [
@@ -32,7 +36,9 @@ const config = {
         ],
         commands: [
             ['MoveCommand', MoveCommand],
-            ['FireCommand', FireCommand]
+            ['FireCommand', FireCommand],
+            ['SwitchWeaponCommand', SwitchWeaponCommand],
+            ['DevUpdateWeaponConfigCommand', DevUpdateWeaponConfigCommand]
         ],
         basics: []
     }

@@ -12,9 +12,25 @@
 //
 // Exit code 0 = all assertions passed, 1 = failure.
 import puppeteer from 'puppeteer-core'
+import os from 'os'
+import fs from 'fs'
 
 const URL = process.env.FRAG_URL || 'http://localhost:8080/'
-const CHROME = process.env.CHROME_BIN || '/usr/bin/google-chrome'
+
+let CHROME = process.env.CHROME_BIN
+if (!CHROME) {
+  if (os.platform() === 'win32') {
+    const paths = [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`
+    ]
+    CHROME = paths.find(p => fs.existsSync(p))
+  } else {
+    CHROME = '/usr/bin/google-chrome'
+  }
+}
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const browser = await puppeteer.launch({
@@ -71,16 +87,40 @@ try {
   await startSampling(page)
   await page.evaluate(() => {
     const s = window.gameClient.simulator
+    const startY = s.myRawEntity ? s.myRawEntity.y : 0
     s.input._currentState.jump = true
-    setTimeout(() => { s.input._currentState.jump = false }, 100)
+    const interval = setInterval(() => {
+      if (s.myRawEntity && s.myRawEntity.y > startY + 0.05) {
+        s.input._currentState.jump = false
+        clearInterval(interval)
+      }
+    }, 16)
+    // Fallback safety to release key in case it doesn't jump
+    setTimeout(() => { clearInterval(interval); s.input._currentState.jump = false }, 1500)
   })
-  await sleep(1200) // full arc is ~0.7s at JumpZ 6.2 / gravity 18
+  // Poll until the jump lands back on the ground, up to 5 seconds
+  for (let i = 0; i < 50; i++) {
+    await sleep(100)
+    const samples = await page.evaluate(() => window.__samples)
+    if (samples && samples.length > 0) {
+      const last = samples[samples.length - 1]
+      const hasLeftFloor = samples.some(s => s.y > 0.1)
+      if (hasLeftFloor && last.grounded && last.y < 0.05) {
+        break
+      }
+    }
+  }
   const jump = await stopSampling(page)
   const apex = Math.max(...jump.map((s) => s.y))
   const last = jump[jump.length - 1]
   check('jump leaves the floor', apex > 0.3, `apex=${apex.toFixed(2)}m`)
   check('jump apex is UT-ish (~1m)', apex > 0.7 && apex < 1.5, `apex=${apex.toFixed(2)}m`)
-  check('gravity brings us back down', last.y < 0.05 && last.grounded, `y=${last.y.toFixed(3)} grounded=${last.grounded}`)
+  const gravityPass = last.y < 0.05 && last.grounded;
+  check('gravity brings us back down', gravityPass, `y=${last.y.toFixed(3)} grounded=${last.grounded}`);
+  if (!gravityPass) {
+    console.log("Jump samples Y:", jump.map(s => s.y.toFixed(3)).join(', '));
+    console.log("Jump samples grounded:", jump.map(s => s.grounded).join(', '));
+  }
 
   /* dodge: double-tap burst + hop, friction bleeds it after landing */
   await startSampling(page)
@@ -89,7 +129,18 @@ try {
     // the next simulator update, exactly like a real double-tap)
     window.gameClient.simulator.input.frameState.dodge = 'left'
   })
-  await sleep(1000)
+  // Poll until we land and friction slows us down, up to 5 seconds
+  for (let i = 0; i < 50; i++) {
+    await sleep(100)
+    const samples = await page.evaluate(() => window.__samples)
+    if (samples && samples.length > 0) {
+      const last = samples[samples.length - 1]
+      const hasLeftFloor = samples.some(s => s.y > 0.1)
+      if (hasLeftFloor && last.grounded && last.speed < 1 && last.y < 0.05) {
+        break
+      }
+    }
+  }
   const dodge = await stopSampling(page)
   const burst = Math.max(...dodge.map((s) => s.speed))
   const hop = Math.max(...dodge.map((s) => s.y))
