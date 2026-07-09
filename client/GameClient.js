@@ -12,7 +12,12 @@ class GameClient {
 
 		this.client.on('connected', res => { console.log('onConnect response:', res) })
 		this.client.on('disconnected', () => { console.log('connection closed') })
-		this.client.connect('ws://localhost:8079')
+		// over https the game socket is proxied by nginx at /ws; in local dev
+		// we talk straight to the game server's port
+		const wsUrl = location.protocol === 'https:'
+			? `wss://${location.host}/ws`
+			: `ws://${location.hostname}:8079`
+		this.client.connect(wsUrl)
 	}
 
 	update(delta, tick, now) {
