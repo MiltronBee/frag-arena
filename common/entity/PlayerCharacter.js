@@ -13,7 +13,14 @@ class PlayerCharacter {
 		
 		this.hitpoints = 100
 		this.isAlive = true
-		this.speed = 5
+
+		// movement state (see common/applyCommand.js) — velocities are synced +
+		// predicted so reconciliation replays land on the server's trajectory
+		this.velX = 0
+		this.velY = 0
+		this.velZ = 0
+		this.grounded = false
+		this.dodgeTimer = 0
 
 		this.weapon = {
 			onCooldown: false,
@@ -48,6 +55,9 @@ PlayerCharacter.protocol = {
 	rotationX: { type: nengi.RotationFloat32, interp: true },
 	rotationY: { type: nengi.RotationFloat32, interp: true },
 	rotationZ: { type: nengi.RotationFloat32, interp: true },
+	velX: nengi.Float32,
+	velY: nengi.Float32,
+	velZ: nengi.Float32,
 	isAlive: nengi.Boolean,
 	hitpoints: nengi.UInt8
 }

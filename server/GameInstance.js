@@ -6,7 +6,7 @@ import WeaponFired from '../common/message/WeaponFired'
 import followPath from './followPath'
 import damagePlayer from './damagePlayer' // TODO
 import niceInstanceExtension from './niceInstanceExtension'
-import applyCommand from '../common/applyCommand'
+import applyCommand, { MAX_SPEED } from '../common/applyCommand'
 import setupObstacles from './setupObstacles'
 import { fire } from '../common/weapon'
 import lagCompensatedHitscanCheck from './lagCompensatedHitscanCheck'
@@ -166,9 +166,10 @@ class GameInstance {
 			client.view.y = rawEntity.y
 			client.view.z = rawEntity.z
 
-			// smooth entity will follow raw entity's path at *up to* 110% movement speed
-			// confused? stop by the nengi discord server https://discord.gg/7kAa7NJ 
-			const movementBudget = rawEntity.speed * 1.1 * delta
+			// smooth entity will follow raw entity's path at *up to* 110% of the
+			// fastest legit movement (dodge speed) — falls can briefly exceed this
+			// and catch up on landing
+			const movementBudget = MAX_SPEED * 1.1 * delta
 			followPath(smoothEntity, client.positions, movementBudget)
 			smoothEntity.rotationX = rawEntity.rotationX
 			smoothEntity.rotationY = rawEntity.rotationY

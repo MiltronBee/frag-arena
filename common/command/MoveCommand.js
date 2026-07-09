@@ -13,6 +13,7 @@ MoveCommand.protocol = {
     backwards: nengi.Boolean,
 	right: nengi.Boolean,
 	jump: nengi.Boolean,
+	dodge: nengi.UInt8, // 0 = none, else a DODGE_DIRS code (see applyCommand)
 	camRayX: nengi.Float32,
 	camRayY: nengi.Float32,
 	camRayZ: nengi.Float32,

@@ -186,8 +186,21 @@ copyrightable; assets and branding are.
 - [x] **Lock renderer**: Babylon.js.
 - [x] Start mode: forked `nengi-babylon-3d-shooter`, promoted to repo root, `git init` done.
 - [x] First milestone: two capsules shooting (prediction + lag comp) — verified via `npm run verify`.
-- [ ] Nail netcode *feel*: dodge-jump, air control, tighter hit reg — tune movement in `common/applyCommand.js`
-      + `common/weapon.js`. (The template's movement is placeholder-basic.)
+- [x] **UT99 movement** (2026-07-07): velocity-based model in shared `common/applyCommand.js` —
+      quake-style friction+accel (snappy starts/stops), gravity/jump (JumpZ 325 ≈ 6.2 m/s, apex ~0.95m),
+      UT99 air control (0.35), and **double-tap dodge** (1.5x ground speed burst + hop, 0.35s cooldown
+      that only ticks while grounded). UT99 values converted at ~52.5uu/m; tunables at the top of the file.
+      - Double-tap detected client-side (`InputSystem`, 250ms window, key-repeat filtered), sent as a
+        `dodge` code in MoveCommand, executed deterministically in the shared code.
+      - `velX/velY/velZ` are in the entity protocol, ignored+predicted+reconciled like x/y/z — a corrected
+        position replayed with a stale velocity would miss the server's trajectory.
+      - Grounded = a downward `moveWithCollisions` got cut short (works on obstacle tops too). Horizontal
+        velocity is re-derived from actual displacement so walls absorb speed instead of slingshotting.
+      - GOTCHA: `Simulator.update` takes `input.frameState` by reference then calls `releaseKeys()`, which
+        clears one-shot flags in place — read one-shots (dodge) BEFORE releaseKeys.
+      - Verified headlessly: `npm run verify:movement` (8/8 — jump arc, dodge burst 11.4 m/s, friction
+        bleed, zero reconciliation corrections) + `npm run verify` still 9/9.
+- [ ] Tighter hit reg / weapon feel per-weapon (`common/weapon.js`) — cooldowns are global, not per-weapon.
 - [ ] Replace the `ws` transport shim with **geckos.io / WebTransport (UDP)** — the whole reason to avoid
       TCP for gameplay; the current WS path is fine only for localhost/dev.
 - [ ] Consider migrating server+shared to real ESM or TS (currently run via tsx) for a cleaner monorepo.

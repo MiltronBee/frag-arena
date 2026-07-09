@@ -30,6 +30,10 @@ const keybinds = {
 	82: 'reload' // r
 }
 
+// UT dodge: double-tap a movement key within this window (UT99 DodgeClickTime)
+const DOUBLE_TAP_MS = 250
+const dodgeable = { forwards: true, backwards: true, left: true, right: true }
+
 const keystate = () => {
 	return {
 		forwards: false,
@@ -38,7 +42,8 @@ const keystate = () => {
 		right: false,
 		jump: false,
 		reload: false,
-		mouseDown: false
+		mouseDown: false,
+		dodge: null // a dodgeable action name when a double-tap fired this frame
 	}
 }
 
@@ -60,6 +65,18 @@ class InputSystem {
 
 			const action = keybinds[event.keyCode]
 			if (action) {
+				// double-tap dodge — only on a fresh press (key-repeat events and
+				// already-held keys don't count as taps)
+				if (dodgeable[action] && !event.repeat && !this._currentState[action]) {
+					const now = performance.now()
+					if (this._lastTap && this._lastTap.action === action &&
+						now - this._lastTap.time < DOUBLE_TAP_MS) {
+						this.frameState.dodge = action
+						this._lastTap = null // consume: a triple-tap isn't two dodges
+					} else {
+						this._lastTap = { action, time: now }
+					}
+				}
 				this._currentState[action] = true
 				this.frameState[action] = true
 			}
@@ -122,6 +139,7 @@ class InputSystem {
 		this.frameState.mouseDown = this._currentState.mouseDown
 		this.frameState.jump = this._currentState.jump
 		this.frameState.justReleasedR = false
+		this.frameState.dodge = null
 	}
 }
 

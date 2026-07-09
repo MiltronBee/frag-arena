@@ -20,10 +20,13 @@ export default (predictionErrorFrame, client, entity) => {
 						nid: entity.nid,
 						x: entity.x,
 						y: entity.y,
-						z: entity.z
+						z: entity.z,
+						velX: entity.velX,
+						velY: entity.velY,
+						velZ: entity.velZ
 					}
 					// these reconciled positions are now our new predictions, going forward
-					client.addCustomPrediction(clientTick, prediction, ['x', 'y', 'z'])
+					client.addCustomPrediction(clientTick, prediction, ['x', 'y', 'z', 'velX', 'velY', 'velZ'])
 				}
 			})
 		})

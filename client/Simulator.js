@@ -4,13 +4,13 @@ import MoveCommand from '../common/command/MoveCommand'
 import FireCommand from '../common/command/FireCommand'
 import createFactories from './factories/createFactories'
 import reconcilePlayer from './reconcilePlayer'
-import applyCommand from '../common/applyCommand'
+import applyCommand, { DODGE_DIRS } from '../common/applyCommand'
 import { fire } from '../common/weapon'
 import Viewmodel from './graphics/Viewmodel'
 import { assets, weapons } from './assets/assetManifest'
 
 // ignoring certain data from the sever b/c we will be predicting these properties on the client
-const ignoreProps = ['x', 'y', 'z']
+const ignoreProps = ['x', 'y', 'z', 'velX', 'velY', 'velZ']
 const shouldIgnore = (myId, update) => {
 	if (update.nid === myId) {
 		if (ignoreProps.indexOf(update.prop) !== -1) {
@@ -125,6 +125,9 @@ class Simulator {
 
 	update(delta) {
 		const input = this.input.frameState
+		// one-shot flags must be read BEFORE releaseKeys — `input` is a live
+		// reference to frameState and releaseKeys clears them in place
+		const dodge = input.dodge
 		this.input.releaseKeys()
 
 		/* all of this is just for our own entity */
@@ -139,6 +142,7 @@ class Simulator {
 				camRayY: camRay.y,
 				camRayZ: camRay.z,
 				forwards, backwards, left, right, jump,
+				dodge: dodge ? DODGE_DIRS[dodge] : 0,
 				delta
 			})
 			// send moveCommand to the server
@@ -147,14 +151,19 @@ class Simulator {
 			// apply moveCommand  to our local entity
 			applyCommand(this.myRawEntity, moveCommand)
 
-			// save the result of applying the command as a prediction
+			// save the result of applying the command as a prediction (velocities
+			// included: a corrected position replayed with a stale velocity would
+			// land somewhere else than the server did)
 			const prediction = {
 				nid: this.myRawEntity.nid,
 				x: this.myRawEntity.x,
 				y: this.myRawEntity.y,
-				z: this.myRawEntity.z
+				z: this.myRawEntity.z,
+				velX: this.myRawEntity.velX,
+				velY: this.myRawEntity.velY,
+				velZ: this.myRawEntity.velZ
 			}
-			this.client.addCustomPrediction(this.client.tick, prediction, ['x', 'y', 'z'])
+			this.client.addCustomPrediction(this.client.tick, prediction, ['x', 'y', 'z', 'velX', 'velY', 'velZ'])
 
 			// move the camera to our entity
 			Object.assign(this.renderer.camera.position, this.myRawEntity.mesh.position)
