@@ -45,8 +45,11 @@ class Simulator {
 		this.renderer.camera.fov = (this.fov * Math.PI) / 180
 		this._setupSettingsUI()
 		
+		// dev-only tooling: the server ignores DevUpdateWeaponConfigCommand in
+		// production, so predicting with modified configs would only desync us
+		this.devToolsEnabled = process.env.NODE_ENV !== 'production'
 		this.devInspectorOpen = false
-		this._setupDevInspector()
+		if (this.devToolsEnabled) this._setupDevInspector()
 
 		this.myRawId = -1
 		this.mySmoothId = -1
@@ -153,7 +156,7 @@ class Simulator {
 		if (this.myRawEntity) {
 			if (!this._initialServerSyncDone) {
 				this._initialServerSyncDone = true
-				this._syncWeaponsConfigToServer()
+				if (this.devToolsEnabled) this._syncWeaponsConfigToServer()
 			}
 
 			// which way are we pointing?

@@ -127,6 +127,8 @@ class GameInstance {
 		})
 
 		this.instance.on('command::DevUpdateWeaponConfigCommand', ({ command, client, tick }) => {
+			// weapon config is global + authoritative — only honor this in local dev
+			if (process.env.ALLOW_DEV_TOOLS !== '1') return
 			if (command.index !== undefined && command.index >= 0 && command.index < weapons.length) {
 				const w = weapons[command.index]
 				w.type = command.type === 0 ? 'hitscan' : 'projectile'
