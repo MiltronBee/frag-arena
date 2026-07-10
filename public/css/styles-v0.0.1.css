@@ -221,3 +221,126 @@ html, body {
     margin-top: 15px;
     opacity: 0.8;
 }
+/* ===== Touch controls (mobile FPS overlay) ===== */
+html, body {
+    overscroll-behavior: none;
+}
+
+#main-canvas {
+    touch-action: none;
+}
+
+/* sliders inside menus still need native touch handling */
+#settings-menu, #dev-inspector {
+    touch-action: auto;
+}
+
+#touch-controls, #touch-controls * {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* invisible zones: left half = floating joystick, right half = drag look */
+#touch-move-zone, #touch-look-zone {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 50%;
+    z-index: 500;
+}
+#touch-move-zone { left: 0; }
+#touch-look-zone { right: 0; }
+
+#touch-joy-base {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    margin: -60px 0 0 -60px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    background: rgba(16, 18, 27, 0.25);
+    backdrop-filter: blur(2px);
+    display: none;
+    pointer-events: none;
+    z-index: 510;
+}
+#touch-joy-base.active { display: block; }
+
+#touch-joy-knob {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(0, 255, 255, 0.45);
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+    transform: translate(-50%, -50%);
+}
+
+/* thumb-cluster buttons — big targets, semi-transparent, glow when held */
+#touch-fire, #touch-jump, #touch-reload, #touch-switch, #touch-gear {
+    position: absolute;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    background: rgba(16, 18, 27, 0.35);
+    color: rgba(255, 255, 255, 0.8);
+    font-family: 'Courier New', monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 520;
+}
+#touch-fire.active, #touch-jump.active, #touch-reload.active, #touch-switch.active {
+    background: rgba(0, 255, 255, 0.35);
+    box-shadow: 0 0 14px rgba(0, 255, 255, 0.5);
+}
+
+#touch-fire {
+    right: 110px;
+    bottom: 70px;
+    width: 96px;
+    height: 96px;
+    font-size: 42px;
+    color: rgba(255, 80, 80, 0.9);
+    border-color: rgba(255, 80, 80, 0.5);
+}
+#touch-fire.active {
+    background: rgba(255, 80, 80, 0.35);
+    box-shadow: 0 0 14px rgba(255, 80, 80, 0.6);
+}
+
+#touch-jump {
+    right: 24px;
+    bottom: 150px;
+    width: 68px;
+    height: 68px;
+    font-size: 26px;
+}
+
+#touch-reload {
+    right: 220px;
+    bottom: 40px;
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+}
+
+#touch-switch {
+    right: 40px;
+    bottom: 60px;
+    width: 60px;
+    height: 60px;
+    font-size: 26px;
+}
+
+#touch-gear {
+    top: 16px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+    opacity: 0.7;
+}

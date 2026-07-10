@@ -11,6 +11,7 @@
     "build": "cross-env NODE_OPTIONS=--openssl-legacy-provider webpack --config webpack.prod.js",
     "verify": "node scripts/verify-netcode.mjs",
     "verify:movement": "node scripts/verify-movement.mjs",
+    "verify:mobile": "node scripts/verify-mobile.mjs",
     "postinstall": "patch-package"
   },
   "author": "timetocode // Alex (fork: Frag Arena)",

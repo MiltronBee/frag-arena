@@ -7,6 +7,7 @@ import DevUpdateWeaponConfigCommand from '../common/command/DevUpdateWeaponConfi
 import createFactories from './factories/createFactories'
 import reconcilePlayer from './reconcilePlayer'
 import applyCommand, { DODGE_DIRS } from '../common/applyCommand'
+import TouchControls, { isTouchDevice } from './TouchControls'
 import { fire } from '../common/weapon'
 import Viewmodel from './graphics/Viewmodel'
 import { assets, weapons } from './assets/assetManifest'
@@ -44,6 +45,12 @@ class Simulator {
 		this.fov = parseInt(localStorage.getItem('fov') || '95', 10)
 		this.renderer.camera.fov = (this.fov * Math.PI) / 180
 		this._setupSettingsUI()
+
+		// phones/tablets get the joystick + drag-look overlay instead of
+		// pointer lock (which doesn't exist on mobile browsers)
+		if (isTouchDevice()) {
+			this.touchControls = new TouchControls(this)
+		}
 		
 		// dev-only tooling: the server ignores DevUpdateWeaponConfigCommand in
 		// production, so predicting with modified configs would only desync us
