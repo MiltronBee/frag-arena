@@ -10,8 +10,15 @@ class GameClient {
 		niceClientExtension(this.client)// API EXTENSION
 		this.simulator = new Simulator(this.client)
 
-		this.client.on('connected', res => { console.log('onConnect response:', res) })
-		this.client.on('disconnected', () => { console.log('connection closed') })
+		this.simulator.setConnectionState('connecting')
+		this.client.on('connected', res => {
+			console.log('onConnect response:', res)
+			this.simulator.setConnectionState('connected')
+		})
+		this.client.on('disconnected', () => {
+			console.log('connection closed')
+			this.simulator.setConnectionState('disconnected')
+		})
 		// over https the game socket is proxied by nginx at /ws; in local dev
 		// we talk straight to the game server's port
 		const wsUrl = location.protocol === 'https:'

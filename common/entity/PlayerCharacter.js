@@ -15,6 +15,10 @@ class PlayerCharacter {
 		this.hitpoints = 100
 		this.isAlive = true
 
+		// match scoreboard (server-authoritative; UInt8 on the wire, so clamp at 255)
+		this.kills = 0
+		this.deaths = 0
+
 		// movement state (see common/applyCommand.js) — velocities are synced +
 		// predicted so reconciliation replays land on the server's trajectory
 		this.velX = 0
@@ -29,7 +33,8 @@ class PlayerCharacter {
 			magazineAmmo: w.magazineCapacity,
 			reserveAmmo: w.maxReserveAmmo,
 			cooldownTimer: 0,
-			onCooldown: false
+			onCooldown: false,
+			heat: 0 // sustained-fire spread bloom (common/firePattern.js)
 		}))
 
 		// Keep legacy weapon object for backward compatibility with template checks
@@ -71,7 +76,9 @@ PlayerCharacter.protocol = {
 	velZ: nengi.Float32,
 	isAlive: nengi.Boolean,
 	hitpoints: nengi.UInt8,
-	currentWeaponIndex: nengi.UInt8
+	currentWeaponIndex: nengi.UInt8,
+	kills: nengi.UInt8,
+	deaths: nengi.UInt8
 }
 
 export default PlayerCharacter

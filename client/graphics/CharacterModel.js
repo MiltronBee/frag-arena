@@ -43,6 +43,12 @@ export default class CharacterModel {
     result.meshes[0].parent = this.holder
     this.meshes = result.meshes
 
+    // tag body meshes so a shot that lands on a player reads as a flesh/blood impact
+    // (and drives the local player's predicted hit marker). See firingFx.classifySurface.
+    result.meshes.forEach((m) => {
+      m.metadata = Object.assign({}, m.metadata, { fragSurface: 'flesh' })
+    })
+
     result.animationGroups.forEach((g) => { g.stop(); this.groups[g.name] = g })
     this.idle = this.groups[this.spec.anims.idle]
     this.run = this.groups[this.spec.anims.run]
@@ -54,6 +60,7 @@ export default class CharacterModel {
     if (!this.ready || !this.holder || this.disposed) return
     const p = this.host.position
 
+    this.holder.setEnabled(this.host.isAlive !== false)
     this.holder.position.set(p.x, p.y + this.spec.yOffset, p.z)
     this.holder.rotation.y = this.host.rotation.y + (this.spec.yawOffset || 0)
 

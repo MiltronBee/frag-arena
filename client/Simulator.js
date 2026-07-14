@@ -9,7 +9,10 @@ import reconcilePlayer from './reconcilePlayer'
 import applyCommand, { DODGE_DIRS } from '../common/applyCommand'
 import TouchControls, { isTouchDevice } from './TouchControls'
 import { fire } from '../common/weapon'
+import { shotPattern, applyPattern } from '../common/firePattern'
 import Viewmodel from './graphics/Viewmodel'
+import WeaponAudio from './graphics/WeaponAudio'
+import { resolveWeaponFx } from './graphics/firingFx'
 import { assets, weapons } from './assets/assetManifest'
 
 // ignoring certain data from the sever b/c we will be predicting these properties on the client
@@ -30,6 +33,18 @@ class Simulator {
 		this.input = new InputSystem()
 		this.obstacles = new Map()
 		this.characterModels = new Map() // nid -> CharacterModel (other players' visuals)
+		this._projectiles = new Map()    // nid -> {entity, prev pos} for the plasma streak
+
+		// procedural weapon audio (WebAudio). Silent until resume() runs from a user
+		// gesture (enter-arena / pointer-lock / touch).
+		this.audio = new WeaponAudio()
+
+		// AIM-SAFE camera recoil: a POSITION-only kick spring. It never rotates the
+		// camera, so the fire ray + MoveCommand aim (both rotation-only) are byte-
+		// identical — zero authority/cadence change. Reset from the entity each frame,
+		// so it self-clears and can never drift the view.
+		this._camKick = new BABYLON.Vector3(0, 0, 0)
+		this._camKickVel = new BABYLON.Vector3(0, 0, 0)
 
 		// first-person weapon, swap with 1-4 / Q / wheel. Only the EQUIPPED weapon's
 		// rig lives in the scene: multiple copies of the same skeleton coexisting
@@ -38,19 +53,30 @@ class Simulator {
 		this.weaponIndex = 0
 		this.viewmodel = new Viewmodel(this.renderer.scene, this.renderer.camera, weapons[0])
 		this.viewmodel.setActive(true)
+		this._viewmodelSwapId = 0
+		this._viewmodelSwapQueue = Promise.resolve()
 		this._setupWeaponSwitching()
 
-		// Load settings with defaults
+		// isTouch must be known before the settings UI is built so the touch-only
+		// rows (touch sensitivity, invert-Y) can be shown/hidden correctly
+		this.isTouch = isTouchDevice()
+
+		// Load settings with defaults. Desktop mouse sensitivity (`sens`) and touch
+		// look sensitivity (`touchSens`) are persisted independently so tuning one
+		// never disturbs the other.
 		this.sensitivity = parseFloat(localStorage.getItem('sens') || '1.0')
+		this.touchSensitivity = parseFloat(localStorage.getItem('touchSens') || '1.0')
+		this.touchInvertY = localStorage.getItem('touchInvertY') === 'true'
 		this.fov = parseInt(localStorage.getItem('fov') || '95', 10)
 		this.renderer.camera.fov = (this.fov * Math.PI) / 180
 		this._setupSettingsUI()
 
 		// phones/tablets get the joystick + drag-look overlay instead of
 		// pointer lock (which doesn't exist on mobile browsers)
-		if (isTouchDevice()) {
+		if (this.isTouch) {
 			this.touchControls = new TouchControls(this)
 		}
+		this._setupGameUI()
 		
 		// dev-only tooling: the server ignores DevUpdateWeaponConfigCommand in
 		// production, so predicting with modified configs would only desync us
@@ -84,12 +110,44 @@ class Simulator {
 			console.log('identified as', message)
 		})
 
+		client.on('message::Respawned', message => {
+			// server respawn teleport for our own predicted entity (own x/y/z
+			// snapshots are ignored, so this message is the only way we move)
+			if (!this.myRawEntity) return
+			this.myRawEntity.x = message.x
+			this.myRawEntity.y = 0
+			this.myRawEntity.z = message.z
+			this.myRawEntity.velX = 0
+			this.myRawEntity.velY = 0
+			this.myRawEntity.velZ = 0
+		})
+
 		client.on('message::WeaponFired', message => {
-			if (message.sourceId === this.mySmoothEntity.nid) {
+			if (this.mySmoothEntity && message.sourceId === this.mySmoothEntity.nid) {
 				// hide our own shots.. we'll predict those instead
 				return
 			}
-			this.renderer.drawHitscan(message, new BABYLON.Color3(1, 0, 0))
+			// The message carries the weapon index + the shot's deterministic spread
+			// inputs (seed/heat), so observers render the EXACT pellet pattern the
+			// server judged damage with, plus the correct per-weapon FX + report.
+			const spec = weapons[message.weaponIndex]
+			const fx = resolveWeaponFx(spec)
+			if (spec && spec.type === 'hitscan') {
+				const offsets = shotPattern(spec, message.seed, message.heat)
+				const maxTracers = (fx.tracer && fx.tracer.pelletTracers) || offsets.length
+				offsets.forEach((off, i) => {
+					const d = applyPattern({ x: message.tx, y: message.ty, z: message.tz }, off)
+					this.renderer.drawHitscan(
+						{ x: message.x, y: message.y, z: message.z, tx: d.x, ty: d.y, tz: d.z },
+						{ fx, muzzle: i === 0, tracer: i < maxTracers }
+					)
+				})
+			} else {
+				this.renderer.drawHitscan(message, { fx })
+			}
+			const cam = this.renderer.camera.position
+			const dist = Math.hypot(message.x - cam.x, message.y - cam.y, message.z - cam.z)
+			this.audio.shoot(fx.report, { distance: dist })
 		})
 
 		client.on('predictionErrorFrame', predictionErrorFrame => {
@@ -116,15 +174,129 @@ class Simulator {
 		}
 	}
 
+	// touch-only camera seam: apply a yaw/pitch delta (radians) already computed
+	// by TouchLook. Kept separate from the mouse `onmousemove` path so desktop
+	// pointer-lock behavior is untouched; the pitch clamp here is byte-for-byte
+	// the same as the mouse path above (no flips past ~±89.8°).
+	applyTouchLookDelta(yawRad, pitchRad) {
+		const cam = this.renderer.camera
+		cam.rotation.y += yawRad
+		cam.rotation.x += pitchRad
+
+		if (cam.rotation.x > Math.PI * 0.499) {
+			cam.rotation.x = Math.PI * 0.499
+		}
+
+		if (cam.rotation.x < -Math.PI * 0.499) {
+			cam.rotation.x = -Math.PI * 0.499
+		}
+	}
+
+	// Eject one brass casing from the weapon's port (firingFx eject preset). The
+	// camera-local port offset is transformed through the live camera matrix, and
+	// the fling velocity is built on the camera basis (right + up + a touch back)
+	// so brass always arcs off the gun's right side, whatever way we face.
+	_spawnCasing(eject) {
+		if (!eject) return
+		const cam = this.renderer.camera
+		const m = cam.getWorldMatrix()
+		const pos = BABYLON.Vector3.TransformCoordinates(
+			new BABYLON.Vector3(eject.x, eject.y, eject.z), m)
+		const right = BABYLON.Vector3.TransformNormal(BABYLON.Vector3.Right(), m)
+		const up = BABYLON.Vector3.TransformNormal(BABYLON.Vector3.Up(), m)
+		const fwd = BABYLON.Vector3.TransformNormal(BABYLON.Vector3.Forward(), m)
+		const vel = right.scale(1.3 + Math.random() * 0.7)
+			.add(up.scale(1.8 + Math.random() * 0.6))
+			.add(fwd.scale(-0.2 + Math.random() * 0.3))
+		this.renderer.spawnCasing(pos, vel, eject)
+	}
+
+	// Inject a recoil impulse on fire. POSITION-only (world space): a shove back along
+	// -aim, a slight rise, and a little lateral jitter. Never touches camera rotation,
+	// so the fire ray + MoveCommand aim are unchanged. Gentler on touch (nausea).
+	_applyCameraRecoil(recoil) {
+		if (!recoil) return
+		const scale = this.isTouch ? 0.55 : 1.0
+		const fwd = this.renderer.camera.getForwardRay().direction
+		const back = (recoil.back || 0) * scale
+		const jit = (recoil.shake || 0) * 0.018 * scale
+		this._camKickVel.x += -fwd.x * back + (Math.random() - 0.5) * jit
+		this._camKickVel.y += (recoil.rise || 0) * scale + (Math.random() - 0.5) * jit * 0.5
+		this._camKickVel.z += -fwd.z * back + (Math.random() - 0.5) * jit
+	}
+
+	// critically-ish damped spring returning the position kick to zero, clamped so a
+	// sustained burst can never drift the view far.
+	_springCameraRecoil(delta) {
+		const dt = Math.min(delta || 0.016, 0.05)
+		const tension = 240, damping = 24
+		const k = this._camKick, v = this._camKickVel
+		v.x += (-tension * k.x - damping * v.x) * dt
+		v.y += (-tension * k.y - damping * v.y) * dt
+		v.z += (-tension * k.z - damping * v.z) * dt
+		k.x += v.x * dt; k.y += v.y * dt; k.z += v.z * dt
+		const M = 0.14
+		k.x = Math.max(-M, Math.min(M, k.x))
+		k.y = Math.max(-M, Math.min(M, k.y))
+		k.z = Math.max(-M, Math.min(M, k.z))
+	}
+
+	// flash the crosshair hit marker. One reused timer (cleared each call) so repeated
+	// hits never pile up timers. kill = brighter/longer confirmation.
+	_showHitMarker(kill) {
+		const el = document.getElementById('hit-marker')
+		if (!el) return
+		el.classList.remove('hit-active', 'kill-active')
+		void el.offsetWidth // restart the CSS animation
+		el.classList.add(kill ? 'kill-active' : 'hit-active')
+		clearTimeout(this._hitMarkerTimer)
+		this._hitMarkerTimer = setTimeout(() => {
+			el.classList.remove('hit-active', 'kill-active')
+		}, kill ? 520 : 260)
+	}
+
+	// plasma bolt bookkeeping (called from the Projectile factory). Each bolt is
+	// oriented + stretched into a travel streak every frame; on delete it emits a
+	// pooled energetic impact + a positional zap.
+	registerProjectile(entity) {
+		if (!entity) return
+		this._projectiles.set(entity.nid, { entity, px: entity.x, py: entity.y, pz: entity.z })
+	}
+
+	unregisterProjectile(nid) {
+		const rec = this._projectiles.get(nid)
+		if (!rec) return
+		this._projectiles.delete(nid)
+		const e = rec.entity
+		const pos = new BABYLON.Vector3(e.x, e.y, e.z)
+		this.renderer.plasmaImpact(pos)
+		const cam = this.renderer.camera.position
+		this.audio.impact('energy', { distance: BABYLON.Vector3.Distance(pos, cam) })
+	}
+
+	_updateProjectiles() {
+		if (this._projectiles.size === 0) return
+		const STREAK = 3.2
+		this._projectiles.forEach((rec) => {
+			const e = rec.entity
+			const mesh = e && e.mesh
+			if (!mesh || (mesh.isDisposed && mesh.isDisposed())) return
+			const dx = e.x - rec.px, dy = e.y - rec.py, dz = e.z - rec.pz
+			if ((dx * dx + dy * dy + dz * dz) > 1e-8) {
+				mesh.lookAt(new BABYLON.Vector3(e.x + dx, e.y + dy, e.z + dz))
+				mesh.scaling.set(1, 1, STREAK)
+			}
+			rec.px = e.x; rec.py = e.y; rec.pz = e.z
+		})
+	}
+
 	// equip weapon by index (wraps around); updates the on-screen weapon name
 	switchWeapon(index) {
 		const n = weapons.length
 		index = ((index % n) + n) % n
 		if (index === this.weaponIndex) return
-		this.viewmodel.dispose()
 		this.weaponIndex = index
-		this.viewmodel = new Viewmodel(this.renderer.scene, this.renderer.camera, weapons[index])
-		this.viewmodel.setActive(true)
+		this._queueViewmodelSwap(index)
 		
 		if (this.myRawEntity) {
 			this.myRawEntity.currentWeaponIndex = index
@@ -134,11 +306,37 @@ class Simulator {
 		this._updateDevInspectorInputs()
 
 		const el = document.getElementById('weapon-name')
-		if (el) el.textContent = weapons[index].name
+		if (el) el.textContent = weapons[index].name.toUpperCase()
+	}
+
+	_queueViewmodelSwap(index) {
+		const requestId = ++this._viewmodelSwapId
+
+		// GLB imports cannot be cancelled. Serialize swaps so an old rig finishes
+		// disposing before the newest one starts, and skip requests superseded by
+		// another wheel notch while cleanup was in flight.
+		this._viewmodelSwapQueue = this._viewmodelSwapQueue
+			.then(async () => {
+				if (requestId !== this._viewmodelSwapId) return
+
+				const previous = this.viewmodel
+				this.viewmodel = null
+				if (previous) await previous.dispose()
+
+				if (requestId !== this._viewmodelSwapId) return
+
+				const next = new Viewmodel(this.renderer.scene, this.renderer.camera, weapons[index])
+				this.viewmodel = next
+				next.setActive(!this.myRawEntity || this.myRawEntity.isAlive !== false)
+			})
+			.catch((error) => {
+				console.error('Unable to switch viewmodel:', error)
+			})
 	}
 
 	_setupWeaponSwitching() {
 		document.addEventListener('keydown', (e) => {
+			if (!this.input.pointerLocked) return
 			if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3' || e.code === 'Digit4') {
 				this.switchWeapon(parseInt(e.code.slice(5), 10) - 1)
 			} else if (e.key === 'q' || e.key === 'Q') {
@@ -146,10 +344,11 @@ class Simulator {
 			}
 		})
 		document.addEventListener('wheel', (e) => {
+			if (!this.input.pointerLocked) return
 			this.switchWeapon(this.weaponIndex + (e.deltaY > 0 ? 1 : -1))
 		})
 		const el = document.getElementById('weapon-name')
-		if (el) el.textContent = weapons[0].name
+		if (el) el.textContent = weapons[0].name.toUpperCase()
 	}
 
 	update(delta) {
@@ -192,12 +391,12 @@ class Simulator {
 
 			// Handle visual reload cancellation if state.reloading was interrupted
 			if (wasReloading && !this.myRawEntity.weaponsState[this.weaponIndex].reloading) {
-				this.viewmodel.cancelReload()
+				if (this.viewmodel) this.viewmodel.cancelReload()
 			}
 
 			// Handle visual reload start if state.reloading became true (covers manual and auto-reload)
 			if (!wasReloading && this.myRawEntity.weaponsState[this.weaponIndex].reloading) {
-				this.viewmodel.reload()
+				if (this.viewmodel) this.viewmodel.reload()
 			}
 
 			// store state for reconciliation (in case the server disagrees later)
@@ -211,8 +410,12 @@ class Simulator {
 			}
 			this.client.addCustomPrediction(this.client.tick, prediction, ['x', 'y', 'z', 'velX', 'velY', 'velZ'])
 
-			// move the camera to our entity
+			// move the camera to our entity, then add the AIM-SAFE recoil kick as a
+			// position-only offset. Because camera.position is re-based from the entity
+			// every frame, the kick self-clears and never accumulates into the aim.
 			Object.assign(this.renderer.camera.position, this.myRawEntity.mesh.position)
+			this._springCameraRecoil(delta)
+			this.renderer.camera.position.addInPlace(this._camKick)
 
 			const state = this.myRawEntity.weaponsState[this.weaponIndex]
 			this._reloadHeld = input.reload
@@ -227,46 +430,257 @@ class Simulator {
 					// our own tracer + flash originate at the BARREL TIP so the shot
 					// visibly leaves the gun (the ray itself — and the server's hit
 					// check — still starts at the entity; this is presentation only)
-					const muzzle = this.viewmodel.muzzleWorldPos()
-					const spec = {
-						x: muzzle ? muzzle.x : this.myRawEntity.x,
-						y: muzzle ? muzzle.y : this.myRawEntity.y,
-						z: muzzle ? muzzle.z : this.myRawEntity.z,
-						tx: ray.direction.x,
-						ty: ray.direction.y,
-						tz: ray.direction.z,
-					}
-					// draw a predicted shot locally for hitscan weapons
+					const muzzle = this.viewmodel ? this.viewmodel.muzzleWorldPos() : null
+					const ox = muzzle ? muzzle.x : this.myRawEntity.x
+					const oy = muzzle ? muzzle.y : this.myRawEntity.y
+					const oz = muzzle ? muzzle.z : this.myRawEntity.z
+					const fx = resolveWeaponFx(weapons[this.weaponIndex])
+
+					// Predicted shot: fire() attached the same seed/heat the server will
+					// derive for this shot, so the pattern we paint (every pellet's
+					// tracer + wall mark) IS the server's damage pattern — instant
+					// feedback, no round trip. Flesh hits flash the predicted marker.
 					if (ray.config.type === 'hitscan') {
-						this.renderer.drawHitscan(spec, new BABYLON.Color3(1, 0.7, 0.2), { muzzle: false })
+						const offsets = shotPattern(ray.config, ray.seed, ray.heat)
+						const maxTracers = (fx.tracer && fx.tracer.pelletTracers) || offsets.length
+						let hitFlesh = false
+						offsets.forEach((off, i) => {
+							const d = applyPattern(
+								{ x: ray.direction.x, y: ray.direction.y, z: ray.direction.z }, off)
+							const info = this.renderer.drawHitscan(
+								{ x: ox, y: oy, z: oz, tx: d.x, ty: d.y, tz: d.z },
+								{ fx, muzzle: false, tracer: i < maxTracers }
+							)
+							if (info && info.hit && info.surface === 'flesh') hitFlesh = true
+						})
+						if (hitFlesh) {
+							this._showHitMarker(false)
+							this.audio.hitMarker(false)
+						}
 					}
-					this.renderer.flashMuzzle(muzzle)
+					// flash on the VIEWMODEL layer so the gun can't paint over it
+					this.renderer.flashMuzzle(muzzle, fx, { vmLayer: true })
+					this._spawnCasing(fx.eject)
 
-					// play the pack's fire animation (arms recoil + gun action)
-					this.viewmodel.kick()
-				}
-			}
-
-			// Update Ammo Counter HUD
-			if (this.myRawEntity.weaponsState) {
-				const ammoEl = document.getElementById('ammo-counter')
-				if (ammoEl) {
-					if (state.reloading) {
-						ammoEl.textContent = 'RELOADING...'
-					} else {
-						ammoEl.textContent = `${state.magazineAmmo} / ${state.reserveAmmo}`
-					}
+					// one synchronized shot event: audio transient + aim-safe camera
+					// kick + procedural weapon recoil animation, all on this frame.
+					this.audio.shoot(fx.report, { distance: 0 })
+					if (fx.vmKick && fx.vmKick.pump) this.audio.pump(fx.vmKick.pump.delay / 1000)
+					this._applyCameraRecoil(fx.recoil)
+					if (this.viewmodel) this.viewmodel.kick(fx.vmKick)
 				}
 			}
 
 			// bob the equipped weapon each frame (based on movement)
-			this.viewmodel.update(delta, forwards || backwards || left || right)
+			if (this.viewmodel) this.viewmodel.update(delta, forwards || backwards || left || right)
 		}
 
 		// drive other players' character visuals (position/yaw follow + idle/run anim)
 		this.characterModels.forEach(model => model.update(delta))
 
+		// orient + stretch live plasma bolts into hot travel streaks
+		this._updateProjectiles()
+
+		this._updateHud()
 		this.renderer.update()
+	}
+
+	setConnectionState(state) {
+		this._connectionState = state
+		const body = document.body
+		body.classList.remove('connection-connecting', 'connection-connected', 'connection-disconnected')
+		body.classList.add(`connection-${state}`)
+
+		const label = document.getElementById('connection-label')
+		if (label) {
+			label.textContent = state === 'connected'
+				? 'ONLINE'
+				: state === 'disconnected' ? 'OFFLINE' : 'CONNECTING'
+		}
+
+		if (state === 'disconnected') {
+			this._arenaEntered = false
+			body.classList.remove('arena-entered')
+			const overlay = document.getElementById('entry-overlay')
+			if (overlay) overlay.classList.add('is-visible')
+			this._closeSettings()
+			if (document.pointerLockElement) document.exitPointerLock()
+		}
+
+		this._syncEntryState()
+	}
+
+	setArenaReady() {
+		if (this._arenaReady) return
+		this._arenaReady = true
+		document.body.classList.add('arena-ready')
+		this._syncEntryState()
+	}
+
+	_setupGameUI() {
+		this._arenaEntered = false
+		this._arenaReady = false
+		this._connectionState = 'connecting'
+		this._lastHealth = null
+		this._wasDead = false
+
+		const enterButton = document.getElementById('enter-arena')
+		const resumeButton = document.getElementById('resume-game')
+		if (enterButton) enterButton.addEventListener('click', () => this._enterArena())
+		if (resumeButton) resumeButton.addEventListener('click', () => {
+			if (this.isTouch) {
+				this._closeSettings()
+			} else {
+				this.input.requestPointerLock()
+			}
+		})
+
+		document.addEventListener('pointerlockchange', () => {
+			const locked = document.pointerLockElement === this.input.canvasEle
+			if (locked) {
+				this.audio.resume() // ensure audio is live once we're in the arena
+				this._arenaEntered = true
+				document.body.classList.add('arena-entered')
+				const overlay = document.getElementById('entry-overlay')
+				if (overlay) overlay.classList.remove('is-visible')
+				this._closeSettings()
+			} else if (this._arenaEntered && !this.isTouch &&
+				!this.devInspectorOpen && this._connectionState === 'connected') {
+				this._openSettings()
+			}
+		})
+
+		this._syncEntryState()
+	}
+
+	_syncEntryState() {
+		const ready = this._connectionState === 'connected' && this._arenaReady
+		const button = document.getElementById('enter-arena')
+		const status = document.getElementById('entry-status')
+		if (button) button.disabled = !ready
+		if (status) {
+			status.textContent = this._connectionState === 'disconnected'
+				? 'CONNECTION LOST'
+				: ready ? 'ARENA READY' : 'CONNECTING TO ARENA'
+		}
+	}
+
+	_enterArena() {
+		if (this._connectionState !== 'connected' || !this._arenaReady) return
+		this.audio.resume() // WebAudio needs a user gesture — this click is one
+		this._arenaEntered = true
+		document.body.classList.add('arena-entered')
+		this._closeSettings()
+
+		const overlay = document.getElementById('entry-overlay')
+		if (this.isTouch) {
+			if (overlay) overlay.classList.remove('is-visible')
+			if (this.touchControls) this.touchControls.enterFullscreen()
+		} else {
+			this.input.requestPointerLock()
+		}
+	}
+
+	_openSettings() {
+		const menu = document.getElementById('settings-menu')
+		if (menu) menu.classList.remove('settings-closed')
+		document.body.classList.add('menu-open')
+	}
+
+	_closeSettings() {
+		const menu = document.getElementById('settings-menu')
+		if (menu) menu.classList.add('settings-closed')
+		document.body.classList.remove('menu-open')
+	}
+
+	toggleSettings() {
+		const menu = document.getElementById('settings-menu')
+		if (!menu || menu.classList.contains('settings-closed')) {
+			this._openSettings()
+		} else if (this.isTouch) {
+			this._closeSettings()
+		} else {
+			this.input.requestPointerLock()
+		}
+	}
+
+	_updateHud() {
+		let playerCount = 0
+		for (const entity of this.client.entities.values()) {
+			if (entity.protocol && entity.protocol.name === 'PlayerCharacter' &&
+				entity.nid !== this.myRawId) {
+				playerCount++
+			}
+		}
+		if (playerCount !== this._lastPlayerCount) {
+			this._lastPlayerCount = playerCount
+			const count = document.getElementById('player-count')
+			if (count) count.textContent = `${playerCount} ${playerCount === 1 ? 'PLAYER' : 'PLAYERS'}`
+		}
+
+		if (!this.myRawEntity) return
+		if (!this._arenaReady) this.setArenaReady()
+
+		const health = Math.max(0, Math.min(100, this.myRawEntity.hitpoints))
+		const healthValue = document.getElementById('health-value')
+		const healthFill = document.getElementById('health-fill')
+		if (healthValue) healthValue.textContent = Math.round(health)
+		if (healthFill) healthFill.style.transform = `scaleX(${health / 100})`
+		document.body.classList.toggle('low-health', health > 0 && health <= 30)
+
+		if (this._lastHealth !== null && health < this._lastHealth) {
+			clearTimeout(this._hitFlashTimer)
+			document.body.classList.add('player-hit')
+			this._hitFlashTimer = setTimeout(() => {
+				document.body.classList.remove('player-hit')
+			}, 90)
+		}
+		this._lastHealth = health
+
+		const dead = this.myRawEntity.isAlive === false
+		document.body.classList.toggle('player-dead', dead)
+		const combatState = document.getElementById('combat-state')
+		if (combatState) combatState.classList.toggle('combat-state-hidden', !dead)
+		if (dead !== this._wasDead) {
+			this._wasDead = dead
+			if (this.viewmodel) this.viewmodel.setActive(!dead)
+			if (!dead) {
+				// we just respawned: mirror the server's respawn ammo reset
+				// (GameInstance.respawnPlayer) so predicted fire/reload state stays
+				// in lockstep — ammo isn't networked, it's predicted deterministically
+				this.myRawEntity.weaponsState.forEach((state, i) => {
+					state.magazineAmmo = weapons[i].magazineCapacity
+					state.reserveAmmo = weapons[i].maxReserveAmmo
+					state.cooldownTimer = 0
+					state.onCooldown = false
+					state.reloading = false
+					state.reloadTimer = 0
+					state.heat = 0
+				})
+				if (this.viewmodel) this.viewmodel.cancelReload()
+			}
+		}
+
+		const frags = document.getElementById('frag-count')
+		if (frags) {
+			const k = this.myRawEntity.kills || 0
+			const d = this.myRawEntity.deaths || 0
+			const text = `${k} FRAG${k === 1 ? '' : 'S'} · ${d} DEATH${d === 1 ? '' : 'S'}`
+			if (frags.textContent !== text) frags.textContent = text
+		}
+
+		const weapon = weapons[this.weaponIndex]
+		const state = this.myRawEntity.weaponsState && this.myRawEntity.weaponsState[this.weaponIndex]
+		const weaponName = document.getElementById('weapon-name')
+		if (weaponName && weapon) weaponName.textContent = weapon.name.toUpperCase()
+		if (!state) return
+
+		const magazine = document.getElementById('magazine-ammo')
+		const reserve = document.getElementById('reserve-ammo')
+		const weaponPanel = document.getElementById('weapon-panel')
+		if (magazine) magazine.textContent = state.magazineAmmo
+		if (reserve) reserve.textContent = state.reserveAmmo
+		if (weaponPanel) weaponPanel.classList.toggle('is-reloading', !!state.reloading)
 	}
 
 	_setupSettingsUI() {
@@ -299,15 +713,35 @@ class Simulator {
 			})
 		}
 
-		document.addEventListener('pointerlockchange', () => {
-			if (document.pointerLockElement === this.input.canvasEle) {
-				if (menu) menu.classList.add('settings-closed')
-			} else {
-				if (menu && !this.devInspectorOpen) {
-					menu.classList.remove('settings-closed')
-				}
-			}
-		})
+		// touch-only look settings: independent sensitivity + invert-Y. These rows
+		// are meaningless with a mouse, so hide them unless this is a touch device.
+		const touchSensRow = document.getElementById('touch-sens-row')
+		const touchSensSlider = document.getElementById('touch-sens-slider')
+		const touchSensVal = document.getElementById('touch-sens-val')
+		const touchInvertRow = document.getElementById('touch-invert-row')
+		const touchInvert = document.getElementById('touch-invert-y')
+
+		if (touchSensRow) touchSensRow.style.display = this.isTouch ? '' : 'none'
+		if (touchInvertRow) touchInvertRow.style.display = this.isTouch ? '' : 'none'
+
+		if (touchSensSlider && touchSensVal) {
+			touchSensSlider.value = this.touchSensitivity.toFixed(2)
+			touchSensVal.textContent = this.touchSensitivity.toFixed(2)
+			touchSensSlider.addEventListener('input', (e) => {
+				const val = parseFloat(e.target.value)
+				this.touchSensitivity = val
+				touchSensVal.textContent = val.toFixed(2)
+				localStorage.setItem('touchSens', val)
+			})
+		}
+
+		if (touchInvert) {
+			touchInvert.checked = this.touchInvertY
+			touchInvert.addEventListener('change', (e) => {
+				this.touchInvertY = e.target.checked
+				localStorage.setItem('touchInvertY', e.target.checked ? 'true' : 'false')
+			})
+		}
 	}
 
 	_syncWeaponsConfigToServer() {

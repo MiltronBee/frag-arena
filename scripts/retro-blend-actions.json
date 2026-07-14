@@ -1,0 +1,78 @@
+{
+  "schema": "retro-blend-actions/v1",
+  "description": "Per-weapon resolution from runtime clip name -> the concrete Blender ACTION names inside each FP_Arms_<W>_01_Anims.blend, for scripts/blend-to-gltf.blender.py. This is the blend-action counterpart to scripts/retro-clip-mapping.json (which maps semantics to source FBX tokens): the four weapons use four DIFFERENT action-naming schemes and split gun motion between an armature-object family and a gun-bone family in different ways, which a single source+spelling map cannot express. Every entry was validated read-only in Blender 4.2 (scripts/retro-preflight is FBX-token level; the grip-slip attachment probe drove this file). For each clip: 'arms' is the Arms armature action (null => hold base pose); 'gun' is the ordered list of gun-armature actions stacked on same-named NLA tracks (they merge on export). Attachment is structural: the arms' hand-IK is constrained to the gun, so any gun object/bone motion is followed by the hands and baked per-frame at glTF export. Editing this changes what blend-to-gltf.blender.py exports and what scripts/verify-retro-glb.py can cross-check.",
+  "pack": "RetroWeaponPack_V1",
+  "notes": {
+    "attachment": "Arms hand-IK (ctrl_HandIK_l/r + pole targets, 35-64 constraints per rig) is constrained to the gun Main bone. Gun locomotion is authored as object-level and/or Main-bone motion; the hands follow it. Measured grip slip (right hand vs gun Main across a clip) is < 0.005cm for every clip below. Left-hand slip during reload is intentional (the support hand leaves the grip to feed rounds).",
+    "gunBonesAtBind": "Rifle object-only clips (idle/walk/run/draw/hide) leave the gun BONES at bind; each clip's object-TRS still lands the whole gun at the identical base position that fire/reload/draw-end use, so the gun parts stay mutually consistent across clips (BasePose is the outlier and is deliberately NOT used as idle).",
+    "shotgunSplit": "Shotgun gun motion is split into an object family (movement_*) and a bone family (shotgun01_*); both are listed in 'gun' and merge on one clip track.",
+    "shotgunFireGrip": "Shotgun 'fire' deliberately lists gun:[] (no gun action). The left-hand IK target (ctrl_HandIK_l) is CHILD_OF-constrained to the gun Forearm (pump) bone, and shotgun01_fire is a full 24-frame pump-rack that translates the Forearm ~11cm; baked per-frame that yanks the support hand ~26cm off the weapon-root reference every shot. The source art offers only glued-grip (0cm) or full-pump (26cm) for the left hand -- no short recoil-only take -- so fire keeps the gun at bind (rigid grip, hand stays on the weapon) and relies on procedural recoil + arms_Fire's finger/camera/spine recoil. Support-hand release is preserved where it is authored and coherent: the reload segments. Verified: fire hand<->gun spread 0.00cm.",
+    "shotgunNotShippedBlocker": "NOT SHIPPED as of 2026-07-13: even with the fire grip fixed above, the FULL-SET expanded shotgun build mis-poses the held weapon at runtime -- the gun's object-family idle action (movement_breathing) carries a base orientation that, under the shared camera-relative mount (rotation y=pi/2), tilts the whole shotgun UP and out of frame (rifle/SMG/pistol/plasma pose correctly with the same mount). Root cause is source-data: the shotgun splits gun motion into object (movement_*) + bone (shotgun01_*) families whose object base transform differs from the single-action rifle/smg/pistol rigs, and the exporter's gun-mesh pass reports 'gun meshes added: []' / no CHECK GUN for it. Fixing it needs a per-weapon mount correction or a re-export that re-bases the shotgun object transform -- neither cleanly available from the vendor source alongside the pump fix. public/assets/weapons/retro_shotgun_arms.glb therefore ships the ORIGINAL committed 4-clip shotgun (idle/fire/reload/draw, correct pose, fire hand<->gun 3.16cm < 3.5cm tol). Re-enable by rebuilding with build-retro-candidates.sh Shotgun once the base-orientation is corrected.",
+    "segmentedReload": "Shotgun has no single reload; reload_start/reload_insert/reload_end are exported as distinct clips AND chained into a combined 'reload' (start+insert+insert+end, loading two shells) for the current single-clip runtime."
+  },
+  "runtimeConsumedToday": ["idle", "fire", "reload", "draw"],
+  "fullRuntimeSet": ["idle", "walk", "run", "fire", "reload", "draw", "hide", "interact"],
+  "loopClips": ["idle", "walk", "run"],
+  "requiredNodes": ["Arms_Armature", "FPS_Arms_Mesh", "hand_l", "hand_r", "Main"],
+  "weapons": {
+    "Rifle": {
+      "armsArmature": "Arms_Armature",
+      "gunArmature": "Rifle_01_Armature",
+      "clips": {
+        "idle":     { "arms": "Arms_BasePose", "gun": ["Rifle_Breathing"], "loop": true,  "runtime": "idle" },
+        "walk":     { "arms": "Arms_BasePose", "gun": ["Rifle_Walk"],      "loop": true },
+        "run":      { "arms": "Arms_BasePose", "gun": ["Rifle_Run"],       "loop": true },
+        "fire":     { "arms": "Arms_Fire",     "gun": ["Rifle_Fire"],      "runtime": "fire" },
+        "reload":   { "arms": "Arms_Reload",   "gun": ["Rifle_Reload"],    "runtime": "reload" },
+        "draw":     { "arms": "Arms_Draw",     "gun": ["Rifle_Draw"],      "runtime": "draw" },
+        "hide":     { "arms": "Arms_Hide",     "gun": ["Rifle_Hide"] },
+        "interact": { "arms": "Arms_BasePose", "gun": ["Rifle_Interact"] }
+      }
+    },
+    "Pistol": {
+      "armsArmature": "Arms_Armature",
+      "gunArmature": "Pistol_01_Armature",
+      "clips": {
+        "idle":     { "arms": "Arms_BasePose", "gun": ["Pistol_Breathing"],   "loop": true,  "runtime": "idle" },
+        "walk":     { "arms": "Arms_BasePose", "gun": ["Pistol_Walk"],        "loop": true },
+        "run":      { "arms": "Arms_BasePose", "gun": ["Pistol_Run"],         "loop": true },
+        "fire":     { "arms": "Arms_Fire",     "gun": ["Pistol_Fire"],        "runtime": "fire" },
+        "reload":   { "arms": "Arms_Reload",   "gun": ["Pistol_Reload"],      "runtime": "reload" },
+        "draw":     { "arms": "Arms_Draw",     "gun": ["Pistol_Draw"],        "runtime": "draw" },
+        "hide":     { "arms": "Arms_Hide",     "gun": ["Pistol_Hide"] },
+        "interact": { "arms": "Arms_BasePose", "gun": ["Pistol_Interaction"] }
+      }
+    },
+    "SMG": {
+      "armsArmature": "Arms_Armature",
+      "gunArmature": "SMG_01_Armature",
+      "clips": {
+        "idle":     { "arms": "Arms_BasePose", "gun": ["Smg_Breathing"],   "loop": true,  "runtime": "idle" },
+        "walk":     { "arms": "Arms_BasePose", "gun": ["Smg_Walk"],        "loop": true },
+        "run":      { "arms": "Arms_BasePose", "gun": ["Smg_Run"],         "loop": true },
+        "fire":     { "arms": "Arms_Fire",     "gun": ["Smg_Fire"],        "runtime": "fire" },
+        "reload":   { "arms": "Arms_Reload",   "gun": ["Smg_Reload"],      "runtime": "reload" },
+        "draw":     { "arms": "Arms_Draw",     "gun": ["Smg_Draw"],        "runtime": "draw" },
+        "hide":     { "arms": "Arms_Hide",     "gun": ["Smg_Hide"] },
+        "interact": { "arms": "Arms_BasePose", "gun": ["Smg_Interaction"] }
+      }
+    },
+    "Shotgun": {
+      "armsArmature": "Arms_Armature",
+      "gunArmature": "Shotgun_01_Armature",
+      "clips": {
+        "idle":          { "arms": "arms_basePose",  "gun": ["movement_breathing"], "loop": true, "runtime": "idle" },
+        "walk":          { "arms": "arms_basePose",  "gun": ["movement_walking"],   "loop": true },
+        "run":           { "arms": "arms_basePose",  "gun": ["movement_running"],   "loop": true },
+        "fire":          { "arms": "arms_Fire",      "gun": [], "runtime": "fire" },
+        "reload_start":  { "arms": "arms_ReloadStart", "gun": ["movement_ReloadStart", "shotgun01_ReloadStart"] },
+        "reload_insert": { "arms": "arms_ReloadStep",  "gun": ["movement_ReloadStep", "shotgun01_ReloadStep"] },
+        "reload_end":    { "arms": "arms_ReloadEnd",   "gun": ["movement_ReloadEnd", "shotgun01_ReloadEnd"] },
+        "reload":        { "chain": ["reload_start", "reload_insert", "reload_insert", "reload_end"], "runtime": "reload" },
+        "draw":          { "arms": "arms_DrawWeapon", "gun": ["movement_DrawWeapon"], "runtime": "draw" },
+        "hide":          { "arms": "arms_HideWeapon", "gun": ["movement_hideWeapon"] },
+        "interact":      { "arms": "arms_basePose",   "gun": ["movement_Interaction"] }
+      }
+    }
+  }
+}

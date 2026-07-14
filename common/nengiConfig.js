@@ -2,6 +2,10 @@ import nengi from 'nengi'
 import PlayerCharacter from './entity/PlayerCharacter'
 import Identity from './message/Identity'
 import WeaponFired from './message/WeaponFired'
+import Respawned from './message/Respawned'
+import HitConfirmed from './message/HitConfirmed'
+import Killed from './message/Killed'
+import DamageTaken from './message/DamageTaken'
 import MoveCommand from './command/MoveCommand'
 import FireCommand from './command/FireCommand'
 import SwitchWeaponCommand from './command/SwitchWeaponCommand'
@@ -32,7 +36,11 @@ const config = {
         localMessages: [],
         messages: [
             ['Identity', Identity],
-            ['WeaponFired', WeaponFired]
+            ['WeaponFired', WeaponFired],
+            ['Respawned', Respawned],
+            ['HitConfirmed', HitConfirmed],
+            ['Killed', Killed],
+            ['DamageTaken', DamageTaken]
         ],
         commands: [
             ['MoveCommand', MoveCommand],

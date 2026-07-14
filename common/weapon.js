@@ -2,6 +2,7 @@
 
 import { Vector3, Ray } from 'babylonjs'
 import { weapons } from './weaponsConfig'
+import { shotSeed } from './firePattern'
 
 // advances the weapon cooldown timers
 export const update = (entity, delta) => {
@@ -25,6 +26,12 @@ export const update = (entity, delta) => {
 					state.onCooldown = false
 				}
 			}
+			// sustained-fire heat cools off between bursts (drives spread bloom).
+			// Client and server both run this; small drift only shifts VISUAL spread,
+			// damage always uses the server's own heat.
+			if (state.heat) {
+				state.heat = Math.max(0, state.heat - delta * 1.3)
+			}
 		})
 	}
 }
@@ -47,6 +54,12 @@ export const fire = (entity) => {
 
 	// Enforce active cooldown and ammo check
 	if (!state.onCooldown && state.magazineAmmo > 0) {
+		// per-shot spread identity, computed IDENTICALLY on client and server:
+		// seed from pre-shot ammo, heat sampled before this shot's own bump
+		const seed = shotSeed(entity.nid || 0, index, state.magazineAmmo)
+		const heat = state.heat || 0
+		state.heat = Math.min(1, heat + (config.heatPerShot || 0))
+
 		// Consume 1 ammo
 		state.magazineAmmo -= 1
 		state.onCooldown = true
@@ -67,6 +80,8 @@ export const fire = (entity) => {
 
 		const ray = new Ray(entity.mesh.position, aimVector)
 		ray.config = config // attach scriptable object config dynamically
+		ray.seed = seed
+		ray.heat = heat
 		return ray
 	} else {
 		console.log("WEAPON_FIRE_FAIL: onCooldown:", state.onCooldown, "magazineAmmo:", state.magazineAmmo)

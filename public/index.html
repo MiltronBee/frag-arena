@@ -1,74 +1,137 @@
 <!doctype html>
-
-<html lang='en'>
+<html lang="en">
 <head>
-    <meta charset='utf-8'>
+    <meta charset="utf-8">
     <title>Frag Arena</title>
-    <meta name='description' content='Frag Arena - browser arena shooter'>
-    <meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover'>
-    <meta name='mobile-web-app-capable' content='yes'>
-    <link rel='stylesheet' href='css/styles-v0.0.1.css'>
-<body>
-    <script src='js/app-v0.0.1.js'></script>
-    <canvas id='main-canvas'></canvas>
-    <img id='crosshair' src='assets/sprites/crosshair.png' alt=''>
-    <div id='ammo-counter'>30 / 90</div>
-    <div id='weapon-name'>Rifle</div>
-    <div id='weapon-hint'>1-4 / Q / scroll to switch &middot; R to reload</div>
+    <meta name="description" content="Frag Arena - a fast multiplayer browser arena shooter">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#10161a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="icon" type="image/png" href="assets/sprites/crosshair.png">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-2e27160ad9">
+</head>
+<body class="connection-connecting">
+    <main id="game-shell">
+        <canvas id="main-canvas" aria-label="Frag Arena game view"></canvas>
 
-    <!-- Glassmorphic settings menu overlay -->
-    <div id="settings-menu" class="settings-closed">
-        <h3 class="settings-title">SETTINGS</h3>
-        <div class="settings-row">
-            <label for="fov-slider">FOV: <span id="fov-val">95</span>°</label>
-            <input type="range" id="fov-slider" min="70" max="120" value="95">
-        </div>
-        <div class="settings-row">
-            <label for="sens-slider">Sensitivity: <span id="sens-val">1.00</span></label>
-            <input type="range" id="sens-slider" min="0.1" max="5.0" step="0.05" value="1.00">
-        </div>
-        <div class="settings-hint">Press [ESC] to toggle settings</div>
-    </div>
+        <div id="arena-hud" aria-live="polite">
+            <header id="top-hud">
+                <div class="brand-lockup" aria-label="Frag Arena">
+                    <span class="brand-mark">FA</span>
+                    <span class="brand-name">FRAG ARENA</span>
+                </div>
+                <div class="match-strip">
+                    <span class="status-dot" aria-hidden="true"></span>
+                    <span id="connection-label">CONNECTING</span>
+                    <span class="status-divider" aria-hidden="true"></span>
+                    <span id="player-count">0 PLAYERS</span>
+                    <span class="status-divider" aria-hidden="true"></span>
+                    <span id="frag-count">0 FRAGS · 0 DEATHS</span>
+                </div>
+            </header>
 
-    <!-- Glassmorphic dev inspector panel -->
-    <div id="dev-inspector" class="dev-closed">
-        <h3 class="dev-title">DEV INSPECTOR</h3>
-        <div class="dev-row">
-            <label for="dev-weapon-type">Type</label>
-            <select id="dev-weapon-type">
-                <option value="0">Hitscan</option>
-                <option value="1">Projectile</option>
-            </select>
+            <img id="crosshair" src="assets/sprites/crosshair.png" alt="">
+            <div id="hit-marker" aria-hidden="true"><i></i><i></i></div>
+
+            <section id="health-panel" aria-label="Player health">
+                <div class="hud-label">VITALS</div>
+                <div class="health-readout">
+                    <span id="health-value">100</span>
+                    <span class="health-unit">HP</span>
+                </div>
+                <div class="health-track" aria-hidden="true">
+                    <span id="health-fill"></span>
+                </div>
+            </section>
+
+            <section id="weapon-panel" aria-label="Weapon and ammunition">
+                <div id="weapon-name">RIFLE</div>
+                <div id="ammo-counter">
+                    <span id="magazine-ammo">30</span>
+                    <span class="ammo-separator">/</span>
+                    <span id="reserve-ammo">90</span>
+                </div>
+                <div id="reload-state" aria-live="assertive">RELOADING</div>
+            </section>
+
+            <div id="combat-state" class="combat-state-hidden" role="status">
+                <div id="combat-title">ELIMINATED</div>
+                <div id="combat-subtitle">RESPAWNING</div>
+            </div>
         </div>
-        <div class="dev-row">
-            <label for="dev-fire-cooldown">Fire Cooldown (s)</label>
-            <input type="number" id="dev-fire-cooldown" step="0.01" min="0.01">
-        </div>
-        <div class="dev-row">
-            <label for="dev-reload-time">Reload Time (s)</label>
-            <input type="number" id="dev-reload-time" step="0.1" min="0.1">
-        </div>
-        <div class="dev-row">
-            <label for="dev-mag-capacity">Mag Capacity</label>
-            <input type="number" id="dev-mag-capacity" step="1" min="1">
-        </div>
-        <div class="dev-row">
-            <label for="dev-max-reserve">Max Reserve Ammo</label>
-            <input type="number" id="dev-max-reserve" step="1" min="0">
-        </div>
-        <div class="dev-row">
-            <label for="dev-damage">Damage</label>
-            <input type="number" id="dev-damage" step="1" min="0">
-        </div>
-        <div class="dev-row">
-            <label for="dev-range">Range</label>
-            <input type="number" id="dev-range" step="5" min="0">
-        </div>
-        <div class="dev-row">
-            <label for="dev-proj-speed">Proj Speed</label>
-            <input type="number" id="dev-proj-speed" step="1" min="0">
-        </div>
-        <div class="dev-hint">Press [F2] to toggle Dev Inspector</div>
-    </div>
+
+        <div id="damage-flash" aria-hidden="true"></div>
+
+        <section id="entry-overlay" class="is-visible" aria-labelledby="entry-title">
+            <div class="entry-content">
+                <div class="entry-kicker">LIVE MULTIPLAYER</div>
+                <h1 id="entry-title">FRAG ARENA</h1>
+                <div id="entry-status">CONNECTING TO ARENA</div>
+                <button id="enter-arena" type="button" disabled>ENTER ARENA</button>
+            </div>
+        </section>
+
+        <section id="settings-menu" class="settings-closed" aria-labelledby="settings-title">
+            <div class="menu-kicker">MATCH PAUSED</div>
+            <h2 id="settings-title">SETTINGS</h2>
+            <div class="settings-row">
+                <label for="fov-slider">FIELD OF VIEW <span id="fov-val">95</span></label>
+                <input type="range" id="fov-slider" min="70" max="120" value="95">
+            </div>
+            <div class="settings-row">
+                <label for="sens-slider">SENSITIVITY <span id="sens-val">1.00</span></label>
+                <input type="range" id="sens-slider" min="0.1" max="5.0" step="0.05" value="1.00">
+            </div>
+            <div class="settings-row" id="touch-sens-row">
+                <label for="touch-sens-slider">TOUCH SENSITIVITY <span id="touch-sens-val">1.00</span></label>
+                <input type="range" id="touch-sens-slider" min="0.4" max="3.0" step="0.05" value="1.00">
+            </div>
+            <div class="settings-row" id="touch-invert-row">
+                <label for="touch-invert-y">INVERT LOOK (Y) <input type="checkbox" id="touch-invert-y"></label>
+            </div>
+            <button id="resume-game" type="button">RESUME</button>
+        </section>
+
+        <section id="dev-inspector" class="dev-closed" aria-labelledby="dev-title">
+            <h2 id="dev-title" class="dev-title">DEV INSPECTOR</h2>
+            <div class="dev-row">
+                <label for="dev-weapon-type">Type</label>
+                <select id="dev-weapon-type">
+                    <option value="0">Hitscan</option>
+                    <option value="1">Projectile</option>
+                </select>
+            </div>
+            <div class="dev-row">
+                <label for="dev-fire-cooldown">Fire cooldown</label>
+                <input type="number" id="dev-fire-cooldown" step="0.01" min="0.01">
+            </div>
+            <div class="dev-row">
+                <label for="dev-reload-time">Reload time</label>
+                <input type="number" id="dev-reload-time" step="0.1" min="0.1">
+            </div>
+            <div class="dev-row">
+                <label for="dev-mag-capacity">Magazine</label>
+                <input type="number" id="dev-mag-capacity" step="1" min="1">
+            </div>
+            <div class="dev-row">
+                <label for="dev-max-reserve">Reserve ammo</label>
+                <input type="number" id="dev-max-reserve" step="1" min="0">
+            </div>
+            <div class="dev-row">
+                <label for="dev-damage">Damage</label>
+                <input type="number" id="dev-damage" step="1" min="0">
+            </div>
+            <div class="dev-row">
+                <label for="dev-range">Range</label>
+                <input type="number" id="dev-range" step="5" min="0">
+            </div>
+            <div class="dev-row">
+                <label for="dev-proj-speed">Projectile speed</label>
+                <input type="number" id="dev-proj-speed" step="1" min="0">
+            </div>
+        </section>
+    </main>
+    <script>window.__BUILD_ID__="0.0.1-2e27160ad9";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-2e27160ad9"></script>
 </body>
 </html>

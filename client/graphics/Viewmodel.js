@@ -3,8 +3,46 @@ import 'babylonjs-loaders' // registers the glTF/GLB loader with SceneLoader
 
 // First-person viewmodel locked to the camera. Parented to the camera node so it
 // renders in view space. If the model ships animation clips (per the manifest
-// `anims`), it plays an idle loop and a one-shot fire clip; otherwise it falls back
-// to a code-driven bob + recoil kick. Subtle positional bob is layered on either way.
+// `anims`), it plays an idle loop and one-shot fire/reload/draw clips; otherwise it
+// falls back to a code-driven bob + recoil kick. Subtle positional bob is layered on.
+//
+// STATE MACHINE
+// -------------
+// The rig is driven by an explicit finite-state controller instead of loose
+// booleans. The states and their legal transitions:
+//
+//   LOADING  --load ok, want active-->  DRAWING (has draw clip) | IDLE
+//   LOADING  --load ok, want hidden-->  HIDDEN
+//   LOADING  --disposed mid-import-->   DISPOSED (resources cleaned on settle)
+//   HIDDEN   --setActive(true)------->  DRAWING | IDLE
+//   DRAWING  --draw clip ends--------->  IDLE
+//   IDLE     --kick()---------------->   FIRING
+//   FIRING   --kick() (auto/semi)---->   FIRING   (restart the fire clip)
+//   FIRING   --fire clip ends-------->   IDLE
+//   IDLE/FIRING --reload()----------->   RELOADING
+//   RELOADING --reload clip ends----->   IDLE
+//   RELOADING --cancelReload()------->   IDLE     (base pose restored first)
+//   any live --setActive(false)/death-> HIDDEN   (mid clips rewound to base)
+//   any --dispose()------------------>  DISPOSED
+//
+// Every state-changing call bumps a generation token (`_gen`). Animation
+// end-callbacks capture the token at scheduling time and no-op if a newer
+// transition has superseded them — this is what prevents a stale "fire ended,
+// restart idle" callback from firing idle underneath a fresh reload/fire clip.
+// Babylon 4.0.3's AnimationGroup.stop() synchronously fires the end observable,
+// so superseded one-shot (addOnce) callbacks self-remove the moment we stop a
+// clip to start the next one; no clear() of the whole observable is needed
+// (clear() would also drop observers owned by other code).
+const S = {
+  LOADING: 'loading',
+  HIDDEN: 'hidden',
+  DRAWING: 'drawing',
+  IDLE: 'idle',
+  FIRING: 'firing',
+  RELOADING: 'reloading',
+  DISPOSED: 'disposed',
+}
+
 export default class Viewmodel {
   constructor(scene, camera, spec) {
     this.scene = scene
@@ -16,6 +54,12 @@ export default class Viewmodel {
     this.idleAnim = null
     this.fireAnim = null
     this._t = 0
+
+    // explicit FSM state + generation token (see class header)
+    this._state = S.LOADING
+    this._gen = 0
+    this._reloading = false // kept in sync with _state === RELOADING (read by tests/HUD)
+    this._drawn = false     // draw clip plays once per equipped instance
 
     // Spring-based procedural recoil state
     this.recoilPos = new BABYLON.Vector3(0, 0, 0)
@@ -29,21 +73,75 @@ export default class Viewmodel {
     this._basePos = new BABYLON.Vector3(spec.position.x, spec.position.y, spec.position.z)
     this._baseRotX = (spec.rotation && spec.rotation.x) || 0
     this._wantActive = false // shown only when this is the equipped weapon
-    this._load()
+    this._disposed = false
+    this._cleanupDone = false
+    this._disposePromise = null
+    this._loadPromise = this._load().catch((error) => {
+      this.ready = false
+      if (!this._disposed) {
+        console.error('Failed to load viewmodel ' + this.spec.name + ':', error)
+      }
+    })
   }
 
   async _load() {
     const url = this.spec.url
     const slash = url.lastIndexOf('/') + 1
+    // Cache-bust the GLB with the build id so a phone that cached an older weapon
+    // (e.g. the pre-fix shotgun) can never keep serving it against fresh JS. The
+    // id is shared with the JS bundle + CSS (see scripts/stamp-build.mjs), so a
+    // deploy's code and its assets are always fetched as one matched set.
+    const version = (typeof window !== 'undefined' && window.__BUILD_ID__)
+      ? '?v=' + window.__BUILD_ID__ : ''
     // Babylon 4.0.3's loader result has no transformNodes list, so snapshot the
     // scene around the load to know which joint nodes are ours (dispose() needs
     // them — leaking them piles up dead nodes on every weapon switch).
     const beforeTN = new Set(this.scene.transformNodes)
-    const result = await BABYLON.SceneLoader.ImportMeshAsync('', url.slice(0, slash), url.slice(slash), this.scene)
-    this._myTransformNodes = this.scene.transformNodes.filter((n) => !beforeTN.has(n))
-
+    const result = await BABYLON.SceneLoader.ImportMeshAsync('', url.slice(0, slash), url.slice(slash) + version, this.scene)
     this._result = result // kept so dispose() can drop EVERYTHING the load created
     this.meshes = result.meshes
+
+    // Babylon does not dispose imported materials/textures when a mesh is
+    // disposed with the default options. Track exactly what this GLB owns so
+    // repeated weapon swaps do not grow GPU memory forever.
+    const ownedMaterials = new Set()
+    result.meshes.forEach((mesh) => {
+      if (!mesh.material) return
+      ownedMaterials.add(mesh.material)
+      ;(mesh.material.subMaterials || []).forEach((material) => {
+        if (material) ownedMaterials.add(material)
+      })
+    })
+    this._ownedMaterials = Array.from(ownedMaterials)
+    const ownedTextures = new Set()
+    this._ownedMaterials.forEach((material) => {
+      if (material.getActiveTextures) {
+        material.getActiveTextures().forEach((texture) => ownedTextures.add(texture))
+      }
+    })
+    this._ownedTextures = Array.from(ownedTextures)
+
+    // Prefer nodes below the imported root. Unlike a scene-wide before/after
+    // snapshot, this remains correct if another importer is active concurrently.
+    const importedDescendants = new Set()
+    result.meshes.forEach((mesh) => {
+      if (mesh.getDescendants) {
+        mesh.getDescendants(false).forEach((node) => importedDescendants.add(node))
+      }
+    })
+    const ownedTransformNodes = this.scene.transformNodes.filter((node) => importedDescendants.has(node))
+    this._myTransformNodes = ownedTransformNodes.length > 0
+      ? ownedTransformNodes
+      : this.scene.transformNodes.filter((node) => !beforeTN.has(node))
+
+    // ImportMeshAsync cannot be cancelled. A swap may dispose us while the GLB
+    // is still loading, so clean up the completed import before it ever becomes
+    // visible or starts an animation.
+    if (this._disposed) {
+      this._disposeLoadedResources()
+      return
+    }
+
     const root = result.meshes[0]
 
     // fine-tune offset holder, parented to the camera (bob is applied here too)
@@ -56,12 +154,15 @@ export default class Viewmodel {
 
     root.parent = this.holder
 
-    // barrel-tip socket (camera-local, from the manifest): muzzle flash + the local
-    // tracer originate here so shots visibly leave the gun
+    // barrel-tip socket. The manifest authors it CAMERA-local, but it must be
+    // parented to the HOLDER so the flash/tracer origin rides the gun through
+    // bob + procedural recoil (camera-parented, it hung fixed in view while the
+    // gun moved under it — the flash visibly detached from the barrel). Convert
+    // the camera-local offset into holder space via the holder's base transform.
     this.muzzle = new BABYLON.TransformNode('muzzle', this.scene)
-    this.muzzle.parent = this.camera
+    this.muzzle.parent = this.holder
     const mz = this.spec.muzzle || { x: 0.08, y: -0.14, z: 0.9 }
-    this.muzzle.position.set(mz.x, mz.y, mz.z)
+    this.muzzle.position.copyFrom(this._cameraLocalToHolder(new BABYLON.Vector3(mz.x, mz.y, mz.z)))
 
     // it sits right on the camera; never cull it, and light it with the dedicated
     // viewmodel light so arms/gun stay legible regardless of where the player looks.
@@ -81,221 +182,227 @@ export default class Viewmodel {
     // wire up animation clips if this model has them
     const anims = this.spec.anims || {}
     result.animationGroups.forEach((g) => { g.stop(); this.groups[g.name] = g })
-    console.log("VIEWMODEL LOADED:", this.spec.name, "Spec anims:", anims, "Available groups:", Object.keys(this.groups));
     this.idleAnim = this.groups[anims.idle]
+    // The fire clip must play UNFILTERED: the pack bakes the arms' IK at export,
+    // so only the full clip keeps both hands riding the gun through the recoil.
+    // (Runtime "IK" via ctrl_HandIK_* is impossible here — those control bones
+    // carry zero skin weights in the exported GLBs.)
     this.fireAnim = this.groups[anims.fire]
-    if (this.fireAnim && !this.spec.isOneHanded) {
-      const leftHandKeywords = ['_l', 'IK_l', 'elbow_l']
-      const filtered = this.fireAnim.targetedAnimations.filter(ta => {
-        const name = ta.target.name || ta.target.id || ''
-        const isLeftHand = leftHandKeywords.some(kw => name.endsWith(kw) || name.includes(kw + '_') || name.includes(kw + '+') || name.toLowerCase().includes('handik_l'))
-        return !isLeftHand
+    if (this.idleAnim) {
+      // fire/reload clips end away from the base pose; blend idle in from the
+      // clip's final pose instead of snapping the arms back in a single frame
+      this.idleAnim.targetedAnimations.forEach((ta) => {
+        ta.animation.enableBlending = true
+        ta.animation.blendingSpeed = 0.08
       })
-      this.fireAnim.targetedAnimations.length = 0
-      this.fireAnim.targetedAnimations.push(...filtered)
     }
     this.reloadAnim = this.groups[anims.reload]
     this.drawAnim = this.groups[anims.draw]
-    console.log("VIEWMODEL MAPPED ANIMS:", {
-      idle: !!this.idleAnim,
-      fire: !!this.fireAnim,
-      reload: !!this.reloadAnim,
-      draw: !!this.drawAnim
-    });
-    console.log("LOAD RESULT KEYS:", Object.keys(result), "Skeletons in result:", result.skeletons ? result.skeletons.length : 0);
-    console.log("Skeletons in scene after load:", this.scene.skeletons.length);
-
-    // Setup procedural left hand IK lock for two-handed weapons
-    if (!this.spec.isOneHanded) {
-      let weaponNode = this._myTransformNodes.find(n => n.name === 'Main' || n.name === 'Main_Mesh' || n.name === 'Pistol_Mesh')
-      if (!weaponNode && this.meshes) {
-        weaponNode = this.meshes.find(m => m.name === 'Main' || m.name === 'Main_Mesh' || m.name === 'Pistol_Mesh')
-      }
-
-      if (!weaponNode) {
-        const weaponKeywords = ['Main', 'Pistol', 'Rifle', 'SMG', 'Shotgun', 'gun', 'weapon']
-        for (const tn of this._myTransformNodes) {
-          if (weaponKeywords.some(k => tn.name.includes(k)) && !tn.name.toLowerCase().includes('armature')) {
-            weaponNode = tn
-            break
-          }
-        }
-      }
-      if (!weaponNode && this.meshes) {
-        const weaponKeywords = ['Main', 'Pistol', 'Rifle', 'SMG', 'Shotgun', 'gun', 'weapon']
-        for (const m of this.meshes) {
-          if (m.name !== '__root__' && weaponKeywords.some(k => m.name.includes(k)) && !m.name.toLowerCase().includes('armature')) {
-            weaponNode = m
-            break
-          }
-        }
-      }
-
-      const ikNode = this._myTransformNodes.find(n => n.name === 'ctrl_HandIK_l')
-
-      if (weaponNode && ikNode) {
-        this._nodeIK = ikNode
-        this._nodeWeapon = weaponNode
-        this._ikLockInitialized = false
-        
-        // Add the observer to enforce the lock after animation evaluations
-        this._afterAnimationsObserver = this.scene.onAfterAnimationsObservable.add(() => {
-          this._applyProceduralIKLock()
-        })
-        console.log(`PROCEDURAL IK LOCK: Registered observer to bind left hand IK node "${ikNode.name}" to weapon node "${weaponNode.name}"`);
-      } else {
-        console.warn(`PROCEDURAL IK LOCK: Could not find weaponNode (${!!weaponNode}) or ikNode (${!!ikNode}) for ${this.spec.name}`);
-      }
-    }
 
     this.ready = true
-    this._applyActive() // show/hide + idle depending on whether we're equipped
+    this._applyActive() // enter DRAWING/IDLE or HIDDEN depending on equip state
+  }
+
+  // ---- FSM core -------------------------------------------------------------
+
+  _setState(state) {
+    this._state = state
+    this._reloading = state === S.RELOADING
+  }
+
+  // Schedule a generation-guarded one-shot end callback. Superseded callbacks
+  // (an older token) simply no-op, so a stale clip end can never drive the rig.
+  _onEndOnce(group, gen, fn) {
+    group.onAnimationGroupEndObservable.addOnce(() => {
+      if (this._disposed || gen !== this._gen) return
+      fn()
+    })
+  }
+
+  // Stop a clip, first snapping it to its rest (from) frame so gun-only bones it
+  // solely drives (slide/magazine/weapon root) do not freeze mid-swing. In
+  // Babylon 4.0.3 goToFrame() applies the sampled value to the target
+  // immediately (RuntimeAnimation.setValue), so this deterministically restores
+  // the base pose without waiting for another animation pass.
+  _rewindStop(group) {
+    if (!group) return
+    if (group.isPlaying) group.goToFrame(group.from)
+    group.stop()
+  }
+
+  _startIdleLoop() {
+    if (!this.idleAnim) return
+    this.idleAnim.stop()
+    this.idleAnim.start(true, 1.0)
   }
 
   // equip/unequip this weapon: toggle visibility and idle animation
   setActive(active) {
+    if (this._disposed) return
     this._wantActive = active
     if (this.ready) this._applyActive()
   }
 
   _applyActive() {
-    if (!this.holder) return
+    if (this._disposed || !this.holder) return
     this.holder.setEnabled(this._wantActive)
-    console.log("Apply active:", this.spec.name, "wantActive:", this._wantActive, "hasDrawAnim:", !!this.drawAnim);
     if (this._wantActive) {
-      // equip: play the weapon-raise (draw) once, then settle into idle
-      if (this.drawAnim && !this._drawn) {
-        this._drawn = true
-        this._drawing = true
-        if (this.idleAnim) this.idleAnim.stop()
-        this.drawAnim.stop()
-        this.drawAnim.onAnimationGroupEndObservable.clear()
-        this.drawAnim.onAnimationGroupEndObservable.addOnce(() => {
-          console.log("DRAW ANIM ENDED for", this.spec.name);
-          this._drawing = false
-          if (this._wantActive && this.idleAnim) {
-            this.idleAnim.stop()
-            this.idleAnim.start(true, 1.0)
-          }
-        })
-        this.drawAnim.start(false, 1.0)
-      } else if (this.idleAnim) {
-        if (!this.idleAnim.isPlaying) {
-          this.idleAnim.stop()
-          this.idleAnim.start(true, 1.0)
-        }
-      }
+      this._enterActive()
     } else {
-      this._reloading = false
-      this._drawing = false
-      Object.values(this.groups).forEach((g) => g.stop())
+      this._enterHidden()
     }
   }
 
-  get isReloading() { return !!this._reloading }
+  // becoming the equipped weapon: play draw once (if any) then settle into idle
+  _enterActive() {
+    // already the live rig? don't interrupt an in-flight draw/idle/fire/reload
+    if (this._state === S.DRAWING || this._state === S.IDLE ||
+        this._state === S.FIRING || this._state === S.RELOADING) return
+
+    const gen = ++this._gen
+    if (this.drawAnim && !this._drawn) {
+      this._drawn = true
+      this._setState(S.DRAWING)
+      if (this.idleAnim) this.idleAnim.stop()
+      this.drawAnim.stop()
+      this._onEndOnce(this.drawAnim, gen, () => {
+        if (!this._wantActive) return
+        this._setState(S.IDLE)
+        this._startIdleLoop()
+      })
+      this.drawAnim.start(false, 1.0)
+    } else {
+      this._setState(S.IDLE)
+      this._startIdleLoop()
+    }
+  }
+
+  // being unequipped (weapon swap, death): rewind any mid-play clip to its base
+  // pose and stop everything so the rig re-equips clean, not frozen mid-clip.
+  _enterHidden() {
+    ++this._gen // invalidate any pending end callbacks
+    this._setState(S.HIDDEN)
+    Object.values(this.groups).forEach((g) => this._rewindStop(g))
+  }
+
+  get isReloading() { return this._state === S.RELOADING }
+
+  // re-express a camera-local point in holder-local space using the holder's
+  // BASE transform (so sockets land where the manifest authored them, then
+  // follow every live holder motion: bob, spring recoil, pump rack)
+  _cameraLocalToHolder(camLocal) {
+    const r = this.spec.rotation || {}
+    const q = BABYLON.Quaternion.FromEulerAngles(r.x || 0, r.y || 0, r.z || 0)
+    const s = this.spec.scale || 1
+    const base = BABYLON.Matrix.Compose(
+      new BABYLON.Vector3(s, s, s), q, this._basePos)
+    return BABYLON.Vector3.TransformCoordinates(camLocal, base.invert())
+  }
 
   // world-space barrel tip (for muzzle flash / tracer origin)
   muzzleWorldPos() {
-    if (!this.muzzle) return null
+    if (this._disposed || !this.muzzle) return null
     this.muzzle.computeWorldMatrix(true)
     return this.muzzle.getAbsolutePosition()
   }
 
   cancelReload() {
-    if (!this._reloading) return
-    this._reloading = false
-    if (this.reloadAnim) {
-      this.reloadAnim.stop()
-    }
+    if (this._disposed || this._state !== S.RELOADING) return
+    ++this._gen // invalidate the pending reload-end callback
+    // Rewind the reload clip to its rest frame BEFORE stopping: it is the only
+    // clip driving some gun bones (slide/magazine/weapon root), so a bare
+    // mid-clip stop would freeze the gun away from the hands.
+    this._rewindStop(this.reloadAnim)
     if (this.idleAnim) {
-      // Force immediate evaluation of the idle animation frame to snap arm bones
-      // out of their reload pose before any fire animations kick in.
-      this.idleAnim.goToFrame(this.idleAnim.from)
-      this.idleAnim.stop()
+      // snap arm bones out of the reload pose before idle blends back in
+      this._rewindStop(this.idleAnim)
     }
-    if (this._wantActive && this.idleAnim) {
-      this.idleAnim.start(true, 1.0)
-    }
+    this._setState(S.IDLE)
+    if (this._wantActive) this._startIdleLoop()
   }
 
   // play the reload clip once (arms + gun bones together: mag out, charge, etc.),
-  // then hand back to idle. Firing is blocked while it runs.
+  // then hand back to idle. Firing is blocked while it runs (gated by Simulator).
   reload() {
-    if (!this._wantActive || !this.ready || this._reloading || this._drawing || !this.reloadAnim) return false
-    this._reloading = true
+    if (this._disposed || !this._wantActive || !this.ready) return false
+    if (this._state === S.RELOADING || this._state === S.DRAWING || !this.reloadAnim) return false
+
+    const gen = ++this._gen
+    this._setState(S.RELOADING)
     if (this.idleAnim) this.idleAnim.stop()
-    if (this.fireAnim) this.fireAnim.stop()
+    if (this.fireAnim) this.fireAnim.stop() // fires the stale fire-end cb (gen-guarded no-op)
     this.reloadAnim.stop()
-    this.reloadAnim.onAnimationGroupEndObservable.clear()
-    this.reloadAnim.onAnimationGroupEndObservable.addOnce(() => {
-      console.log("RELOAD ANIM ENDED for", this.spec.name);
-      this._reloading = false
-      if (this._wantActive && this.idleAnim) {
-        this.idleAnim.stop()
-        this.idleAnim.start(true, 1.0)
-      }
+    this._onEndOnce(this.reloadAnim, gen, () => {
+      this._setState(S.IDLE)
+      if (this._wantActive) this._startIdleLoop()
     })
 
-    // Calculate dynamic speed ratio to match the spec's reloadTime exactly
+    // stretch/squash the clip so its wall-clock matches the gameplay reloadTime
     const normalDuration = this.reloadAnim.to - this.reloadAnim.from
     const reloadTime = this.spec.reloadTime || 1.5
     const speedRatio = normalDuration / reloadTime
-    console.log(`[RELOAD DEBUG] name=${this.spec.name} normalDuration=${normalDuration} reloadTime=${reloadTime} speedRatio=${speedRatio}`)
-
     this.reloadAnim.start(false, speedRatio)
     return true
   }
 
-  // called when the local player fires
-  kick() {
-    if (!this._wantActive || this._reloading || this._drawing) return
+  // called when the local player fires (once per shot, auto or semi).
+  // `profile` is the weapon's vmKick preset (firingFx): absolute impulse values
+  // plus spring params, so each gun has its own recoil PERSONALITY — snappy
+  // pistol flick, buzzy SMG chatter, heavy slow-recover shotgun shove (with a
+  // delayed pump-rack impulse). No profile falls back to the legacy
+  // recoilForce-scaled kick.
+  kick(profile) {
+    if (this._disposed || !this.ready || !this._wantActive) return
+    if (this._state === S.RELOADING || this._state === S.DRAWING) return
 
-    // Inject procedural spring recoil velocities (backward kick in Z, slight pitch up in X, slight horizontal jar)
-    const kickForce = this.spec.recoilForce || 1.0
-    this.recoilPosVel.z -= 0.6 * kickForce
-    this.recoilPosVel.y += 0.08 * kickForce
-    this.recoilRotVel.x -= 0.4 * kickForce
-    this.recoilRotVel.y += (Math.random() - 0.5) * 0.08 * kickForce
-
-    if (this.fireAnim) {
-      if (this.idleAnim) this.idleAnim.stop()
-      this.fireAnim.stop()
-      this.fireAnim.onAnimationGroupEndObservable.clear()
-      this.fireAnim.onAnimationGroupEndObservable.addOnce(() => {
-        console.log("FIRE ANIM ENDED for", this.spec.name);
-        if (!this._reloading && this._wantActive && this.idleAnim) {
-          this.idleAnim.stop()
-          this.idleAnim.start(true, 1.0)
-        }
-      })
-      this.fireAnim.start(false, 1.0)
+    // Inject procedural spring recoil velocities (backward kick in Z, slight
+    // pitch up in X, slight horizontal jar)
+    if (profile) {
+      this.recoilTension = profile.tension || 140
+      this.recoilDamping = profile.damping || 18
+      this.recoilPosVel.z -= profile.back || 0.5
+      this.recoilPosVel.y += profile.up || 0.06
+      this.recoilRotVel.x -= profile.pitch || 0.35
+      this.recoilRotVel.y += (Math.random() - 0.5) * (profile.yaw || 0.06)
+      if (profile.pump) {
+        // second, smaller shove when the action racks (shell out + clack land
+        // on the same beat via Simulator's pump audio/casing delay)
+        const gen = this._gen
+        setTimeout(() => {
+          // superseded by a swap/reload/hide (each bumps _gen) or unequipped
+          if (this._disposed || gen !== this._gen || !this._wantActive) return
+          this.recoilPosVel.z -= profile.pump.back || 0.3
+          this.recoilRotVel.x += profile.pump.pitch || 0.2 // muzzle dips as the arm racks
+        }, profile.pump.delay || 350)
+      }
+    } else {
+      const kickForce = this.spec.recoilForce || 1.0
+      this.recoilPosVel.z -= 0.6 * kickForce
+      this.recoilPosVel.y += 0.08 * kickForce
+      this.recoilRotVel.x -= 0.4 * kickForce
+      this.recoilRotVel.y += (Math.random() - 0.5) * 0.08 * kickForce
     }
+
+    if (!this.fireAnim) return
+
+    const gen = ++this._gen
+    this._setState(S.FIRING)
+    if (this.idleAnim) this.idleAnim.stop()
+    // stop() fires the previous fire clip's end observable; the older token makes
+    // it a no-op, so rapid auto-fire restarts the clip with no idle flicker under
+    // it. On the LAST shot the completing clip's callback (current token) settles
+    // us back to idle — semi-auto stays edge-correct because each click is one kick.
+    this.fireAnim.stop()
+    this._onEndOnce(this.fireAnim, gen, () => {
+      if (this._state !== S.FIRING || !this._wantActive) return
+      this._setState(S.IDLE)
+      this._startIdleLoop()
+    })
+    this.fireAnim.start(false, 1.0)
   }
 
   update(delta, moving) {
-    if (!this.ready || !this.holder) return
-
-    // Lazy initialization of procedural IK offsets once matrices are fully evaluated and valid
-    if (!this._ikLockInitialized && this._nodeIK && this._nodeWeapon) {
-      this._nodeWeapon.computeWorldMatrix(true)
-      this._nodeIK.computeWorldMatrix(true)
-
-      const matrix = this._nodeWeapon.getWorldMatrix()
-      if (matrix && Math.abs(matrix.determinant()) > 1e-12) {
-        // Compute left hand position in weapon's local space
-        const invWeaponMatrix = matrix.clone().invert()
-        this._leftHandOffset = BABYLON.Vector3.TransformCoordinates(this._nodeIK.getAbsolutePosition(), invWeaponMatrix)
-        
-        // Compute left hand rotation relative to the weapon
-        const weaponQuat = BABYLON.Quaternion.FromRotationMatrix(matrix)
-        const ikQuat = BABYLON.Quaternion.FromRotationMatrix(this._nodeIK.getWorldMatrix())
-        const invWeaponQuat = BABYLON.Quaternion.Inverse(weaponQuat)
-        this._leftHandRotOffset = invWeaponQuat.multiply(ikQuat)
-
-        this._ikLockInitialized = true
-        console.log(`PROCEDURAL IK LOCK INITIALIZED for ${this.spec.name} with position offset: ${this._leftHandOffset}`);
-      }
-    }
+    if (this._disposed || !this.ready || !this.holder) return
 
     this._t += delta
 
@@ -307,7 +414,7 @@ export default class Viewmodel {
 
     // Update position and rotation springs for procedural recoil
     const dt = Math.min(delta, 0.1) // Cap dt to avoid spring instability on frame drops
-    
+
     // Position spring: Accel = -Tension * Pos - Damping * Vel
     const posAcc = this.recoilPos.scale(-this.recoilTension).subtract(this.recoilPosVel.scale(this.recoilDamping))
     this.recoilPosVel.addInPlace(posAcc.scale(dt))
@@ -331,52 +438,54 @@ export default class Viewmodel {
     )
   }
 
-  dispose() {
-    console.log("Disposing viewmodel:", this.spec.name, "Skeletons in scene before dispose:", this.scene.skeletons.length);
-    
-    // Clean up observer
+  _disposeLoadedResources() {
+    if (this._cleanupDone) return
+    this._cleanupDone = true
+
     if (this._afterAnimationsObserver) {
       this.scene.onAfterAnimationsObservable.remove(this._afterAnimationsObserver)
+      this._afterAnimationsObserver = null
     }
 
-    // dispose EVERYTHING the load created — leaked skeletons/transform-nodes with
-    // identical bone names cross-wire the next rig's pose in Babylon 4.0.3.
+    // Dispose EVERYTHING the import created. Identically named skeletons can
+    // cross-wire each other's linked transform nodes in Babylon 4.0.3.
     if (this._result) {
-      this._result.animationGroups.forEach((g) => g.dispose())
-      this._result.meshes.forEach((m) => m.dispose())
-      ;(this._myTransformNodes || []).forEach((n) => n.dispose())
-      ;(this._result.skeletons || []).forEach((s) => s.dispose())
-      ;(this._result.particleSystems || []).forEach((p) => p.dispose())
+      this._result.animationGroups.forEach((group) => group.dispose())
+      this._result.meshes.forEach((mesh) => mesh.dispose())
+      ;(this._myTransformNodes || []).forEach((node) => node.dispose())
+      ;(this._result.skeletons || []).forEach((skeleton) => skeleton.dispose())
+      ;(this._result.particleSystems || []).forEach((system) => system.dispose())
     }
+    ;(this._ownedMaterials || []).forEach((material) => material.dispose(true, true))
+    ;(this._ownedTextures || []).forEach((texture) => texture.dispose())
     if (this.muzzle) this.muzzle.dispose()
     if (this.holder) this.holder.dispose()
-    console.log("Disposed viewmodel:", this.spec.name, "Skeletons in scene after dispose:", this.scene.skeletons.length);
+
+    this.ready = false
+    this.muzzle = null
+    this.holder = null
+    this.meshes = []
+    this.groups = {}
+    this._myTransformNodes = []
+    this._ownedMaterials = []
+    this._ownedTextures = []
+    this._result = null
   }
 
-  _applyProceduralIKLock() {
-    if (!this._ikLockInitialized) return // Skip until offsets are calculated on a valid frame
+  dispose() {
+    if (this._disposePromise) return this._disposePromise
 
-    if (this._nodeIK && this._nodeWeapon && this._leftHandOffset && !this._reloading && !this._drawing) {
-      this._nodeWeapon.computeWorldMatrix(true)
-      
-      // Force parent bones/nodes in the armature hierarchy to recompute world matrices 
-      // so setAbsolutePosition receives clean, non-stale parent transforms.
-      if (this._nodeIK.parent) {
-        this._nodeIK.parent.computeWorldMatrix(true)
-      }
-      
-      // Update position
-      const targetWorldPos = BABYLON.Vector3.TransformCoordinates(this._leftHandOffset, this._nodeWeapon.getWorldMatrix())
-      this._nodeIK.setAbsolutePosition(targetWorldPos)
+    this._disposed = true
+    this._wantActive = false
+    this.ready = false
+    this._setState(S.DISPOSED)
+    if (this.holder) this.holder.setEnabled(false)
 
-      // Update rotation
-      if (this._leftHandRotOffset) {
-        const weaponQuat = BABYLON.Quaternion.FromRotationMatrix(this._nodeWeapon.getWorldMatrix())
-        const targetQuat = weaponQuat.multiply(this._leftHandRotOffset)
-        this._nodeIK.rotationQuaternion = targetQuat
-      }
-
-      this._nodeIK.computeWorldMatrix(true)
-    }
+    // If the import is still in flight, cleanup runs as soon as it settles.
+    // Returning the promise lets the simulator serialize the next GLB import.
+    this._disposePromise = Promise.resolve(this._loadPromise)
+      .catch(() => undefined)
+      .then(() => this._disposeLoadedResources())
+    return this._disposePromise
   }
 }

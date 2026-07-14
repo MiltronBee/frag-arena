@@ -16,6 +16,7 @@ export default ({ simulator }) => {
 					entity.z = simulator.spawnPos.z
 				}
 				simulator.myRawEntity = entity
+				simulator.setArenaReady()
 				return
 			}
 

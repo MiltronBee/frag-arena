@@ -1,0 +1,80 @@
+{
+  "schema": "retro-clip-mapping/v1",
+  "description": "Declarative source->runtime clip mapping for the Retro Weapon Pack first-person arms. Single source of truth for the semantic clip vocabulary, per-weapon naming quirks, and which clips the game runtime consumes today. Consumed by scripts/build-retro-manifest.py, scripts/retro-preflight.py and scripts/verify-retro-manifest.py; intended to also drive scripts/blend-to-gltf.blender.py in a later checkpoint. Editing this file changes what the preflight/verify tools require -- keep it in sync with the archive.",
+  "pack": "RetroWeaponPack_V1",
+  "weapons": ["Pistol", "Rifle", "Shotgun", "SMG"],
+  "patterns": {
+    "armsAnimFbx": "FP_Arms_{weapon}_01_{clip}.fbx",
+    "animBlend": "FP_Arms_{weapon}_01_Anims.blend",
+    "gunBlend": "{weapon}_01.blend",
+    "gunMeshFbx": "{weapon}_01.fbx",
+    "armsMeshFbx": "FP_Arms.fbx",
+    "armsTexture": "FPS_Arms_Albedo.png",
+    "gunTexture": "{weapon}_01_Albedo.png"
+  },
+  "categories": {
+    "Cycles": "Looping locomotion / breathing cycles",
+    "OneTimeAnimations": "One-shot action clips",
+    "Poses": "Single-frame reference poses",
+    "TransitionAnimations": "Enter/exit transition clips"
+  },
+  "runtimeAnims": {
+    "note": "The blend-to-gltf pipeline names each exported glTF animation after its semantic key; the game (common/weaponsConfig.js authoredMount.anims + client/graphics/Viewmodel.js) references idle/fire/reload/draw. A null runtime means the clip is staged for the fuller pipeline but not consumed yet.",
+    "consumedToday": ["idle", "fire", "reload", "draw"]
+  },
+  "semanticClips": {
+    "idle": {
+      "required": true, "group": "core", "loop": true,
+      "category": "Cycles", "source": "Breathing",
+      "runtime": "idle",
+      "note": "Looping breathing cycle; the equipped idle. NB the current blend-to-gltf.blender.py still uses BasePose (see base_pose) as its idle placeholder -- migrating idle onto Breathing is a later-checkpoint behavioral change, out of scope here."
+    },
+    "walk":     { "required": true, "group": "core", "loop": true,  "category": "Cycles", "source": "Walk", "runtime": null },
+    "run":      { "required": true, "group": "core", "loop": true,  "category": "Cycles", "source": "Run", "runtime": null },
+    "fire":     { "required": true, "group": "core", "loop": false, "category": "OneTimeAnimations", "source": "Fire", "runtime": "fire" },
+    "reload": {
+      "required": true, "group": "core", "loop": false,
+      "category": "OneTimeAnimations", "source": "Reload",
+      "runtime": "reload",
+      "segmented": {
+        "weapons": ["Shotgun"],
+        "category": "OneTimeAnimations",
+        "sources": ["ReloadStart", "ReloadStep", "ReloadEnd"],
+        "sequence": ["ReloadStart", "ReloadStep", "ReloadStep", "ReloadEnd"],
+        "note": "Pump-action shotgun has no single Reload clip; the reload is authored as segments and loads two shells via Start+Step+Step+End (matches reload_clips() in blend-to-gltf.blender.py)."
+      }
+    },
+    "draw":     { "required": true, "group": "core", "loop": false, "category": "TransitionAnimations", "source": "Draw", "runtime": "draw" },
+    "hide":     { "required": true, "group": "core", "loop": false, "category": "TransitionAnimations", "source": "Hide", "runtime": null },
+    "interact": {
+      "required": true, "group": "core", "loop": false,
+      "category": "OneTimeAnimations", "source": "Interact",
+      "runtime": null,
+      "spelling": { "Shotgun": "Interaction" },
+      "note": "Shotgun spells this clip 'Interaction' where every other weapon uses 'Interact'."
+    },
+
+    "aim_pose":         { "required": false, "group": "aim", "loop": false, "category": "Poses",               "source": "AimPose",          "runtime": null },
+    "aim_start":        { "required": false, "group": "aim", "loop": false, "category": "TransitionAnimations", "source": "AimStart",         "runtime": null },
+    "aim_end":          { "required": false, "group": "aim", "loop": false, "category": "TransitionAnimations", "source": "AimEnd",           "runtime": null },
+    "fire_aiming":      { "required": false, "group": "aim", "loop": false, "category": "OneTimeAnimations",    "source": "Fire_Aiming",      "runtime": null },
+    "breathing_aiming": { "required": false, "group": "aim", "loop": true,  "category": "Cycles",              "source": "Breathing_Aiming", "runtime": null },
+    "walk_aiming":      { "required": false, "group": "aim", "loop": true,  "category": "Cycles",              "source": "Walk_Aiming",      "runtime": null },
+
+    "base_pose":            { "required": false, "group": "reference", "loop": false, "category": "Poses",  "source": "BasePose",            "runtime": null, "note": "Static neutral pose; current blend-to-gltf idle placeholder." },
+    "breathing_crouching":  { "required": false, "group": "crouch",    "loop": true,  "category": "Cycles", "source": "Breathing_Crouching", "runtime": null },
+    "walk_crouching":       { "required": false, "group": "crouch",    "loop": true,  "category": "Cycles", "source": "Walk_Crouching",      "runtime": null }
+  },
+  "groups": {
+    "core": "Required for every weapon in the fuller pipeline.",
+    "aim": "Optional ADS (aim-down-sights) set. Assert as a complete group when present.",
+    "crouch": "Optional crouch locomotion variants.",
+    "reference": "Non-animated reference poses."
+  },
+  "quirks": [
+    "Shotgun uses 'Interaction' where other weapons use 'Interact' (interact.spelling).",
+    "Shotgun reload is segmented (ReloadStart/ReloadStep/ReloadEnd) with no single Reload clip (reload.segmented).",
+    "Gun subtrees alternate folder casing: Pistol_01/Shotgun_01 use 'FbxFiles', Rifle_01/SMG_01 use 'Fbx_Files'.",
+    "Rifle_01 and SMG_01 gun animation folders lack an EmptyMagazine clip that Pistol_01 has; Shotgun_01 gun anims are BasePose/Fire/ReloadEnd/ReloadStep only (no gun-side ReloadStart)."
+  ]
+}

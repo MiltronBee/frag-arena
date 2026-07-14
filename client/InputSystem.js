@@ -130,12 +130,20 @@ class InputSystem {
 			} else {
 				console.log('pointer unlocked')
 				this.pointerLocked = false
+				this._currentState.mouseDown = false
+				this.frameState.mouseDown = false
 			}
 		})
 
-		document.addEventListener('mouseup', event => {
+		document.addEventListener('mouseup', () => {
 			this._currentState.mouseDown = false
 		})
+	}
+
+	requestPointerLock() {
+		if (!this.pointerLocked && this.canvasEle) {
+			_pointerLock(this.canvasEle)
+		}
 	}
 
 	releaseKeys() {

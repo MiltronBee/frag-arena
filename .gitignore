@@ -9,3 +9,7 @@ _incoming/
 public/vendor/
 public/_modelview.html
 scratch/
+backups/
+*.orig
+__pycache__/
+frag-*.png

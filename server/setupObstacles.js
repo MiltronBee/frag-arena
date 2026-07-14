@@ -1,26 +1,23 @@
 import Obstacle from '../common/entity/Obstacle'
+import { OBSTACLE_SPECS, obstacleY } from '../common/arenaConfig'
 
-// setup a few obstacles
-export default (instance) => {
-
+export default instance => {
 	const obstacles = new Map()
 
-	const obsA = new Obstacle()
-	obsA.x = 10
-	
-	instance.addEntity(obsA)
-	obstacles.set(obsA.nid, obsA)
+	OBSTACLE_SPECS.forEach(spec => {
+		const obstacle = new Obstacle()
+		obstacle.x = spec.x
+		obstacle.y = spec.y === undefined ? obstacleY(spec.height) : spec.y
+		obstacle.z = spec.z
+		obstacle.width = spec.width
+		obstacle.height = spec.height
+		obstacle.depth = spec.depth
+		obstacle.style = spec.style
 
-	obsA.mesh.computeWorldMatrix(true)
-
-	const obsB = new Obstacle()
-	obsB.x = 6
-	obsB.z = 8
-
-	instance.addEntity(obsB)
-	obstacles.set(obsB.nid, obsB)
-
-	obsB.mesh.computeWorldMatrix(true)
+		instance.addEntity(obstacle)
+		obstacles.set(obstacle.nid, obstacle)
+		obstacle.mesh.computeWorldMatrix(true)
+	})
 
 	return obstacles
 }

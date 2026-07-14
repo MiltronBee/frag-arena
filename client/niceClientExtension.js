@@ -99,15 +99,18 @@ export default (client) => {
 
 
 	client.on('delete', nid => {
+		// A late or duplicate delete (common for short-lived projectiles) can
+		// arrive after the entity is already gone. Check existence BEFORE touching
+		// entity.protocol so a stale delete is a clean no-op, not a null deref.
 		const entity = client.entities.get(nid)
+		if (!entity) {
+			return
+		}
 		const name = entity.protocol.name
 		const factory = client.factory[name]
-
-		if (client.entities.has(nid)) {
-			client.entities.delete(nid)
+		client.entities.delete(nid)
+		if (factory && typeof factory.delete === 'function') {
 			factory.delete({ nid, entity: entity })
-		} else {
-			console.log('tried to delete an entity that did not exist')
 		}
 	})
 }

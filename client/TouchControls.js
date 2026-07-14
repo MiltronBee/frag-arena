@@ -2,9 +2,15 @@
    popularized: a floating movement joystick anywhere on the left half,
    drag-to-look anywhere on the right half, and a thumb-reach button cluster
    (fire / jump / reload / weapon switch). Everything writes into the existing
-   InputSystem state, so prediction/netcode is identical to keyboard+mouse. */
+   InputSystem state, so prediction/netcode is identical to keyboard+mouse.
 
-const TOUCH_LOOK_SCALE = 3   // touch drags are short — amplify vs mouse pixels
+   Look drags (right-half zone AND the fire button — the fire thumb keeps
+   aiming) are converted to yaw/pitch by the pure TouchLook module and applied
+   through Simulator.applyTouchLookDelta, honoring the separate touch-sensitivity
+   / invert-Y settings. */
+
+import { computeLookDelta } from './TouchLook'
+
 const JOY_RADIUS = 60        // px the knob can travel from where the thumb landed
 const JOY_DEADZONE = 12      // px of drift before movement registers
 const SECTOR = Math.sin(Math.PI / 8) // 8-way sector edges at 22.5°
@@ -29,18 +35,22 @@ class TouchControls {
 		this.input = simulator.input
 
 		this._joyId = null   // touch identifier owning the joystick
-		this._lookId = null  // touch identifier owning the look drag
+		this._lookId = null  // touch identifier owning the right-half look drag
 		this._lookLast = null
+		this._fireId = null  // touch identifier owning the fire button (also aims)
+		this._fireLast = null
 		this._triedFullscreen = false
 
 		this._buildDom()
 		this._bindJoystick()
 		this._bindLook()
+		this._bindFire()
 		this._bindButtons()
 
-		// keyboard hints are noise on a phone
-		const hint = document.getElementById('weapon-hint')
-		if (hint) hint.style.display = 'none'
+	}
+
+	enterFullscreen() {
+		this._tryFullscreen()
 	}
 
 	_buildDom() {
@@ -61,18 +71,16 @@ class TouchControls {
 		this.gearBtn = el('div', 'touch-gear', root, '⚙')
 	}
 
-	// browsers only allow fullscreen/orientation from a user gesture, so we
-	// piggyback on the first touch; failures (iOS Safari) are fine to ignore
+	// browsers only allow fullscreen from a user gesture, so we piggyback on the
+	// first touch; failures (iOS Safari) are fine to ignore. We do NOT lock
+	// orientation: portrait is a supported, primary layout — the game never
+	// forces landscape.
 	_tryFullscreen() {
 		if (this._triedFullscreen) return
 		this._triedFullscreen = true
 		const doc = document.documentElement
 		if (doc.requestFullscreen) {
-			doc.requestFullscreen().then(() => {
-				if (screen.orientation && screen.orientation.lock) {
-					screen.orientation.lock('landscape').catch(() => {})
-				}
-			}).catch(() => {})
+			doc.requestFullscreen().catch(() => {})
 		}
 	}
 
@@ -137,8 +145,20 @@ class TouchControls {
 		if (nx > SECTOR) s.right = true
 	}
 
-	/* look: relative drag on the right half, fed through the same
-	   onmousemove path as the mouse so the sensitivity setting applies */
+	/* convert one drag sample into a camera rotation, honoring the touch
+	   sensitivity + invert-Y settings, and apply it via Simulator's touch-only
+	   seam. Shared by the right-half look zone and the fire button so both aim
+	   through the exact same pipeline. */
+	_applyLook(dx, dy, dt) {
+		const { yaw, pitch } = computeLookDelta(dx, dy, dt, {
+			sensitivity: this.simulator.touchSensitivity,
+			invertY: this.simulator.touchInvertY,
+		})
+		this.simulator.applyTouchLookDelta(yaw, pitch)
+	}
+
+	/* look: relative drag on the right half, converted to yaw/pitch by TouchLook.
+	   (dt is threaded through for a future acceleration term; unused for now.) */
 	_bindLook() {
 		const zone = this.lookZone
 
@@ -148,7 +168,7 @@ class TouchControls {
 			if (this._lookId !== null) return
 			const t = e.changedTouches[0]
 			this._lookId = t.identifier
-			this._lookLast = { x: t.clientX, y: t.clientY }
+			this._lookLast = { x: t.clientX, y: t.clientY, t: e.timeStamp }
 		}, { passive: false })
 
 		zone.addEventListener('touchmove', (e) => {
@@ -157,13 +177,9 @@ class TouchControls {
 			if (!t) return
 			const dx = t.clientX - this._lookLast.x
 			const dy = t.clientY - this._lookLast.y
-			this._lookLast = { x: t.clientX, y: t.clientY }
-			if (this.input.onmousemove) {
-				this.input.onmousemove({
-					movementX: dx * TOUCH_LOOK_SCALE,
-					movementY: dy * TOUCH_LOOK_SCALE
-				})
-			}
+			const dt = e.timeStamp - this._lookLast.t
+			this._lookLast = { x: t.clientX, y: t.clientY, t: e.timeStamp }
+			this._applyLook(dx, dy, dt)
 		}, { passive: false })
 
 		const end = (e) => {
@@ -173,6 +189,51 @@ class TouchControls {
 		}
 		zone.addEventListener('touchend', end)
 		zone.addEventListener('touchcancel', end)
+	}
+
+	/* fire: latches the shot on touchstart (zero added latency, exactly as
+	   before) but the SAME finger can then drag to keep aiming — Touch Events
+	   keep targeting the button where the touch started, so its moves reach us
+	   here and feed the shared look pipeline. end/cancel always release fire so
+	   it can never stick. */
+	_bindFire() {
+		const btn = this.fireBtn
+		const s = this.input._currentState
+
+		btn.addEventListener('touchstart', (e) => {
+			e.preventDefault()
+			this._tryFullscreen()
+			if (this._fireId !== null) return   // one finger owns fire at a time
+			const t = e.changedTouches[0]
+			this._fireId = t.identifier
+			this._fireLast = { x: t.clientX, y: t.clientY, t: e.timeStamp }
+			s.mouseDown = true
+			this.input.frameState.mouseDown = true   // catch a sub-frame tap
+			btn.classList.add('active')
+			if (navigator.vibrate) navigator.vibrate(8)
+		}, { passive: false })
+
+		btn.addEventListener('touchmove', (e) => {
+			e.preventDefault()
+			const t = this._findTouch(e, this._fireId)
+			if (!t) return
+			const dx = t.clientX - this._fireLast.x
+			const dy = t.clientY - this._fireLast.y
+			const dt = e.timeStamp - this._fireLast.t
+			this._fireLast = { x: t.clientX, y: t.clientY, t: e.timeStamp }
+			this._applyLook(dx, dy, dt)
+		}, { passive: false })
+
+		const end = (e) => {
+			if (!this._findTouch(e, this._fireId)) return
+			e.preventDefault()
+			this._fireId = null
+			this._fireLast = null
+			s.mouseDown = false
+			btn.classList.remove('active')
+		}
+		btn.addEventListener('touchend', end, { passive: false })
+		btn.addEventListener('touchcancel', end, { passive: false })
 	}
 
 	_bindHold(btn, onDown, onUp) {
@@ -194,11 +255,8 @@ class TouchControls {
 	_bindButtons() {
 		const s = this.input._currentState
 
-		this._bindHold(this.fireBtn, () => {
-			s.mouseDown = true
-			this.input.frameState.mouseDown = true
-			if (navigator.vibrate) navigator.vibrate(8)
-		}, () => { s.mouseDown = false })
+		// fire is bound separately (_bindFire) because it doubles as a look
+		// surface — the fire thumb keeps aiming while shooting
 
 		this._bindHold(this.jumpBtn, () => {
 			s.jump = true
@@ -214,8 +272,7 @@ class TouchControls {
 		})
 
 		this._bindHold(this.gearBtn, () => {
-			const menu = document.getElementById('settings-menu')
-			if (menu) menu.classList.toggle('settings-closed')
+			this.simulator.toggleSettings()
 		})
 	}
 }
