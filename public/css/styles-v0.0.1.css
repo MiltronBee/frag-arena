@@ -362,6 +362,108 @@ body.player-hit #damage-flash {
     transition-duration: 40ms;
 }
 
+/* own death: a stronger red wash that HOLDS until respawn (not a quick flash).
+   FragLayer adds/removes body.own-death; the --damage-wash var scales its punch. */
+body.own-death #damage-flash {
+    opacity: calc(0.85 * var(--damage-wash, 1));
+    transition-duration: 200ms;
+}
+
+/* ---- FRAG LAYER: kill feed, frag banner, directional damage arc (FragLayer.js) --- */
+
+/* kill feed: top-right stack, newest on top, entries fade after a few seconds. */
+#kill-feed {
+    position: absolute;
+    top: calc(64px + env(safe-area-inset-top));
+    right: calc(22px + env(safe-area-inset-right));
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-items: flex-end;
+    pointer-events: none;
+    z-index: 90;
+}
+
+.kill-feed-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 9px;
+    background: rgba(9, 13, 16, 0.72);
+    border-right: 2px solid var(--line);
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text);
+    opacity: 0;
+    transform: translateX(14px);
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.kill-feed-row.kf-in {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.kill-feed-row.kf-out {
+    opacity: 0;
+    transform: translateX(14px);
+}
+
+.kill-feed-row .kf-killer { color: var(--text); }
+.kill-feed-row .kf-victim { color: var(--muted); }
+.kill-feed-row .kf-weapon {
+    color: var(--orange);
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: 0.04em;
+}
+
+/* entries where I'm the killer or victim get the coral accent + brighter border. */
+.kill-feed-row.kill-feed-mine {
+    border-right-color: var(--coral);
+    background: rgba(40, 12, 12, 0.78);
+}
+.kill-feed-row.kill-feed-mine .kf-killer,
+.kill-feed-row.kill-feed-mine .kf-victim { color: var(--coral); }
+
+/* frag banner: centered, bold, UT99-flavored, pops then holds ~2.7s. */
+#frag-banner {
+    position: absolute;
+    top: 34%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.85);
+    text-align: center;
+    color: var(--coral);
+    font-size: clamp(28px, 5vh, 48px);
+    font-weight: 900;
+    letter-spacing: 0.03em;
+    text-shadow: 0 0 14px rgba(255, 62, 60, 0.7), 0 2px 0 rgba(0, 0, 0, 0.6);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 95;
+}
+
+#frag-banner.frag-banner-show {
+    animation: frag-banner-pop 2700ms ease-out;
+}
+
+@keyframes frag-banner-pop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
+    8% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    82% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+}
+
+/* directional damage arc: full-screen canvas FragLayer paints the arc onto. */
+#damage-arc {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 118;
+}
+
 body.player-dead #crosshair,
 body.player-dead #weapon-panel {
     opacity: 0.18;

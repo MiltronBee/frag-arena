@@ -17,6 +17,7 @@
     "verify:fire": "node scripts/verify-fire-attachment.mjs",
     "verify:fx": "node scripts/verify-firing-fx.mjs",
     "verify:1v1": "node scripts/verify-1v1.mjs",
+    "verify:killfeedback": "node scripts/verify-kill-feedback.mjs",
     "verify:bots": "node scripts/verify-bots.mjs",
     "verify:anim": "node scripts/verify-weapon-anim.mjs",
     "verify:weapons": "node scripts/verify-weapon-states.mjs",

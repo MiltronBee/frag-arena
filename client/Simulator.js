@@ -12,6 +12,7 @@ import { fire } from '../common/weapon'
 import { shotPattern, applyPattern } from '../common/firePattern'
 import Viewmodel from './graphics/Viewmodel'
 import WeaponAudio from './graphics/WeaponAudio'
+import FragLayer from './graphics/FragLayer'
 import { resolveWeaponFx } from './graphics/firingFx'
 import { assets, weapons } from './assets/assetManifest'
 
@@ -38,6 +39,11 @@ class Simulator {
 		// procedural weapon audio (WebAudio). Silent until resume() runs from a user
 		// gesture (enter-arena / pointer-lock / touch).
 		this.audio = new WeaponAudio()
+
+		// kill-feedback / "juice" layer (kill feed, frag banner, hitmarker upgrade,
+		// corpses, gibs, directional damage arc, own-death camera). Isolated from the
+		// sim: the message handlers below just forward events to it. See FragLayer.js.
+		this.fragLayer = new FragLayer(this)
 
 		// AIM-SAFE camera recoil: a POSITION-only kick spring. It never rotates the
 		// camera, so the fire ray + MoveCommand aim (both rotation-only) are byte-
@@ -120,6 +126,27 @@ class Simulator {
 			this.myRawEntity.velX = 0
 			this.myRawEntity.velY = 0
 			this.myRawEntity.velZ = 0
+
+			// clear own-death camera drop/roll + red wash (FragLayer owns them)
+			this.fragLayer.onRespawned()
+		})
+
+		// --- kill-feedback messages: forward straight to the FragLayer, which owns
+		// all the DOM/FX. Simulator stays a thin router here (no UI logic).
+
+		// attacker-only: upgrade the predicted hitmarker to the confirmed/kill marker
+		client.on('message::HitConfirmed', message => {
+			this.fragLayer.onHitConfirmed(message)
+		})
+
+		// broadcast: kill feed, frag banner, victim corpse/gib, own-death camera
+		client.on('message::Killed', message => {
+			this.fragLayer.onKilled(message)
+		})
+
+		// victim-only: directional damage arc + scaled red screen wash
+		client.on('message::DamageTaken', message => {
+			this.fragLayer.onDamageTaken(message)
 		})
 
 		client.on('message::WeaponFired', message => {
@@ -127,6 +154,11 @@ class Simulator {
 				// hide our own shots.. we'll predict those instead
 				return
 			}
+			// remote shooter: play their body's shoot one-shot overlay so observers
+			// see the gun recoil in-world. Keyed by smooth nid (same key as the
+			// CharacterModel map). No-op if we have no model for them yet.
+			const shooterModel = this.characterModels.get(message.sourceId)
+			if (shooterModel) shooterModel.playShoot()
 			// The message carries the weapon index + the shot's deterministic spread
 			// inputs (seed/heat), so observers render the EXACT pellet pattern the
 			// server judged damage with, plus the correct per-weapon FX + report.
@@ -480,6 +512,15 @@ class Simulator {
 
 		// orient + stretch live plasma bolts into hot travel streaks
 		this._updateProjectiles()
+
+		// advance kill-feedback FX (corpses, gibs, damage arc). Runs after the
+		// character models are driven so a corpse's frozen pose isn't re-overridden.
+		this.fragLayer.update(delta)
+
+		// apply the own-death camera drop/roll LAST — after all aim + fire logic has
+		// read the camera this frame — so the cosmetic roll never rotates the shot
+		// ray or the MoveCommand aim the server judges shots with.
+		this.fragLayer.applyDeathCamera()
 
 		this._updateHud()
 		this.renderer.update()

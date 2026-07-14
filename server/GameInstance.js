@@ -142,6 +142,10 @@ class GameInstance {
 			const entity = client.rawEntity
 			if (entity && command.index !== undefined && command.index >= 0 && command.index < weapons.length) {
 				entity.currentWeaponIndex = command.index
+				// mirror to the smooth entity — remote clients read THAT one (same
+				// lockstep rule as hitpoints in damagePlayer); without this everyone
+				// appears to hold weapon 0 forever
+				if (client.smoothEntity) client.smoothEntity.currentWeaponIndex = command.index
 			}
 		})
 
@@ -347,12 +351,16 @@ class GameInstance {
 				attackerClient.smoothEntity.kills = ak
 			}
 
-			// Killed → broadcast to EVERYONE via addLocalMessage (view covers the whole
-			// arena, so no client culls it). overkill = damage past what the kill needed.
-			// If there's no attacker (e.g. projectile owner lookup missed), attribute the
-			// kill to the victim itself (killerNid = victimNid, suicide-style).
+			// Killed → broadcast to EVERYONE via instance.messageAll. (addLocalMessage
+			// is NOT usable here: nengi local events are spatially culled and REQUIRE
+			// x/y in their schema — Killed carries none — and they decode through the
+			// localMessages protocol map, not `messages`, so an addLocalMessage(Killed)
+			// silently never reaches any client. messageAll uses the same per-client
+			// message path HitConfirmed/DamageTaken already work through, delivered to
+			// every connected socket.) overkill = damage past what the kill needed. If
+			// there's no attacker, killerNid = victimNid (suicide-style, unattributed).
 			const overkill = Math.min(255, Math.max(0, damage - hpBefore))
-			this.instance.addLocalMessage(new Killed(attackerNid, victimNid, weaponIndex || 0, overkill))
+			this.instance.messageAll(new Killed(attackerNid, victimNid, weaponIndex || 0, overkill))
 
 			console.log(`Player ${raw.nid} died from ${sourceName}!`)
 		}

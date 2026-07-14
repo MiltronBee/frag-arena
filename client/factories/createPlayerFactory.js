@@ -45,9 +45,24 @@ export default ({ simulator }) => {
 			entity.mesh.dispose()
 		},
 		watch: {
+			// swap the held weapon prop when the replicated index changes. The watch
+			// also fires on create with the initial value, so a player already holding
+			// a non-default gun shows it correctly to a client that joins later.
+			// (CharacterModel's host is the entity MESH, which has no protocol fields —
+			// replicated props must come through here.)
+			currentWeaponIndex({ entity, value }) {
+				const model = simulator.characterModels.get(entity.nid)
+				if (model) model.setWeapon(value)
+			},
+			// observers can detect damage on any remote player via replicated hitpoints
+			// decreasing — play a brief hit-react one-shot (RecieveHit). Priority in
+			// CharacterModel keeps this from stomping an active shoot/death.
 			hitpoints({ entity, value }) {
-				// this doesnt happen ever.. but this is an example hook
-				console.log('hitpoints changed! time to update our ui or something')
+				const prev = entity._prevHitpoints
+				entity._prevHitpoints = value
+				if (prev == null || value >= prev) return // spawn/heal, not a hit
+				const model = simulator.characterModels.get(entity.nid)
+				if (model) model.playHit()
 			}
 		}
 	}
