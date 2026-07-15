@@ -161,6 +161,14 @@ export default class CharacterModel {
     if (!this.ready || !this.holder || this.disposed) return
     const p = this.host.position
 
+    // Babylon 4.0.3 stops re-syncing bones from their linked glTF transform nodes
+    // once a skeleton is large enough to store its matrices in a texture (~>30
+    // bones, as the 65-bone UBC rig does). The AnimationGroups animate the nodes,
+    // but the skinned mesh stays frozen at bind pose unless we re-prepare the
+    // skeleton each frame. (The 23-bone soldier rig used the uniform path and
+    // never needed this.) Cheap for a handful of players.
+    if (this.skeleton) this.skeleton.prepare()
+
     // (held-weapon sync happens via the currentWeaponIndex factory watch —
     // this.host is the entity MESH and carries no replicated fields)
 

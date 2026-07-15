@@ -11,27 +11,32 @@
 
 export const assets = {
   // third-person body other players see (attached to their replicated entity).
-  // Quaternius 'Ultimate Animated Character Pack' BlueSoldier_Male (CC0,
-  // https://quaternius.com/packs/ultimatedanimatedcharacter.html), exported from
-  // the pack .blend via scripts/export-player-glb.blender.py — one skin, 23
-  // joints, 17 clips. Raw model: feet at y=0, 3.28 units tall.
+  // Quaternius 'Universal Base Characters' Superhero_Male body (paid, standard
+  // license) baked with the 'Universal Animation Library 2' (UAL2) clips via
+  // scripts/build-hero-character.blender.py — one skin, 65-bone "Standard"
+  // mannequin rig, 43 clips. Raw model: feet at y=0, ~1.82 units tall.
+  // (hero_female.glb is the same rig/clips with the Superhero_Female body.)
+  //
+  // ITERATION 1: UAL2 has no basic run/shoot/death, so run/jump/shoot/death below
+  // are placeholders mapped to the nearest UAL2 motion — expect them to look off
+  // until proper locomotion clips (UAL1) are added. idle + hit are genuine.
   playerBody: {
-    url: '/assets/characters/soldier.glb',
-    scale: 0.32,
-    yOffset: -0.49,
-    yawOffset: Math.PI, // model faces +Z in-file; the loader's __root__ 180deg Y
-                        // flip inverts that, so PI re-aligns the body with travel dir
+    url: '/assets/characters/hero_male.glb',
+    scale: 0.577, // raw ~1.82 units * 0.577 ≈ 1.05 in-game (matches old body height)
+    yOffset: -0.5, // body origin is at the feet; drop feet to the box bottom
+    yawOffset: Math.PI, // tunable — loader adds a 180deg Y flip on __root__
     anims: {
-      idle: 'Idle',
-      run: 'Run',
-      jump: 'Jump',
-      shoot: 'Shoot_OneHanded',
-      hit: 'RecieveHit',
-      death: 'Death',
+      idle: 'Idle_No_Loop',
+      run: 'Walk_Carry_Loop', // placeholder (no real run in UAL2)
+      jump: 'NinjaJump_Start', // placeholder
+      shoot: 'OverhandThrow', // placeholder (no gun-shoot in UAL2)
+      hit: 'Hit_Knockback',
+      death: 'Hit_Knockback', // placeholder (frozen last frame as corpse)
     },
     // bone the held weapon prop attaches to (Babylon exposes a linked TransformNode
-    // per glTF joint; see CharacterModel._attachWeapon)
-    handBone: 'Fist.R',
+    // per glTF joint; see CharacterModel._attachWeapon). NOTE: rig changed from the
+    // old 'Fist.R' to 'hand_r' — tpWeapons mounts below still need retuning.
+    handBone: 'hand_r',
   },
 
 }
@@ -41,40 +46,44 @@ export const assets = {
 // Indexed to match common/weaponsConfig order: 0=Rifle 1=SMG 2=Shotgun 3=Pistol.
 //
 // These are plain props (no rig/anims), authored in cm with the barrel along +X,
-// grip near the origin. They parent to the soldier's `Fist.R` bone, INSIDE the
-// holder's 0.32 scaling — so 1 raw model unit ~= 0.57m and 1cm ~= 0.018 game
-// units of parent-local scale (rifle ~60cm -> ~0.49 game units long).
+// grip near the origin. They parent to the soldier's `hand_r` bone, INSIDE the
+// holder's 0.577 body scaling — so the per-cm scale factor is ~0.010 game units
+// (was ~0.018 inside the old 0.32 body; the body grew ~1.8x, so the scale shrank
+// by 0.32/0.577 to keep real-world gun size). pos/rot are in the hand bone's
+// local space; scale is uniform.
 //
-// Orientation trap (same as the FP weapons above): the glTF loader adds a 180deg
-// Y flip on each prop's __root__. We attach the prop's own root under the bone,
-// so its authored +X barrel is what we rotate — expect per-gun yaw tuning to
-// point the barrel forward and seat the grip in the fist. pos/rot are in the
-// bone's local space; scale is uniform game-units-per-cm inside the holder.
+// Orientation: the `hand_r` bone frame is rotated relative to the prop's authored
+// +X barrel, so a base yaw of y=+PI/2 (1.5708) swings the barrel forward. Each
+// gun then needs a small per-weapon roll (z) to level the barrel, because the
+// props were authored with slightly different barrel pitches (the shotgun even
+// needs a negative roll). position y=-0.03 lifts the whole gun so the grip seats
+// in the fist. Re-tuned from scratch after the Fist.R -> hand_r rig swap
+// (2026-07-14) via scripts/tune-tp-mounts.mjs.
 // ---------------------------------------------------------------------------
 export const tpWeapons = [
   { // 0 Rifle
     url: '/assets/weapons/tp_rifle.glb',
-    scale: 0.018,
-    position: { x: 0.0, y: 0.0, z: 0.0 },
-    rotation: { x: 0, y: 0, z: 0 },
+    scale: 0.010,
+    position: { x: 0.0, y: -0.03, z: 0.0 },
+    rotation: { x: 0, y: 1.5708, z: 0.3 },
   },
   { // 1 SMG
     url: '/assets/weapons/tp_smg.glb',
-    scale: 0.018,
-    position: { x: 0.0, y: 0.0, z: 0.0 },
-    rotation: { x: 0, y: 0, z: 0 },
+    scale: 0.010,
+    position: { x: 0.0, y: -0.03, z: 0.0 },
+    rotation: { x: 0, y: 1.5708, z: 0.15 },
   },
   { // 2 Shotgun
     url: '/assets/weapons/tp_shotgun.glb',
-    scale: 0.018,
-    position: { x: 0.0, y: 0.0, z: 0.0 },
-    rotation: { x: 0, y: 0, z: 0 },
+    scale: 0.010,
+    position: { x: 0.0, y: -0.03, z: 0.0 },
+    rotation: { x: 0, y: 1.5708, z: -0.4 },
   },
   { // 3 Pistol
     url: '/assets/weapons/tp_pistol.glb',
-    scale: 0.018,
-    position: { x: 0.0, y: 0.0, z: 0.0 },
-    rotation: { x: 0, y: 0, z: 0 },
+    scale: 0.013,
+    position: { x: 0.0, y: -0.03, z: 0.0 },
+    rotation: { x: 0, y: 1.5708, z: 0.1 },
   },
 ]
 
