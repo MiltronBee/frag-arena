@@ -1,0 +1,106 @@
+VOSS — the on-screen camera recoil reads "soo buggy" (jittery/glitchy) since I ADDED
+sustained-fire visual CLIMB to the automatic weapons (Rifle, SMG) this session. Find
+the bug in the real code below. All angles noted are DEGREES in the preset, converted
+to radians at apply time. Client renders at variable fps (uncapped rAF). Fire rates:
+Rifle cd 0.14s (~7/s), SMG cd 0.08s (~12.5/s), Shotgun 0.9s, Pistol 0.45s.
+
+============================================================================
+PER-WEAPON camKick PRESETS (client/graphics/firingFx.js) — VISUAL rotation recoil.
+Fields: pitch (per-shot deg), yawDrift, yawJitter, climb (per-shot climb add),
+climbMax (climb ceiling), heatBias, tension, damping. (fov = shotgun only.)
+============================================================================
+0 Rifle : pitch 0.45, yawDrift 0.06, yawJitter 0.05, climb 0.15, climbMax 1.8, heatBias 0.4, tension 950,  damping 62
+1 SMG   : pitch 0.22, yawDrift -0.04, yawJitter 0.18, climb 0.25, climbMax 2.2, heatBias 0.6, tension 1500, damping 80
+2 Shotgun: pitch 1.20, yawJitter 0.20, climb 0, climbMax 1.2, tension 380, damping 39, fov{amount -0.04,inMs 50,outMs 180}, pumpDip{delay 350,pitch 0.15}
+3 Pistol: pitch 0, climb 0, tension 1400, damping 75
+4 Plasma: pitch 0.30, yawJitter 0.15, climb 0.10, climbMax 0.8, heatBias 0.3, tension 1100, damping 60
+5 Flak  : pitch 1.20, yawJitter 0.20, climb 0, climbMax 1.2, tension 380, damping 39, fov{...}
+(Rifle/SMG climb + heatBias are the values I ADDED this session. Before, both were pitch 0 / climb 0 — dead-flat, "weightless".)
+
+============================================================================
+THE APPLY (client/Simulator.js). Called once per fired shot inside the update loop.
+`heat` is 0..1 (sustained-fire accuracy penalty, same value server charges spread with).
+============================================================================
+_applyCamRecoil(camKick, heat) {
+  if (!camKick) return
+  const scale = (this.isTouch ? 0.55 : 1.0) * Math.PI / 180
+  this._recoilTension = camKick.tension || 900
+  this._recoilDamping = camKick.damping || 60
+  const h = Math.min(1, Math.max(0, heat || 0))
+  const climbBonus = camKick.climb ? Math.min(this._visClimb + camKick.climb, camKick.climbMax || 1.2) : 0
+  if (camKick.climb) this._visClimb = climbBonus
+  const pitchDeg = (camKick.pitch || 0) * (1 + (camKick.heatBias || 0) * h) + climbBonus
+  this._recoilVel.x -= pitchDeg * scale * this._springImpulseGain()          // pitch up = -x
+  const yaw = (camKick.yawDrift || 0) + (Math.random() - 0.5) * 2 * (camKick.yawJitter || 0)
+  this._recoilVel.y += yaw * scale * this._springImpulseGain()
+  const rollDeg = (camKick.yawJitter || 0) * 0.6
+  this._recoilVel.z += (Math.random() - 0.5) * 2 * rollDeg * scale * this._springImpulseGain()
+  if (camKick.fov) { this._recoilFov = { t0: performance.now(), amount: camKick.fov.amount, inMs, outMs } }
+  if (camKick.pumpDip) {
+    const dipVel = (camKick.pumpDip.pitch || 0.15) * scale * this._springImpulseGain()
+    setTimeout(() => { this._recoilVel.x += dipVel }, camKick.pumpDip.delay || 350)
+  }
+}
+
+// impulse gain: inject v0 = theta * sqrt(tension) * e so the preset angle reads as the peak.
+_springImpulseGain() { return Math.sqrt(this._recoilTension || 900) * Math.E }
+
+============================================================================
+THE SPRING (client/Simulator.js) — integrated every frame.
+============================================================================
+_springCamRecoil(delta) {
+  const dt = Math.min(delta || 0.016, 0.05)
+  const tension = this._recoilTension || 900, damping = this._recoilDamping || 60
+  const r = this._recoil, v = this._recoilVel
+  v.x += (-tension * r.x - damping * v.x) * dt
+  v.y += (-tension * r.y - damping * v.y) * dt
+  v.z += (-tension * r.z - damping * v.z) * dt
+  r.x += v.x * dt; r.y += v.y * dt; r.z += v.z * dt
+  const P = 1.5 * Math.PI / 180   // ~1.5 deg pitch/yaw ceiling, 3 deg roll
+  r.x = Math.max(-P, Math.min(P, r.x))
+  r.y = Math.max(-P, Math.min(P, r.y))
+  r.z = Math.max(-2 * P, Math.min(2 * P, r.z))
+  if (this._visClimb > 0) this._visClimb = Math.max(0, this._visClimb - dt * 3)  // bleed climb
+}
+
+============================================================================
+THE FRAME ORDER (client/Simulator.js update loop), abridged:
+============================================================================
+// [top of frame] remove last frame's applied cosmetic rotation BEFORE reading aim:
+cam.rotation.x -= this._recoilApplied.x
+cam.rotation.y -= this._recoilApplied.y
+cam.rotation.z -= this._recoilApplied.z
+this._recoilApplied.set(0,0,0)
+const camRay = camera.getForwardRay().direction   // <-- aim + fire ray read here (must be TRUE orientation)
+... build MoveCommand, run client prediction, and per fired shot call _applyCamRecoil(fx.camKick, ray.heat) ...
+// [after aim/fire] integrate + apply the cosmetic rotation:
+this._springCamRecoil(delta)
+cam.rotation.x += this._recoil.x
+cam.rotation.y += this._recoil.y
+this._recoilApplied.set(this._recoil.x, this._recoil.y, this._recoil.z)   // records x,y,z
+this._applyRecoilFov()
+... character models, projectiles, fragLayer.applyDeathCamera() (sets rotation.z each frame) ...
+// roll applied LAST, after death-cam owns z:
+if (myRawEntity && !(fragLayer._deathCam && fragLayer._deathCam.active)) {
+  cam.rotation.z += this._recoil.z
+}
+
+Mouse-look writes cam.rotation.x/y directly each mousemove (rotation.x clamped to ±0.499*PI).
+
+There is ALSO a separate POSITION-only kick spring (_springCameraRecoil, tension 240,
+damping 24, clamp 0.14 world-units) that shoves camera.position back along -aim on each
+shot — that one predates this session and felt fine.
+
+============================================================================
+MY SUSPICIONS (confirm, correct, or expand — you're the debugger):
+ - climbMax 1.8 (Rifle) / 2.2 (SMG) EXCEEDS the spring output clamp P=1.5deg. During
+   sustained auto-fire the pitch target saturates the clamp.
+ - visClimb bleeds at dt*3/s EVERY frame, but only gains `climb` per SHOT. Rifle: +0.15/shot
+   at 7/s; between shots (~0.14s) it bleeds ~0.42. Bleed-per-interval > gain-per-shot, so
+   visClimb never builds — it sawtooths 0→0.15→decay each shot. Is that the jitter?
+ - dt cap is 0.05; SMG tension 1500 -> dt*sqrt(tension) = 0.05*38.7 = 1.94 on a frame hitch.
+   Rifle 950 -> 1.54. How close to divergence is that?
+ - Each auto shot re-injects an impulse (v0 = angle*sqrt(tension)*e) into a spring that may
+   still be mid-recovery and near the clamp — re-pumping velocity into a wall.
+Tell me the exact fix (clamp target vs output, raise P, retune climb/bleed, substep the
+spring, decouple climb accumulation from per-shot impulse, whatever it really is).

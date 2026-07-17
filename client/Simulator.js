@@ -90,6 +90,7 @@ class Simulator {
 		this._recoilDamping = 60
 		this._visClimb = 0
 		this._recoilFov = null // { t0, amount, inMs, outMs } transient FOV punch
+		this._pumpDip = null // { t, vel } frame-clock shotgun/flak pump-dip timer
 
 		// first-person weapon, swap with 1-4 / Q / wheel. Only the EQUIPPED weapon's
 		// rig lives in the scene: multiple copies of the same skeleton coexisting
@@ -365,21 +366,28 @@ class Simulator {
 	// NEVER live when getForwardRay() is read (removed at the top of update(), re-applied
 	// only after the fire command + prediction are done) — so the fire ray / MoveCommand
 	// aim are byte-identical. `ray.heat` (client-predicted, same value the server charges
-	// spread with) scales the pitch climb so the felt kick mirrors the accuracy penalty
+	// spread with) scales the per-shot kick so the felt kick mirrors the accuracy penalty
 	// with zero netcode change. Degrees in the preset → radians here. Gentler on touch.
+	//
+	// The high-frequency per-shot KICK goes through the return spring (_recoil), while the
+	// low-frequency sustained-fire CLIMB is a SEPARATE persistent offset (_visClimb, degrees)
+	// that is NOT fed into the spring — folding climb into the velocity impulse hammered the
+	// spring with the full accumulated lean every shot (Bug A). Both are applied to the
+	// camera (and tracked in _recoilApplied) in update()'s apply block, so both stay aim-safe.
 	_applyCamRecoil(camKick, heat) {
 		if (!camKick) return
 		const scale = (this.isTouch ? 0.55 : 1.0) * Math.PI / 180
 		// per-weapon return spring (read by _springCamRecoil this frame + after)
 		this._recoilTension = camKick.tension || 900
 		this._recoilDamping = camKick.damping || 60
-		// pitch climb: base + a heat-scaled term + the capped sustained-fire lean.
 		const h = Math.min(1, Math.max(0, heat || 0))
-		const climbBonus = camKick.climb ? Math.min(this._visClimb + camKick.climb, camKick.climbMax || 1.2) : 0
-		if (camKick.climb) this._visClimb = climbBonus
-		const pitchDeg = (camKick.pitch || 0) * (1 + (camKick.heatBias || 0) * h) + climbBonus
+		// per-shot pitch kick ONLY (no climb term): base + a heat-scaled bias.
+		const pitchDeg = (camKick.pitch || 0) * (1 + (camKick.heatBias || 0) * h)
 		// pitch UP is a NEGATIVE rotation.x (mouse-look uses +x = look down; see onmousemove)
 		this._recoilVel.x -= pitchDeg * scale * this._springImpulseGain()
+		// sustained-fire CLIMB accrues SEPARATELY as a capped persistent lean (degrees),
+		// applied as a smooth offset in update() and bled off exponentially between shots.
+		if (camKick.climb) this._visClimb = Math.min(this._visClimb + camKick.climb, camKick.climbMax || 1.2)
 		const yaw = (camKick.yawDrift || 0) + (Math.random() - 0.5) * 2 * (camKick.yawJitter || 0)
 		this._recoilVel.y += yaw * scale * this._springImpulseGain()
 		// subtle roll, random sign, tiny magnitude (readability): reuse yawJitter as a
@@ -394,14 +402,15 @@ class Simulator {
 				inMs: camKick.fov.inMs || 50, outMs: camKick.fov.outMs || 180 }
 		}
 		// shotgun pump dip: a small downward camera nod on the rack, timed to the
-		// viewmodel/audio pump so the whole body agrees. Gen-free (just a delayed impulse).
+		// viewmodel/audio pump so the whole body agrees. Driven by a FRAME-CLOCK timer
+		// (not setTimeout) so it obeys pause and can be cleared on weapon swap — a
+		// wall-clock timer fired the dip on whatever gun was equipped 350ms later.
 		if (camKick.pumpDip) {
 			// capture the gain now (weapon may swap before the delayed dip fires)
-			const dipVel = (camKick.pumpDip.pitch || 0.15) * scale * this._springImpulseGain()
-			setTimeout(() => {
-				// pitch DOWN = +x. Small; the spring absorbs it inside the recovery window.
-				this._recoilVel.x += dipVel
-			}, camKick.pumpDip.delay || 350)
+			this._pumpDip = {
+				t: (camKick.pumpDip.delay || 350) / 1000,
+				vel: (camKick.pumpDip.pitch || 0.15) * scale * this._springImpulseGain()
+			}
 		}
 	}
 
@@ -413,23 +422,35 @@ class Simulator {
 	_springImpulseGain() { return Math.sqrt(this._recoilTension || 900) * Math.E }
 
 	// critically-ish damped spring returning the VISUAL recoil rotation offset to zero.
-	// Clamped so a sustained burst's picture can never diverge more than ~1.5° from where
-	// shots actually land (shots stay true; only the picture leads slightly).
+	// Integrated in FIXED SUBSTEPS (semi-implicit Euler, v before r) so it is frame-rate
+	// independent and can never diverge: a single Euler step at the 0.05s dt cap gave
+	// dt·sqrt(tension) ≈ 1.94, right at the 2.0 blow-up boundary → chatter (Bug B). At a
+	// <=0.004s substep, dt·ω stays tiny (<=0.155 even at tension 1500) regardless of the
+	// frame rate. Clamped so the KICK picture can never diverge more than ~1.5° from where
+	// shots actually land; the sustained CLIMB lean is applied OUTSIDE this clamp.
 	_springCamRecoil(delta) {
-		const dt = Math.min(delta || 0.016, 0.05)
+		let remaining = Math.min(delta || 0.016, 0.05)
+		const SUB = 0.004
 		const tension = this._recoilTension || 900, damping = this._recoilDamping || 60
 		const r = this._recoil, v = this._recoilVel
-		v.x += (-tension * r.x - damping * v.x) * dt
-		v.y += (-tension * r.y - damping * v.y) * dt
-		v.z += (-tension * r.z - damping * v.z) * dt
-		r.x += v.x * dt; r.y += v.y * dt; r.z += v.z * dt
-		const P = 1.5 * Math.PI / 180 // ~1.5° pitch/yaw ceiling, 3° roll
+		while (remaining > 0) {
+			const dt = Math.min(remaining, SUB)
+			v.x += (-tension * r.x - damping * v.x) * dt
+			v.y += (-tension * r.y - damping * v.y) * dt
+			v.z += (-tension * r.z - damping * v.z) * dt
+			r.x += v.x * dt; r.y += v.y * dt; r.z += v.z * dt
+			remaining -= dt
+		}
+		const P = 1.5 * Math.PI / 180 // ~1.5° pitch/yaw ceiling, 3° roll — bounds the KICK only
 		r.x = Math.max(-P, Math.min(P, r.x))
 		r.y = Math.max(-P, Math.min(P, r.y))
 		r.z = Math.max(-2 * P, Math.min(2 * P, r.z))
-		// bleed the sustained-fire climb accumulator back down when not actively firing,
-		// so the next burst starts from a cool baseline (mirrors weapon.js heat cooldown).
-		if (this._visClimb > 0) this._visClimb = Math.max(0, this._visClimb - dt * 3)
+		// bleed the sustained-fire climb accumulator down EXPONENTIALLY (frame-rate
+		// independent) when not actively firing, so the next burst starts from a cool
+		// baseline. Exp decay lets climb accumulate then settle smoothly; the old linear
+		// dt·3 bleed drained faster than a burst could accrue → visible sawtooth (Bug C).
+		if (this._visClimb > 0) this._visClimb = this._visClimb * Math.exp(-4.0 * (delta || 0.016))
+		if (this._visClimb < 1e-4) this._visClimb = 0
 	}
 
 	// Compose the transient shotgun FOV punch onto the LIVE base fov each frame (never
@@ -657,7 +678,8 @@ class Simulator {
 		if (index === this.weaponIndex) return
 		this.weaponIndex = index
 		this._queueViewmodelSwap(index)
-		
+		this._pumpDip = null // drop any pending pump-dip so it can't fire on the new gun
+
 		if (this.myRawEntity) {
 			this.myRawEntity.currentWeaponIndex = index
 			// swap commitment: lock firing for this weapon's drawTime so the local
@@ -969,13 +991,33 @@ class Simulator {
 			// while the shot bytes stayed byte-identical. Integrate the spring now; the
 			// PITCH(x)/YAW(y) offsets (the two that affect getForwardRay) are added here
 			// and remembered in _recoilApplied so next frame removes exactly this much
-			// before reading the aim (never compounds). The ROLL(z) is applied AFTER the
-			// death-cam below (which assigns rotation.z each frame and would clobber it);
-			// roll is about the view axis, so it does not affect the fire ray anyway.
+			// before reading the aim (never compounds). The pitch offset is the spring
+			// KICK displacement PLUS the sustained-fire CLIMB lean (_visClimb, degrees →
+			// radians): climb is an UPWARD lean, and pitch-up is NEGATIVE rotation.x, so
+			// climb SUBTRACTS from x. Because it's baked into appliedX (and recorded in
+			// _recoilApplied.x), the top-of-frame remove strips it too → aim stays true.
+			// The ROLL(z) is applied AFTER the death-cam below (which assigns rotation.z
+			// each frame and would clobber it) and records its OWN _recoilApplied.z there.
+			// shotgun/flak pump-dip frame-clock timer (replaces a wall-clock setTimeout):
+			// count down in real frame time, then inject a small downward nod into the
+			// spring. Cleared on weapon swap so it can't fire on the wrong gun.
+			if (this._pumpDip) {
+				this._pumpDip.t -= delta
+				if (this._pumpDip.t <= 0) {
+					this._recoilVel.x += this._pumpDip.vel // pitch DOWN = +x
+					this._pumpDip = null
+				}
+			}
 			this._springCamRecoil(delta)
-			cam.rotation.x += this._recoil.x
-			cam.rotation.y += this._recoil.y
-			this._recoilApplied.set(this._recoil.x, this._recoil.y, this._recoil.z)
+			const DEG = Math.PI / 180
+			const appliedX = this._recoil.x - this._visClimb * DEG
+			const appliedY = this._recoil.y
+			cam.rotation.x += appliedX
+			cam.rotation.y += appliedY
+			this._recoilApplied.x = appliedX
+			this._recoilApplied.y = appliedY
+			// _recoilApplied.z is set in the roll block below (post-death-cam), matching
+			// exactly what was applied (0 when the death-cam owns the roll) — see FIX 4.
 			// transient shotgun FOV concussion punch (world camera only; aim-safe).
 			this._applyRecoilFov()
 		}
@@ -1013,12 +1055,16 @@ class Simulator {
 		// ray or the MoveCommand aim the server judges shots with.
 		this.fragLayer.applyDeathCamera()
 
-		// recoil ROLL, applied after the death-cam has set rotation.z for this frame
-		// (it assigns z=0 while alive, its death roll while dead — either way it fully
-		// overwrites z, so recoil roll self-clears and needs no remove-first tracking).
-		// Skipped while the death-cam owns the roll so the two never fight.
+		// recoil ROLL, applied after the death-cam has set rotation.z for this frame.
+		// Record _recoilApplied.z to EXACTLY what we add here so the top-of-frame remove
+		// subtracts precisely what was applied. When the death-cam owns the roll we skip
+		// the add AND set applied.z = 0 — otherwise removing a z that was never added
+		// leaked a persistent roll on death-cam frames (Bug D).
 		if (this.myRawEntity && !(this.fragLayer._deathCam && this.fragLayer._deathCam.active)) {
 			this.renderer.camera.rotation.z += this._recoil.z
+			this._recoilApplied.z = this._recoil.z
+		} else {
+			this._recoilApplied.z = 0
 		}
 
 		this._updateCrosshairSpread()
