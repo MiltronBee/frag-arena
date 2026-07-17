@@ -6,15 +6,20 @@ import Respawned from './message/Respawned'
 import HitConfirmed from './message/HitConfirmed'
 import Killed from './message/Killed'
 import DamageTaken from './message/DamageTaken'
+import PlayerName from './message/PlayerName'
 import MoveCommand from './command/MoveCommand'
+import SetNameCommand from './command/SetNameCommand'
 import FireCommand from './command/FireCommand'
 import SwitchWeaponCommand from './command/SwitchWeaponCommand'
 import DevUpdateWeaponConfigCommand from './command/DevUpdateWeaponConfigCommand'
 import Obstacle from './entity/Obstacle'
 import Projectile from './entity/Projectile'
+import Grenade from './entity/Grenade'
+import MegaHealthPickup from './entity/MegaHealthPickup'
 
 const config = {
-    UPDATE_RATE: 20, 
+    UPDATE_RATE: 40, // raised 20->40 (2026-07-16): halves per-tick dodge jump (0.57m->0.285m)
+                     // for target trackability. MAX_DELTA in applyCommand derives from this.
 
     ID_BINARY_TYPE: nengi.UInt16,
     TYPE_BINARY_TYPE: nengi.UInt8, 
@@ -23,7 +28,11 @@ const config = {
     TYPE_PROPERTY_NAME: 'ntype', 
 
     USE_HISTORIAN: true,
-    HISTORIAN_TICKS: 40,
+    // 80 ticks @ 40Hz = 2000ms lag-comp rewind window — PRESERVES the old window
+    // (was 40 @ 20Hz = 2000ms). Sized in TICKS, so it MUST scale with UPDATE_RATE
+    // or the rewind window in ms silently shrinks and high-ping shots stop
+    // registering. 2000ms comfortably covers latency + 100ms interp + margin.
+    HISTORIAN_TICKS: 80,
 
     DIMENSIONALITY: 3,
 
@@ -31,7 +40,9 @@ const config = {
         entities: [
             ['PlayerCharacter', PlayerCharacter],
             ['Obstacle', Obstacle],
-            ['Projectile', Projectile]
+            ['Projectile', Projectile],
+            ['Grenade', Grenade],
+            ['MegaHealthPickup', MegaHealthPickup]
         ],
         localMessages: [],
         messages: [
@@ -40,13 +51,15 @@ const config = {
             ['Respawned', Respawned],
             ['HitConfirmed', HitConfirmed],
             ['Killed', Killed],
-            ['DamageTaken', DamageTaken]
+            ['DamageTaken', DamageTaken],
+            ['PlayerName', PlayerName]
         ],
         commands: [
             ['MoveCommand', MoveCommand],
             ['FireCommand', FireCommand],
             ['SwitchWeaponCommand', SwitchWeaponCommand],
-            ['DevUpdateWeaponConfigCommand', DevUpdateWeaponConfigCommand]
+            ['DevUpdateWeaponConfigCommand', DevUpdateWeaponConfigCommand],
+            ['SetNameCommand', SetNameCommand]
         ],
         basics: []
     }

@@ -20,6 +20,7 @@ MoveCommand.protocol = {
 	weaponIndex: nengi.UInt8,
 	reload: nengi.Boolean,
 	fireInput: nengi.Boolean,
+	throwInput: nengi.Boolean, // Phase 3: rising-edge frag-grenade throw (edge-triggered client-side)
     delta: nengi.Float32
 }
 

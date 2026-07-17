@@ -18,7 +18,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,600;0,700;1,700&family=Inter:wght@400;600&family=Teko:wght@500;600&display=block">
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-d8a7e6d166">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-65e8b899a7">
 </head>
 <body class="connection-connecting">
     <main id="game-shell">
@@ -92,6 +92,14 @@
                     </div>
                     <div id="reload-state" aria-live="assertive">RELOAD</div>
                 </div>
+            </section>
+
+            <!-- Phase 3: frag-grenade charge count. Sits beside the weapon panel;
+                 the count is driven by Simulator._updateHud from the networked
+                 grenadeCharges. Throw with G (desktop) or the mobile grenade button. -->
+            <section id="grenade-panel" aria-label="Frag grenades">
+                <span id="grenade-icon" aria-hidden="true">&#9788;</span>
+                <span id="grenade-count">x2</span>
             </section>
 
             <div id="combat-state" class="combat-state-hidden" role="status">
@@ -283,7 +291,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-d8a7e6d166";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-d8a7e6d166"></script>
+    <script>window.__BUILD_ID__="0.0.1-65e8b899a7";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-65e8b899a7"></script>
 </body>
 </html>

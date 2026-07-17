@@ -1,0 +1,44 @@
+DERRICK — FOLLOW-UP. The dev accepted your direction: we are cutting the energy
+LADDER and re-verbing slots 4-7 into REAL tools, adding a grenade, a mega-health
+pickup, a landing penalty, and giving the autos real camera climb. Same visual-only
+camKick system (never moves the aim ray). Models on hand: we have 4 sci-fi "Red"
+gun meshes already imported (Rifle/SMG/Shotgun/Pistol silhouettes) that slots 4-7
+currently use — so re-verbed weapons should ideally reuse one of those 4 silhouettes.
+
+I need you to LOCK THE FINAL ROSTER as an implementation spec. No prose sandbox
+theory this time — I have that. Just the table. For EACH slot give me EVERY number
+a programmer needs, and resolve the two you left open (E-SMG "keep or cut", E-Pistol
+"fix or fold").
+
+Constraints / reminders:
+- Health 100, no regen (mega-health pickup can overheal to 150). Hitscan is cheap;
+  projectiles now exist (Plasma Repeater, Flak Cannon, grenade all use projectiles).
+- TTK target band for spawn weapons: 0.8-0.9s to 100 HP. Power weapons can be faster
+  but must be scarce/committal.
+- Small arena. Ranges are in meters (arena obstacle boxes ~a few dozen m across).
+- Reticle already scales its gap to live spread; ammo HUD shows mag/reserve.
+
+GIVE ME THIS, nothing else:
+
+A) THE ROSTER TABLE — one row per slot (decide final slot count, 6 or 8). Columns:
+   slot | name | verb (<=5 words) | type(hitscan/projectile) | cd | reload | mag |
+   reserve | dmg (note pellets/aoe) | range OR projectile-speed | spreadBase |
+   spreadHeat | heatPerShot | recoilForce | special (slow%, bounce#, aoe radius, etc.)
+   Confirm each row's TTK to 100 HP and name who-it-beats / who-beats-it in <=8 words.
+
+B) camKick per slot (VISUAL recoil): pitch, yawDrift, yawJitter, climb, climbMax,
+   heatBias, tension, damping. Make each gun feel distinct in the hand.
+
+C) THE GRENADE: is it a weapon slot or a separate throw button? damage falloff curve
+   (center dmg, edge dmg, radius), fuse seconds, throw speed, count carried, cooldown.
+
+D) MEGA-HEALTH: exact heal, overheal cap, respawn interval, pickup radius, and the
+   ONE audio/visual tell that makes the lobby fight over it.
+
+E) LANDING PENALTY: exact speed multiplier + duration, and any exception (does it
+   apply to the dodge burst or only to jumps?).
+
+F) THE 3 THINGS most likely to feel WRONG on first playtest with these numbers, and
+   the single knob to turn for each. One line each.
+
+Terse. Numbers over words. This is going straight into weaponsConfig.js and firingFx.js.

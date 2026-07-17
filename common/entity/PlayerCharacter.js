@@ -15,6 +15,12 @@ class PlayerCharacter {
 		this.hitpoints = 100
 		this.isAlive = true
 
+		// Phase 4 mega-health OVERHEAL decay (server-only, NOT networked — the decay
+		// runs server-side in GameInstance.update and the resulting hitpoints ARE
+		// networked). While hitpoints > 100, HP decays 2/sec, but only AFTER this
+		// grace timer (set to 3.0 on pickup) has counted down to 0. Cleared on respawn.
+		this.overhealDecayTimer = 0
+
 		// callsign: index into common/playerNames.js PLAYER_NAMES (UInt8 on the wire).
 		// A value of HUMAN_NAME_SENTINEL (30) means "human player — real name arrives
 		// via the PlayerName message" (the callsign the human typed); bots use 0–29.
@@ -31,6 +37,25 @@ class PlayerCharacter {
 		this.velZ = 0
 		this.grounded = false
 		this.dodgeTimer = 0
+
+		// Phase 2 debuff: a Plasma hit slows ground accel + max speed by slowFactor
+		// for slowTimer seconds. slowTimer is networked so the victim's own client
+		// prediction applies the debuff deterministically during reconciliation;
+		// slowFactor is server-derived (set alongside slowTimer on hit).
+		this.slowTimer = 0
+		this.slowFactor = 0
+
+		// Phase 2 swap commitment: seconds left before the just-equipped weapon can
+		// fire. Predicted + server-computed from the same switch event (not networked).
+		this.equipTimer = 0
+
+		// Phase 3 frag grenades (server-authoritative; the throw is NOT predicted).
+		// grenadeCharges is networked (UInt8) so the HUD shows the live count.
+		// throwCooldown gates min-interval between throws; rechargeAccum accrues the
+		// 12s-per-charge regen. Both are server-only (ticked in GameInstance.update).
+		this.grenadeCharges = 2       // start full
+		this.throwCooldown = 0        // seconds until the next throw is allowed
+		this.rechargeAccum = 0        // seconds accrued toward the next +1 charge
 
 		// Modular weapons state
 		this.currentWeaponIndex = 0
@@ -81,7 +106,9 @@ PlayerCharacter.protocol = {
 	velZ: nengi.Float32,
 	isAlive: nengi.Boolean,
 	hitpoints: nengi.UInt8,
+	slowTimer: nengi.Float32,
 	currentWeaponIndex: nengi.UInt8,
+	grenadeCharges: nengi.UInt8,
 	kills: nengi.UInt8,
 	deaths: nengi.UInt8,
 	nameIndex: nengi.UInt8

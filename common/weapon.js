@@ -6,6 +6,14 @@ import { shotSeed } from './firePattern'
 
 // advances the weapon cooldown timers
 export const update = (entity, delta) => {
+	// swap-commitment equip lock: tick down the just-equipped weapon's draw time.
+	// fire() refuses to fire while this is > 0. Runs on client + server through this
+	// shared function, so prediction and authority stay in lockstep.
+	if (entity.equipTimer > 0) {
+		entity.equipTimer -= delta
+		if (entity.equipTimer < 0) entity.equipTimer = 0
+	}
+
 	// Update legacy cooldown
 	const weapon = entity.weapon
 	if (weapon && weapon.onCooldown) {
@@ -49,6 +57,12 @@ export const fire = (entity) => {
 
 	if (!config || !state) {
 		console.log("WEAPON_FIRE_FAIL: no config or state for index:", index)
+		return false
+	}
+
+	// swap-commitment: cannot fire mid-draw. Gates BOTH client prediction and server
+	// authority through this shared function, so they stay in lockstep (like reload).
+	if (entity.equipTimer > 0) {
 		return false
 	}
 

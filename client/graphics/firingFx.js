@@ -14,7 +14,8 @@
 // the plasma bolt is a tight hot core, not a soft neon orb.
 
 // ---------------------------------------------------------------------------
-// Per-weapon presentation presets, keyed by the weapon's gameplay index (0..4).
+// Per-weapon presentation presets, keyed by the weapon's gameplay index (0..5):
+// 0 Rifle, 1 SMG, 2 Shotgun, 3 Pistol, 4 Plasma (cyan projectile), 5 Flak (green projectile).
 // tracer:null => the weapon renders no hitscan tracer (plasma uses a projectile).
 // projectile != null => plasma bolt visual params.
 // report => procedural WebAudio synth params (see WeaponAudio.voiceParams).
@@ -59,8 +60,8 @@ const WEAPON_FX = {
     impact: { scale: 0.22 },
     recoil: { back: 0.040, rise: 0.020, shake: 0.55 },
     // disciplined punch: small climb, subtle right drift, quick 220ms settle.
-    camKick: { pitch: 0, yawDrift: 0, yawJitter: 0, climb: 0, climbMax: 0,
-               heatBias: 0, tension: 900, damping: 60 },
+    camKick: { pitch: 0.45, yawDrift: 0.06, yawJitter: 0.05, climb: 0.15, climbMax: 1.8,
+               heatBias: 0.4, tension: 950, damping: 62 },
     vmKick: { back: 0.5, up: 0.06, pitch: 0.35, yaw: 0.06, tension: 280, damping: 23,
               roll: 0.010, variance: 0.2 },
     eject: { x: 0.14, y: -0.10, z: 0.55, delay: 0, size: 0.020, color: [0.85, 0.62, 0.22] },
@@ -79,8 +80,8 @@ const WEAPON_FX = {
     recoil: { back: 0.024, rise: 0.012, shake: 0.34 },
     // rattly climb: lower per-shot pitch but higher heat bias + left drift; fast 160ms
     // recovery keeps the picture honest between the SMG's tight bursts.
-    camKick: { pitch: 0, yawDrift: 0, yawJitter: 0, climb: 0, climbMax: 0,
-               heatBias: 0, tension: 1600, damping: 80 },
+    camKick: { pitch: 0.22, yawDrift: -0.04, yawJitter: 0.18, climb: 0.25, climbMax: 2.2,
+               heatBias: 0.6, tension: 1500, damping: 80 },
     vmKick: { back: 0.22, up: 0.03, pitch: 0.16, yaw: 0.10, tension: 500, damping: 31,
               roll: 0.018, variance: 0.3 },
     eject: { x: 0.13, y: -0.11, z: 0.45, delay: 0, size: 0.016, color: [0.85, 0.62, 0.22] },
@@ -135,8 +136,41 @@ const WEAPON_FX = {
     report: { kind: 'ballistic', level: 0.9, bodyFreq: 200, bodyDrop: 70, noiseHz: 2000, noiseQ: 1.1, decay: 0.12, mech: 0.6 },
     projectile: null,
   },
-  // (index 4, the plasma preset, was removed with the weapon slot — see
-  // weaponsConfig.js. The projectile/energy FX plumbing it drove is kept.)
+  // 4 — Plasma Repeater: cyan energy identity. The projectile bolt carries the
+  // visual (chance:0 so no hitscan tracer), light-climb auto with soft recovery.
+  4: {
+    tracer: { color: [0.45, 0.85, 1.0], core: [0.85, 0.98, 1.0], width: 0.013, life: 30, chance: 0.0 }, // bolt carries the visual; keep chance 0 so no hitscan tracer
+    muzzle: { color: [0.45, 0.85, 1.0], scale: 0.20, glowScale: 0.34, life: 34 },
+    impact: { scale: 0.20 },
+    recoil: { back: 0.030, rise: 0.016, shake: 0.40 },
+    camKick: { pitch: 0.30, yawDrift: 0.03, yawJitter: 0.15, climb: 0.10, climbMax: 0.8,
+               heatBias: 0.3, tension: 1100, damping: 60 },
+    vmKick: { back: 0.30, up: 0.04, pitch: 0.22, yaw: 0.06, tension: 420, damping: 28,
+              roll: 0.012, variance: 0.25 },
+    eject: null,
+    light: { intensity: 1.4, range: 8, life: 60, decayPow: 2, jitter: 0.15 },
+    smoke: { chance: 0.0, scale: 0.0, life: 0, gray: 0.0 },
+    report: { kind: 'ballistic', level: 0.7, bodyFreq: 300, bodyDrop: 120, noiseHz: 3200, noiseQ: 1.2, decay: 0.10, mech: 0.35 },
+    projectile: null,
+  },
+  // 5 — Flak Cannon: heavy, shotgun-like feel but a projectile. Big single shove +
+  // FOV concussion punch, dirty green muzzle, long low report.
+  5: {
+    tracer: { color: [0.6, 1.0, 0.5], core: [0.9, 1.0, 0.8], width: 0.014, life: 34, chance: 0.0 },
+    muzzle: { color: [0.6, 1.0, 0.5], scale: 0.40, glowScale: 0.62, life: 46 },
+    impact: { scale: 0.24 },
+    recoil: { back: 0.080, rise: 0.042, shake: 1.0 },
+    camKick: { pitch: 1.20, yawDrift: 0, yawJitter: 0.20, climb: 0, climbMax: 1.2,
+               heatBias: 0, tension: 380, damping: 39,
+               fov: { amount: -0.04, inMs: 50, outMs: 180 } },
+    vmKick: { back: 0.9, up: 0.15, pitch: 0.60, yaw: 0.05, tension: 100, damping: 24,
+              roll: 0.028, variance: 0.12 },
+    eject: null,
+    light: { intensity: 2.8, range: 12, life: 100, decayPow: 2, jitter: 0.15 },
+    smoke: { chance: 0.6, scale: 0.30, life: 900, gray: 0.5 },
+    report: { kind: 'shotgun', level: 0.95, bodyFreq: 150, bodyDrop: 50, noiseHz: 1500, noiseQ: 0.6, decay: 0.28, mech: 0.6 },
+    projectile: null,
+  },
 }
 
 // Fallback for shots we render without a known weapon identity — chiefly OTHER

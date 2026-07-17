@@ -744,6 +744,49 @@ class BABYLONRenderer {
 		this._track(impact, s.life, 'flash', 2, 0.5, 0.5, 0.5)
 	}
 
+	// Phase 3: frag-grenade detonation FX at a world position — a big orange fireball
+	// core + a softer expanding glow shell + a couple of hot sparks. Reuses the pooled
+	// 'impact' meshes (no allocation) and the same _track fade system as plasmaImpact,
+	// just scaled up and tinted orange so it reads as an explosion, not an energy zap.
+	grenadeExplosion(pos) {
+		if (!pos) return
+		// bright core fireball
+		const core = this._next('impact')
+		core.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL
+		core.layerMask = 0x0FFFFFFF
+		this._setImpactSprite(core, 'spark', true)
+		this._setColor(core, [1.0, 0.55, 0.15], 1.6) // hot orange
+		core.position.copyFrom(pos)
+		core.rotation.z = Math.random() * Math.PI * 2
+		this._track(core, 300, 'impact', 0.8, 3.2, 3.2, 3.2)
+
+		// softer expanding glow shell
+		const glow = this._next('impact')
+		glow.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL
+		glow.layerMask = 0x0FFFFFFF
+		this._setImpactSprite(glow, 'spark', true)
+		this._setColor(glow, [1.0, 0.35, 0.08], 1.0) // deeper orange
+		glow.position.copyFrom(pos)
+		glow.rotation.z = Math.random() * Math.PI * 2
+		this._track(glow, 420, 'impact', 0.6, 5.0, 5.0, 5.0)
+
+		// a dark scorch smoke puff that swells + lingers
+		const smoke = this._next('impact')
+		smoke.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL
+		smoke.layerMask = 0x0FFFFFFF
+		this._setImpactSprite(smoke, 'scorch', false)
+		this._setColor(smoke, [0.16, 0.14, 0.13])
+		smoke.position.copyFrom(pos)
+		smoke.rotation.z = Math.random() * Math.PI * 2
+		this._track(smoke, 700, 'smoke', 1, 3.0, 3.0, 3.0)
+
+		// a brief bright light pulse if the pooled muzzle light exists (no new lights)
+		if (this._muzzleLight) {
+			this._muzzleLight.position.copyFrom(pos)
+			this._muzzleLightPulse = { t0: performance.now(), life: 260, peak: 2.4, decayPow: 2 }
+		}
+	}
+
 	// advance every active FX one frame (framerate-independent via wall clock), then
 	// render. Finished effects are hidden and reclaimed — the pool never grows.
 	update() {

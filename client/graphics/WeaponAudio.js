@@ -550,6 +550,133 @@ export default class WeaponAudio {
     this._teardownWhenDone(sources, nodes)
   }
 
+  // Phase 3: frag-grenade detonation — a punchy low boom (descending sine sub) layered
+  // with a filtered noise burst (the crack/debris). Positional when opts.pos is given
+  // (panner owns distance); otherwise 2D with the manual distanceGain. Procedural only,
+  // matching the impact() convention above (no sample dependency).
+  explosion(opts = {}) {
+    if (!this.ctx) return
+    const ctx = this.ctx, t0 = ctx.currentTime
+    const positional = !!opts.pos
+    const g = positional ? 0.9 : 0.9 * distanceGain(opts.distance || 0)
+    if (g <= 0.002) return
+    const panner = this._makePanner(opts.pos)
+    const out = this._voiceOut(g, panner || this.comp)
+
+    // low sub boom: sine sweeping down for weight
+    const dur = 0.55
+    const osc = ctx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(160, t0)
+    osc.frequency.exponentialRampToValueAtTime(38, t0 + dur)
+    const oGain = ctx.createGain()
+    oGain.gain.setValueAtTime(0.9, t0)
+    oGain.gain.exponentialRampToValueAtTime(0.001, t0 + dur)
+    osc.connect(oGain); oGain.connect(out)
+    osc.start(t0); osc.stop(t0 + dur + 0.02)
+    const sources = [osc], nodes = panner ? [out, panner, osc, oGain] : [out, osc, oGain]
+
+    // debris/crack: broadband noise burst, low-passed and decaying fast
+    if (this._noise) {
+      const noise = ctx.createBufferSource(); noise.buffer = this._noise
+      const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400
+      const nGain = ctx.createGain()
+      nGain.gain.setValueAtTime(0.8, t0)
+      nGain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.28)
+      noise.connect(lp); lp.connect(nGain); nGain.connect(out)
+      noise.start(t0); noise.stop(t0 + 0.3)
+      sources.push(noise); nodes.push(noise, lp, nGain)
+    }
+    this._teardownWhenDone(sources, nodes)
+  }
+
+  // Phase 4: MEGA-HEALTH ambient hum. A single looping low sine (positional, at the
+  // pickup's world spot) whose base gain + pitch are set once and then RAMPED while
+  // CHARGING (the last ~5s before respawn) into a rising tell everyone nearby can time.
+  // Started when the pickup becomes AVAILABLE (or CHARGING), stopped on grab / hidden.
+  // Cheap: one oscillator + one gain through a panner, torn down explicitly on stop.
+  megaHumStart(pos) {
+    if (!this.ctx || this._megaHum) return
+    const ctx = this.ctx, t0 = ctx.currentTime
+    const panner = this._makePanner(pos)
+    const dest = panner || this.comp
+    const osc = ctx.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(90, t0) // low ambient base
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0.0001, t0)
+    gain.gain.exponentialRampToValueAtTime(0.14, t0 + 0.6) // fade the hum in
+    // a soft high shimmer partial so it reads as "power item", not a fog horn
+    const osc2 = ctx.createOscillator()
+    osc2.type = 'triangle'
+    osc2.frequency.setValueAtTime(270, t0)
+    const g2 = ctx.createGain()
+    g2.gain.setValueAtTime(0.0001, t0)
+    g2.gain.exponentialRampToValueAtTime(0.04, t0 + 0.6)
+    osc.connect(gain); gain.connect(dest)
+    osc2.connect(g2); g2.connect(dest)
+    osc.start(t0); osc2.start(t0)
+    this._megaHum = { osc, osc2, gain, g2, panner }
+  }
+
+  // Drive the CHARGING tell: over `secs` climb the hum's pitch + level so it rises
+  // toward the respawn moment. Called each frame while CHARGING with the seconds
+  // remaining. Idempotent-ish (uses setTargetAtTime toward the current target).
+  megaHumCharge(secsRemaining) {
+    if (!this.ctx || !this._megaHum) return
+    const t = this.ctx.currentTime
+    // 1 at 5s out -> 0 at respawn; ramp pitch 90->200Hz and gain 0.14->0.30
+    const k = Math.max(0, Math.min(1, 1 - secsRemaining / 5))
+    const h = this._megaHum
+    h.osc.frequency.setTargetAtTime(90 + 110 * k, t, 0.15)
+    h.osc2.frequency.setTargetAtTime(270 + 330 * k, t, 0.15)
+    h.gain.gain.setTargetAtTime(0.14 + 0.16 * k, t, 0.15)
+  }
+
+  // Stop + tear down the mega-health hum (grab / hidden). Quick fade so a grab
+  // doesn't click. Safe to call when no hum is running.
+  megaHumStop() {
+    if (!this._megaHum) return
+    const h = this._megaHum
+    this._megaHum = null
+    if (!this.ctx) return
+    const t = this.ctx.currentTime
+    try {
+      h.gain.gain.setTargetAtTime(0.0001, t, 0.05)
+      h.g2.gain.setTargetAtTime(0.0001, t, 0.05)
+      h.osc.stop(t + 0.2); h.osc2.stop(t + 0.2)
+      const kill = () => { [h.osc, h.osc2, h.gain, h.g2, h.panner].forEach(n => { try { n && n.disconnect() } catch (e) {} }) }
+      h.osc.onended = kill
+    } catch (e) { /* already stopped */ }
+  }
+
+  // Bright pickup CHIME on grabbing the mega-health — a quick rising two-note
+  // sparkle so the grab feels rewarding. Positional when opts.pos is given.
+  megaPickup(opts = {}) {
+    if (!this.ctx) return
+    const ctx = this.ctx, t0 = ctx.currentTime
+    const positional = !!opts.pos
+    const g = positional ? 0.6 : 0.6 * distanceGain(opts.distance || 0)
+    if (g <= 0.002) return
+    const panner = this._makePanner(opts.pos)
+    const out = this._voiceOut(g, panner || this.comp)
+    const sources = [], nodes = panner ? [out, panner] : [out]
+    // two bright rising blips
+    ;[[t0, 660, 990], [t0 + 0.08, 990, 1480]].forEach(([t, f0, f1]) => {
+      const osc = ctx.createOscillator()
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(f0, t)
+      osc.frequency.exponentialRampToValueAtTime(f1, t + 0.09)
+      const og = ctx.createGain()
+      og.gain.setValueAtTime(0.5, t)
+      og.gain.exponentialRampToValueAtTime(0.001, t + 0.14)
+      osc.connect(og); og.connect(out)
+      osc.start(t); osc.stop(t + 0.16)
+      sources.push(osc); nodes.push(osc, og)
+    })
+    this._teardownWhenDone(sources, nodes)
+  }
+
   // crisp positive tick when the local player's shot hits an enemy; a brighter rising
   // two-tone for a kill.
   hitMarker(kill = false) {

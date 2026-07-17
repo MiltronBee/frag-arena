@@ -27,7 +27,8 @@ const keybinds = {
 	83: 'backwards', // s
 	68: 'right', // d
 	32: 'jump', // spacebar
-	82: 'reload' // r
+	82: 'reload', // r
+	71: 'throwInput' // g — Phase 3 frag-grenade throw
 }
 
 // UT dodge: double-tap a movement key within this window (UT99 DodgeClickTime)
@@ -42,6 +43,7 @@ const keystate = () => {
 		right: false,
 		jump: false,
 		reload: false,
+		throwInput: false,
 		mouseDown: false,
 		dodge: null // a dodgeable action name when a double-tap fired this frame
 	}
@@ -152,6 +154,7 @@ class InputSystem {
 		this.frameState.backwards = this._currentState.backwards
 		this.frameState.right = this._currentState.right
 		this.frameState.reload = this._currentState.reload
+		this.frameState.throwInput = this._currentState.throwInput
 		this.frameState.mouseDown = this._currentState.mouseDown
 		this.frameState.jump = this._currentState.jump
 		this.frameState.justReleasedR = false

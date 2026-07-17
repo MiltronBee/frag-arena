@@ -1,0 +1,84 @@
+DERRICK — SESSION SCOPE EXPANSION (read this first):
+For THIS review your remit is the WHOLE GUN FEEL, not just the sandbox-as-a-system.
+Visor and Shotcaller are off today; you own it all. I want your verdict on every
+weapon's: reload time, accuracy (spread/heat), power (damage/TTK), magazine size,
+reserve ammo, RECOIL feel (camera + viewmodel kick), the RETICLE, the AMMO HUD, and
+overall FPS "feel" — does firing each gun feel right in the hand? Still give me the
+sandbox map (verbs, collisions, gaps), but go deep on the FEEL layer too.
+
+=============================================================================
+FRAG ARENA — CURRENT WEAPON STATE (2026-07-17), all values live in the tree.
+=============================================================================
+Engine: Babylon.js client, 20→40Hz custom WS netcode (tick raise staged, not shipped).
+Health 100, no shields, no regen. All hip-fire, no ADS. Quake accel+friction movement,
+UT99 jump, double-tap dodge burst. Arena is still a PLACEHOLDER (white plane + boxes) —
+no real geometry, NO pickups, NO power weapons, NO grenades, NO melee yet. Roster is
+8 slots: 4 conventional (0-3) + 4 "energy" clones (4-7).
+
+--- SANDBOX / STATS (common/weaponsConfig.js) ---
+Spread values are radians (half-cone). heat 0..1, +heatPerShot/shot, -1.3/s cooldown;
+effective spread = spreadBase + spreadHeat*heat.
+
+0 RIFLE   hitscan  cd 0.14s (~430rpm)  reload 1.5s  mag 30  reserve 90  dmg 15
+          range 75  spreadBase 0.003  spreadHeat 0.004  heat/shot 0.12  recoilForce 1.0
+          Authored verb: "mid-range pressure / tracking workhorse". ~0.84s TTK to 100.
+1 SMG     hitscan  cd 0.08s (~750rpm)  reload 1.2s  mag 40  reserve 120 dmg 10
+          range 60  spreadBase 0.006  spreadHeat 0.032  heat/shot 0.13  recoilForce 0.6
+          Verb: "close-range hose, rate over accuracy". ~0.72s TTK up close.
+2 SHOTGUN hitscan  cd 0.8s   reload 2.2s  mag 8   reserve 24  dmg 10 x 8 pellets
+          range 30  ring rosette (radius 0.05, jitter 0.016), spreadBase 0.004  recoilForce 2.2
+          Verb: "own this doorway". 80 dmg max point-blank.
+3 PISTOL  hitscan  cd 0.45s  reload 1.0s  mag 6   reserve 36  dmg 34  range 50
+          spreadBase 0.0015  spreadHeat 0 (laser)  recoilForce 0.8  isOneHanded
+          Verb: "quick-draw precision finisher, 3-shot kill". Punishes spam.
+          NOTE: fast-draw equip time is a TODO — switching is currently INSTANT.
+
+4 E-RIFLE   clone of Rifle:  cd 0.165  mag 30 res 90  dmg 17  range 100 spreadBase .003 heat .007 h/s .16
+5 E-SMG     clone of SMG:    cd 0.088  mag 40 res 120 dmg 12  range 60  spreadBase .006 heat .032 h/s .13
+6 E-SHOTGUN clone of Shotgun:cd 0.88   mag 8  res 24  dmg 12x8 range 30
+7 E-PISTOL  clone of Pistol: cd 0.165  mag 12 res 36  dmg 23  range 50  spreadBase .0015 heat 0
+The energy tier is authored as "+15% dmg, -10% fire rate, same recoil". Note E-Pistol
+BREAKS its own template: cd 0.165 (not 0.5) and mag 12 (not 6) — it is NOT a slow
+finisher, it's a fast 5-shot laser SMG-pistol. E-Rifle range 100 vs Rifle 75.
+
+--- RECOIL FEEL (client/graphics/firingFx.js) ---
+Two independent layers per weapon:
+ camKick = camera ROTATION recoil (degrees). Applied AFTER aim is read, removed before
+   next read, so it is PROVABLY invisible to the shot ray (pure visual). Fields:
+   pitch (per-shot climb), yawDrift (signed), yawJitter, climb/climbMax (sustained lean),
+   heatBias (scales climb by predicted heat), tension/damping (return spring ~critically
+   damped), fov (shotgun only, world-cam concussion punch).
+ vmKick = viewmodel procedural kick: back/up/pitch/yaw impulse + spring tension/damping,
+   optional pump (delayed 2nd rack), roll, per-shot variance (Vlambeer "vary everything").
+Current per-weapon:
+ RIFLE   camKick pitch 0, climb 0, tension 900/damp 60 (settle ~220ms). vmKick back .5 up .06 pitch .35.
+ SMG     camKick pitch 0, climb 0, tension 1600/damp 80 (settle ~160ms). vmKick back .22 up .03 pitch .16.
+ SHOTGUN camKick pitch 1.20, yawJitter .20, climbMax 1.2, tension 380/damp 39 (~380ms) + pumpDip + FOV -5%.
+         vmKick back 1.0 up .16 pitch .65 + pump(350ms). This is the ONLY gun with real camera pitch kick.
+ PISTOL  camKick pitch 0, tension 1400/damp 75 (settle ~120ms, first-shot honest). vmKick back .45 up .11 pitch .6.
+ >>> OBSERVATION: Rifle/SMG/Pistol all have camKick.pitch = 0 and climb = 0. Only the
+     shotgun actually kicks the camera. Autos have NO climb. Is that right for "feel"?
+
+--- RETICLE (client/Simulator.js, inline #crosshair SVG) ---
+Per-weapon shape via data-weapon; a dynamic 4-line cross whose GAP grows with the live
+client-predicted spread (spreadNow * pxPerRad, honest at any FOV). Shotgun shows a
+static ring sized to ringRadius. No hitmarker-on-kill distinction beyond a hit flash.
+
+--- AMMO HUD (client/Simulator.js _updateHud) ---
+#magazine-ammo / #reserve-ammo big numbers + weapon-name + weapon silhouette panel.
+low-ammo CSS class at <=25% mag; is-reloading class while reloading. Health bar,
+frag/death count, player count. Ammo is NOT networked — predicted deterministically
+client-side, reset on respawn to mag=capacity/reserve=max.
+
+=============================================================================
+WHAT I WANT FROM YOU (use your 6-part structure): THE VERDICT, THE SANDBOX MAP,
+WHAT'S BROKEN, THE FIXES (exact numbers), THE SLEEPER ISSUE, ONE THING RIGHT.
+Extra asks on top of the sandbox map:
+ - RECOIL: should the autos get real vertical climb? Give me concrete camKick pitch/
+   climb/tension numbers per weapon that would make each gun feel distinct in the hand
+   without lying to the aim (remember camKick is visual-only, doesn't move the ray).
+ - The ENERGY tier: is it a real tier or a ladder rung? Cut it, re-verb it, or fix the
+   E-Pistol/E-Rifle inconsistencies — your call, with numbers.
+ - RETICLE + AMMO HUD: anything that would make the read faster / the feedback punchier?
+ - Reload times & mag sizes: which feel wrong for the verb, and what to.
+Be blunt. Exact weapon, exact number, exact reason.

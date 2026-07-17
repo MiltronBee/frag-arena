@@ -46,6 +46,7 @@ class TouchControls {
 		this._triedFullscreen = false
 
 		this._reloadPulseTimer = null   // pending release of a reload input pulse
+		this._throwPulseTimer = null    // pending release of a grenade-throw input pulse
 
 		this._buildDom()
 		this._bindJoystick()
@@ -73,6 +74,7 @@ class TouchControls {
 		this.jumpBtn = el('div', 'touch-jump', root, '▲')
 		this.reloadBtn = el('div', 'touch-reload', root, '⟳')
 		this.switchBtn = el('div', 'touch-switch', root, '⇄')
+		this.throwBtn = el('div', 'touch-throw', root, '☀') // Phase 3 frag-grenade throw
 		this.gearBtn = el('div', 'touch-gear', root, '⚙')
 	}
 
@@ -292,6 +294,20 @@ class TouchControls {
 		this._bindTap(this.switchBtn, () => {
 			this.simulator.switchWeapon(this.simulator.weaponIndex + 1)
 			if (navigator.vibrate) navigator.vibrate(8)
+		})
+
+		// THROW — rising-edge pulse of the grenade throwInput, identical mechanism to
+		// RELOAD above: hold the input true across ≥1 update frame so Simulator's
+		// rising-edge check (`throwInput && !_throwHeld`) fires exactly once, then
+		// release so it can be re-triggered.
+		this._bindTap(this.throwBtn, () => {
+			if (this._throwPulseTimer !== null) clearTimeout(this._throwPulseTimer)
+			s.throwInput = true
+			this._throwPulseTimer = setTimeout(() => {
+				s.throwInput = false
+				this._throwPulseTimer = null
+			}, RELOAD_PULSE_MS)
+			if (navigator.vibrate) navigator.vibrate(10)
 		})
 	}
 

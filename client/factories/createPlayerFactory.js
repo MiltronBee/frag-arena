@@ -75,7 +75,8 @@ export default ({ simulator }) => {
 			// callsign arrives as a replicated index (also fires on create with the
 			// initial value); resolve + register it so the nametag + kill feed match.
 			nameIndex({ entity, value }) {
-				const name = PLAYER_NAMES[value] || `Player ${entity.nid}`
+				if (value >= HUMAN_NAME_SENTINEL) return // human; name comes via PlayerName
+				const name = PLAYER_NAMES[value] || `Bot ${entity.nid}`
 				simulator._nameRegistry.set(entity.nid, name)
 				const model = simulator.characterModels.get(entity.nid)
 				if (model) model.setName(name)

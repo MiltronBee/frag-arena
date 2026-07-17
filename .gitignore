@@ -1,6 +1,9 @@
 node_modules
 dist
 public/js/
+.env
+.env.*
+*.env
 .claude/settings.local.json
 *.log
 .venv/

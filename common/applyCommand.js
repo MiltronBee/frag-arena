@@ -1,6 +1,7 @@
 import { update as updateWeapon } from './weapon'
 import { Vector3, Matrix, Axis } from 'babylonjs'
 import { weapons } from './weaponsConfig'
+import nengiConfig from './nengiConfig'
 
 /* UT99-style movement. Runs on BOTH the client (prediction) and the server
    (authoritative) — it must stay deterministic: same entity state + same
@@ -18,8 +19,17 @@ const TERMINAL_FALL = 30
 export const DODGE_SPEED = 11.4   // dodge bursts at 1.5x GroundSpeed
 const DODGE_UP = 3.4              // small hop so the dodge clears the floor
 const DODGE_COOLDOWN = 0.35       // after landing, before the next dodge
+// NOTE: an earlier post-dodge "landing speed clamp" was removed — DYOR found it has
+// no prior art in shipped arena shooters (they use a re-dodge cooldown, which we
+// already have). Raising the sim tick to 40Hz halves the per-tick dodge jump
+// (0.57m -> 0.285m), which fixes the target-trackability problem the clamp was
+// invented for. If dodges still feel spammy in playtest, bump DODGE_COOLDOWN to
+// ~0.45 (UT4's shipped `dodgedelay`) rather than reintroducing a clamp.
 const GROUND_Y = 0
-const MAX_DELTA = 1 / 20          // clamp hitches so one lagged frame can't teleport
+// clamp hitches so one lagged frame can't teleport. Derived from the sim tick so
+// a tick-rate raise (nengiConfig.UPDATE_RATE) keeps the per-command clamp equal to
+// exactly one server tick automatically — do NOT hardcode this to 1/20.
+const MAX_DELTA = 1 / nengiConfig.UPDATE_RATE
 
 // the fastest a player legitimately moves horizontally (used for the smooth
 // entity's path-following budget on the server)
@@ -80,7 +90,12 @@ export default (entity, command) => {
 			entity.velZ *= scale
 		}
 		if (wishLen > 0) {
-			accelerate(entity, wishX, wishZ, GROUND_SPEED, GROUND_ACCEL, delta)
+			// Plasma slow debuff: scale ground max-speed AND accel by (1-slowFactor)
+			// for this frame. Deterministic (slowTimer/slowFactor are entity state,
+			// synced + predicted), so it reconciles exactly. Does NOT touch the dodge
+			// burst below (escape stays viable at full DODGE_SPEED).
+			const slow = entity.slowTimer > 0 ? (1 - (entity.slowFactor || 0)) : 1
+			accelerate(entity, wishX, wishZ, GROUND_SPEED * slow, GROUND_ACCEL * slow, delta)
 		}
 
 		// the cooldown only ticks while grounded: dodging launches you airborne,
@@ -137,8 +152,21 @@ export default (entity, command) => {
 		entity.grounded = false
 	}
 
-	// Apply weapon switching
+	// tick the Plasma slow debuff down (independent of grounded state so it also
+	// expires while airborne). Clamp at 0 so a networked/predicted value never runs
+	// negative and permanently disables the (1-slowFactor) gate above.
+	if (entity.slowTimer > 0) {
+		entity.slowTimer -= delta
+		if (entity.slowTimer < 0) entity.slowTimer = 0
+	}
+
+	// Apply weapon switching. When the equipped index actually changes, start the
+	// equip lock (drawTime) — weapon.fire() refuses to fire while equipTimer > 0.
 	if (command.weaponIndex !== undefined) {
+		if (command.weaponIndex !== entity.currentWeaponIndex) {
+			const w = weapons[command.weaponIndex]
+			entity.equipTimer = (w && w.drawTime) || 0
+		}
 		entity.currentWeaponIndex = command.weaponIndex
 	}
 

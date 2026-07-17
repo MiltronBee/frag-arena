@@ -55,6 +55,14 @@ function _loadProp(scene, url) {
   return p
 }
 
+// Public re-export of the shared prop loader so non-character visuals (e.g. the
+// thrown grenade) can mount the SAME cached template the preloader warms —
+// without duplicating the ImportMesh+cache logic. Returns the cached
+// { root } template (a hidden, disabled node); callers clone from it.
+export function loadPropTemplate(scene, url) {
+  return _loadProp(scene, url)
+}
+
 // ---------------------------------------------------------------------------
 // PRELOAD / GPU-WARM helpers (called by the boot preloader, NOT in-match).
 //

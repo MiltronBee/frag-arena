@@ -89,6 +89,18 @@ export default function preloadAssets(renderer, arenaReadyPromise, onProgress) {
     }
   })
 
+  // EFFECTS — the thrown frag-grenade prop model. Parse the GLB + shader-warm +
+  // prime the browser cache behind the loading gate so the first grenade thrown
+  // in-match mounts from the warm cache with zero ImportMesh hitch (matches the
+  // no-in-match-import contract in the header). Cloned per grenade in
+  // createFactories' Grenade factory via loadPropTemplate.
+  items.push({ w: 0.5, stage: 'EFFECTS', run: () => warmProp(scene, '/assets/props/Prop_Grenade.gltf') })
+
+  // EFFECTS — the Phase 4 mega-health pickup prop. Warmed behind the gate like the
+  // grenade so the first in-match mount (createFactories' MegaHealthPickup factory,
+  // via loadPropTemplate) hits the warm browser cache + compiled shader with no hitch.
+  items.push({ w: 0.5, stage: 'EFFECTS', run: () => warmProp(scene, '/assets/props/Prop_HealthPack.gltf') })
+
   // FINALIZING — resolve UI fonts (labeled generically so the last stage the
   // player sees reads as "wrapping up").
   items.push({ w: 0.5, stage: 'FINALIZING', run: () => loadFonts() })

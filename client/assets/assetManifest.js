@@ -79,29 +79,51 @@ export const assets = {
 // (2026-07-14) via scripts/tune-tp-mounts.mjs.
 // ---------------------------------------------------------------------------
 export const tpWeapons = [
-  { // 0 Rifle
-    url: '/assets/weapons/tp_rifle.glb',
-    scale: 0.010,
+  // NOTE (2026-07-16 sci-fi swap): the Quaternius sci-fi guns are authored in
+  // METERS, not cm — so the per-cm ~0.010 scale no longer applies. Scales below
+  // are computed to give real-ish world lengths (rifle ~0.70u, SMG ~0.42u,
+  // shotgun ~0.55u, pistol ~0.24u) INSIDE the 0.577 body bone scale, from each
+  // gun's measured raw X-length (see bounding boxes). Rough first pass — a
+  // visual tuning pass on pos/rot follows.
+  { // 0 Rifle  (raw len 1.06m)
+    url: '/assets/weapons/Gun_Rifle.gltf',
+    scale: 1.145,
     position: { x: 0.0, y: -0.03, z: 0.0 },
     rotation: { x: 0, y: 1.5708, z: 0.3 },
   },
-  { // 1 SMG
-    url: '/assets/weapons/tp_smg.glb',
-    scale: 0.010,
+  { // 1 SMG  (raw len 0.48m)
+    url: '/assets/weapons/Gun_SMG.gltf',
+    scale: 1.507,
     position: { x: 0.0, y: -0.03, z: 0.0 },
     rotation: { x: 0, y: 1.5708, z: 0.15 },
   },
-  { // 2 Shotgun
-    url: '/assets/weapons/tp_shotgun.glb',
-    scale: 0.010,
+  { // 2 Shotgun  (raw len 0.63m)
+    url: '/assets/weapons/Gun_Shotgun.gltf',
+    scale: 1.518,
     position: { x: 0.0, y: -0.03, z: 0.0 },
     rotation: { x: 0, y: 1.5708, z: -0.4 },
   },
-  { // 3 Pistol
-    url: '/assets/weapons/tp_pistol.glb',
-    scale: 0.013,
+  { // 3 Pistol  (raw len 0.44m)
+    url: '/assets/weapons/Gun_Pistol.gltf',
+    scale: 0.941,
     position: { x: 0.0, y: -0.03, z: 0.0 },
     rotation: { x: 0, y: 1.5708, z: 0.1 },
+  },
+  // PROJECTILE WEAPONS (slots 4-5). They reuse the PLAIN (non-red) sci-fi gun
+  // meshes as third-person props — same geometry as their sci-fi counterparts, so
+  // the bounding-box scales and rotations match the like-shaped slots above
+  // (Plasma reuses the Rifle prop, Flak reuses the Shotgun prop).
+  { // 4 Plasma  (Rifle prop, raw len 1.06m)
+    url: '/assets/weapons/Gun_Rifle.gltf',
+    scale: 1.145,
+    position: { x: 0.0, y: -0.03, z: 0.0 },
+    rotation: { x: 0, y: 1.5708, z: 0.3 },
+  },
+  { // 5 Flak  (Shotgun prop, raw len 0.63m)
+    url: '/assets/weapons/Gun_Shotgun.gltf',
+    scale: 1.518,
+    position: { x: 0.0, y: -0.03, z: 0.0 },
+    rotation: { x: 0, y: 1.5708, z: -0.4 },
   },
 ]
 

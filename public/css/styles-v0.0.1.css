@@ -424,6 +424,16 @@ body.low-health .hud-skull { animation: hp-pulse 1.2s ease-in-out infinite; }
 
 @keyframes hp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
 
+/* Phase 4 mega-health OVERHEAL (>100): the fill + readout + track glow read as an
+   amber "power" state distinct from the teal base bar, so 100-150 HP is obvious.
+   JS toggles body.overheal in Simulator._updateHud. */
+body.overheal #health-fill {
+    background: #ffbf3f;
+    box-shadow: 0 0 12px rgba(255, 191, 63, 0.85);
+}
+body.overheal .health-track { border-color: rgba(255, 191, 63, 0.55); }
+body.overheal #health-value { color: #ffd27a; text-shadow: 0 0 10px rgba(255, 191, 63, 0.6); }
+
 /* persistent low-HP edge vignette (DESIGN 3.5) */
 body.low-health #damage-flash {
     opacity: 0.15;
@@ -519,6 +529,42 @@ body.low-health #damage-flash {
 #weapon-panel.low-ammo {
     border-left-color: var(--warn);
 }
+
+/* Phase 3: frag-grenade charge indicator. Small plate sitting directly ABOVE the
+   weapon panel (bottom-right), matching the Halo-ish HUD chrome. #grenade-count is
+   driven by Simulator._updateHud from the networked grenadeCharges. */
+#grenade-panel {
+    position: absolute;
+    bottom: calc(var(--sp-5) + 66px + env(safe-area-inset-bottom));
+    right: calc(var(--sp-5) + env(safe-area-inset-right));
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: var(--scrim);
+    border: 1px solid rgba(111, 217, 232, 0.28);
+    border-left: 2px solid var(--halo-cyan-deep);
+    box-shadow: var(--edge-hairline);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+    font-family: var(--font-hud, var(--font-display));
+}
+#grenade-icon {
+    font-size: 20px;
+    line-height: 1;
+    color: #ffb84d; /* warm ordnance amber */
+    text-shadow: 0 0 8px rgba(255, 140, 40, .55);
+}
+#grenade-count {
+    font-family: var(--font-hud, var(--font-display));
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--bone, #ece6d2);
+}
+#grenade-panel.is-empty {
+    opacity: 0.5;
+}
+#grenade-panel.is-empty #grenade-count { color: var(--warn); }
 
 /* ---- Death / respawn card (DESIGN 4e) ---- */
 #combat-state {
@@ -1296,7 +1342,7 @@ body.player-dead #touch-controls {
    zone) so their taps register; the weapon plate is now a pure display. All
    right-side buttons are laid out as distinct, non-overlapping ≥44px (HIG)
    targets in the thumb arc, safe-area aware, landscape-first. */
-#touch-fire, #touch-jump, #touch-reload, #touch-switch, #touch-gear {
+#touch-fire, #touch-jump, #touch-reload, #touch-switch, #touch-throw, #touch-gear {
     position: absolute;
     z-index: 32;
     display: flex;
@@ -1312,7 +1358,7 @@ body.player-dead #touch-controls {
     opacity: 0.85;
     transition: transform 80ms ease, background 80ms ease, border-color 80ms ease, opacity 80ms ease;
 }
-#touch-jump.active, #touch-reload.active, #touch-switch.active {
+#touch-jump.active, #touch-reload.active, #touch-switch.active, #touch-throw.active {
     border-color: var(--sol-teal);
     background: rgba(20, 241, 149, 0.18);
     opacity: 1;
@@ -1358,6 +1404,22 @@ body.player-dead #touch-controls {
     bottom: calc(254px + env(safe-area-inset-bottom));
     width: 60px; height: 60px;
     font-size: 24px;
+}
+/* THROW — frag grenade. Right of jump (rect right[210..270] bottom[168..228]);
+   clear of fire/reload/jump/switch. Amber ordnance tint to read as "grenade". */
+#touch-throw {
+    right: calc(210px + env(safe-area-inset-right));
+    bottom: calc(168px + env(safe-area-inset-bottom));
+    width: 60px; height: 60px;
+    font-size: 24px;
+    border-color: rgba(255, 176, 32, 0.6);
+    color: #ffb84d;
+}
+#touch-throw.active {
+    border-color: #ffb84d;
+    background: rgba(255, 140, 40, 0.2);
+    opacity: 1;
+    transform: scale(0.92);
 }
 #touch-gear {
     top: calc(12px + env(safe-area-inset-top));

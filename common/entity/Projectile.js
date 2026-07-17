@@ -57,6 +57,11 @@ class Projectile {
 		this.damage = 0
 		this.ownerNid = 0
 		this.lifeTime = 3.0
+		// Phase 2 (server-only): Flak shrapnel bounces off obstacles this many more
+		// times before dying; Plasma bolts carry a slow debuff to apply on a player hit.
+		this.bounceRemaining = 0
+		this.slowFactor = 0
+		this.slowDuration = 0
 	}
 
 	get x() { return this.mesh.position.x }

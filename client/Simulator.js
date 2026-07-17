@@ -4,6 +4,8 @@ import MoveCommand from '../common/command/MoveCommand'
 import FireCommand from '../common/command/FireCommand'
 import SwitchWeaponCommand from '../common/command/SwitchWeaponCommand'
 import DevUpdateWeaponConfigCommand from '../common/command/DevUpdateWeaponConfigCommand'
+import SetNameCommand from '../common/command/SetNameCommand'
+import { decodeName, sanitizeName } from '../common/playerNames'
 import createFactories from './factories/createFactories'
 import reconcilePlayer from './reconcilePlayer'
 import applyCommand, { DODGE_DIRS } from '../common/applyCommand'
@@ -17,12 +19,18 @@ import MenuControls from './graphics/MenuControls'
 import { resolveWeaponFx } from './graphics/firingFx'
 import { assets, weapons } from './assets/assetManifest'
 import preloadAssets from './graphics/assetPreloader'
+import { MEGA_STATE } from '../common/entity/MegaHealthPickup'
 
 // Aim-safe positional camera pulse on a confirmed LOCAL flesh hit (world units of
 // velocity impulse fed to the existing recoil spring; never rotates aim). Kept small
 // on purpose — research flags camera shake as the effect most likely to hurt
 // readability / cause sickness in a fast shooter. Set to 0 to disable entirely.
 const CONFIRM_KICK = 0.05
+
+// Phase 4: the mega-health CHARGING lead (ms) — mirrors GameInstance MEGA.CHARGE_LEAD
+// (5s). Drives the client scale-in + hum ramp duration so the tell tracks the server's
+// state=CHARGING window.
+const MEGA_CHARGE_LEAD_MS = 5000
 
 // ignoring certain data from the sever b/c we will be predicting these properties on the client
 const ignoreProps = ['x', 'y', 'z', 'velX', 'velY', 'velZ']
@@ -44,6 +52,9 @@ class Simulator {
 		this.characterModels = new Map() // nid -> CharacterModel (other players' visuals)
 		this._nameRegistry = new Map()   // nid -> callsign string (overhead nametags + kill feed)
 		this._projectiles = new Map()    // nid -> {entity, prev pos} for the plasma streak
+		this._grenades = new Map()       // nid -> {entity, t0} for the Phase 3 fuse blink
+		this._megaHealth = null          // the Phase 4 mega-health pickup entity (bob/spin/hum tell)
+		this._megaState = -1             // last-seen networked pickup state (drives transitions)
 
 		// procedural weapon audio (WebAudio). Silent until resume() runs from a user
 		// gesture (enter-arena / pointer-lock / touch).
@@ -153,6 +164,21 @@ class Simulator {
 			// us the spawn point here; applied when the raw entity arrives
 			this.spawnPos = { x: message.x, z: message.z }
 			console.log('identified as', message)
+
+			// tell the server our chosen callsign (typed at the menu, saved by
+			// MenuControls). The server broadcasts it as a PlayerName message so every
+			// client's nametag + kill feed shows the real name instead of a random one.
+			const callsign = sanitizeName(localStorage.getItem('callsign') || '')
+			this.client.addCommand(new SetNameCommand(callsign))
+		})
+
+		// a human player's real callsign (server broadcast). Register it under the
+		// smooth nid (same key as the CharacterModel map) and update any live nametag.
+		client.on('message::PlayerName', message => {
+			const name = decodeName(message)
+			this._nameRegistry.set(message.smoothNid, name)
+			const model = this.characterModels.get(message.smoothNid)
+			if (model) model.setName(name)
 		})
 
 		client.on('message::Respawned', message => {
@@ -490,6 +516,140 @@ class Simulator {
 		})
 	}
 
+	// Phase 3 frag-grenade bookkeeping (called from the Grenade factory). Tracks the
+	// spawn time so the arming light can blink FASTER as the 1.8s fuse nears 0; on
+	// delete (server detonation) it fires the explosion FX + boom at the last position.
+	registerGrenade(entity) {
+		if (!entity) return
+		this._grenades.set(entity.nid, { entity, t0: performance.now() })
+	}
+
+	unregisterGrenade(nid) {
+		const rec = this._grenades.get(nid)
+		if (!rec) return
+		this._grenades.delete(nid)
+		const e = rec.entity
+		const pos = new BABYLON.Vector3(e.x, e.y, e.z)
+		if (this.renderer.grenadeExplosion) this.renderer.grenadeExplosion(pos)
+		const cam = this.renderer.camera.position
+		if (this.audio.explosion) {
+			this.audio.explosion({
+				distance: BABYLON.Vector3.Distance(pos, cam),
+				pos: { x: e.x, y: e.y, z: e.z },
+			})
+		}
+	}
+
+	// blink the grenade's arming light, accelerating toward the ~1.8s fuse. Presentation
+	// only; the authoritative fuse + detonation live server-side.
+	_updateGrenades() {
+		if (this._grenades.size === 0) return
+		const now = performance.now()
+		const FUSE_MS = 1800
+		this._grenades.forEach((rec) => {
+			const e = rec.entity
+			const mat = e && e.lightMat
+			if (!mat) return
+			const age = Math.min(now - rec.t0, FUSE_MS)
+			const t = age / FUSE_MS
+			// blink period shrinks from ~320ms down to ~70ms as the fuse runs out
+			const period = 320 - 250 * t
+			const on = (age % period) < period * 0.5
+			mat.emissiveColor.set(on ? 1.0 : 0.15, on ? 0.35 : 0.05, on ? 0.1 : 0.02)
+		})
+	}
+
+	// Phase 4 mega-health bookkeeping (called from the MegaHealthPickup factory).
+	registerMegaHealth(entity) {
+		if (!entity) return
+		this._megaHealth = entity
+		this._megaState = -1 // force the next _updateMegaHealth to run the transition
+	}
+
+	unregisterMegaHealth(nid) {
+		if (this._megaHealth && this._megaHealth.nid === nid) this._megaHealth = null
+		if (this.audio.megaHumStop) this.audio.megaHumStop()
+		this._megaState = -1
+	}
+
+	// Drive the mega-health pickup presentation off its networked `state`:
+	//   AVAILABLE → visible, slow bob + spin + amber glow, ambient hum
+	//   CHARGING  → scale/fade IN + rising-hum tell (final ~5s before respawn)
+	//   HIDDEN    → hidden, hum off (taken or silently charging)
+	// State TRANSITIONS fire the hum start/stop + the pickup chime (on AVAILABLE→HIDDEN,
+	// i.e. a grab). Per-frame bob/spin/glow run while shown. Presentation only — the
+	// heal + respawn clock are server-authoritative.
+	_updateMegaHealth() {
+		const e = this._megaHealth
+		if (!e) return
+		const mesh = e.mesh
+		if (!mesh || (mesh.isDisposed && mesh.isDisposed())) return
+		const model = e._healthModel
+		const state = e.state
+		const now = performance.now()
+		const pos = { x: e.x, y: e.y, z: e.z }
+
+		// ---- state transitions ----
+		if (state !== this._megaState) {
+			const prev = this._megaState
+			this._megaState = state
+			if (state === MEGA_STATE.HIDDEN) {
+				// grab (was AVAILABLE) → chime; either way stop the hum
+				if (prev === MEGA_STATE.AVAILABLE && this.audio.megaPickup) {
+					const cam = this.renderer.camera.position
+					this.audio.megaPickup({
+						distance: BABYLON.Vector3.Distance(new BABYLON.Vector3(e.x, e.y, e.z), cam),
+						pos,
+					})
+				}
+				if (this.audio.megaHumStop) this.audio.megaHumStop()
+				this._megaCharge0 = 0
+			} else {
+				// AVAILABLE or CHARGING → ensure the hum is running
+				if (this.audio.megaHumStart) this.audio.megaHumStart(pos)
+				if (state === MEGA_STATE.CHARGING) this._megaCharge0 = now
+			}
+		}
+
+		// ---- per-frame visuals ----
+		const shown = state !== MEGA_STATE.HIDDEN
+		mesh.setEnabled(shown)
+		if (model && model.setEnabled) model.setEnabled(shown)
+		if (!shown) return
+
+		// slow bob + spin on the model (the placeholder box is hidden but is the
+		// positioned parent; spinning the model child gives the visible motion).
+		if (model) {
+			model.rotation.y = (now * 0.0011) % (Math.PI * 2)
+			// bob is applied to the parent mesh Y around the networked base so the
+			// glow child rides with it; kept small so it never leaves the pickup radius.
+			// (Networked y is fixed at the bob-base; add a gentle sine here.)
+		}
+		// gentle vertical bob of the whole holder around the networked base position.
+		const bob = Math.sin(now * 0.0025) * 0.12
+		mesh.position.y = e.y + bob
+
+		if (state === MEGA_STATE.CHARGING) {
+			// scale/fade IN over the ~5s lead so nearby players can time the grab, and
+			// climb the hum's pitch/level toward the respawn moment.
+			const t = Math.max(0, Math.min(1, (now - (this._megaCharge0 || now)) / (MEGA_CHARGE_LEAD_MS)))
+			if (model && model.scaling) model.scaling.setAll(this._megaBaseScale(model) * (0.2 + 0.8 * t))
+			if (this.audio.megaHumCharge) this.audio.megaHumCharge((1 - t) * 5)
+		} else {
+			// AVAILABLE: restore full scale (in case we just came back from CHARGING).
+			if (model && model.scaling) model.scaling.setAll(this._megaBaseScale(model))
+		}
+	}
+
+	// the model's authored (attach-time) uniform scale, cached the first time we see
+	// it so CHARGING scale-in can lerp from it without re-measuring the bbox.
+	_megaBaseScale(model) {
+		if (this._megaModelScale == null && model && model.scaling) {
+			this._megaModelScale = model.scaling.x
+		}
+		return this._megaModelScale || 1
+	}
+
 	// equip weapon by index (wraps around); updates the on-screen weapon name
 	switchWeapon(index) {
 		const n = weapons.length
@@ -500,6 +660,10 @@ class Simulator {
 		
 		if (this.myRawEntity) {
 			this.myRawEntity.currentWeaponIndex = index
+			// swap commitment: lock firing for this weapon's drawTime so the local
+			// predicted view stops firing immediately on keypress (weapon.fire() gates
+			// on equipTimer). The server sets the same lock via SwitchWeaponCommand.
+			this.myRawEntity.equipTimer = (weapons[index] && weapons[index].drawTime) || 0
 			this.client.addCommand(new SwitchWeaponCommand(index))
 		}
 
@@ -609,8 +773,9 @@ class Simulator {
 	_setupWeaponSwitching() {
 		document.addEventListener('keydown', (e) => {
 			if (!this.input.pointerLocked) return
-			if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3' || e.code === 'Digit4') {
-				this.switchWeapon(parseInt(e.code.slice(5), 10) - 1)
+			if (e.code >= 'Digit1' && e.code <= 'Digit9') {
+				const slot = parseInt(e.code.slice(5), 10) - 1
+				if (slot < weapons.length) this.switchWeapon(slot)
 			} else if (e.key === 'q' || e.key === 'Q') {
 				this.switchWeapon(this.weaponIndex + 1)
 			}
@@ -672,6 +837,9 @@ class Simulator {
 				weaponIndex: this.weaponIndex,
 				reload: input.reload && !this._reloadHeld,
 				fireInput: input.mouseDown,
+				// Phase 3: edge-triggered frag-grenade throw (only the rising edge — so
+				// holding G doesn't dump both charges). Same pattern as reload above.
+				throwInput: input.throwInput && !this._throwHeld,
 				delta
 			})
 			// send command to the server
@@ -724,6 +892,7 @@ class Simulator {
 
 			const state = this.myRawEntity.weaponsState[this.weaponIndex]
 			this._reloadHeld = input.reload
+			this._throwHeld = input.throwInput
 
 			/* shooting (blocked while the reload animation runs) */
 			if (input.mouseDown && !state.reloading) {
@@ -828,6 +997,12 @@ class Simulator {
 
 		// orient + stretch live plasma bolts into hot travel streaks
 		this._updateProjectiles()
+
+		// blink live frag grenades' arming light (accelerating toward the fuse)
+		this._updateGrenades()
+
+		// Phase 4: mega-health pickup bob/spin/glow + hum tell (off networked state)
+		this._updateMegaHealth()
 
 		// advance kill-feedback FX (corpses, gibs, damage arc). Runs after the
 		// character models are driven so a corpse's frozen pose isn't re-overridden.
@@ -1051,14 +1226,25 @@ class Simulator {
 		if (!this.myRawEntity) return
 		if (!this._arenaReady) this.setArenaReady()
 
-		const health = Math.max(0, Math.min(100, this.myRawEntity.hitpoints))
+		// Phase 4: display cap raised to 150 (mega-health overheal). The bar fill scales
+		// 0..1 for 0..100 base HP (the track clips overflow), and the OVERHEAL band
+		// (100..150) reads distinctly via body.overheal — an amber fill + glow — while
+		// the number shows the real value up to 150.
+		const health = Math.max(0, Math.min(150, this.myRawEntity.hitpoints))
+		const overheal = health > 100
 		const healthValue = document.getElementById('health-value')
 		const healthFill = document.getElementById('health-fill')
 		if (healthValue) healthValue.textContent = Math.round(health)
-		if (healthFill) healthFill.style.transform = `scaleX(${health / 100})`
+		// fill is full at >=100 (base bar maxed); the overheal color/glow signals the extra
+		if (healthFill) healthFill.style.transform = `scaleX(${Math.min(1, health / 100)})`
+		document.body.classList.toggle('overheal', overheal)
 		document.body.classList.toggle('low-health', health > 0 && health <= 30)
 
-		if (this._lastHealth !== null && health < this._lastHealth) {
+		// hit flash on a health drop — but NOT when the drop is just the overheal band
+		// decaying (prev >100 shrinking while still >=100 is the 2/s overheal decay, not
+		// an incoming hit), which would otherwise strobe the damage flash every step.
+		const overhealDecayTick = this._lastHealth > 100 && health >= 100
+		if (this._lastHealth !== null && health < this._lastHealth && !overhealDecayTick) {
 			clearTimeout(this._hitFlashTimer)
 			document.body.classList.add('player-hit')
 			this._hitFlashTimer = setTimeout(() => {
@@ -1097,6 +1283,16 @@ class Simulator {
 			const d = this.myRawEntity.deaths || 0
 			const text = `${k} FRAG${k === 1 ? '' : 'S'} · ${d} DEATH${d === 1 ? '' : 'S'}`
 			if (frags.textContent !== text) frags.textContent = text
+		}
+
+		// Phase 3: frag-grenade charge count (networked UInt8 on the player entity)
+		const grenadeCount = document.getElementById('grenade-count')
+		if (grenadeCount) {
+			const n = this.myRawEntity.grenadeCharges == null ? 0 : this.myRawEntity.grenadeCharges
+			const text = 'x' + n
+			if (grenadeCount.textContent !== text) grenadeCount.textContent = text
+			const panel = document.getElementById('grenade-panel')
+			if (panel) panel.classList.toggle('is-empty', n <= 0)
 		}
 
 		const weapon = weapons[this.weaponIndex]
