@@ -1,8 +1,11 @@
 /* Touch controls — the standard mobile-FPS layout that CoD Mobile / PUBG
    popularized: a floating movement joystick anywhere on the left half,
-   drag-to-look anywhere on the right half, and a thumb-reach button cluster
-   (fire / jump / reload / weapon switch). Everything writes into the existing
-   InputSystem state, so prediction/netcode is identical to keyboard+mouse.
+   drag-to-look anywhere on the right half, and a thumb-reach button set
+   (fire / jump / reload / switch / gear). Reload + switch-weapon live inside the
+   touch overlay (z above the look zone) so their taps register instead of being
+   swallowed by drag-look; the weapon HUD plate is a pure display. Everything
+   writes into the existing InputSystem state, so prediction/netcode is identical
+   to keyboard+mouse.
 
    Look drags (right-half zone AND the fire button — the fire thumb keeps
    aiming) are converted to yaw/pitch by the pure TouchLook module and applied
@@ -12,8 +15,9 @@
 import { computeLookDelta } from './TouchLook'
 
 const JOY_RADIUS = 60        // px the knob can travel from where the thumb landed
-const JOY_DEADZONE = 12      // px of drift before movement registers
+const JOY_DEADZONE = 10      // px of drift before movement registers
 const SECTOR = Math.sin(Math.PI / 8) // 8-way sector edges at 22.5°
+const RELOAD_PULSE_MS = 150  // hold the reload input true across ≥1 update frame
 
 // overlay only on devices whose PRIMARY pointer is a finger — a desktop with a
 // touchscreen still gets mouse controls
@@ -41,12 +45,13 @@ class TouchControls {
 		this._fireLast = null
 		this._triedFullscreen = false
 
+		this._reloadPulseTimer = null   // pending release of a reload input pulse
+
 		this._buildDom()
 		this._bindJoystick()
 		this._bindLook()
 		this._bindFire()
 		this._bindButtons()
-
 	}
 
 	enterFullscreen() {
@@ -66,7 +71,7 @@ class TouchControls {
 
 		this.fireBtn = el('div', 'touch-fire', root, '◉')
 		this.jumpBtn = el('div', 'touch-jump', root, '▲')
-		this.reloadBtn = el('div', 'touch-reload', root, 'R')
+		this.reloadBtn = el('div', 'touch-reload', root, '⟳')
 		this.switchBtn = el('div', 'touch-switch', root, '⇄')
 		this.gearBtn = el('div', 'touch-gear', root, '⚙')
 	}
@@ -261,20 +266,53 @@ class TouchControls {
 		this._bindHold(this.jumpBtn, () => {
 			s.jump = true
 			this.input.frameState.jump = true
+			if (navigator.vibrate) navigator.vibrate(8)
 		}, () => { s.jump = false })
-
-		this._bindHold(this.reloadBtn, () => {
-			s.reload = true
-		}, () => { s.reload = false })
-
-		this._bindHold(this.switchBtn, () => {
-			this.simulator.switchWeapon(this.simulator.weaponIndex + 1)
-		})
 
 		this._bindHold(this.gearBtn, () => {
 			this.simulator.toggleSettings()
 		})
+
+		// RELOAD — rising-edge pulse of the reload input, identical to a brief press
+		// of the old reload button. Hold `reload` true long enough to span at least
+		// one update frame (releaseKeys copies it into frameState, then Simulator's
+		// rising-edge check `reload && !_reloadHeld` fires it exactly once), then
+		// release so it can be re-triggered later.
+		this._bindTap(this.reloadBtn, () => {
+			if (this._reloadPulseTimer !== null) clearTimeout(this._reloadPulseTimer)
+			s.reload = true
+			this._reloadPulseTimer = setTimeout(() => {
+				s.reload = false
+				this._reloadPulseTimer = null
+			}, RELOAD_PULSE_MS)
+			if (navigator.vibrate) navigator.vibrate(8)
+		})
+
+		// SWITCH — cycle to the next weapon (switchWeapon wraps the index)
+		this._bindTap(this.switchBtn, () => {
+			this.simulator.switchWeapon(this.simulator.weaponIndex + 1)
+			if (navigator.vibrate) navigator.vibrate(8)
+		})
 	}
+
+	/* momentary tap button: fires `onTap` once on touchstart (rising edge) and
+	   shows the .active press state until release. Used for reload/switch, which
+	   are one-shot actions rather than held inputs. */
+	_bindTap(btn, onTap) {
+		btn.addEventListener('touchstart', (e) => {
+			e.preventDefault()
+			this._tryFullscreen()
+			btn.classList.add('active')
+			onTap()
+		}, { passive: false })
+		const end = (e) => {
+			e.preventDefault()
+			btn.classList.remove('active')
+		}
+		btn.addEventListener('touchend', end, { passive: false })
+		btn.addEventListener('touchcancel', end, { passive: false })
+	}
+
 }
 
 export default TouchControls

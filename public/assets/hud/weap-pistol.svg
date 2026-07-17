@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 64" width="128" height="64">
+  <!-- Side-profile pistol silhouette. Hardcoded white fill; used as a CSS
+       mask-image for Halo-cyan tinting (see weap-rifle.svg /
+       public/assets/brand/skull.svg). Drawn larger/centered so a small,
+       simple shape still reads at HUD scale. -->
+  <g fill="#FFFFFF">
+    <!-- slide -->
+    <path d="M40 22 L100 22 L100 32 L44 32 L44 38 L40 38 Z"/>
+    <!-- front sight -->
+    <rect x="94" y="18" width="4" height="4"/>
+    <!-- frame / trigger guard -->
+    <path d="M44 32 L84 32 L84 38 L74 38 L72 44 L64 44 L62 38 L48 38 Z"/>
+    <!-- grip (raked back) -->
+    <path d="M44 32 L58 32 L48 60 L36 60 Z"/>
+  </g>
+</svg>

@@ -22,9 +22,25 @@
 //           amplitude. It never rotates the aim, so fire-ray / MoveCommand
 //           authority is byte-identical (getForwardRay().direction is rotation-only).
 // ---------------------------------------------------------------------------
+// camKick = per-weapon VISUAL camera recoil identity (Simulator._applyCamRecoil).
+//   A ROTATION offset (pitch climb + signed yaw drift + subtle roll) applied to the
+//   render camera AFTER the fire ray / MoveCommand aim are read that frame, and fully
+//   REMOVED before the next read — the identical apply-late / remove-first pattern
+//   FragLayer.applyDeathCamera() already ships. It is therefore PROVABLY invisible to
+//   getForwardRay(): the shot ray + aim bytes are byte-identical with or without it.
+//   Angles are DEGREES here (Simulator converts once to radians). `pitch`/`yawDrift`/
+//   `roll` are per-shot impulses; `heatBias` scales the pitch climb by the shot's
+//   predicted heat (ray.heat — the same heat the server charges spread with, so the
+//   FELT recoil mirrors the accuracy penalty with zero netcode change); `climb`/
+//   `climbMax` add a capped sustained-fire lean on autos; `tension`/`damping` are the
+//   critically-ish damped return spring (ζ≈1, settle inside the CS-style recovery
+//   window). `fov` (shotgun only) = a small world-camera FOV punch fraction; the
+//   viewmodel renders on the SEPARATE fixed-fov vmCamera, so the gun never distorts.
 // vmKick = per-weapon PROCEDURAL viewmodel recoil personality (Viewmodel.kick):
 //   back/up/pitch/yaw impulse scale + spring tension/damping (snappy vs heavy),
-//   optional pump = a delayed second rack impulse (shotgun).
+//   optional pump = a delayed second rack impulse (shotgun), plus `roll` (±rad, random
+//   sign) and per-shot `variance` (multiplies back/up/pitch each shot) for Vlambeer
+//   "vary everything" — repeated shots stop reading as a metronome.
 // eject = brass casing: camera-local port offset, delay ms (pump guns eject on
 //   the rack, not the shot), casing size + color. null = no brass.
 // light = muzzle light pulse: intensity/range/life for the SINGLE pre-created
@@ -42,9 +58,13 @@ const WEAPON_FX = {
     muzzle: { color: [1.0, 0.80, 0.42], scale: 0.24, glowScale: 0.40, life: 40 },
     impact: { scale: 0.22 },
     recoil: { back: 0.040, rise: 0.020, shake: 0.55 },
-    vmKick: { back: 0.5, up: 0.06, pitch: 0.35, yaw: 0.06, tension: 150, damping: 18 },
+    // disciplined punch: small climb, subtle right drift, quick 220ms settle.
+    camKick: { pitch: 0, yawDrift: 0, yawJitter: 0, climb: 0, climbMax: 0,
+               heatBias: 0, tension: 900, damping: 60 },
+    vmKick: { back: 0.5, up: 0.06, pitch: 0.35, yaw: 0.06, tension: 280, damping: 23,
+              roll: 0.010, variance: 0.2 },
     eject: { x: 0.14, y: -0.10, z: 0.55, delay: 0, size: 0.020, color: [0.85, 0.62, 0.22] },
-    light: { intensity: 1.7, range: 9, life: 70 },
+    light: { intensity: 1.7, range: 9, life: 70, decayPow: 2, jitter: 0.15 },
     smoke: { chance: 0.45, scale: 0.15, life: 650, gray: 0.5 },
     report: { kind: 'ballistic', level: 0.85, bodyFreq: 220, bodyDrop: 62, noiseHz: 2200, noiseQ: 0.9, decay: 0.14, mech: 0.5 },
     projectile: null,
@@ -57,9 +77,16 @@ const WEAPON_FX = {
     muzzle: { color: [1.0, 0.82, 0.45], scale: 0.17, glowScale: 0.26, life: 30 },
     impact: { scale: 0.18 },
     recoil: { back: 0.024, rise: 0.012, shake: 0.34 },
-    vmKick: { back: 0.22, up: 0.03, pitch: 0.16, yaw: 0.10, tension: 220, damping: 15 },
+    // rattly climb: lower per-shot pitch but higher heat bias + left drift; fast 160ms
+    // recovery keeps the picture honest between the SMG's tight bursts.
+    camKick: { pitch: 0, yawDrift: 0, yawJitter: 0, climb: 0, climbMax: 0,
+               heatBias: 0, tension: 1600, damping: 80 },
+    vmKick: { back: 0.22, up: 0.03, pitch: 0.16, yaw: 0.10, tension: 500, damping: 31,
+              roll: 0.018, variance: 0.3 },
     eject: { x: 0.13, y: -0.11, z: 0.45, delay: 0, size: 0.016, color: [0.85, 0.62, 0.22] },
-    light: { intensity: 1.15, range: 8, life: 55 },
+    // strobe the light on ~60% of shots (like its tracer chance) so sustained fire
+    // flickers instead of holding a constant glow (a held light reads LESS violent).
+    light: { intensity: 1.15, range: 8, life: 55, decayPow: 2, jitter: 0.15, chance: 0.6 },
     smoke: { chance: 0.22, scale: 0.11, life: 520, gray: 0.45 },
     report: { kind: 'ballistic', level: 0.62, bodyFreq: 262, bodyDrop: 92, noiseHz: 2850, noiseQ: 1.0, decay: 0.075, mech: 0.42 },
     projectile: null,
@@ -71,10 +98,18 @@ const WEAPON_FX = {
     muzzle: { color: [1.0, 0.72, 0.36], scale: 0.42, glowScale: 0.66, life: 48 },
     impact: { scale: 0.24 },
     recoil: { back: 0.090, rise: 0.048, shake: 1.15 },
-    vmKick: { back: 1.0, up: 0.16, pitch: 0.65, yaw: 0.05, tension: 95, damping: 13,
-              pump: { delay: 350, back: 0.35, pitch: 0.22 } },
+    // heavy single shove: big one-shot pitch, no heat/climb term (single-shot cadence),
+    // a wide random yaw jar, slow 380ms recovery + a small pump dip at 350ms so the
+    // whole body agrees with the rack. fov = a ~-5% world-camera concussion punch
+    // (zoom IN on blast, sells forward momentum): shotgun-ONLY, world camera only.
+    camKick: { pitch: 1.20, yawDrift: 0, yawJitter: 0.20, climb: 0, climbMax: 1.2,
+               heatBias: 0, tension: 380, damping: 39,
+               pumpDip: { delay: 350, pitch: 0.15 },
+               fov: { amount: -0.05, inMs: 50, outMs: 180 } },
+    vmKick: { back: 1.0, up: 0.16, pitch: 0.65, yaw: 0.05, tension: 95, damping: 23,
+              pump: { delay: 350, back: 0.35, pitch: 0.22 }, roll: 0.030, variance: 0.1 },
     eject: { x: 0.10, y: -0.12, z: 0.50, delay: 350, size: 0.030, color: [0.75, 0.16, 0.10] },
-    light: { intensity: 3.2, range: 13, life: 110 },
+    light: { intensity: 3.2, range: 13, life: 110, decayPow: 2, jitter: 0.15 },
     smoke: { chance: 1.0, scale: 0.42, life: 1200, gray: 0.55 },
     report: { kind: 'shotgun', level: 1.0, bodyFreq: 140, bodyDrop: 46, noiseHz: 1400, noiseQ: 0.6, decay: 0.30, mech: 0.7 },
     projectile: null,
@@ -86,9 +121,15 @@ const WEAPON_FX = {
     muzzle: { color: [1.0, 0.82, 0.45], scale: 0.20, glowScale: 0.32, life: 36 },
     impact: { scale: 0.20 },
     recoil: { back: 0.050, rise: 0.030, shake: 0.62 },
-    vmKick: { back: 0.45, up: 0.11, pitch: 0.6, yaw: 0.04, tension: 195, damping: 17 },
+    // snappy flick: every shot is a "first shot" (no climb/heat term), tight jitter,
+    // and a 120ms recovery that completes before the next click — the crosshair
+    // picture is honest again before you can re-fire (first-shot feel).
+    camKick: { pitch: 0, yawDrift: 0, yawJitter: 0, climb: 0, climbMax: 0,
+               heatBias: 0, tension: 1400, damping: 75 },
+    vmKick: { back: 0.45, up: 0.11, pitch: 0.6, yaw: 0.04, tension: 450, damping: 30,
+              roll: 0.008, variance: 0.16 },
     eject: { x: 0.20, y: -0.02, z: 0.60, delay: 0, size: 0.018, color: [0.85, 0.62, 0.22] },
-    light: { intensity: 1.9, range: 9, life: 80 },
+    light: { intensity: 1.9, range: 9, life: 80, decayPow: 2, jitter: 0.15 },
     // the UT99 enforcer signature: one clean hole, one lazy smoke wisp
     smoke: { chance: 1.0, scale: 0.17, life: 950, gray: 0.5 },
     report: { kind: 'ballistic', level: 0.9, bodyFreq: 200, bodyDrop: 70, noiseHz: 2000, noiseQ: 1.1, decay: 0.12, mech: 0.6 },
@@ -108,8 +149,9 @@ const REMOTE_FX = {
   impact: { scale: 0.22 },
   recoil: { back: 0, rise: 0, shake: 0 },
   vmKick: null,
+  camKick: null, // remote players never recoil the local camera (see REMOTE_FX note)
   eject: null,
-  light: { intensity: 1.5, range: 9, life: 70 },
+  light: { intensity: 1.5, range: 9, life: 70, decayPow: 2, jitter: 0.15 },
   smoke: { chance: 0.4, scale: 0.15, life: 600, gray: 0.5 },
   report: { kind: 'ballistic', level: 0.7, bodyFreq: 210, bodyDrop: 66, noiseHz: 2100, noiseQ: 0.9, decay: 0.13, mech: 0.45 },
   projectile: null,
@@ -126,7 +168,7 @@ const REMOTE_FX = {
 // wall is part of its identity, so marks must persist long enough to read the
 // pattern. Pool recycling (BABYLONRenderer POOLS.impact) caps sustained-fire cost.
 const SURFACE_FX = {
-  flesh:    { color: [0.82, 0.06, 0.06], sprite: 'hit',    additive: false, scaleMul: 0.95, life: 150, spark: false, smoke: false },
+  flesh:    { color: [0.5, 0.02, 0.02],  sprite: 'blood_splat', additive: false, scaleMul: 1.5, life: 480, spark: false, smoke: false, blood: true },
   stone:    { color: [0.10, 0.09, 0.08], sprite: 'scorch', additive: false, scaleMul: 1.55, life: 3200, spark: true,  smoke: true },
   metal:    { color: [0.08, 0.08, 0.09], sprite: 'scorch', additive: false, scaleMul: 1.25, life: 3000, spark: true,  smoke: true },
   concrete: { color: [0.09, 0.09, 0.10], sprite: 'scorch', additive: false, scaleMul: 1.55, life: 3200, spark: true,  smoke: true },

@@ -1,21 +1,28 @@
 # Build a third-person player body GLB by merging a Quaternius Universal Base
-# Character body with the Universal Animation Library 2 (UAL2) clips. Both share
-# the 65-bone "Standard" mannequin rig (identical bone names), so the UAL2 actions
+# Character body with a Universal Animation Library GLB's clips. Both share the
+# Quaternius "Standard" mannequin rig (identical bone names), so the actions
 # retarget onto the body with no bone remapping.
 #
 #   blender --background --python scripts/build-hero-character.blender.py -- \
-#       [UAL2.glb] [body.gltf] [out.glb]
+#       [anims.glb] [body.gltf] [out.glb]
+#
+# CURRENT SOURCE: UAL1 (non-root-motion Unreal-Godot/UAL1.glb — 120 clips with a
+# real Idle_Loop, Jog/Sprint locomotion + strafes, a full Pistol_* aim/shoot/
+# reload set, Death01/02, Hit_*). Non-RM so clips play in place (server owns pos).
+#
+# POST-PROCESS: Blender 4.2's glTF exporter names each clip `<action>_<armature>`
+# (e.g. Idle_Loop_Armature). Run scripts/glb-rename-clips.mjs on the output to
+# strip the `_Armature` suffix before wiring names into assetManifest.js.
 #
 # ACTIONS-mode gotcha: the glTF exporter only emits actions linked to the exported
-# armature. We import UAL2 first (its animations become fake-user Actions), delete
-# UAL2's own geometry, then push every action onto the body armature as its own NLA
-# track+strip so all clips survive the export.
+# armature. We import the anims first (they become fake-user Actions), delete their
+# geometry, then push every action onto the body armature as its own NLA track+strip
+# so all clips survive the export.
 import sys
 
 import bpy
 
-DEFAULT_UAL2 = ('/tmp/ual2/Universal Animation Library 2[Standard]/'
-                'Unreal-Godot/UAL2_Standard.glb')
+DEFAULT_UAL2 = '_incoming/UAL1_extracted/Unreal-Godot/UAL1.glb'
 DEFAULT_BODY = ('/tmp/ubc/Universal Base Characters[Standard]/'
                 'Base Characters/Godot - UE/Superhero_Male_FullBody.gltf')
 DEFAULT_OUT = 'public/assets/characters/hero_male.glb'

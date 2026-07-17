@@ -103,14 +103,16 @@ export const weapons = [
     
     // Gameplay specs
     type: 'hitscan',
-    fireCooldown: 0.3,
+    fireCooldown: 0.15,
     reloadTime: 1.0,
     magazineCapacity: 12,
     maxReserveAmmo: 36,
     damage: 20,
     range: 50,
-    // Enforcer: slow but near-laser accurate — single clean holes on the wall
-    spreadBase: 0.0015
+    // Enforcer: snappy semi-auto finisher — near-laser accurate with flat spread
+    // (no heat scaling), so trigger speed is rewarded. 400 RPM, TTK 0.6s @ 100 HP.
+    spreadBase: 0.0015,
+    spreadHeat: 0
   }
   // Slot 5 ('Plasma Rifle') removed 2026-07-13: it reused the AR rifle GLB and read
   // as a duplicate AR. The projectile plumbing (Projectile entity, factory, bolt

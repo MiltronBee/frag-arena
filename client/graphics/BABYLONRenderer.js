@@ -2,6 +2,47 @@ import * as BABYLON from 'babylonjs'
 import { resolveWeaponFx, classifySurface, surfaceFx, fadeAlpha } from './firingFx'
 import ArenaDressing from './arenaDressing'
 
+// Blood/impact VFX — DISTINCT POOLED CLASSES (per FX consult), not one droplet
+// spray. The "dark core" rule: a bright crimson ADDITIVE mist puff sells the hot
+// atomized flash; dark-burgundy ALPHA streaks + drops carry the weight; floor
+// pools mark where blood lands. No mesh decals — all pooled billboard/flat quads,
+// no per-frame allocation, gated by _fxTier so mobile can thin it. Dial from play.
+
+// MIST PUFF — a fast-expanding, fast-fading atomized cloud at the hit instant.
+const MIST_COUNT_HI = 2, MIST_COUNT_LO = 1
+const MIST_COLOR = [0.85, 0.02, 0.02] // bright crimson; additive on 'high', alpha on 'low'
+const MIST_LIFE = 150         // ms
+const MIST_SCALE0 = 1.6       // × base impact scale at spawn
+const MIST_SCALE1 = 3.2       // × base at death (expands)
+const MIST_ALPHA0 = 0.8       // starting opacity (ramps to 0)
+
+// SPURT STREAKS — fast, high-drag, velocity-STRETCHED dark droplets (read as
+// directional streaks, not dots). Oriented along travel at spawn.
+const STREAK_COUNT_HI = 4, STREAK_COUNT_LO = 0
+const STREAK_COLOR = [0.35, 0.02, 0.02] // dark burgundy, alpha
+const STREAK_SPEED = 7.5, STREAK_SPREAD = 3.0
+const STREAK_DRAG = 0.9       // per-frame velocity retention (rapid deceleration)
+const STREAK_GRAVITY = 4.0    // light fall
+const STREAK_LIFE = 360       // ms
+const STREAK_WIDTH = 0.5      // × base (thin)
+const STREAK_STRETCH = 0.16   // extra length per m/s of spawn speed
+
+// MICRO-DROPS — heavier, slower, gravity-bound droplets that fall and can pool.
+const DROP_COUNT_HI = 8, DROP_COUNT_LO = 3
+const DROP_COLOR = [0.5, 0.02, 0.02]
+const DROP_SPEED = 4.0, DROP_SPREAD = 3.0, DROP_UP = 1.6
+const DROP_GRAVITY = 9.8
+const DROP_LIFE = 600         // ms
+const DROP_SIZE_MUL = 0.55, DROP_SIZE_JITTER = 0.4
+
+// GROUND POOLS — a separate capped pool of flat floor quads (no mesh decals).
+// A drop/streak that reaches the floor leaves one: grow, hold, fade, recycle.
+const GROUND_Y = -1           // arenaDressing floor height
+const GROUND_POOL = 24        // max simultaneous floor pools (round-robin recycle)
+const GROUND_COLOR = [0.4, 0.01, 0.01]
+const GROUND_GROW = 100, GROUND_HOLD = 3000, GROUND_FADE = 1000 // ms phases
+const GROUND_SIZE = 0.5, GROUND_SIZE_JITTER = 0.4 // × base impact scale
+
 // Babylon 4.0.3 declares the WebGL2 PCF shadow helpers (sampler2DShadow params)
 // without a precision default. Lenient desktop drivers accept it, but strict
 // GLES compilers (SwiftShader, some mobile GPUs) reject the effect, so every
@@ -87,6 +128,18 @@ class BABYLONRenderer {
 		this.viewmodelLight.intensity = 0.9 // dimmer than daylight tuning so the arms sit in the dusk scene
 		this.viewmodelLight.diffuse = new BABYLON.Color3(0.95, 0.88, 0.8)
 		this.viewmodelLight.includedOnlyMeshes = []
+		// includedOnlyMeshes is a WHITELIST, but in Babylon 4.0.3 an EMPTY list means
+		// the light affects EVERY mesh. A weapon swap disposes the old gun BEFORE the
+		// new GLB finishes importing, briefly emptying the list — for those async frames
+		// the vmLight would flood the WHOLE arena (and force a scene-wide light-count
+		// shader resync). Park a permanent, never-disposed, never-drawn placeholder in
+		// the list so it stays length >= 1 across every swap. isVisible=false keeps it
+		// off-screen but it still counts toward the light's whitelist.
+		this._vmLightAnchor = BABYLON.MeshBuilder.CreateBox('vmLightAnchor', { size: 0.001 }, this.scene)
+		this._vmLightAnchor.isVisible = false
+		this._vmLightAnchor.isPickable = false
+		this._vmLightAnchor.layerMask = 0x10000000
+		this.viewmodelLight.includedOnlyMeshes.push(this._vmLightAnchor)
 
 		// --- muzzle flash world light: ONE point light created here at init and
 		// shared by every shot (local + remote — newest shot wins it; flashes are
@@ -184,17 +237,41 @@ class BABYLONRenderer {
 			glow: this._loadTex('/assets/sprites/fx_glow.png'),
 			scorch: this._loadTex('/assets/sprites/fx_scorch.png'),
 			hit: this._loadTex('/assets/sprites/hit.png'),
+			// blood-impact shapes (make-blood-sprites.py), grayscale+alpha, tinted per class
+			blood_mist: this._loadTex('/assets/sprites/blood_mist.png'),
+			blood_drop: this._loadTex('/assets/sprites/blood_drop.png'),
+			blood_streak: this._loadTex('/assets/sprites/blood_streak.png'),
+			blood_splat: this._loadTex('/assets/sprites/blood_splat.png'),
 		}
 
 		// Sized per role: impacts largest — a shotgun rosette burns 8 marks/shot and
 		// scorches linger seconds so wall patterns stay readable (firingFx SURFACE_FX).
 		// smoke = barrel puffs, pooled SEPARATELY from impacts so a lingering muzzle
 		// puff can't recycle away a wall scorch (the wall pattern is weapon identity).
-		const POOLS = { tracer: 24, muzzle: 12, glow: 12, impact: 64, casing: 24, smoke: 12 }
-		this._pool = { tracer: [], muzzle: [], glow: [], impact: [], casing: [], smoke: [] }
-		this._idx = { tracer: 0, muzzle: 0, glow: 0, impact: 0, casing: 0, smoke: 0 }
+		// impact bumped 64 -> 96 so a flesh hit's blood burst (base mark + ~5 droplets)
+		// can't recycle away a still-fading wall scorch under sustained fire.
+		// impact pool sized for GENEROUS blood: up to BLOOD_DROPLETS (14) per flesh hit
+		// plus the base mark, so a burst of near-simultaneous hits needs deep headroom
+		// before droplets start stealing each other's sprites (round-robin recycle).
+		// blood classes (mist + streaks + drops) all draw from the impact pool: up to
+		// MIST(2)+STREAK(4)+DROP(8)=14 + base mark per hit, so keep deep headroom before
+		// near-simultaneous hits recycle each other. Ground pools are a SEPARATE pool so
+		// a lingering floor mark can't be recycled away by fresh airborne droplets.
+		const POOLS = { tracer: 24, muzzle: 12, glow: 12, impact: 224, casing: 24, smoke: 12, ground: GROUND_POOL }
+		this._pool = { tracer: [], muzzle: [], glow: [], impact: [], casing: [], smoke: [], ground: [] }
+		this._idx = { tracer: 0, muzzle: 0, glow: 0, impact: 0, casing: 0, smoke: 0, ground: 0 }
 		this._fx = [] // active fading effects, advanced every frame in update()
 		this._casings = [] // active brass, simulated every frame in update()
+		this._blood = [] // active blood particles (mist/streak/drop), simulated in update()
+		this._groundPools = [] // active floor blood pools, simulated in update()
+		this._bloodVelScratch = new BABYLON.Vector3() // reused so the sim never allocates
+		// scratch for orienting velocity-stretched streaks at spawn (no per-frame alloc)
+		this._svUp = new BABYLON.Vector3()
+		this._svFwd = new BABYLON.Vector3()
+		this._svRight = new BABYLON.Vector3()
+		this._svFwd2 = new BABYLON.Vector3()
+		this._streakQuat = new BABYLON.Quaternion()
+		this._fxTier = 'high' // 'low' thins the blood (see _spawnBloodBurst); tune externally
 		for (let i = 0; i < POOLS.tracer; i++) {
 			// tracer: a thin box, additive + unlit so it reads as a hot streak, never a
 			// solid painted stick. Width/length/color set per shot.
@@ -213,8 +290,8 @@ class BABYLONRenderer {
 			// muzzle core (bright, additive, billboarded) + a softer larger glow halo.
 			// Two cheap additive sprites read as a flash-with-bloom without a runtime
 			// dynamic light (those force Babylon shader recompiles + cost every frame).
-			this._pool.muzzle.push(this._makeSprite('muzzle' + i, this._sprites.muzzle, true))
-			this._pool.glow.push(this._makeSprite('glow' + i, this._sprites.glow, true))
+			this._pool.muzzle.push(this._makeSprite('muzzle' + i, this._sprites.muzzle, true, true))
+			this._pool.glow.push(this._makeSprite('glow' + i, this._sprites.glow, true, true))
 		}
 		for (let i = 0; i < POOLS.impact; i++) {
 			// impact: a small quad oriented to the surface normal (decal-like), not a
@@ -242,17 +319,24 @@ class BABYLONRenderer {
 			casing.isVisible = false
 			this._pool.casing.push(casing)
 		}
+		for (let i = 0; i < POOLS.ground; i++) {
+			// floor blood pool: a flat alpha quad laid on the ground (normal +Y), NOT a
+			// mesh decal — no new mesh/draw-call per hit. Rotated horizontal here; the
+			// per-pool random spin + scale happens on spawn (_spawnGroundPool).
+			const gp = this._makeSprite('ground' + i, this._sprites.blood_splat, false)
+			gp.material.alphaMode = BABYLON.Engine.ALPHA_COMBINE
+			gp.rotation.x = Math.PI / 2 // lay the plane flat on the floor
+			this._pool.ground.push(gp)
+		}
 		// compile the shaders now so the first shot never binds an unready effect
 		this._pool.tracer[0].material.forceCompilation(this._pool.tracer[0])
 		this._pool.muzzle[0].material.forceCompilation(this._pool.muzzle[0])
 		this._pool.impact[0].material.forceCompilation(this._pool.impact[0])
 		this._pool.casing[0].material.forceCompilation(this._pool.casing[0])
 		this._pool.smoke[0].material.forceCompilation(this._pool.smoke[0])
+		this._pool.ground[0].material.forceCompilation(this._pool.ground[0])
 
 		this.scene.executeWhenReady(() => { console.log('SCENE READY') })
-
-		// needed for certain shaders, though none in this simple demo
-		this.engine.runRenderLoop(() => { })
 	}
 
 	_loadTex(url) {
@@ -264,11 +348,19 @@ class BABYLONRenderer {
 	// a pooled sprite quad with its OWN additive material (texture shared across the
 	// kind). billboard = always face the camera (muzzle/glow). Non-billboard sprites
 	// (impacts) are oriented to the surface normal per shot instead.
-	_makeSprite(name, tex, billboard) {
+	_makeSprite(name, tex, billboard, keepEmissive = false) {
 		const mesh = BABYLON.MeshBuilder.CreatePlane(name, { size: 1 }, this.scene)
 		const mat = new BABYLON.StandardMaterial(name + 'Mat', this.scene)
 		mat.diffuseTexture = tex
-		mat.emissiveTexture = tex
+		// emissiveTexture is opt-in (keepEmissive). For the TINTED pools (blood/impact/
+		// smoke/ground) it must stay OFF: those PNGs are WHITE luminance masks and
+		// StandardMaterial ADDS emissiveTexture RGB onto emissiveColor (the crimson tint
+		// from _setColor), so white+crimson clamps to white — the shape comes from
+		// opacityTexture (alpha), the tint from emissiveColor → tint × alpha. For the
+		// always-additive white-hot pools (muzzle/glow) we KEEP it: the white texture add
+		// is the intended hot-core look, and those pools never swap textures at runtime so
+		// the emissive define is stable (no mid-frame shader recompile; see the pool comment).
+		if (keepEmissive) mat.emissiveTexture = tex
 		mat.opacityTexture = tex
 		mat.emissiveColor = new BABYLON.Color3(1, 1, 1)
 		mat.disableLighting = true
@@ -298,15 +390,21 @@ class BABYLONRenderer {
 	//   'impact' grows slightly as it fades.
 	// `power` shapes the fade falloff (1 linear, 2 punchy). No allocation on fire
 	// beyond the small entry object (reclaimed as it finishes).
+	// drop any live sim entries (fade set + blood) for a pooled mesh about to be
+	// reused, so its previous effect can't hide/fight the new one mid-life.
+	_reclaim(mesh) {
+		for (let i = this._fx.length - 1; i >= 0; i--) {
+			if (this._fx[i].mesh === mesh) { this._fx[i] = this._fx[this._fx.length - 1]; this._fx.pop() }
+		}
+		for (let i = this._blood.length - 1; i >= 0; i--) {
+			if (this._blood[i].mesh === mesh) { this._blood[i] = this._blood[this._blood.length - 1]; this._blood.pop() }
+		}
+	}
+
 	_track(mesh, life, mode, power, sx, sy, sz) {
 		// pool recycling can hand out a mesh whose previous effect is still fading;
 		// drop the stale entry so it can't hide/fight the new one mid-life
-		for (let i = this._fx.length - 1; i >= 0; i--) {
-			if (this._fx[i].mesh === mesh) {
-				this._fx[i] = this._fx[this._fx.length - 1]
-				this._fx.pop()
-			}
-		}
+		this._reclaim(mesh)
 		mesh.isVisible = true
 		mesh.visibility = 1
 		mesh.scaling.set(sx, sy, sz)
@@ -324,28 +422,42 @@ class BABYLONRenderer {
 		const layer = opts.vmLayer ? 0x10000000 : 0x0FFFFFFF
 		const f = fx || resolveWeaponFx(null)
 		const m = f.muzzle
+		// per-shot scale variance (Vlambeer "vary everything"): a fixed-size flash is
+		// the #1 tell of a cheap gun. Roll a single factor so core + glow stay coherent.
+		const sJit = 0.8 + Math.random() * 0.45 // ~0.8..1.25
 		const core = this._next('muzzle')
 		core.layerMask = layer
 		core.position.copyFrom(pos)
 		core.rotation.z = Math.random() * Math.PI * 2
 		this._setColor(core, m.color)
-		this._track(core, m.life, 'flash', 2, m.scale, m.scale, m.scale)
+		const cs = m.scale * sJit
+		this._track(core, m.life, 'flash', 2, cs, cs, cs)
 
 		const glow = this._next('glow')
 		glow.layerMask = layer
 		glow.position.copyFrom(pos)
+		glow.rotation.z = Math.random() * Math.PI * 2
 		this._setColor(glow, m.color, 0.6)
-		this._track(glow, m.life * 1.1, 'flash', 2, m.glowScale, m.glowScale, m.glowScale)
+		const gs = m.glowScale * sJit
+		this._track(glow, m.life * 1.1, 'flash', 2, gs, gs, gs)
 
 		// pulse the single pre-created world light (see constructor) so the flash
 		// briefly licks nearby walls/floor. Newest shot re-stamps it.
 		const li = f.light
-		if (li) {
+		// full-auto strobe: some weapons (SMG) only light on a fraction of shots so
+		// sustained fire flickers instead of holding a constant, less-violent glow
+		// (also a photosensitivity safeguard vs a steady 10Hz+ full-screen light).
+		if (li && (li.chance == null || Math.random() <= li.chance)) {
+			// vary the peak per shot (Vlambeer): a fixed-brightness flash is a tell.
+			const jit = li.jitter || 0
+			const peak = li.intensity * (1 - jit * 0.5 + Math.random() * jit)
 			this._muzzleLight.position.copyFrom(pos)
 			this._muzzleLight.diffuse.set(m.color[0], m.color[1], m.color[2])
 			this._muzzleLight.range = li.range || 10
-			this._muzzleLight.intensity = li.intensity
-			this._muzzleLightPulse = { t0: performance.now(), life: li.life || 70, peak: li.intensity }
+			this._muzzleLight.intensity = peak
+			// decayPow shapes the falloff: 2 = front-loaded quadratic (reads as a
+			// flash), 1 = linear (reads as a lamp dimming). Default punchy.
+			this._muzzleLightPulse = { t0: performance.now(), life: li.life || 70, peak, decayPow: li.decayPow || 2 }
 		}
 
 		// barrel smoke: ALWAYS world layer, even for the local player's vm-layer
@@ -454,9 +566,13 @@ class BABYLONRenderer {
 	_setImpactSprite(mesh, spriteKey, additive) {
 		const tex = this._sprites[spriteKey] || this._sprites.hit
 		mesh.material.diffuseTexture = tex
-		mesh.material.emissiveTexture = tex
+		// NO emissiveTexture (see _makeSprite): only SWAP bitmaps here, never toggle the
+		// emissive define, so the per-impact path can't recompile the shader mid-frame.
 		mesh.material.opacityTexture = tex
 		mesh.material.alphaMode = additive ? BABYLON.Engine.ALPHA_ADD : BABYLON.Engine.ALPHA_COMBINE
+		// clear any quaternion a prior streak left on this recycled mesh, so Euler
+		// rotation.z / billboard / lookAt on the new use take effect
+		mesh.rotationQuaternion = null
 	}
 
 	_spawnImpact(point, normal, surfaceKey, fx) {
@@ -497,6 +613,122 @@ class BABYLONRenderer {
 			smoke.rotation.z = Math.random() * Math.PI * 2
 			this._track(smoke, 560, 'smoke', 1, base * 1.4, base * 1.4, base * 1.4)
 		}
+		// flesh: a burst of ballistic blood droplets sprayed off the hit (the diegetic
+		// "meat" read, layered under the base wet mark). Pooled + simulated in update().
+		if (s.blood) this._spawnBloodBurst(impact.position, normal, base)
+	}
+
+	// Blood off a flesh hit, in DISTINCT CLASSES (see the tunables block): a bright
+	// additive MIST puff (hot flash), fast velocity-stretched STREAKS, and heavier
+	// gravity-bound DROPS — all pooled from the impact pool and simulated in update()'s
+	// blood loop. Drops/streaks leave a floor pool where they land. `point` is the
+	// (already normal-lifted) hit position; `base` the base impact scale.
+	_spawnBloodBurst(point, normal, base) {
+		const low = this._fxTier === 'low'
+		const nx = normal ? normal.x : 0
+		const ny = normal ? normal.y : 0
+		const nz = normal ? normal.z : 0
+		const now = performance.now()
+
+		// --- MIST: bright additive puff(s) that expand + fade fast ---
+		const mistN = low ? MIST_COUNT_LO : MIST_COUNT_HI
+		for (let i = 0; i < mistN; i++) {
+			const m = this._next('impact')
+			this._reclaim(m)
+			m.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL
+			this._setImpactSprite(m, 'blood_mist', !low) // additive on high, alpha on low
+			this._setColor(m, MIST_COLOR)
+			m.position.copyFrom(point)
+			m.rotation.z = Math.random() * Math.PI * 2
+			const s0 = base * MIST_SCALE0
+			m.scaling.set(s0, s0, s0)
+			m.isVisible = true
+			m.visibility = MIST_ALPHA0
+			this._blood.push({ mesh: m, kind: 'mist', t0: now, life: MIST_LIFE, s0: base * MIST_SCALE0, s1: base * MIST_SCALE1, a0: MIST_ALPHA0 })
+		}
+
+		// --- STREAKS: fast, high-drag, velocity-stretched (skipped on low tier) ---
+		const streakN = low ? STREAK_COUNT_LO : STREAK_COUNT_HI
+		for (let i = 0; i < streakN; i++) {
+			const st = this._next('impact')
+			this._reclaim(st)
+			st.billboardMode = BABYLON.Mesh.BILLBOARDMODE_NONE // oriented along travel, not camera
+			this._setImpactSprite(st, 'blood_streak', false)
+			this._setColor(st, STREAK_COLOR)
+			st.position.copyFrom(point)
+			const vx = nx * STREAK_SPEED + (Math.random() - 0.5) * STREAK_SPREAD
+			const vy = ny * STREAK_SPEED + Math.random() * STREAK_SPREAD * 0.5
+			const vz = nz * STREAK_SPEED + (Math.random() - 0.5) * STREAK_SPREAD
+			const vel = new BABYLON.Vector3(vx, vy, vz)
+			const speed = vel.length()
+			// orient ONCE at spawn: local +Y along travel, facing the camera → a streak
+			const w = base * STREAK_WIDTH
+			const len = w + base * speed * STREAK_STRETCH
+			st.scaling.set(w, len, 1)
+			this._orientStreak(st, vel)
+			st.isVisible = true
+			st.visibility = 1
+			this._blood.push({ mesh: st, kind: 'streak', vel, t0: now, life: STREAK_LIFE, grav: STREAK_GRAVITY, drag: STREAK_DRAG, ground: true })
+		}
+
+		// --- DROPS: heavier gravity-bound droplets (thinned, not removed, on low) ---
+		const dropN = low ? DROP_COUNT_LO : DROP_COUNT_HI
+		for (let i = 0; i < dropN; i++) {
+			const d = this._next('impact')
+			this._reclaim(d)
+			d.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL
+			this._setImpactSprite(d, 'blood_drop', false)
+			this._setColor(d, DROP_COLOR)
+			d.position.copyFrom(point)
+			d.rotation.z = Math.random() * Math.PI * 2
+			const sz = base * (DROP_SIZE_MUL + Math.random() * DROP_SIZE_JITTER)
+			d.scaling.set(sz, sz, sz)
+			d.isVisible = true
+			d.visibility = 1
+			const vx = nx * DROP_SPEED + (Math.random() - 0.5) * DROP_SPREAD
+			const vy = ny * DROP_SPEED + DROP_UP + Math.random() * DROP_UP
+			const vz = nz * DROP_SPEED + (Math.random() - 0.5) * DROP_SPREAD
+			this._blood.push({ mesh: d, kind: 'drop', vel: new BABYLON.Vector3(vx, vy, vz), t0: now, life: DROP_LIFE, grav: DROP_GRAVITY, ground: !low })
+		}
+	}
+
+	// orient a NON-billboard streak quad so its long (local +Y) axis runs along its
+	// velocity and it roughly faces the camera — the cheap velocity-stretch read.
+	// Reuses scratch vectors; sets rotationQuaternion (cleared on reuse via
+	// _setImpactSprite). Called once at spawn (streaks are brief).
+	_orientStreak(mesh, vel) {
+		const cam = this.scene.activeCamera
+		this._svUp.copyFrom(vel)
+		if (this._svUp.lengthSquared() < 1e-6) this._svUp.set(0, 1, 0)
+		this._svUp.normalize()
+		if (cam) { cam.position.subtractToRef(mesh.position, this._svFwd) } else { this._svFwd.set(0, 0, 1) }
+		if (this._svFwd.lengthSquared() < 1e-6) this._svFwd.set(0, 0, 1)
+		this._svFwd.normalize()
+		BABYLON.Vector3.CrossToRef(this._svUp, this._svFwd, this._svRight) // local X
+		if (this._svRight.lengthSquared() < 1e-6) { this._svRight.set(1, 0, 0) } else { this._svRight.normalize() }
+		BABYLON.Vector3.CrossToRef(this._svRight, this._svUp, this._svFwd2) // re-orthogonalize Z
+		BABYLON.Quaternion.RotationQuaternionFromAxisToRef(this._svRight, this._svUp, this._svFwd2, this._streakQuat)
+		mesh.rotationQuaternion = this._streakQuat.clone()
+	}
+
+	// Leave a flat blood pool on the floor where a droplet landed. Separate pool so a
+	// lingering pool isn't recycled by fresh airborne droplets. No mesh decals.
+	_spawnGroundPool(x, z) {
+		const gp = this._next('ground')
+		// drop any stale sim entry for this recycled mesh
+		for (let i = this._groundPools.length - 1; i >= 0; i--) {
+			if (this._groundPools[i].mesh === gp) { this._groundPools[i] = this._groundPools[this._groundPools.length - 1]; this._groundPools.pop() }
+		}
+		this._setColor(gp, GROUND_COLOR)
+		const idx = this._idx.ground % GROUND_POOL
+		gp.position.set(x, GROUND_Y + 0.002 + idx * 0.0002, z) // tiny per-index epsilon vs z-fight
+		gp.rotation.x = Math.PI / 2
+		gp.rotation.y = Math.random() * Math.PI * 2
+		const size = GROUND_SIZE + Math.random() * GROUND_SIZE_JITTER
+		gp.scaling.set(0.1 * size, 0.1 * size, 1) // grows to `size` over GROUND_GROW
+		gp.isVisible = true
+		gp.visibility = 1
+		this._groundPools.push({ mesh: gp, t0: performance.now(), size, life: GROUND_GROW + GROUND_HOLD + GROUND_FADE })
 	}
 
 	// energetic burst where a plasma bolt ended (server-driven entity delete). Pooled.
@@ -517,8 +749,10 @@ class BABYLONRenderer {
 	update() {
 		const now = performance.now()
 
-		// decay the muzzle light pulse back to its idle intensity 0 (linear over the
-		// weapon's light.life). The light object itself is never created/destroyed.
+		// decay the muzzle light pulse back to its idle intensity 0 over the weapon's
+		// light.life. decayPow>1 front-loads the energy: peak*(1-t)^2 reads as a FLASH,
+		// linear (pow 1) reads as a dimming lamp. The light object is never created/
+		// destroyed — the scene's light count stays constant (no shader recompile).
 		if (this._muzzleLightPulse) {
 			const p = this._muzzleLightPulse
 			const t = (now - p.t0) / p.life
@@ -526,7 +760,7 @@ class BABYLONRenderer {
 				this._muzzleLight.intensity = 0
 				this._muzzleLightPulse = null
 			} else {
-				this._muzzleLight.intensity = p.peak * (1 - t)
+				this._muzzleLight.intensity = p.peak * Math.pow(1 - t, p.decayPow || 2)
 			}
 		}
 
@@ -588,6 +822,63 @@ class BABYLONRenderer {
 			}
 			const left = 1 - age / c.life
 			if (left < 0.25) c.mesh.visibility = left / 0.25 // fade only the tail
+		}
+
+		// simulate blood particles by class (see _spawnBloodBurst). Shares dt with the
+		// casing sim above; reuses _bloodVelScratch so nothing allocates per frame.
+		//   mist  — no move; expands s0->s1 and fades over its short life.
+		//   streak/drop — ballistic (gravity + optional drag); a `ground` one that
+		//                 reaches the floor leaves a pool and is retired.
+		const bs = this._blood
+		for (let i = bs.length - 1; i >= 0; i--) {
+			const b = bs[i]
+			const f = (now - b.t0) / b.life
+			if (f >= 1) {
+				b.mesh.isVisible = false
+				b.mesh.visibility = 1
+				if (b.kind === 'streak') b.mesh.rotationQuaternion = null
+				bs[i] = bs[bs.length - 1]
+				bs.pop()
+				continue
+			}
+			if (b.kind === 'mist') {
+				const s = b.s0 + (b.s1 - b.s0) * f
+				b.mesh.scaling.set(s, s, s)
+				b.mesh.visibility = b.a0 * (1 - f)
+				continue
+			}
+			// streak / drop: ballistic
+			b.vel.y -= b.grav * dt
+			if (b.drag) b.vel.scaleInPlace(b.drag)
+			this._bloodVelScratch.copyFrom(b.vel).scaleInPlace(dt)
+			b.mesh.position.addInPlace(this._bloodVelScratch)
+			b.mesh.visibility = fadeAlpha(f, 1)
+			if (b.ground && b.mesh.position.y <= GROUND_Y) {
+				if (this._fxTier !== 'low') this._spawnGroundPool(b.mesh.position.x, b.mesh.position.z)
+				b.mesh.isVisible = false
+				b.mesh.visibility = 1
+				if (b.kind === 'streak') b.mesh.rotationQuaternion = null
+				bs[i] = bs[bs.length - 1]
+				bs.pop()
+			}
+		}
+
+		// floor blood pools: grow (GROUND_GROW), hold, then fade (GROUND_FADE), recycle.
+		const gps = this._groundPools
+		for (let i = gps.length - 1; i >= 0; i--) {
+			const g = gps[i]
+			const age = now - g.t0
+			if (age >= g.life) {
+				g.mesh.isVisible = false
+				g.mesh.visibility = 1
+				gps[i] = gps[gps.length - 1]
+				gps.pop()
+				continue
+			}
+			const s = age < GROUND_GROW ? g.size * (0.1 + 0.9 * (age / GROUND_GROW)) : g.size
+			g.mesh.scaling.set(s, s, 1)
+			const fadeStart = g.life - GROUND_FADE
+			g.mesh.visibility = age > fadeStart ? Math.max(0, 1 - (age - fadeStart) / GROUND_FADE) : 1
 		}
 
 		this.scene.render()

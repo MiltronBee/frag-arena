@@ -5,19 +5,31 @@
     <title>Frag Arena</title>
     <meta name="description" content="Frag Arena - a fast multiplayer browser arena shooter">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#10161a">
+    <meta name="theme-color" content="#07090C">
     <meta name="mobile-web-app-capable" content="yes">
+    <link rel="icon" type="image/svg+xml" href="assets/brand/logo.svg">
     <link rel="icon" type="image/png" href="assets/sprites/crosshair.png">
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-c3d3c800d8">
+
+    <!-- UI fonts: Chakra Petch (display), Teko (HUD numerals), Inter (body).
+         Preconnect + Google Fonts CSS in <head> so text is ready before the
+         splash measures. font-display:block guards first paint (fonts are cached
+         quickly); the preloader also awaits document.fonts before entry unlocks. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,600;0,700;1,700&family=Inter:wght@400;600&family=Teko:wght@500;600&display=block">
+
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-d8a7e6d166">
 </head>
 <body class="connection-connecting">
     <main id="game-shell">
         <canvas id="main-canvas" aria-label="Frag Arena game view"></canvas>
 
+        <div id="nametags" aria-hidden="true"></div>
+
         <div id="arena-hud" aria-live="polite">
             <header id="top-hud">
                 <div class="brand-lockup" aria-label="Frag Arena">
-                    <span class="brand-mark">FA</span>
+                    <img class="brand-mark" src="assets/brand/logo.svg" alt="" width="30" height="30">
                     <span class="brand-name">FRAG ARENA</span>
                 </div>
                 <div class="match-strip">
@@ -30,50 +42,144 @@
                 </div>
             </header>
 
-            <img id="crosshair" src="assets/sprites/crosshair.png" alt="">
-            <div id="hit-marker" aria-hidden="true"><i></i><i></i></div>
+            <!-- Per-weapon, spread-reactive crosshair (see _work/ui/CROSSHAIR-proposal.md).
+                 Dynamic SVG keeps the #crosshair id, centering anchor + death-fade CSS.
+                 data-weapon selects the reticle (0 Rifle · 1 SMG · 2 Shotgun · 3 Pistol);
+                 --xhair-spread (px) is written per-frame from client-predicted heat and
+                 drives the dynamic-cross tick gap. The shotgun ring radius (--xhair-ring)
+                 is set on weapon-switch / resize. The #hit-marker below is untouched and
+                 overlays this element. viewBox is symmetric about 0,0 so shapes center. -->
+            <svg id="crosshair" data-weapon="0" viewBox="-64 -64 128 128" aria-hidden="true"
+                 xmlns="http://www.w3.org/2000/svg">
+                <!-- dynamic cross: rifle / smg / pistol. 4 ticks translate outward by the
+                     spread gap; the center dot marks the true (fixed) aim point. -->
+                <g class="xh xh-cross">
+                    <rect class="xh-tick xh-tick-up"    x="-1" y="-7" width="2" height="7"></rect>
+                    <rect class="xh-tick xh-tick-down"  x="-1" y="0"  width="2" height="7"></rect>
+                    <rect class="xh-tick xh-tick-left"  x="-7" y="-1" width="7" height="2"></rect>
+                    <rect class="xh-tick xh-tick-right" x="0"  y="-1" width="7" height="2"></rect>
+                    <circle class="xh-dot" cx="0" cy="0" r="1"></circle>
+                </g>
+                <!-- shotgun: wide ring drawn at the true pellet-cone angle + center dot -->
+                <g class="xh xh-ring">
+                    <circle class="xh-ring-circle" cx="0" cy="0" r="49" fill="none"></circle>
+                    <circle class="xh-dot" cx="0" cy="0" r="1"></circle>
+                </g>
+            </svg>
+            <div id="hit-marker" aria-hidden="true"><i></i><i></i><span class="hm-skull"></span></div>
 
             <section id="health-panel" aria-label="Player health">
-                <div class="hud-label">VITALS</div>
-                <div class="health-readout">
-                    <span id="health-value">100</span>
-                    <span class="health-unit">HP</span>
+                <div class="hud-cluster">
+                    <img class="hud-skull" src="assets/brand/skull.svg" alt="" width="26" height="26" aria-hidden="true">
+                    <div class="health-readout">
+                        <span id="health-value">100</span>
+                        <span class="health-unit">HP</span>
+                    </div>
                 </div>
                 <div class="health-track" aria-hidden="true">
                     <span id="health-fill"></span>
                 </div>
             </section>
 
-            <section id="weapon-panel" aria-label="Weapon and ammunition">
-                <div id="weapon-name">RIFLE</div>
-                <div id="ammo-counter">
-                    <span id="magazine-ammo">30</span>
-                    <span class="ammo-separator">/</span>
-                    <span id="reserve-ammo">90</span>
+            <section id="weapon-panel" data-weapon="0" aria-label="Weapon and ammunition">
+                <div id="weapon-icon" aria-hidden="true"></div>
+                <div class="weapon-readout">
+                    <div id="weapon-name">RIFLE</div>
+                    <div id="ammo-counter">
+                        <span id="magazine-ammo">30</span>
+                        <span class="ammo-separator">/</span>
+                        <span id="reserve-ammo">90</span>
+                    </div>
+                    <div id="reload-state" aria-live="assertive">RELOAD</div>
                 </div>
-                <div id="reload-state" aria-live="assertive">RELOADING</div>
             </section>
 
             <div id="combat-state" class="combat-state-hidden" role="status">
-                <div id="combat-title">ELIMINATED</div>
+                <img class="combat-skull" src="assets/brand/skull.svg" alt="" width="72" height="72" aria-hidden="true">
+                <div id="combat-title">YOU DIED</div>
                 <div id="combat-subtitle">RESPAWNING</div>
             </div>
         </div>
 
         <div id="damage-flash" aria-hidden="true"></div>
 
+        <!-- ENTRY / MAIN MENU (doubles as the loading screen). The PLAY button
+             (#enter-arena) is the loading-locked primary: its fill = load
+             progress until the triple gate opens, then it unlocks to PLAY. -->
         <section id="entry-overlay" class="is-visible" aria-labelledby="entry-title">
+            <div class="entry-header">
+                <img class="entry-logo" src="assets/brand/logo.svg" alt="Frag Arena" width="52" height="52">
+                <span class="entry-wordmark">FRAG ARENA</span>
+                <div class="entry-meta">
+                    <span id="entry-ping" class="entry-ping">PING --</span>
+                    <span class="entry-build" id="entry-build">v0.x</span>
+                </div>
+            </div>
+
             <div class="entry-content">
-                <div class="entry-kicker">LIVE MULTIPLAYER</div>
-                <h1 id="entry-title">FRAG ARENA</h1>
-                <div id="entry-status">CONNECTING TO ARENA</div>
-                <button id="enter-arena" type="button" disabled>ENTER ARENA</button>
+                <div class="menu-card">
+                    <div class="card-strip" aria-hidden="true"></div>
+
+                    <div class="entry-kicker">LIVE MULTIPLAYER</div>
+                    <h1 id="entry-title" class="visually-quiet">FRAG ARENA</h1>
+
+                    <label class="field-label" for="callsign-input">CALLSIGN</label>
+                    <input id="callsign-input" class="callsign" type="text" maxlength="24"
+                           autocomplete="off" spellcheck="false" placeholder="PLAYER">
+
+                    <button id="enter-arena" type="button" data-loading="true" aria-disabled="true" disabled>LOADING… 0%</button>
+
+                    <div id="entry-progress" aria-hidden="true"><span id="entry-progress-fill"></span></div>
+                    <div class="progress-row">
+                        <span id="entry-stage" class="entry-stage">LOADING…</span>
+                        <span id="entry-status" role="status" aria-live="polite">CONNECTING TO ARENA</span>
+                    </div>
+
+                    <div class="menu-actions">
+                        <button id="wallet-connect" class="btn-wallet" type="button">
+                            <span class="wallet-tick" aria-hidden="true"></span>
+                            <span class="wallet-sym" id="wallet-symbol">TBD</span>
+                            CONNECT
+                        </button>
+                        <button id="how-to-play" class="btn-ghost" type="button">HOW TO PLAY</button>
+                    </div>
+                </div>
+
+                <div class="key-hints" aria-hidden="true">
+                    WASD move · SPACE jump · 1–4 weapons · CLICK fire · ESC settings
+                </div>
+            </div>
+        </section>
+
+        <!-- HOW TO PLAY (ghost modal, same panel spec) -->
+        <section id="howto-modal" class="howto-closed" aria-labelledby="howto-title">
+            <div class="howto-panel">
+                <div class="card-strip" aria-hidden="true"></div>
+                <button id="howto-close" class="panel-close" type="button" aria-label="Close">✕</button>
+                <h2 id="howto-title">HOW TO PLAY</h2>
+                <ul class="howto-list howto-desktop">
+                    <li><b>WASD</b> move</li>
+                    <li><b>MOUSE</b> aim · <b>CLICK</b> fire</li>
+                    <li><b>SPACE</b> jump</li>
+                    <li><b>1–4 / Q / WHEEL</b> switch weapon</li>
+                    <li><b>R</b> reload · <b>ESC</b> settings</li>
+                </ul>
+                <ul class="howto-list howto-touch">
+                    <li><b>LEFT THUMB</b> move (floating stick)</li>
+                    <li><b>RIGHT HALF</b> drag to aim</li>
+                    <li><b>FIRE</b> hold to shoot</li>
+                    <li><b>JUMP / RELOAD / SWAP</b> buttons</li>
+                    <li><b>GEAR</b> settings</li>
+                </ul>
             </div>
         </section>
 
         <section id="settings-menu" class="settings-closed" aria-labelledby="settings-title">
+            <div class="card-strip" aria-hidden="true"></div>
             <div class="menu-kicker">MATCH PAUSED</div>
             <h2 id="settings-title">SETTINGS</h2>
+
+            <div class="settings-group">CONTROLS</div>
             <div class="settings-row">
                 <label for="fov-slider">FIELD OF VIEW <span id="fov-val">95</span></label>
                 <input type="range" id="fov-slider" min="70" max="120" value="95">
@@ -86,9 +192,10 @@
                 <label for="touch-sens-slider">TOUCH SENSITIVITY <span id="touch-sens-val">1.00</span></label>
                 <input type="range" id="touch-sens-slider" min="0.4" max="3.0" step="0.05" value="1.00">
             </div>
-            <div class="settings-row" id="touch-invert-row">
+            <div class="settings-row settings-toggle-row" id="touch-invert-row">
                 <label for="touch-invert-y">INVERT LOOK (Y) <input type="checkbox" id="touch-invert-y"></label>
             </div>
+
             <button id="resume-game" type="button">RESUME</button>
         </section>
 
@@ -130,8 +237,53 @@
                 <input type="number" id="dev-proj-speed" step="1" min="0">
             </div>
         </section>
+
+        <!-- SPLASH: instant brand cover over the boot. Logo draw-in, auto-advances
+             (~1.9s) and is skippable by any input after 0.8s. The menu is mounted
+             underneath and asset loading starts immediately — the splash is pure
+             theater over it. Inline so it paints before the JS bundle runs. -->
+        <section id="splash" aria-hidden="true">
+            <div class="splash-inner">
+                <img class="splash-logo" src="assets/brand/logo.svg" alt="Frag Arena" width="180" height="180">
+                <div class="splash-wordmark">FRAG ARENA</div>
+                <div class="splash-rule" aria-hidden="true"></div>
+                <div class="splash-tagline">LOAD. FRAG. REPEAT.</div>
+            </div>
+            <div class="splash-foot">built on Solana · v0.x</div>
+        </section>
     </main>
-    <script>window.__BUILD_ID__="0.0.1-c3d3c800d8";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-c3d3c800d8"></script>
+
+    <script>
+      // Splash controller (0 JS deps): draw-in runs via CSS; auto-advance after
+      // ~1.9s, skippable by any input after 0.8s. Dismissing only fades the splash
+      // layer — it does NOT resume audio or lock the pointer (that stays gated to
+      // the PLAY button / pointer-lock wiring in Simulator, unchanged).
+      (function () {
+        var splash = document.getElementById('splash')
+        if (!splash) return
+        var dismissed = false
+        function dismiss() {
+          if (dismissed) return
+          dismissed = true
+          splash.classList.add('splash-out')
+          setTimeout(function () { if (splash.parentNode) splash.parentNode.removeChild(splash) }, 320)
+        }
+        var canSkip = false
+        setTimeout(function () { canSkip = true }, 800)
+        setTimeout(dismiss, 1900)
+        var skip = function () { if (canSkip) dismiss() }
+        window.addEventListener('pointerdown', skip, { passive: true })
+        window.addEventListener('keydown', skip)
+        // stamp the build id into the splash/menu version tags once the bundle sets it
+        setTimeout(function () {
+          var b = window.__BUILD_ID__
+          if (!b) return
+          var el = document.getElementById('entry-build'); if (el) el.textContent = 'v' + b
+          var f = splash.querySelector('.splash-foot'); if (f) f.textContent = 'built on Solana · v' + b
+        }, 0)
+      })()
+    </script>
+    <script>window.__BUILD_ID__="0.0.1-d8a7e6d166";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-d8a7e6d166"></script>
 </body>
 </html>

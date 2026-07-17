@@ -15,6 +15,11 @@ class PlayerCharacter {
 		this.hitpoints = 100
 		this.isAlive = true
 
+		// callsign: index into common/playerNames.js PLAYER_NAMES (UInt8 on the wire).
+		// A value of HUMAN_NAME_SENTINEL (30) means "human player — real name arrives
+		// via the PlayerName message" (the callsign the human typed); bots use 0–29.
+		this.nameIndex = 0
+
 		// match scoreboard (server-authoritative; UInt8 on the wire, so clamp at 255)
 		this.kills = 0
 		this.deaths = 0
@@ -78,7 +83,8 @@ PlayerCharacter.protocol = {
 	hitpoints: nengi.UInt8,
 	currentWeaponIndex: nengi.UInt8,
 	kills: nengi.UInt8,
-	deaths: nengi.UInt8
+	deaths: nengi.UInt8,
+	nameIndex: nengi.UInt8
 }
 
 export default PlayerCharacter

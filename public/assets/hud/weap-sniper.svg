@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 64" width="128" height="64">
+  <!-- Side-profile sniper-rifle silhouette (long barrel + scope). Hardcoded white
+       fill; used as a CSS mask-image for Halo-cyan tinting (see weap-rifle.svg /
+       public/assets/brand/skull.svg). Not wired to a weapon yet (no sniper in
+       common/weaponsConfig.js) — provided for the full weapon-class set. -->
+  <g fill="#FFFFFF">
+    <!-- receiver -->
+    <path d="M16 27 L60 27 L60 36 L34 36 L32 42 L22 42 L20 36 L16 36 Z"/>
+    <!-- long barrel + muzzle brake -->
+    <rect x="60" y="29" width="52" height="4"/>
+    <rect x="112" y="27" width="6" height="8"/>
+    <!-- scope -->
+    <rect x="34" y="18" width="34" height="6"/>
+    <rect x="34" y="16" width="6" height="10"/>
+    <rect x="62" y="16" width="6" height="10"/>
+    <!-- magazine -->
+    <path d="M40 36 L52 36 L51 52 L41 52 Z"/>
+    <!-- grip -->
+    <path d="M24 36 L34 36 L31 52 L22 52 Z"/>
+    <!-- stock -->
+    <path d="M4 28 L16 28 L16 36 L4 40 Z"/>
+  </g>
+</svg>

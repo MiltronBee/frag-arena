@@ -7,6 +7,9 @@ import Respawned from '../common/message/Respawned'
 import HitConfirmed from '../common/message/HitConfirmed'
 import Killed from '../common/message/Killed'
 import DamageTaken from '../common/message/DamageTaken'
+import PlayerName from '../common/message/PlayerName'
+import SetNameCommand from '../common/command/SetNameCommand' // for registration only
+import { HUMAN_NAME_SENTINEL, decodeName } from '../common/playerNames'
 import followPath from './followPath'
 import damagePlayer from './damagePlayer' // TODO
 import niceInstanceExtension from './niceInstanceExtension'
@@ -17,6 +20,7 @@ import { shotPattern, applyPattern } from '../common/firePattern'
 import lagCompensatedHitscanCheck from './lagCompensatedHitscanCheck'
 import Projectile from '../common/entity/Projectile'
 import { weapons } from '../common/weaponsConfig'
+import { PLAYER_NAMES } from '../common/playerNames'
 import BotController from './BotController'
 
 import * as BABYLON from 'babylonjs'
@@ -46,9 +50,20 @@ class GameInstance {
 		// Each bot is wrapped in a client-like handle whose rawEntity and
 		// smoothEntity are the SAME entity, so damagePlayer/respawnPlayer and the
 		// hitscan victim resolution work identically for bots and people.
+		this._nameCounter = 0
+		// server-only: smooth nid -> human callsign (bots never appear here). Used to
+		// replay existing human names to late joiners and cleaned up on disconnect.
+		this._humanNames = new Map()
 		this.bots = []
-		const botCount = process.env.BOTS !== undefined ? (parseInt(process.env.BOTS, 10) || 0) : 4
+		// Default 0 = 1v1 player-vs-player (no bots). Set BOTS=N in the env to add
+		// practice bots back for local testing (e.g. `BOTS=4 npm start`).
+		const botCount = process.env.BOTS !== undefined ? (parseInt(process.env.BOTS, 10) || 0) : 0
 		for (let i = 0; i < botCount; i++) this.addBot(i)
+
+		// GODMODE: real players are immortal (set GODMODE=1/true). Bots still take
+		// damage so you can frag them and watch death anims while wandering unkillable.
+		this._godmode = process.env.GODMODE === '1' || process.env.GODMODE === 'true'
+		if (this._godmode) console.log('[GODMODE] real players are immortal')
 
 		this.instance.on('connect', ({ client, callback }) => {
 			// PER player-related state, attached to clients
@@ -78,6 +93,14 @@ class GameInstance {
 			smoothEntity.z = rawEntity.z
 			this.instance.addEntity(smoothEntity)
 
+			// Human players are flagged with HUMAN_NAME_SENTINEL on both entities; their
+			// real callsign (typed at the menu) arrives via SetNameCommand and is
+			// broadcast to everyone as a PlayerName message. Bots still use the round-
+			// robin PLAYER_NAMES index (see addBot). Same lockstep rule as hitpoints —
+			// the victim reads raw (private channel), everyone else reads smooth.
+			rawEntity.nameIndex = HUMAN_NAME_SENTINEL
+			smoothEntity.nameIndex = HUMAN_NAME_SENTINEL
+
 			// tell the client which entities it controls + where it spawned
 			this.instance.message(new Identity(rawEntity.nid, smoothEntity.nid, rawEntity.x, rawEntity.z), client)
 
@@ -104,6 +127,12 @@ class GameInstance {
 
 			// accept the connection
 			callback({ accepted: true, text: 'Welcome!' })
+
+			// replay existing human players' names to the new joiner so their nametags
+			// resolve immediately (their SetNameCommand fired before this client existed)
+			this._humanNames.forEach((name, nid) => {
+				this.instance.message(new PlayerName(nid, name), client)
+			})
 		})
 
 		this.instance.on('disconnect', client => {
@@ -117,6 +146,7 @@ class GameInstance {
 				this.instance.removeEntity(client.rawEntity)
 			}
 			if (client.smoothEntity) {
+				this._humanNames.delete(client.smoothEntity.nid)
 				client.smoothEntity.mesh.dispose()
 				this.instance.removeEntity(client.smoothEntity)
 			}
@@ -181,6 +211,16 @@ class GameInstance {
 		this.instance.on('command::FireCommand', ({ command, client, tick }) => {
 			// shoot from the perspective of this client's entity
 			this.performShot(client)
+		})
+
+		this.instance.on('command::SetNameCommand', ({ command, client }) => {
+			// a human's chosen callsign: keyed by smooth nid (the shared identity),
+			// stored server-side for late-joiner replay, and broadcast to everyone.
+			if (!client.smoothEntity) return
+			const name = decodeName(command)
+			const nid = client.smoothEntity.nid
+			this._humanNames.set(nid, name)
+			this.instance.messageAll(new PlayerName(nid, name))
 		})
 	}
 
@@ -265,6 +305,7 @@ class GameInstance {
 		entity.z = spawn.z
 		// spread the loadouts: rifle / smg / shotgun / pistol
 		entity.currentWeaponIndex = index % weapons.length
+		entity.nameIndex = this._nameCounter++ % PLAYER_NAMES.length
 		this.instance.addEntity(entity)
 
 		const handle = { bot: true, rawEntity: entity, smoothEntity: entity, respawnAt: null }
@@ -304,6 +345,8 @@ class GameInstance {
 		const raw = victimClient.rawEntity
 		const smooth = victimClient.smoothEntity
 		if (!raw || !raw.isAlive) return
+		// GODMODE: real players take no damage (bots still do — go frag them)
+		if (this._godmode && !victimClient.bot) return
 
 		// hp BEFORE this hit — overkill is damage beyond what the kill needed
 		const hpBefore = raw.hitpoints

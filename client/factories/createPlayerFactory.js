@@ -1,5 +1,11 @@
 import CharacterModel from '../graphics/CharacterModel'
 import { assets } from '../assets/assetManifest'
+import { PLAYER_NAMES, HUMAN_NAME_SENTINEL } from '../../common/playerNames'
+
+// base hit-stop duration (ms) when an observed player takes damage; CharacterModel
+// scales nothing but clamps to its own HIT_STOP_MAX_MS, so heavier hits (which we
+// nudge up by damage) still can't stall the body. Conservative — tune from play.
+const HIT_STOP_MS = 70
 
 export default ({ simulator }) => {
 	return {
@@ -35,6 +41,17 @@ export default ({ simulator }) => {
 			entity.mesh.isVisible = false
 			const model = new CharacterModel(simulator.renderer.scene, entity.mesh, assets.playerBody)
 			simulator.characterModels.set(entity.nid, model)
+			const isHuman = entity.nameIndex >= HUMAN_NAME_SENTINEL
+			if (isHuman) {
+				// name arrives via PlayerName message; it may already be registered if
+				// that message beat this create (welcome-replay or a fast SetNameCommand)
+				const existing = simulator._nameRegistry.get(entity.nid)
+				if (existing) model.setName(existing)
+			} else {
+				const name = PLAYER_NAMES[entity.nameIndex] || `Bot ${entity.nid}`
+				simulator._nameRegistry.set(entity.nid, name)
+				model.setName(name)
+			}
 		},
 		delete({ nid, entity }) {
 			const model = simulator.characterModels.get(nid)
@@ -42,6 +59,7 @@ export default ({ simulator }) => {
 				model.dispose()
 				simulator.characterModels.delete(nid)
 			}
+			simulator._nameRegistry.delete(nid)
 			entity.mesh.dispose()
 		},
 		watch: {
@@ -54,6 +72,14 @@ export default ({ simulator }) => {
 				const model = simulator.characterModels.get(entity.nid)
 				if (model) model.setWeapon(value)
 			},
+			// callsign arrives as a replicated index (also fires on create with the
+			// initial value); resolve + register it so the nametag + kill feed match.
+			nameIndex({ entity, value }) {
+				const name = PLAYER_NAMES[value] || `Player ${entity.nid}`
+				simulator._nameRegistry.set(entity.nid, name)
+				const model = simulator.characterModels.get(entity.nid)
+				if (model) model.setName(name)
+			},
 			// observers can detect damage on any remote player via replicated hitpoints
 			// decreasing — play a brief hit-react one-shot (RecieveHit). Priority in
 			// CharacterModel keeps this from stomping an active shoot/death.
@@ -62,7 +88,19 @@ export default ({ simulator }) => {
 				entity._prevHitpoints = value
 				if (prev == null || value >= prev) return // spawn/heal, not a hit
 				const model = simulator.characterModels.get(entity.nid)
-				if (model) model.playHit()
+				if (model) {
+					model.playHit()
+					// micro hit-stop: base + a small bump by damage (CharacterModel clamps).
+					model.hitStop(HIT_STOP_MS + Math.min(prev - value, 20) * 1.5)
+					// victim pain grunt (sample-only), spatialized from the remote player's
+					// world position so it comes from THEIR direction (distance kept as a
+					// 2D fallback when audio has no live ctx / panner).
+					if (simulator.audio) {
+						const cam = simulator.renderer && simulator.renderer.camera
+						const dist = cam ? Math.hypot(entity.x - cam.position.x, entity.y - cam.position.y, entity.z - cam.position.z) : 0
+						simulator.audio.pain({ distance: dist, pos: { x: entity.x, y: entity.y, z: entity.z } })
+					}
+				}
 			}
 		}
 	}

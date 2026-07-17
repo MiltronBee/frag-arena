@@ -127,13 +127,18 @@ try {
     await sleep(500) // longest light.life is 110ms; 500 is decisive
     const settled = await sampleFx(300)
 
-    // the sampler observes AFTER render, so the sampled peak has already decayed
-    // up to one frame (~16ms of a 55-110ms life) below the preset intensity
-    check(name + ': muzzle light pulses to its preset peak',
-      firing.lightPeak > expected[index] * 0.65 && firing.lightPeak <= expected[index],
+    // The muzzle light is intentionally STOCHASTIC now: per-shot peak jitter
+    // (firingFx light.jitter=0.15 → intensity × [0.925, 1.075], Vlambeer "no
+    // fixed-brightness tell") and QUADRATIC decay (decayPow=2, punchier falloff).
+    // The per-frame sampler only lands near t≈0 by timing luck, so it routinely
+    // under-catches a fast-decaying peak — measuring the exact preset peak is no
+    // longer meaningful. So verify the invariant that matters: the light PULSES
+    // meaningfully above idle when firing, and never exceeds the jittered ceiling.
+    check(name + ': muzzle light pulses when firing',
+      firing.lightPeak > expected[index] * 0.25 && firing.lightPeak <= expected[index] * 1.1,
       `peak ${firing.lightPeak.toFixed(2)} over ${firing.count} frames (preset ${expected[index]})`)
     check(name + ': light decays back to 0 after the burst',
-      settled.lightPeak === 0 && firing.lightEnd <= expected[index],
+      settled.lightPeak === 0,
       `settled peak ${settled.lightPeak}`)
     check(name + ': scene light count constant while firing (no recompile trigger)',
       firing.lightCountMin === firing.lightCountMax && firing.lightCountMax === init.lightCount,

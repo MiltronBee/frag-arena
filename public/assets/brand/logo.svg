@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="sol" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14F195"/>
+      <stop offset="0.55" stop-color="#00D18F"/>
+      <stop offset="1" stop-color="#9945FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ===== Targeting reticle (Solana gradient) ===== -->
+  <g fill="none" stroke="url(#sol)" stroke-width="9" stroke-linecap="round">
+    <circle cx="128" cy="120" r="100"/>
+    <line x1="128" y1="6"   x2="128" y2="44"/>
+    <line x1="128" y1="196" x2="128" y2="234"/>
+    <line x1="14"  y1="120" x2="52"  y2="120"/>
+    <line x1="204" y1="120" x2="242" y2="120"/>
+  </g>
+
+  <!-- ===== Skull ===== -->
+  <g stroke="#1b1512" stroke-width="4" stroke-linejoin="round">
+    <path fill="#ECE6D2" d="M128,46
+      C166,46 194,74 194,112
+      C194,134 184,150 168,157
+      C165,168 161,177 154,183
+      C148,190 138,193 128,193
+      C118,193 108,190 102,183
+      C95,177 91,168 88,157
+      C72,150 62,134 62,112
+      C62,74 90,46 128,46 Z"/>
+  </g>
+
+  <!-- eye sockets (angry, angled inward) -->
+  <g fill="#1b1512">
+    <ellipse cx="104" cy="112" rx="18" ry="15" transform="rotate(20 104 112)"/>
+    <ellipse cx="152" cy="112" rx="18" ry="15" transform="rotate(-20 152 112)"/>
+    <!-- nose -->
+    <path d="M120,132 L136,132 L128,152 Z"/>
+    <!-- teeth gaps -->
+    <rect x="114" y="171" width="4" height="20" rx="2"/>
+    <rect x="126" y="171" width="4" height="21" rx="2"/>
+    <rect x="138" y="171" width="4" height="20" rx="2"/>
+  </g>
+
+  <!-- ===== Blood ===== -->
+  <g fill="#C81E1E">
+    <!-- streak from left eye -->
+    <path d="M100,126 C96,140 96,150 99,156 C103,150 103,140 100,126 Z"/>
+    <!-- drip off the jaw -->
+    <path d="M117,190 C117,203 109,208 109,216 a6.5 6.5 0 0 0 13 0 C122,208 117,203 117,190 Z"/>
+    <circle cx="112" cy="230" r="4.5"/>
+  </g>
+</svg>

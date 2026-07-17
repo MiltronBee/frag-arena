@@ -12,31 +12,49 @@
 export const assets = {
   // third-person body other players see (attached to their replicated entity).
   // Quaternius 'Universal Base Characters' Superhero_Male body (paid, standard
-  // license) baked with the 'Universal Animation Library 2' (UAL2) clips via
-  // scripts/build-hero-character.blender.py — one skin, 65-bone "Standard"
-  // mannequin rig, 43 clips. Raw model: feet at y=0, ~1.82 units tall.
+  // license) baked with the 'Universal Animation Library 1' (UAL1) clips via
+  // scripts/build-hero-character.blender.py — one skin, "Standard" mannequin rig,
+  // 120 clips. Raw model: feet at y=0, ~1.82 units tall.
   // (hero_female.glb is the same rig/clips with the Superhero_Female body.)
   //
-  // ITERATION 1: UAL2 has no basic run/shoot/death, so run/jump/shoot/death below
-  // are placeholders mapped to the nearest UAL2 motion — expect them to look off
-  // until proper locomotion clips (UAL1) are added. idle + hit are genuine.
+  // UAL1 (CC0) supplies REAL shooter locomotion/combat the old UAL2 set lacked:
+  // Idle_Loop, Jog_Fwd_Loop (+ strafes), Sprint_Loop, a full Pistol_* aim/shoot/
+  // reload set, Death01/02, and Hit_* reactions. Audition all 120 in the client
+  // playground (default boot; ?game for the match) and copy a new mapping there.
   playerBody: {
     url: '/assets/characters/hero_male.glb',
     scale: 0.577, // raw ~1.82 units * 0.577 ≈ 1.05 in-game (matches old body height)
-    yOffset: -0.5, // body origin is at the feet; drop feet to the box bottom
-    yawOffset: Math.PI, // tunable — loader adds a 180deg Y flip on __root__
+    yOffset: -1.0, // feet sit on the VISUAL floor (arenaDressing GROUND_Y = -1),
+                   // NOT the collision box bottom (-0.5) — else bodies hover ~0.5 up
+    yawOffset: 0, // GLB faces +Z and the loader's __root__ fix preserves forward, so no offset (Math.PI flipped bodies 180deg opposite their aim + inverted locomotion)
     anims: {
-      idle: 'Idle_No_Loop',
-      run: 'Walk_Carry_Loop', // placeholder (no real run in UAL2)
-      jump: 'NinjaJump_Start', // placeholder
-      shoot: 'OverhandThrow', // placeholder (no gun-shoot in UAL2)
-      hit: 'Hit_Knockback',
-      death: 'Hit_Knockback', // placeholder (frozen last frame as corpse)
+      idle: 'Idle_Loop',
+      run: 'Jog_Fwd_Loop', // forward jog; directional variants below fix strafe-slide
+      runBack: 'Jog_Bwd_Loop',
+      runLeft: 'Jog_Left_Loop',
+      runRight: 'Jog_Right_Loop',
+      jump: 'Jump_Start',
+      shoot: 'Pistol_Shoot', // one-shot overlay (only gun clip in UAL1)
+      hit: 'Hit_Chest',
+      death: 'Death01', // Death02 is an alternate
     },
     // bone the held weapon prop attaches to (Babylon exposes a linked TransformNode
     // per glTF joint; see CharacterModel._attachWeapon). NOTE: rig changed from the
     // old 'Fist.R' to 'hand_r' — tpWeapons mounts below still need retuning.
     handBone: 'hand_r',
+    // bone the helmet prop attaches to (see CharacterModel._headNode / _mountHelmet)
+    headBone: 'Head',
+    // rigid head prop parented to the Head bone (rides head animation).
+    // TUNED VISUALLY — see probe-helmet
+    helmet: {
+      url: '/assets/props/helmet_0.glb',
+      // TUNED VISUALLY (tune-helmet.mjs): 0.8/y0.04 left the bald crown poking out
+      // the top of the shell. A smaller shell needs a matching lift to still cap the
+      // skull — at 0.85 the crown clips through unless raised to y~0.078.
+      scale: 0.85,
+      position: { x: 0, y: 0.078, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+    },
   },
 
 }

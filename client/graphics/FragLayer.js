@@ -42,7 +42,7 @@ export default class FragLayer {
     // own-death camera state (drop + roll). Applied in applyDeathCamera(), reset
     // by Respawned. Rotation-only tilt applied AFTER Simulator reads the aim ray,
     // so it never changes the shot ray / MoveCommand the server judges with.
-    this._deathCam = { active: false, t0: 0, roll: 0, pitch: 0 }
+    this._deathCam = { active: false, t0: 0, roll: 0, pitch: 0, appliedPitch: 0 }
 
     // directional damage arc canvas state
     this._damageArc = null // { t0, yaw }
@@ -81,11 +81,48 @@ export default class FragLayer {
       this.arcEl.setAttribute('aria-hidden', 'true')
       hud.appendChild(this.arcEl)
     }
+
+    // hit-confirm flash: a brief, subtle red vignette when YOUR shot lands. Kept
+    // fast (≤0.2 alpha, ~80ms) so it reads as "hit!" without clutter (FX consult).
+    // Inline-styled so no CSS-file dependency; a CSS opacity transition drives it.
+    this.confirmEl = document.getElementById('hit-confirm')
+    if (!this.confirmEl) {
+      this.confirmEl = document.createElement('div')
+      this.confirmEl.id = 'hit-confirm'
+      this.confirmEl.setAttribute('aria-hidden', 'true')
+      Object.assign(this.confirmEl.style, {
+        position: 'fixed', top: '0', left: '0', right: '0', bottom: '0',
+        pointerEvents: 'none', opacity: '0', zIndex: '5',
+        background: 'radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 55%, rgba(170,0,0,0.9) 100%)',
+        transition: 'opacity 80ms ease-out',
+      })
+      hud.appendChild(this.confirmEl)
+    }
   }
 
-  // convenience: a display label for a smooth nid. The protocol has no name, so
-  // we render "Player <nid>" (self reads "You" in banners, handled at callsites).
-  _label(nid) { return `Player ${nid}` }
+  // brief red vignette pulse on a confirmed local hit. Snap to peak alpha, then let
+  // the CSS transition fade it to 0. `kill` doubles the weight (α 0.2→0.3, 80→140ms)
+  // per the kill-package spec — impact from the vignette, not from any timescale change.
+  // Skipped on the low FX tier.
+  _confirmFlash(kill) {
+    const r = this.sim && this.sim.renderer
+    if (r && r._fxTier === 'low') return
+    const el = this.confirmEl
+    if (!el) return
+    const peak = kill ? '0.3' : '0.2'
+    const fade = kill ? 140 : 80
+    el.style.transition = 'none'
+    el.style.opacity = peak
+    requestAnimationFrame(() => {
+      el.style.transition = 'opacity ' + fade + 'ms ease-out'
+      el.style.opacity = '0'
+    })
+  }
+
+  // convenience: a display label for a smooth nid — the player's callsign,
+  // resolved via the Simulator name registry (falls back to "Player <nid>").
+  // Self reads "You" in banners, handled at callsites.
+  _label(nid) { return this.sim.getName(nid) }
 
   _weaponName(index) {
     const w = weapons[index]
@@ -110,6 +147,9 @@ export default class FragLayer {
     if (typeof this.sim._showHitMarker === 'function') {
       this.sim._showHitMarker(kill)
     }
+    // brief screen-space red vignette so a landed hit registers viscerally; a kill
+    // gets the doubled-weight pulse (spec §5.2).
+    this._confirmFlash(kill)
     // kill sound: WeaponAudio.hitMarker(true) is a brighter rising two-tone.
     if (kill && this.sim.audio && typeof this.sim.audio.hitMarker === 'function') {
       this.sim.audio.hitMarker(true)
@@ -132,7 +172,14 @@ export default class FragLayer {
 
     // corpse / gib visual for the victim's CharacterModel (remote players only —
     // the local player is invisible in first person; own-death is a camera move)
-    if (!iDied) this._dropCorpse(victimNid, killerNid, overkill)
+    if (!iDied) {
+      // Doom kill-emphasis: a ~140ms freeze on the VICTIM's body only (not a global
+      // slow-mo) the instant the kill lands, just before the corpse takes over the rig.
+      // Skipped for a gib death (the body vanishes into chunks immediately).
+      const victimModel = this.sim.characterModels.get(victimNid)
+      if (victimModel && overkill < GIB_OVERKILL) victimModel.hitStop(140, true)
+      this._dropCorpse(victimNid, killerNid, overkill)
+    }
 
     // own death: camera drop/roll + strong wash, held until Respawned
     if (iDied) this._startDeathCam(killerNid)
@@ -200,7 +247,10 @@ export default class FragLayer {
       killerYaw = Math.atan2(killer.x - victim.x, killer.z - victim.z)
     }
 
-    this._corpses.set(victimNid, { t0: performance.now(), killerYaw, gibbed })
+    // sawDead: has isAlive===false been observed for this corpse yet? Gates the
+    // fast-respawn cancel so a stale-true isAlive right after death can't abort the
+    // death animation. See the race guard in update().
+    this._corpses.set(victimNid, { t0: performance.now(), killerYaw, gibbed, sawDead: false })
 
     if (gibbed) {
       // gibs replace the body: hide the model immediately + spawn chunks
@@ -282,7 +332,10 @@ export default class FragLayer {
   // existing Respawned handler.
   onRespawned() {
     this._deathCam.active = false
-    this.sim.renderer.camera.rotation.z = 0
+    const cam = this.sim.renderer.camera
+    cam.rotation.x -= this._deathCam.appliedPitch || 0
+    this._deathCam.appliedPitch = 0
+    cam.rotation.z = 0
     document.body.classList.remove('own-death')
   }
 
@@ -292,6 +345,12 @@ export default class FragLayer {
   // MoveCommand aim are never rotated by the death cam.
   applyDeathCamera() {
     const cam = this.sim.renderer.camera
+    // rotation.x is the player's PERSISTENT aim pitch (mouse look increments it),
+    // so the death pitch must be a tracked offset that is removed before being
+    // re-applied — adding to rotation.x directly compounds every frame and the
+    // corruption survives respawn.
+    cam.rotation.x -= this._deathCam.appliedPitch || 0
+    this._deathCam.appliedPitch = 0
     if (!this._deathCam.active) {
       cam.rotation.z = 0
       return
@@ -299,7 +358,10 @@ export default class FragLayer {
     const t = Math.min(1, (performance.now() - this._deathCam.t0) / 200)
     const ease = 1 - (1 - t) * (1 - t) // ease-out quad
     cam.rotation.z = this._deathCam.roll * ease
-    cam.rotation.x = Math.min(Math.PI * 0.499, cam.rotation.x + this._deathCam.pitch * ease)
+    const base = cam.rotation.x
+    const pitched = Math.min(Math.PI * 0.499, base + this._deathCam.pitch * ease)
+    this._deathCam.appliedPitch = pitched - base
+    cam.rotation.x = pitched
   }
 
   // =========================================================================
@@ -314,10 +376,25 @@ export default class FragLayer {
         const model = this.sim.characterModels.get(nid)
         const entity = this.sim.client.entities.get(nid)
 
+        // model gone (entity fully removed) -> nothing left to reset, drop it.
+        if (!model) {
+          this._corpses.delete(nid)
+          return
+        }
+
         // FAST RESPAWN cancel: the model was reused and the player is alive again
         // while our corpse timer still runs. Reset the model cleanly and drop it.
-        if (!model || (entity && entity.isAlive === true)) {
-          if (model) model.setCorpse(false)
+        //
+        // RACE GUARD: this corpse was spawned off the Killed MESSAGE, which can beat
+        // the replicated isAlive FIELD to the client by a frame or two — so isAlive
+        // may still read stale-true immediately after death. Cancelling on that would
+        // instantly kill the just-started death clip (the intermittent "body freezes
+        // standing" bug). Only honor a respawn once we've actually SEEN isAlive go
+        // false (death confirmed); a genuine respawn is 2.5s out (RESPAWN_DELAY_MS)
+        // and always transitions false->true, so this never misses a real reuse.
+        if (entity && entity.isAlive === false) corpse.sawDead = true
+        if (corpse.sawDead && entity && entity.isAlive === true) {
+          model.setCorpse(false)
           this._corpses.delete(nid)
           return
         }

@@ -140,10 +140,14 @@ try {
     window.__killMarkerSeen = false
     const el = document.getElementById('hit-marker')
     if (!el) return
-    const obs = new MutationObserver(() => {
-      if (el.classList.contains('kill-active')) window.__killMarkerSeen = true
-    })
-    obs.observe(el, { attributes: true, attributeFilter: ['class'] })
+    // synchronous latch: a MutationObserver races follow-up shots — the shooter
+    // keeps firing after the kill and each predicted hit swaps kill-active for
+    // hit-active before the (async) observer callback gets to look.
+    const origAdd = el.classList.add.bind(el.classList)
+    el.classList.add = (...cls) => {
+      if (cls.includes('kill-active')) window.__killMarkerSeen = true
+      return origAdd(...cls)
+    }
   })
 
   // ---- kill p2 with sustained rifle fire ----

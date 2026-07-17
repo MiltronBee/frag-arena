@@ -8,7 +8,13 @@ import { readFileSync } from 'node:fs'
 
 const src = readFileSync(new URL('../client/TouchLook.js', import.meta.url), 'utf8')
 const mod = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(src))
-const { computeLookDelta, YAW_DEG_PER_PX, YAW_RAD_PER_PX, VERTICAL_GAIN } = mod
+const { computeLookDelta, flickMultiplier, YAW_DEG_PER_PX, YAW_RAD_PER_PX, VERTICAL_GAIN,
+  FLICK_LO, FLICK_HI, FLICK_MAX } = mod
+
+// A "slow" drag stays below FLICK_LO px/ms so flick acceleration is inert and the
+// mapping is purely proportional (the pre-flick behavior). Use a big dt so
+// speed = distance/dt < FLICK_LO for the deltas below.
+const SLOW_DT = 100000
 
 const checks = []
 const check = (name, pass, detail) => { checks.push({ name, pass, detail }); return pass }
@@ -29,18 +35,19 @@ check('constants: 0.22 deg/px, 0.8x vertical',
     `yaw(1px)=${one.yaw.toFixed(6)} rad (${(one.yaw / DEG).toFixed(4)} deg)`)
 }
 
-// a 400 px horizontal swipe turns ~88 degrees at the default sensitivity
+// a 400 px SLOW horizontal drag turns ~88 degrees at the default sensitivity
+// (slow = below the flick threshold, so acceleration is inert)
 {
-  const r = computeLookDelta(400, 0, 16, { sensitivity: 1 })
+  const r = computeLookDelta(400, 0, SLOW_DT, { sensitivity: 1 })
   const deg = r.yaw / DEG
-  check('400px swipe -> ~88 deg yaw', approx(deg, 88, 1e-6), `${deg.toFixed(3)} deg`)
+  check('400px slow drag -> ~88 deg yaw', approx(deg, 88, 1e-6), `${deg.toFixed(3)} deg`)
 }
 
 // --- vertical gain -----------------------------------------------------------
 
 {
-  const h = computeLookDelta(100, 0, 16, {})   // pure horizontal
-  const v = computeLookDelta(0, 100, 16, {})   // pure vertical, same distance
+  const h = computeLookDelta(100, 0, SLOW_DT, {})   // pure horizontal, slow
+  const v = computeLookDelta(0, 100, SLOW_DT, {})   // pure vertical, same distance
   check('pitch is 0.8x yaw for equal deltas', approx(v.pitch / h.yaw, 0.8),
     `ratio=${(v.pitch / h.yaw).toFixed(6)}`)
   check('pure horizontal produces no pitch', v.pitch !== 0 && h.pitch === 0,
@@ -50,6 +57,8 @@ check('constants: 0.22 deg/px, 0.8x vertical',
 // --- touch sensitivity multiplier --------------------------------------------
 
 {
+  // same deltas + dt on both sides, so any flick multiplier is identical and the
+  // sensitivity ratio still holds exactly
   const a = computeLookDelta(100, 80, 16, { sensitivity: 1 })
   const b = computeLookDelta(100, 80, 16, { sensitivity: 2 })
   check('sensitivity 2x doubles yaw and pitch',
@@ -70,16 +79,36 @@ check('constants: 0.22 deg/px, 0.8x vertical',
     `off=${off.pitch.toFixed(4)} on=${on.pitch.toFixed(4)} yaw eq=${approx(on.yaw, off.yaw)}`)
 }
 
-// --- no smoothing / no acceleration yet --------------------------------------
+// --- flick acceleration ------------------------------------------------------
+
+check('flick constants: LO<HI, MAX>1',
+  FLICK_LO === 0.35 && FLICK_HI === 1.4 && FLICK_MAX === 2.2 && FLICK_LO < FLICK_HI && FLICK_MAX > 1,
+  `LO=${FLICK_LO} HI=${FLICK_HI} MAX=${FLICK_MAX}`)
 
 {
-  // output must not depend on dt (no velocity term); a fast flick and a slow
-  // drag of the same distance produce identical rotation
-  const fast = computeLookDelta(120, 40, 5, {})     // 5ms  -> 32 px/ms
-  const slow = computeLookDelta(120, 40, 500, {})   // 500ms -> 0.32 px/ms
-  check('no acceleration: dt does not change output (ratio 1.0)',
-    approx(fast.yaw, slow.yaw) && approx(fast.pitch, slow.pitch),
-    `fast.yaw=${fast.yaw.toFixed(6)} slow.yaw=${slow.yaw.toFixed(6)}`)
+  // multiplier curve: flat 1.0 up to LO, ramps to MAX at HI, clamps above
+  const at = (speed) => flickMultiplier(speed, 0, 1)   // dt=1ms so px/ms == dx
+  check('flick: slow speed (<=LO) => 1.0x', at(0) === 1 && at(FLICK_LO) === 1 && at(FLICK_LO - 0.1) === 1,
+    `at(0)=${at(0)} at(LO)=${at(FLICK_LO)}`)
+  check('flick: fast speed (>=HI) => MAX (clamped)', approx(at(FLICK_HI), FLICK_MAX) && approx(at(FLICK_HI + 10), FLICK_MAX),
+    `at(HI)=${at(FLICK_HI).toFixed(4)} at(HI+10)=${at(FLICK_HI + 10).toFixed(4)}`)
+  const mid = at((FLICK_LO + FLICK_HI) / 2)
+  check('flick: midpoint speed is between 1 and MAX (monotonic ramp)',
+    mid > 1 && mid < FLICK_MAX && approx(mid, 1 + 0.5 * (FLICK_MAX - 1)),
+    `mid=${mid.toFixed(4)}`)
+}
+
+{
+  // a fast flick scales the rotation up vs. the identical-distance slow drag
+  const dist = 300
+  const slow = computeLookDelta(dist, 0, SLOW_DT, {})     // ~0 px/ms -> 1.0x
+  const fast = computeLookDelta(dist, 0, dist / 2, {})    // 2 px/ms -> clamps to MAX
+  check('flick: fast drag scales up to MAX vs slow drag of same distance',
+    approx(fast.yaw / slow.yaw, FLICK_MAX),
+    `ratio=${(fast.yaw / slow.yaw).toFixed(4)} (expected ${FLICK_MAX})`)
+  check('flick: slow drag is bit-identical to base gain (no acceleration)',
+    approx(slow.yaw, dist * YAW_RAD_PER_PX),
+    `slow.yaw=${slow.yaw.toFixed(6)} base=${(dist * YAW_RAD_PER_PX).toFixed(6)}`)
 }
 
 // --- zero / safety -----------------------------------------------------------
@@ -90,12 +119,13 @@ check('constants: 0.22 deg/px, 0.8x vertical',
 }
 
 {
-  // invalid dt must never throw or produce NaN, and must match a valid-dt result
-  const ref = computeLookDelta(90, 30, 16, {})
+  // invalid/zero dt must never throw or produce NaN, and must yield NO
+  // acceleration (multiplier 1.0) — i.e. the base proportional gain
+  const ref = computeLookDelta(90, 30, SLOW_DT, {})   // slow drag == base gain
   const bad = [0, -50, NaN, undefined, Infinity].map((dt) => computeLookDelta(90, 30, dt, {}))
   const ok = bad.every((r) => finite(r.yaw) && finite(r.pitch) &&
     approx(r.yaw, ref.yaw) && approx(r.pitch, ref.pitch))
-  check('invalid/zero dt is safe and inert', ok,
+  check('invalid/zero dt is safe and inert (no acceleration)', ok,
     bad.map((r) => `${r.yaw.toFixed(4)}/${r.pitch.toFixed(4)}`).join(' '))
 }
 

@@ -181,6 +181,8 @@ export default (entity, command) => {
 		}
 	}
 
-	// advances the weapon-related timer(s)
-	updateWeapon(entity, command.delta)
+	// advances the weapon-related timer(s) — use the clamped delta, not the raw
+	// client-supplied command.delta, or a spoofed huge delta drains cooldownTimer
+	// instantly (unlimited rate of fire)
+	updateWeapon(entity, delta)
 }

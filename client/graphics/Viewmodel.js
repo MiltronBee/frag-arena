@@ -43,6 +43,47 @@ const S = {
   DISPOSED: 'disposed',
 }
 
+// ---------------------------------------------------------------------------
+// PRELOAD / GPU-WARM (boot preloader, NOT in-match). Parse each weapon GLB so it
+// lands in the browser cache and its materials' shaders compile once, then
+// dispose the throwaway copy. After this, the first real equip/switch imports
+// from a warm browser cache against a warm shader program — no mid-match parse,
+// no swap hitch (the RECON anti-pattern is gone).
+//
+// A RAW import (not a full Viewmodel) is used deliberately: the arms rigs carry
+// skeletons, and Babylon 4.0.3 cross-wires two live copies of the same skeleton.
+// The live equipped rig (weapon 0) already exists when the preloader runs, so we
+// must NOT stand up a second animated/parented copy — parse, compile, dispose.
+// The URL is versioned exactly as Viewmodel._load versions it, so the warm fetch
+// and the in-match fetch share one cache entry.
+export async function warmViewmodel(scene, spec) {
+  if (!spec || !spec.url) return
+  const url = spec.url
+  const slash = url.lastIndexOf('/') + 1
+  const version = (typeof window !== 'undefined' && window.__BUILD_ID__)
+    ? '?v=' + window.__BUILD_ID__ : ''
+  const result = await BABYLON.SceneLoader.ImportMeshAsync(
+    '', url.slice(0, slash), url.slice(slash) + version, scene)
+  // never render the throwaway copy behind the load overlay (imports at origin,
+  // enabled by default).
+  result.meshes.forEach((m) => { m.setEnabled(false); m.isPickable = false })
+  const seen = new Set()
+  result.meshes.forEach((mesh) => {
+    const mat = mesh.material
+    if (mat && !seen.has(mat) && mat.forceCompilation) {
+      seen.add(mat)
+      try { mat.forceCompilation(mesh) } catch (e) { /* non-fatal */ }
+    }
+  })
+  result.animationGroups.forEach((g) => g.stop())
+  // dispose(false, true): the throwaway warm copy must free its materials + textures
+  // too, else every warmed viewmodel rig leaks them. The compiled shader program stays
+  // cached at the engine level, so the warm still benefits the real in-match import.
+  result.meshes.forEach((m) => m.dispose(false, true))
+  result.animationGroups.forEach((g) => g.dispose())
+  ;(result.skeletons || []).forEach((s) => s.dispose())
+}
+
 export default class Viewmodel {
   constructor(scene, camera, spec) {
     this.scene = scene
@@ -360,10 +401,18 @@ export default class Viewmodel {
     if (profile) {
       this.recoilTension = profile.tension || 140
       this.recoilDamping = profile.damping || 18
-      this.recoilPosVel.z -= profile.back || 0.5
-      this.recoilPosVel.y += profile.up || 0.06
-      this.recoilRotVel.x -= profile.pitch || 0.35
+      // per-shot variance (Vlambeer "vary everything"): scale the deterministic
+      // back/up/pitch impulses by (1 ± variance/2) so a burst never reads as a
+      // metronome. variance 0 => identical to the old deterministic kick.
+      const vAmt = profile.variance || 0
+      const vary = 1 - vAmt * 0.5 + Math.random() * vAmt
+      this.recoilPosVel.z -= (profile.back || 0.5) * vary
+      this.recoilPosVel.y += (profile.up || 0.06) * vary
+      this.recoilRotVel.x -= (profile.pitch || 0.35) * vary
       this.recoilRotVel.y += (Math.random() - 0.5) * (profile.yaw || 0.06)
+      // roll impulse (random sign): the Z rot spring already exists + integrates
+      // every frame but was never excited — cheapest "alive" win. Never touches aim.
+      if (profile.roll) this.recoilRotVel.z += (Math.random() - 0.5) * 2 * profile.roll
       if (profile.pump) {
         // second, smaller shove when the action racks (shell out + clack land
         // on the same beat via Simulator's pump audio/casing delay)
@@ -413,7 +462,7 @@ export default class Viewmodel {
     const bobX = Math.cos(this._t * freq * 0.5) * amp * 0.6
 
     // Update position and rotation springs for procedural recoil
-    const dt = Math.min(delta, 0.1) // Cap dt to avoid spring instability on frame drops
+    const dt = Math.min(delta, 0.05) // Cap dt to avoid spring instability on frame drops
 
     // Position spring: Accel = -Tension * Pos - Damping * Vel
     const posAcc = this.recoilPos.scale(-this.recoilTension).subtract(this.recoilPosVel.scale(this.recoilDamping))

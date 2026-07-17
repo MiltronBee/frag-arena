@@ -13,3 +13,4 @@ backups/
 *.orig
 __pycache__/
 frag-*.png
+_work/

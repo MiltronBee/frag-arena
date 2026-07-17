@@ -24,6 +24,21 @@ import { tpWeapons } from '../assets/assetManifest'
 // ---------------------------------------------------------------------------
 const _propCache = new Map() // url -> Promise<{ meshes: AbstractMesh[] }>
 
+// The death clip (UAL1 Death01) is ~2.375s — nearly the full RESPAWN_DELAY_MS
+// (2.5s), so at 1x speed the fall barely fits before the respawn cancels the
+// corpse, and any network jitter on the Killed packet truncates it (the body
+// pops upright mid-fall). Play it faster so it completes in ~1.3s, leaving >1s
+// of dead-hold slack against the respawn. See _applyDeathClip.
+const DEATH_CLIP_SPEED = 1.8
+
+// HIT-STOP (client-cosmetic "impact freeze"): on taking damage a body's animation
+// near-freezes for a few dozen ms, the empirically top-leverage cue that a hit
+// landed. Purely visual — driven off the replicated hitpoints watch, never on the
+// input/prediction path, and always skipped while a corpse (death owns the rig).
+const HIT_STOP_SPEED = 0.08 // speedRatio during the freeze (0.08 = near-frozen)
+const HIT_STOP_MAX_MS = 120 // cap so a burst of hits can't stack into a long freeze
+const KILL_STOP_MAX_MS = 140 // Doom kill-emphasis freeze on the victim body (NOT global slow-mo)
+
 function _loadProp(scene, url) {
   if (_propCache.has(url)) return _propCache.get(url)
   const slash = url.lastIndexOf('/') + 1
@@ -40,6 +55,87 @@ function _loadProp(scene, url) {
   return p
 }
 
+// ---------------------------------------------------------------------------
+// PRELOAD / GPU-WARM helpers (called by the boot preloader, NOT in-match).
+//
+// The goal: by the time the arena is enterable, every third-person prop the
+// game will ever mount already lives in `_propCache`, and every GLB the game
+// imports has been parsed + had its materials shader-compiled once. After this,
+// `setWeapon`/`_mountHelmet` hit the cache with zero ImportMesh, and the first
+// in-match frame binds no unready effect (the mid-match weapon-swap hitch and
+// import races the RECON doc flags are removed by construction).
+// ---------------------------------------------------------------------------
+
+// Force the GL shaders for every material on a set of meshes to compile now, so
+// the first frame they render never triggers a mid-frame compile/VAO bind.
+function _warmMaterials(meshes) {
+  const seen = new Set()
+  meshes.forEach((mesh) => {
+    const mat = mesh.material
+    if (!mat || seen.has(mat) || !mat.forceCompilation) return
+    seen.add(mat)
+    try { mat.forceCompilation(mesh) } catch (e) { /* non-fatal */ }
+  })
+}
+
+// Import a third-person prop (weapon/helmet) into the shared cache and warm its
+// shaders. Idempotent per url. The template root stays disabled in the scene so
+// in-match clones are pure CPU clones (no fetch, no decode).
+export async function warmProp(scene, url) {
+  if (!url) return
+  // THROWAWAY warm: import to compile shaders + prime the browser cache, then fully
+  // dispose. We deliberately do NOT populate _propCache here — pre-caching every tp
+  // weapon + helmet would keep hidden template meshes/materials in the scene for the
+  // whole session (props that may never be used this match). In-match, _loadProp still
+  // lazily caches the template on first real mount, now hitting the warmed browser
+  // cache + compiled shader so it lands without a hitch.
+  const slash = url.lastIndexOf('/') + 1
+  const result = await BABYLON.SceneLoader.ImportMeshAsync(
+    '', url.slice(0, slash), url.slice(slash), scene)
+  result.meshes.forEach((m) => { m.setEnabled(false); m.isPickable = false })
+  _warmMaterials(result.meshes)
+  result.animationGroups.forEach((g) => g.stop())
+  result.meshes.forEach((m) => m.dispose(false, true))
+  result.animationGroups.forEach((g) => g.dispose())
+  ;(result.skeletons || []).forEach((s) => s.dispose())
+}
+
+// Import the heavy character body ONCE, compile its skinned-mesh shaders, then
+// dispose the throwaway copy. Each real player still imports its own instance
+// (Babylon 4.0.3 lacks instantiateModelsToScene), but that import now hits the
+// browser cache AND a warmed shader program, so it lands without a hitch.
+export async function warmBody(scene, url) {
+  if (!url) return
+  const slash = url.lastIndexOf('/') + 1
+  const result = await BABYLON.SceneLoader.ImportMeshAsync(
+    '', url.slice(0, slash), url.slice(slash), scene)
+  // never let the throwaway copy render even a single frame behind the load
+  // overlay (it imports at origin, enabled by default).
+  result.meshes.forEach((m) => { m.setEnabled(false); m.isPickable = false })
+  _warmMaterials(result.meshes)
+  // let the skinned pipeline compile against a real bone texture upload
+  if (result.skeletons && result.skeletons[0]) {
+    try { result.skeletons[0].prepare() } catch (e) { /* non-fatal */ }
+  }
+  result.animationGroups.forEach((g) => g.stop())
+  // dispose(false, true): the throwaway copy must free its materials + textures too,
+  // else every warmed body/rig leaks them (mesh.dispose() alone keeps them alive).
+  // The compiled shader program stays in the engine's effect cache, so the warm holds.
+  result.meshes.forEach((m) => m.dispose(false, true))
+  result.animationGroups.forEach((g) => g.dispose())
+  ;(result.skeletons || []).forEach((s) => s.dispose())
+}
+
+// Bones owned by the locomotion clip. A momentary overlay (shoot/hit) is masked
+// to EXCLUDE these, so it never freezes the legs — the stride keeps playing under
+// it and the body no longer slides while shooting on the move. (Babylon 4.0.3 has
+// no additive-animation API, so we mask by bone instead.)
+const LOWER_BODY_BONES = new Set([
+  'root', 'pelvis',
+  'thigh_l', 'calf_l', 'foot_l', 'ball_l', 'ball_leaf_l',
+  'thigh_r', 'calf_r', 'foot_r', 'ball_r', 'ball_leaf_r',
+])
+
 export default class CharacterModel {
   constructor(scene, host, spec) {
     this.scene = scene
@@ -54,10 +150,27 @@ export default class CharacterModel {
     this._oneShotToken = 0    // guards stale end-observable callbacks (stop() fires them)
     this._weaponIndex = null  // currently mounted tp weapon
     this._weaponRoot = null   // cloned prop root parented to the hand bone
+    this._helmetRoot = null   // cloned helmet prop parented to the head bone
+    // floating overhead nametag: a plain DOM div in #nametags, positioned each
+    // frame by projecting the body's head-level world point to screen space.
+    this._nameTag = null
+    const container = document.getElementById('nametags')
+    if (container) {
+      this._nameTag = document.createElement('div')
+      this._nameTag.className = 'nametag'
+      container.appendChild(this._nameTag)
+    }
     this._weaponReqId = 0     // serialize async weapon swaps
     this._lastX = host.position.x
     this._lastZ = host.position.z
     this._load()
+  }
+
+  // set (or update) the overhead nametag text. Called from the player factory on
+  // create + on the replicated nameIndex watch.
+  setName(name) {
+    this._playerName = name
+    if (this._nameTag) this._nameTag.textContent = name
   }
 
   async _load() {
@@ -89,9 +202,20 @@ export default class CharacterModel {
     result.animationGroups.forEach((g) => { g.stop(); this.groups[g.name] = g })
     this.idle = this.groups[this.spec.anims.idle]
     this.run = this.groups[this.spec.anims.run]
+    // directional locomotion (UAL1 has fwd/bwd/left/right jogs) so a strafing body
+    // steps sideways instead of moon-walking a forward jog. All optional -> fall
+    // back to `run` then `idle`.
+    this.runBack = this.groups[this.spec.anims.runBack]
+    this.runLeft = this.groups[this.spec.anims.runLeft]
+    this.runRight = this.groups[this.spec.anims.runRight]
     this.shootClip = this.groups[this.spec.anims.shoot]
     this.hitClip = this.groups[this.spec.anims.hit]
     this.deathClip = this.groups[this.spec.anims.death]
+    // upper-body-only overlays: the full shoot/hit clips animate the legs too, so
+    // playing them over locomotion freezes the stride and the body slides. Mask to
+    // spine-and-up so the locomotion clip keeps owning the legs.
+    this.shootUpper = this._maskUpperBody(this.shootClip, 'shootUpper')
+    this.hitUpper = this._maskUpperBody(this.hitClip, 'hitUpper')
     if (this.idle) { this.idle.start(true, 1.0); this.current = this.idle }
     this.ready = true
 
@@ -104,6 +228,7 @@ export default class CharacterModel {
       // no watch fired before load finished -> default weapon (index 0)
       this.setWeapon(0)
     }
+    this._mountHelmet()
     if (this._corpse) this._applyDeathClip()
   }
 
@@ -122,6 +247,49 @@ export default class CharacterModel {
     const node = (bone.getTransformNode && bone.getTransformNode()) || bone._linkedTransformNode || null
     this._cachedHandNode = node
     return node
+  }
+
+  // find the TransformNode linked to the head glTF joint (mirrors _handNode) so
+  // the helmet prop can parent to it and ride the head animation.
+  _headNode() {
+    if (this._cachedHeadNode) return this._cachedHeadNode
+    const name = this.spec.headBone
+    if (!name || !this.skeleton) return null
+    const bone = this.skeleton.bones.find((b) => b.name === name)
+    if (!bone) return null
+    const node = (bone.getTransformNode && bone.getTransformNode()) || bone._linkedTransformNode || null
+    this._cachedHeadNode = node
+    return node
+  }
+
+  // ---- HELMET -------------------------------------------------------------
+  // Mount the rigid helmet prop on the head bone. Parented (not per-frame), so it
+  // rides head animation and persists through corpse/death mode untouched.
+  async _mountHelmet() {
+    if (!this.spec.helmet) return
+    const head = this._headNode()
+    if (!head) return // no bone -> no helmet (skeleton missing)
+
+    const { root } = await _loadProp(this.scene, this.spec.helmet.url)
+    if (this.disposed) return
+
+    // drop any previous helmet
+    if (this._helmetRoot) { this._helmetRoot.dispose(); this._helmetRoot = null }
+
+    // clone the template (deep, with descendants) and mount under the head node
+    const clone = root.clone('helmet', head)
+    clone.setEnabled(true)
+    clone.getChildMeshes().forEach((m) => { m.setEnabled(true); m.isPickable = false })
+    const spec = this.spec.helmet
+    clone.scaling.setAll(spec.scale)
+    clone.position.set(spec.position.x, spec.position.y, spec.position.z)
+    clone.rotationQuaternion = null
+    clone.rotation.set(spec.rotation.x, spec.rotation.y, spec.rotation.z)
+    // tag as flesh so a headshot on the helmet reads like a body hit (matches _load)
+    ;[clone, ...clone.getChildMeshes()].forEach((m) => {
+      m.metadata = Object.assign({}, m.metadata, { fragSurface: 'flesh' })
+    })
+    this._helmetRoot = clone
   }
 
   // ---- HELD WEAPON --------------------------------------------------------
@@ -179,6 +347,7 @@ export default class CharacterModel {
     if (this._corpse) {
       this.holder.setEnabled(!this._hidden)
       this.holder.position.set(p.x, p.y + this.spec.yOffset, p.z)
+      if (this._nameTag) this._nameTag.style.display = 'none'
       return
     }
 
@@ -188,6 +357,23 @@ export default class CharacterModel {
     this.holder.setEnabled(this.host.isAlive !== false)
     this.holder.position.set(p.x, p.y + this.spec.yOffset, p.z)
     this.holder.rotation.y = this.host.rotation.y + (this.spec.yawOffset || 0)
+
+    // HIT-STOP: while active, near-freeze the animation to sell the impact. The body
+    // still tracks host position/yaw (set above); we only stall clip playback and
+    // skip locomotion re-selection so clips don't restart mid-freeze. On expiry we
+    // restore normal speed and fall through. Overlays (shoot/hit) are frozen too but
+    // their end-observable token guards are untouched.
+    if (this._hitStopUntil) {
+      const now = performance.now()
+      if (now < this._hitStopUntil) {
+        if (this.current) this.current.speedRatio = HIT_STOP_SPEED
+        if (this._oneShot) this._oneShot.speedRatio = HIT_STOP_SPEED
+        return
+      }
+      if (this.current) this.current.speedRatio = 1.0
+      if (this._oneShot) this._oneShot.speedRatio = 1.0
+      this._hitStopUntil = 0
+    }
 
     const dx = p.x - this._lastX
     const dz = p.z - this._lastZ
@@ -199,12 +385,72 @@ export default class CharacterModel {
     // locomotion clip running underneath (so the legs still stride); the overlay
     // group blends on the shared skeleton. Locomotion selection continues below
     // so that when the one-shot ends we're already on the right base clip.
-    const target = speed > 0.4 ? (this.run || this.idle) : this.idle
+    //
+    // DIRECTIONAL LOCOMOTION: bots (and strafing players) face one way while
+    // moving another, so pick fwd/back/left/right jog from the movement vector
+    // resolved into the body's local frame (matches applyCommand: forward=+Z,
+    // right=+X, rotated by rotation.y). EMA-smooth the delta so near-diagonal
+    // motion doesn't flicker between clips frame to frame.
+    this._smDx = (this._smDx || 0) * 0.7 + dx * 0.3
+    this._smDz = (this._smDz || 0) * 0.7 + dz * 0.3
+    let target = this.idle
+    if (speed > 0.4) {
+      const yaw = this.host.rotation.y
+      const s = Math.sin(yaw)
+      const c = Math.cos(yaw)
+      const fwd = this._smDx * s + this._smDz * c   // + = forward
+      const rgt = this._smDx * c - this._smDz * s   // + = right
+      if (Math.abs(fwd) >= Math.abs(rgt)) {
+        target = (fwd >= 0 ? this.run : this.runBack) || this.run
+      } else {
+        target = (rgt >= 0 ? this.runRight : this.runLeft) || this.run
+      }
+      target = target || this.idle
+    }
     if (target && target !== this.current) {
       if (this.current) this.current.stop()
       target.start(true, 1.0)
       this.current = target
     }
+
+    // floating nametag: project head-level world position to screen
+    if (this._nameTag) {
+      const show = !this._corpse && this.host.isAlive !== false && this.holder
+      if (show) {
+        const engine = this.scene.getEngine()
+        const camera = this.scene.getCameraByName('camera')
+        if (camera) {
+          const headY = this.holder.position.y + 1.4
+          const wp = new BABYLON.Vector3(this.holder.position.x, headY, this.holder.position.z)
+          const vp = camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight())
+          const sp = BABYLON.Vector3.Project(wp, BABYLON.Matrix.Identity(), this.scene.getTransformMatrix(), vp)
+          if (sp.z > 0 && sp.z < 1) {
+            this._nameTag.style.display = 'block'
+            this._nameTag.style.left = sp.x + 'px'
+            this._nameTag.style.top = sp.y + 'px'
+          } else {
+            this._nameTag.style.display = 'none'
+          }
+        }
+      } else {
+        this._nameTag.style.display = 'none'
+      }
+    }
+  }
+
+  // Build a copy of `src` that drives only upper-body bones (spine-and-up + arms),
+  // so it overlays locomotion without touching the legs. Shares the source's
+  // Animation objects (src stays stopped). Returns null if src is missing/empty.
+  _maskUpperBody(src, name) {
+    if (!src) return null
+    const g = new BABYLON.AnimationGroup(name, this.scene)
+    src.targetedAnimations.forEach((ta) => {
+      const tn = ta.target && ta.target.name
+      if (tn && !LOWER_BODY_BONES.has(tn)) g.addTargetedAnimation(ta.animation, ta.target)
+    })
+    if (g.targetedAnimations.length === 0) { g.dispose(); return null }
+    g.normalize(src.from, src.to)
+    return g
   }
 
   // ---- ONE-SHOT OVERLAYS (shoot / hit) ------------------------------------
@@ -234,14 +480,26 @@ export default class CharacterModel {
   // Rapid fire (SMG) retriggers cleanly by restarting from frame 0.
   playShoot() {
     if (!this.ready || this._corpse) return
-    this._playOneShot(this.shootClip)
+    this._playOneShot(this.shootUpper || this.shootClip)
+  }
+
+  // Begin (or extend) a hit-stop freeze of `ms`, applied in update(). Clamped so a
+  // stream of hits reads as one brief freeze, not a long stall. `kill` raises the cap
+  // to KILL_STOP_MAX_MS for a Doom-style kill emphasis on THIS victim's body only —
+  // never a global timescale change (this is a live multiplayer client). No-op while a
+  // corpse — the death clip owns the rig (kills call this just BEFORE _dropCorpse).
+  hitStop(ms, kill) {
+    if (this._corpse || this.disposed) return
+    const now = performance.now()
+    const cap = kill ? KILL_STOP_MAX_MS : HIT_STOP_MAX_MS
+    this._hitStopUntil = Math.min(Math.max(this._hitStopUntil || 0, now + ms), now + cap)
   }
 
   // Brief hit react. Lowest one-shot priority — never override an active shoot.
   playHit() {
     if (!this.ready || this._corpse) return
-    if (this._oneShot === this.shootClip) return // don't stomp a shoot
-    this._playOneShot(this.hitClip)
+    if (this._oneShot === (this.shootUpper || this.shootClip)) return // don't stomp a shoot
+    this._playOneShot(this.hitUpper || this.hitClip)
   }
 
   // ---- CORPSE MODE (owned by FragLayer) -----------------------------------
@@ -317,7 +575,9 @@ export default class CharacterModel {
       clip.goToFrame(clip.to)
     })
     clip.stop()
-    clip.start(false, 1.0)
+    // played faster than 1x so the ~2.375s fall completes well inside the 2.5s
+    // respawn window (see DEATH_CLIP_SPEED) instead of getting truncated by jitter.
+    clip.start(false, DEATH_CLIP_SPEED)
   }
 
   // hide the visible body outright (gib case: chunks replace the body)
@@ -348,12 +608,18 @@ export default class CharacterModel {
 
   dispose() {
     this.disposed = true
+    if (this._nameTag) { this._nameTag.remove(); this._nameTag = null }
     this._oneShotToken++
+    // masked overlays share Animation objects with the source groups; dispose the
+    // wrappers first (just releases their animatables), then the source groups.
+    if (this.shootUpper) { this.shootUpper.onAnimationGroupEndObservable.clear(); this.shootUpper.dispose() }
+    if (this.hitUpper) { this.hitUpper.onAnimationGroupEndObservable.clear(); this.hitUpper.dispose() }
     Object.values(this.groups).forEach((g) => {
       g.onAnimationGroupEndObservable.clear()
       g.dispose()
     })
     if (this._weaponRoot) this._weaponRoot.dispose()
+    if (this._helmetRoot) this._helmetRoot.dispose()
     if (this.meshes) this.meshes.forEach((m) => m.dispose())
     if (this.holder) this.holder.dispose()
   }

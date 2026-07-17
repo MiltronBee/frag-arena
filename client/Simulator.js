@@ -13,8 +13,16 @@ import { shotPattern, applyPattern } from '../common/firePattern'
 import Viewmodel from './graphics/Viewmodel'
 import WeaponAudio from './graphics/WeaponAudio'
 import FragLayer from './graphics/FragLayer'
+import MenuControls from './graphics/MenuControls'
 import { resolveWeaponFx } from './graphics/firingFx'
 import { assets, weapons } from './assets/assetManifest'
+import preloadAssets from './graphics/assetPreloader'
+
+// Aim-safe positional camera pulse on a confirmed LOCAL flesh hit (world units of
+// velocity impulse fed to the existing recoil spring; never rotates aim). Kept small
+// on purpose — research flags camera shake as the effect most likely to hurt
+// readability / cause sickness in a fast shooter. Set to 0 to disable entirely.
+const CONFIRM_KICK = 0.05
 
 // ignoring certain data from the sever b/c we will be predicting these properties on the client
 const ignoreProps = ['x', 'y', 'z', 'velX', 'velY', 'velZ']
@@ -34,6 +42,7 @@ class Simulator {
 		this.input = new InputSystem()
 		this.obstacles = new Map()
 		this.characterModels = new Map() // nid -> CharacterModel (other players' visuals)
+		this._nameRegistry = new Map()   // nid -> callsign string (overhead nametags + kill feed)
 		this._projectiles = new Map()    // nid -> {entity, prev pos} for the plasma streak
 
 		// procedural weapon audio (WebAudio). Silent until resume() runs from a user
@@ -51,6 +60,25 @@ class Simulator {
 		// so it self-clears and can never drift the view.
 		this._camKick = new BABYLON.Vector3(0, 0, 0)
 		this._camKickVel = new BABYLON.Vector3(0, 0, 0)
+
+		// AIM-SAFE VISUAL camera recoil (Layer B): a ROTATION offset (pitch climb +
+		// signed yaw drift + subtle roll) applied to the render camera AFTER the fire
+		// ray + MoveCommand aim are read each frame, and fully REMOVED before the next
+		// read — the identical apply-late / remove-first pattern FragLayer.applyDeathCamera
+		// ships. Because getForwardRay() is read only while the offset is zero (see
+		// update()), the shot ray + aim bytes the server judges are byte-identical with
+		// or without recoil. `_recoilApplied` tracks exactly what we added last frame so
+		// it can be subtracted before the next read (a plain += would compound into aim).
+		// `visClimb` is the capped sustained-fire lean; `_recoilFov` is the transient
+		// shotgun FOV punch (world camera only). Radians throughout (camKick is degrees;
+		// converted at impulse time).
+		this._recoil = new BABYLON.Vector3(0, 0, 0)      // current spring offset (pitch=x, yaw=y, roll=z)
+		this._recoilVel = new BABYLON.Vector3(0, 0, 0)
+		this._recoilApplied = new BABYLON.Vector3(0, 0, 0) // what we added to the camera last frame
+		this._recoilTension = 900
+		this._recoilDamping = 60
+		this._visClimb = 0
+		this._recoilFov = null // { t0, amount, inMs, outMs } transient FOV punch
 
 		// first-person weapon, swap with 1-4 / Q / wheel. Only the EQUIPPED weapon's
 		// rig lives in the scene: multiple copies of the same skeleton coexisting
@@ -83,7 +111,18 @@ class Simulator {
 			this.touchControls = new TouchControls(this)
 		}
 		this._setupGameUI()
-		
+
+		// menu-as-loadscreen affordances (callsign, wallet plate, how-to-play).
+		// Presentation-only; never touches the entry gate / netcode.
+		this._menuControls = new MenuControls()
+
+		// preload the heavy GLBs (third-person body + weapons) while the player is
+		// on the entry screen, so nothing big downloads mid-match. Gates the ENTER
+		// button (see _syncEntryState) and drives the loading bar.
+		const arenaReady = (this.renderer.arenaDressing && this.renderer.arenaDressing._ready) || Promise.resolve()
+		preloadAssets(this.renderer, arenaReady, (frac, stage) => this._setAssetProgress(frac, stage))
+			.then(() => { this._assetsReady = true; this._setAssetProgress(1, 'FINALIZING'); this._syncEntryState() })
+
 		// dev-only tooling: the server ignores DevUpdateWeaponConfigCommand in
 		// production, so predicting with modified configs would only desync us
 		this.devToolsEnabled = process.env.NODE_ENV !== 'production'
@@ -179,7 +218,13 @@ class Simulator {
 			}
 			const cam = this.renderer.camera.position
 			const dist = Math.hypot(message.x - cam.x, message.y - cam.y, message.z - cam.z)
-			this.audio.shoot(fx.report, { distance: dist })
+			// REMOTE shot: pass the shooter's world position so the panner spatializes it
+			// (comes from THEIR direction). distance kept as a 2D fallback if audio has no
+			// live ctx / panner. Own shots were filtered out above and play 2D (distance 0).
+			this.audio.fire(message.weaponIndex, fx.report, {
+				distance: dist,
+				pos: { x: message.x, y: message.y, z: message.z },
+			})
 		})
 
 		client.on('predictionErrorFrame', predictionErrorFrame => {
@@ -205,6 +250,10 @@ class Simulator {
 			}
 		}
 	}
+
+	// resolve a player's callsign by nid (used by the kill feed + overhead nametags).
+	// Falls back to a generic label until the name is registered by the factory.
+	getName(nid) { return this._nameRegistry.get(nid) || `Player ${nid}` }
 
 	// touch-only camera seam: apply a yaw/pitch delta (radians) already computed
 	// by TouchLook. Kept separate from the mouse `onmousemove` path so desktop
@@ -257,6 +306,19 @@ class Simulator {
 		this._camKickVel.z += -fwd.z * back + (Math.random() - 0.5) * jit
 	}
 
+	// A confirmed local hit: nudge the SAME position-only recoil spring with a tiny
+	// random pulse so a landed shot has a hair of weight. Never rotates the aim (the
+	// fire ray / MoveCommand are untouched); the spring self-clears each frame and the
+	// M-clamp in _springCameraRecoil bounds it. Deliberately small (CONFIRM_KICK) —
+	// shake harms readability in a twitch shooter — and gentler on touch.
+	_applyConfirmKick() {
+		if (!CONFIRM_KICK) return
+		const k = CONFIRM_KICK * (this.isTouch ? 0.5 : 1.0)
+		this._camKickVel.x += (Math.random() - 0.5) * k
+		this._camKickVel.y += (Math.random() - 0.5) * k * 0.5
+		this._camKickVel.z += (Math.random() - 0.5) * k
+	}
+
 	// critically-ish damped spring returning the position kick to zero, clamped so a
 	// sustained burst can never drift the view far.
 	_springCameraRecoil(delta) {
@@ -273,18 +335,120 @@ class Simulator {
 		k.z = Math.max(-M, Math.min(M, k.z))
 	}
 
+	// Inject a VISUAL camera-recoil impulse on a local shot. ROTATION only, and it is
+	// NEVER live when getForwardRay() is read (removed at the top of update(), re-applied
+	// only after the fire command + prediction are done) — so the fire ray / MoveCommand
+	// aim are byte-identical. `ray.heat` (client-predicted, same value the server charges
+	// spread with) scales the pitch climb so the felt kick mirrors the accuracy penalty
+	// with zero netcode change. Degrees in the preset → radians here. Gentler on touch.
+	_applyCamRecoil(camKick, heat) {
+		if (!camKick) return
+		const scale = (this.isTouch ? 0.55 : 1.0) * Math.PI / 180
+		// per-weapon return spring (read by _springCamRecoil this frame + after)
+		this._recoilTension = camKick.tension || 900
+		this._recoilDamping = camKick.damping || 60
+		// pitch climb: base + a heat-scaled term + the capped sustained-fire lean.
+		const h = Math.min(1, Math.max(0, heat || 0))
+		const climbBonus = camKick.climb ? Math.min(this._visClimb + camKick.climb, camKick.climbMax || 1.2) : 0
+		if (camKick.climb) this._visClimb = climbBonus
+		const pitchDeg = (camKick.pitch || 0) * (1 + (camKick.heatBias || 0) * h) + climbBonus
+		// pitch UP is a NEGATIVE rotation.x (mouse-look uses +x = look down; see onmousemove)
+		this._recoilVel.x -= pitchDeg * scale * this._springImpulseGain()
+		const yaw = (camKick.yawDrift || 0) + (Math.random() - 0.5) * 2 * (camKick.yawJitter || 0)
+		this._recoilVel.y += yaw * scale * this._springImpulseGain()
+		// subtle roll, random sign, tiny magnitude (readability): reuse yawJitter as a
+		// roll seed proportion so heavier guns roll a touch more.
+		const rollDeg = (camKick.yawJitter || 0) * 0.6
+		this._recoilVel.z += (Math.random() - 0.5) * 2 * rollDeg * scale * this._springImpulseGain()
+
+		// shotgun-only FOV concussion punch (world camera; the vmCamera has its own
+		// fixed fov so the gun never distorts). Does NOT touch rotation → aim-safe.
+		if (camKick.fov) {
+			this._recoilFov = { t0: performance.now(), amount: camKick.fov.amount || 0.03,
+				inMs: camKick.fov.inMs || 50, outMs: camKick.fov.outMs || 180 }
+		}
+		// shotgun pump dip: a small downward camera nod on the rack, timed to the
+		// viewmodel/audio pump so the whole body agrees. Gen-free (just a delayed impulse).
+		if (camKick.pumpDip) {
+			// capture the gain now (weapon may swap before the delayed dip fires)
+			const dipVel = (camKick.pumpDip.pitch || 0.15) * scale * this._springImpulseGain()
+			setTimeout(() => {
+				// pitch DOWN = +x. Small; the spring absorbs it inside the recovery window.
+				this._recoilVel.x += dipVel
+			}, camKick.pumpDip.delay || 350)
+		}
+	}
+
+	// impulse gain: a critically-damped spring (ζ≈1) driven by a velocity impulse v0
+	// peaks at v0/(ω·e), ω=sqrt(tension). To make the preset `pitch` (etc.) read DIRECTLY
+	// as the peak angle in degrees regardless of per-weapon stiffness, inject
+	// v0 = θ·ω·e — i.e. multiply the target angle by sqrt(tension)·e. Keeps the table's
+	// numbers meaningful (rifle 0.35° really peaks ~0.35°, well inside the 1.5° clamp).
+	_springImpulseGain() { return Math.sqrt(this._recoilTension || 900) * Math.E }
+
+	// critically-ish damped spring returning the VISUAL recoil rotation offset to zero.
+	// Clamped so a sustained burst's picture can never diverge more than ~1.5° from where
+	// shots actually land (shots stay true; only the picture leads slightly).
+	_springCamRecoil(delta) {
+		const dt = Math.min(delta || 0.016, 0.05)
+		const tension = this._recoilTension || 900, damping = this._recoilDamping || 60
+		const r = this._recoil, v = this._recoilVel
+		v.x += (-tension * r.x - damping * v.x) * dt
+		v.y += (-tension * r.y - damping * v.y) * dt
+		v.z += (-tension * r.z - damping * v.z) * dt
+		r.x += v.x * dt; r.y += v.y * dt; r.z += v.z * dt
+		const P = 1.5 * Math.PI / 180 // ~1.5° pitch/yaw ceiling, 3° roll
+		r.x = Math.max(-P, Math.min(P, r.x))
+		r.y = Math.max(-P, Math.min(P, r.y))
+		r.z = Math.max(-2 * P, Math.min(2 * P, r.z))
+		// bleed the sustained-fire climb accumulator back down when not actively firing,
+		// so the next burst starts from a cool baseline (mirrors weapon.js heat cooldown).
+		if (this._visClimb > 0) this._visClimb = Math.max(0, this._visClimb - dt * 3)
+	}
+
+	// Compose the transient shotgun FOV punch onto the LIVE base fov each frame (never
+	// mutate the stored base). Ease in fast, out slow. World camera only. Aim-safe (FOV
+	// is not orientation — getForwardRay() direction is unaffected by field of view).
+	_applyRecoilFov() {
+		const cam = this.renderer.camera
+		const base = (this.fov * Math.PI) / 180
+		const p = this._recoilFov
+		if (!p) { if (cam.fov !== base) cam.fov = base; return }
+		const age = performance.now() - p.t0
+		let f
+		if (age < p.inMs) {
+			f = age / p.inMs
+		} else if (age < p.inMs + p.outMs) {
+			const k = (age - p.inMs) / p.outMs
+			f = 1 - k * (2 - k) // ease-out quad (1 → 0)
+		} else {
+			this._recoilFov = null
+			cam.fov = base
+			return
+		}
+		cam.fov = base * (1 + p.amount * f)
+	}
+
 	// flash the crosshair hit marker. One reused timer (cleared each call) so repeated
-	// hits never pile up timers. kill = brighter/longer confirmation.
-	_showHitMarker(kill) {
+	// hits never pile up timers. kill = the skull/rotating red-X kill treatment; `heavy`
+	// (≥20 predicted dmg — pistol/shotgun) gets a slightly bigger pop. Durations here
+	// MUST match the CSS keyframes (hit-pop 160ms, kill-pop 350ms) so the class is
+	// removed exactly when the grow-in/out animation ends.
+	_showHitMarker(kill, heavy) {
 		const el = document.getElementById('hit-marker')
 		if (!el) return
-		el.classList.remove('hit-active', 'kill-active')
+		el.classList.remove('hit-active', 'kill-active', 'hit-active-heavy')
 		void el.offsetWidth // restart the CSS animation
-		el.classList.add(kill ? 'kill-active' : 'hit-active')
+		if (kill) {
+			el.classList.add('kill-active')
+		} else {
+			el.classList.add('hit-active')
+			if (heavy) el.classList.add('hit-active-heavy')
+		}
 		clearTimeout(this._hitMarkerTimer)
 		this._hitMarkerTimer = setTimeout(() => {
-			el.classList.remove('hit-active', 'kill-active')
-		}, kill ? 520 : 260)
+			el.classList.remove('hit-active', 'kill-active', 'hit-active-heavy')
+		}, kill ? 350 : 160)
 	}
 
 	// plasma bolt bookkeeping (called from the Projectile factory). Each bolt is
@@ -303,7 +467,11 @@ class Simulator {
 		const pos = new BABYLON.Vector3(e.x, e.y, e.z)
 		this.renderer.plasmaImpact(pos)
 		const cam = this.renderer.camera.position
-		this.audio.impact('energy', { distance: BABYLON.Vector3.Distance(pos, cam) })
+		// remote energy impact: spatialize from the projectile's world position.
+		this.audio.impact('energy', {
+			distance: BABYLON.Vector3.Distance(pos, cam),
+			pos: { x: e.x, y: e.y, z: e.z },
+		})
 	}
 
 	_updateProjectiles() {
@@ -339,6 +507,78 @@ class Simulator {
 
 		const el = document.getElementById('weapon-name')
 		if (el) el.textContent = weapons[index].name.toUpperCase()
+
+		// swap the crosshair reticle to this weapon + resize its static parts
+		// (shotgun ring radius). data-weapon drives per-weapon CSS group visibility.
+		this._applyCrosshairWeapon(index)
+		// swap the Halo ammo-HUD weapon silhouette to match (presentation only)
+		this._applyWeaponIcon(index)
+	}
+
+	// set the Halo ammo-HUD weapon silhouette for `index`. Mirrors how the
+	// crosshair sets data-weapon: #weapon-panel[data-weapon] drives a CSS mask
+	// swap (public/assets/hud/weap-*.svg). Client-only presentation — does NOT
+	// touch ammo logic; Simulator._updateHud still owns the counts.
+	_applyWeaponIcon(index) {
+		const el = this._weaponPanelEl ||
+			(this._weaponPanelEl = document.getElementById('weapon-panel'))
+		if (!el) return
+		el.setAttribute('data-weapon', String(index))
+	}
+
+	// ---- Per-weapon, spread-reactive crosshair (client-only presentation). ----
+	// The reticle is the inline #crosshair SVG. data-weapon picks the shape; the
+	// dynamic tick gap (rifle/smg) and the shotgun ring radius are driven from the
+	// SAME spread math the fire ray uses (common/firePattern.js), converted to pixels
+	// with the LIVE render FOV so the reticle is honest at any FOV/resolution.
+
+	// px-per-radian at the current viewport + camera FOV. Vertical-FOV mapping:
+	// a spread angle θ maps to (viewportH/2) * θ / tan(fov/2) px on screen. Read
+	// live so FOV-slider changes and window resizes stay honest.
+	_crosshairPxPerRad() {
+		const h = (this.renderer.engine && this.renderer.engine.getRenderHeight)
+			? this.renderer.engine.getRenderHeight()
+			: window.innerHeight
+		const fov = this.renderer.camera.fov || 1.0
+		return (h / 2) / Math.tan(fov / 2)
+	}
+
+	// set the reticle shape for `index` and size its static parts (shotgun ring).
+	_applyCrosshairWeapon(index) {
+		const el = this._crosshairEl || (this._crosshairEl = document.getElementById('crosshair'))
+		if (!el) return
+		el.setAttribute('data-weapon', String(index))
+		const w = weapons[index]
+		if (w && w.pellets && w.pellets > 1) {
+			// shotgun: draw the ring at the true pellet-cone angle (ringRadius rad)
+			const ringPx = (w.ringRadius || 0.05) * this._crosshairPxPerRad()
+			el.style.setProperty('--xhair-ring', ringPx.toFixed(1) + 'px')
+		}
+		// reset the dynamic gap so a switch away from a hot weapon doesn't leave a
+		// stale wide gap for a frame (the per-frame update overwrites it live anyway)
+		el.style.setProperty('--xhair-spread', '4px')
+		this._lastXhairGap = null
+	}
+
+	// per-frame: push the client-predicted spread (gap px) into the reticle. Uses
+	// firePattern's exact spread formula (spreadBase + spreadHeat*clamp(heat)); only
+	// writes when the value actually changes (pistol/shotgun with heat 0 pay nothing).
+	_updateCrosshairSpread() {
+		const el = this._crosshairEl
+		if (!el || !this.myRawEntity) return
+		const w = weapons[this.weaponIndex]
+		if (!w || (w.pellets && w.pellets > 1)) return // shotgun ring is static
+		const state = this.myRawEntity.weaponsState && this.myRawEntity.weaponsState[this.weaponIndex]
+		const heat = state ? (state.heat || 0) : 0
+		// identical to common/firePattern.js:55 (single-pellet spread)
+		const spreadNow = (w.spreadBase || 0) + (w.spreadHeat || 0) * Math.min(1, Math.max(0, heat))
+		// per-weapon readability floor for the gap (proposal §2): pistol/rifle 4px, smg 6px
+		const minGap = w.name === 'SMG' ? 6 : 4
+		const gap = Math.max(minGap, spreadNow * this._crosshairPxPerRad())
+		const rounded = Math.round(gap * 10) / 10
+		if (rounded === this._lastXhairGap) return
+		this._lastXhairGap = rounded
+		el.style.setProperty('--xhair-spread', rounded + 'px')
 	}
 
 	_queueViewmodelSwap(index) {
@@ -381,6 +621,15 @@ class Simulator {
 		})
 		const el = document.getElementById('weapon-name')
 		if (el) el.textContent = weapons[0].name.toUpperCase()
+
+		// initial spawn: set the crosshair to the starting weapon so the first
+		// reticle is correct before any switch (matches this.weaponIndex = 0)
+		this._applyCrosshairWeapon(this.weaponIndex)
+		// same for the Halo ammo-HUD weapon icon (presentation only)
+		this._applyWeaponIcon(this.weaponIndex)
+
+		// keep the shotgun ring honest across window resize / FOV changes
+		window.addEventListener('resize', () => this._applyCrosshairWeapon(this.weaponIndex))
 	}
 
 	update(delta) {
@@ -396,6 +645,18 @@ class Simulator {
 				this._initialServerSyncDone = true
 				if (this.devToolsEnabled) this._syncWeaponsConfigToServer()
 			}
+
+			// AIM-SAFETY (mirror of FragLayer.applyDeathCamera): remove last frame's
+			// VISUAL recoil rotation offset from the camera BEFORE reading the aim ray,
+			// so getForwardRay() (used for BOTH the MoveCommand aim and the fire ray)
+			// sees the player's TRUE orientation. The offset is re-applied further down,
+			// AFTER the command + fire prediction are built. Tracked (not a bare +=) so
+			// it never compounds into aim. Death-cam runs LAST, unchanged.
+			const cam = this.renderer.camera
+			cam.rotation.x -= this._recoilApplied.x
+			cam.rotation.y -= this._recoilApplied.y
+			cam.rotation.z -= this._recoilApplied.z
+			this._recoilApplied.set(0, 0, 0)
 
 			// which way are we pointing?
 			const camRay = this.renderer.camera.getForwardRay().direction
@@ -417,18 +678,30 @@ class Simulator {
 			this.client.addCommand(command)
 
 			const wasReloading = this.myRawEntity.weaponsState[this.weaponIndex].reloading
+			// captured BEFORE applyCommand: the interrupt path (applyCommand.js:153-156)
+			// fires only when the player shoots mid-reload with ammo already chambered.
+			const magBeforeApply = this.myRawEntity.weaponsState[this.weaponIndex].magazineAmmo
 
 			// predict our own movement locally (runs the exact same logic as the server)
 			applyCommand(this.myRawEntity, command, this.obstacles)
 
-			// Handle visual reload cancellation if state.reloading was interrupted
+			// Reload ended this tick. Distinguish a GENUINE INTERRUPTION (fire-while-
+			// reloading with ammo — applyCommand.js:153-156) from a NATURAL COMPLETION
+			// (timer expiry). Only the interrupt takes the cancel/snap path (which hard-
+			// snaps the rig to the reload clip's first frame, detaching the hands). On a
+			// natural completion we do NOTHING: the stretched visual clip plays out and
+			// self-hands-off to idle via its own end callback (Viewmodel.js:335-338),
+			// blending invisibly from the clip's final (~base) pose.
 			if (wasReloading && !this.myRawEntity.weaponsState[this.weaponIndex].reloading) {
-				if (this.viewmodel) this.viewmodel.cancelReload()
+				const wasInterrupted = command.fireInput && magBeforeApply > 0
+				if (wasInterrupted && this.viewmodel) this.viewmodel.cancelReload()
 			}
 
 			// Handle visual reload start if state.reloading became true (covers manual and auto-reload)
 			if (!wasReloading && this.myRawEntity.weaponsState[this.weaponIndex].reloading) {
 				if (this.viewmodel) this.viewmodel.reload()
+				// layered reload SFX sequenced to this weapon's reloadTime
+				this.audio.reload(this.weaponIndex, weapons[this.weaponIndex].reloadTime)
 			}
 
 			// store state for reconciliation (in case the server disagrees later)
@@ -486,25 +759,68 @@ class Simulator {
 							if (info && info.hit && info.surface === 'flesh') hitFlesh = true
 						})
 						if (hitFlesh) {
-							this._showHitMarker(false)
+							// heavy-tier marker for high per-shot damage (pistol single crack /
+							// shotgun rosette). READ-ONLY use of the balance value for a visual
+							// tier — never fed back into the ray. Shotgun (pellets>1) always heavy.
+							const w = weapons[this.weaponIndex]
+							const heavy = !!(w && ((w.pellets && w.pellets > 1) || (w.damage || 0) >= 20))
+							this._showHitMarker(false, heavy)
 							this.audio.hitMarker(false)
+							// layer a meaty flesh thud under the crisp UI marker (sound
+							// coherence is a top "did it land?" cue) + a tiny aim-safe punch.
+							// Once per shot (hitFlesh collapses all pellets), so no double-fire.
+							this.audio.impact('flesh', { distance: 0 })
+							this._applyConfirmKick()
 						}
 					}
 					// flash on the VIEWMODEL layer so the gun can't paint over it
 					this.renderer.flashMuzzle(muzzle, fx, { vmLayer: true })
 					this._spawnCasing(fx.eject)
 
-					// one synchronized shot event: audio transient + aim-safe camera
+					// one synchronized shot event: layered weapon audio + aim-safe camera
 					// kick + procedural weapon recoil animation, all on this frame.
-					this.audio.shoot(fx.report, { distance: 0 })
+					this.audio.fire(this.weaponIndex, fx.report, { distance: 0 })
 					if (fx.vmKick && fx.vmKick.pump) this.audio.pump(fx.vmKick.pump.delay / 1000)
 					this._applyCameraRecoil(fx.recoil)
+					// VISUAL camera recoil impulse (Layer B). ray.heat is this shot's
+					// pre-bump heat (the same value the server charges spread with — see
+					// weapon.js fire()), so the felt climb mirrors the accuracy penalty.
+					// The offset is only APPLIED to the camera after this whole block, and
+					// is removed before next frame's getForwardRay() — so aim is untouched.
+					this._applyCamRecoil(fx.camKick, ray.heat)
 					if (this.viewmodel) this.viewmodel.kick(fx.vmKick)
 				}
 			}
 
 			// bob the equipped weapon each frame (based on movement)
 			if (this.viewmodel) this.viewmodel.update(delta, forwards || backwards || left || right)
+
+			// VISUAL camera recoil, applied AFTER the fire ray + MoveCommand aim were
+			// read (above) and after prediction — so the render picture shows the kick
+			// while the shot bytes stayed byte-identical. Integrate the spring now; the
+			// PITCH(x)/YAW(y) offsets (the two that affect getForwardRay) are added here
+			// and remembered in _recoilApplied so next frame removes exactly this much
+			// before reading the aim (never compounds). The ROLL(z) is applied AFTER the
+			// death-cam below (which assigns rotation.z each frame and would clobber it);
+			// roll is about the view axis, so it does not affect the fire ray anyway.
+			this._springCamRecoil(delta)
+			cam.rotation.x += this._recoil.x
+			cam.rotation.y += this._recoil.y
+			this._recoilApplied.set(this._recoil.x, this._recoil.y, this._recoil.z)
+			// transient shotgun FOV concussion punch (world camera only; aim-safe).
+			this._applyRecoilFov()
+		}
+
+		// spatial-audio listener sync: place the WebAudio listener at the camera and
+		// orient it down the view forward/up so panned (remote) voices resolve to the
+		// right side/direction. Cheap; no-ops before the audio ctx is live (guarded in
+		// updateListener). Basis is read from the camera matrix exactly like _spawnCasing.
+		if (this.audio && this.audio.ready) {
+			const cm = this.renderer.camera.getWorldMatrix()
+			const lpos = this.renderer.camera.position
+			const lfwd = BABYLON.Vector3.TransformNormal(BABYLON.Vector3.Forward(), cm)
+			const lup = BABYLON.Vector3.TransformNormal(BABYLON.Vector3.Up(), cm)
+			this.audio.updateListener(lpos, lfwd, lup)
 		}
 
 		// drive other players' character visuals (position/yaw follow + idle/run anim)
@@ -522,6 +838,15 @@ class Simulator {
 		// ray or the MoveCommand aim the server judges shots with.
 		this.fragLayer.applyDeathCamera()
 
+		// recoil ROLL, applied after the death-cam has set rotation.z for this frame
+		// (it assigns z=0 while alive, its death roll while dead — either way it fully
+		// overwrites z, so recoil roll self-clears and needs no remove-first tracking).
+		// Skipped while the death-cam owns the roll so the two never fight.
+		if (this.myRawEntity && !(this.fragLayer._deathCam && this.fragLayer._deathCam.active)) {
+			this.renderer.camera.rotation.z += this._recoil.z
+		}
+
+		this._updateCrosshairSpread()
 		this._updateHud()
 		this.renderer.update()
 	}
@@ -561,6 +886,8 @@ class Simulator {
 	_setupGameUI() {
 		this._arenaEntered = false
 		this._arenaReady = false
+		this._assetsReady = false
+		this._assetProgress = 0 // 0..1, drives the loading bar
 		this._connectionState = 'connecting'
 		this._lastHealth = null
 		this._wasDead = false
@@ -591,18 +918,80 @@ class Simulator {
 			}
 		})
 
+		// Mobile has no pointer lock, so the desktop resume path above never runs
+		// there. After any OS audio interruption (screen dim, notification, app
+		// switch, iOS call/Siri) the AudioContext suspends and nothing recovers it —
+		// audio goes permanently silent. Resume on touch-reachable events. resume()
+		// already guards on state, so these are cheap + idempotent.
+		document.addEventListener('touchstart', () => this.audio.resume(), { passive: true })
+		document.addEventListener('pointerdown', () => this.audio.resume())
+		document.addEventListener('visibilitychange', () => {
+			if (document.visibilityState === 'visible') this.audio.resume()
+		})
+
+		this._syncEntryState()
+	}
+
+	// Drive the loading bar + the loading-locked PLAY button as heavy assets are
+	// imported and GPU-warmed. `stage` is a human label (MAP / CHARACTERS /
+	// WEAPONS / SOUNDS / EFFECTS / FINALIZING) shown under the bar. total may be 0
+	// on the initial 0/0 call — guard the divide.
+	_setAssetProgress(frac, stage) {
+		this._assetProgress = Math.max(0, Math.min(1, frac || 0))
+		if (stage) this._assetStage = stage
+		const pct = Math.round(this._assetProgress * 100)
+
+		const fill = document.getElementById('entry-progress-fill')
+		if (fill) fill.style.width = pct + '%'
+
+		// the PLAY button doubles as a progress bar until assets are ready: its
+		// ::after underline width mirrors the load fraction (see CSS
+		// #enter-arena[data-loading]). Label shows LOADING… NN% while locked.
+		const button = document.getElementById('enter-arena')
+		if (button) button.style.setProperty('--load-progress', pct + '%')
+
+		const label = document.getElementById('entry-stage')
+		if (label) {
+			const map = { MAP: 'LOADING MAP…', CHARACTERS: 'LOADING CHARACTERS…', WEAPONS: 'LOADING WEAPONS…', SOUNDS: 'LOADING SOUNDS…', EFFECTS: 'LOADING EFFECTS…', FINALIZING: 'FINALIZING…' }
+			label.textContent = this._assetsReady ? '' : (map[this._assetStage] || 'LOADING…')
+		}
+
 		this._syncEntryState()
 	}
 
 	_syncEntryState() {
-		const ready = this._connectionState === 'connected' && this._arenaReady
+		const connected = this._connectionState === 'connected'
+		const ready = connected && this._arenaReady && this._assetsReady
 		const button = document.getElementById('enter-arena')
 		const status = document.getElementById('entry-status')
-		if (button) button.disabled = !ready
+		const bar = document.getElementById('entry-progress')
+		const pct = Math.round(this._assetProgress * 100)
+
+		if (button) {
+			// Triple gate unchanged: not clickable until connected && arena && assets.
+			button.disabled = !ready
+			// Loading-locked variant (DESIGN 3.1): while locked the button is a
+			// progress bar; at 100% ready it unlocks to the primary PLAY CTA with a
+			// one-shot glow pulse. data-loading drives the CSS locked styling; the
+			// gradient fill width tracks --load-progress (set in _setAssetProgress).
+			button.setAttribute('data-loading', ready ? 'false' : 'true')
+			button.setAttribute('aria-disabled', ready ? 'false' : 'true')
+			const label = ready ? 'PLAY' : (this._connectionState === 'disconnected' ? 'CONNECTION LOST' : 'LOADING… ' + pct + '%')
+			if (button.textContent !== label) button.textContent = label
+			if (ready && !this._enterUnlocked) {
+				this._enterUnlocked = true
+				button.classList.add('enter-unlock')
+			}
+		}
+		// show the loading bar until everything's ready, then hide it
+		if (bar) bar.classList.toggle('is-hidden', ready || this._connectionState === 'disconnected')
 		if (status) {
-			status.textContent = this._connectionState === 'disconnected'
-				? 'CONNECTION LOST'
-				: ready ? 'ARENA READY' : 'CONNECTING TO ARENA'
+			let text
+			if (this._connectionState === 'disconnected') text = 'CONNECTION LOST'
+			else if (ready) text = 'ARENA READY'
+			else if (!this._assetsReady) text = 'LOADING ASSETS ' + pct + '%'
+			else text = 'CONNECTING TO ARENA'
+			status.textContent = text
 		}
 	}
 
@@ -721,7 +1110,14 @@ class Simulator {
 		const weaponPanel = document.getElementById('weapon-panel')
 		if (magazine) magazine.textContent = state.magazineAmmo
 		if (reserve) reserve.textContent = state.reserveAmmo
-		if (weaponPanel) weaponPanel.classList.toggle('is-reloading', !!state.reloading)
+		if (weaponPanel) {
+			weaponPanel.classList.toggle('is-reloading', !!state.reloading)
+			// pre-empty warning: warn the player at <=25% mag so they can reload
+			// before running dry mid-fight (empty is covered by .is-reloading)
+			const lowAmmoThreshold = Math.ceil((weapon ? weapon.magazineCapacity : 1) * 0.25)
+			const isLowAmmo = state.magazineAmmo > 0 && state.magazineAmmo <= lowAmmoThreshold && !state.reloading
+			weaponPanel.classList.toggle('low-ammo', isLowAmmo)
+		}
 	}
 
 	_setupSettingsUI() {
@@ -740,6 +1136,9 @@ class Simulator {
 				fovVal.textContent = val
 				this.renderer.camera.fov = (val * Math.PI) / 180
 				localStorage.setItem('fov', val)
+				// FOV changes the rad→px mapping; re-size the shotgun ring (dynamic
+				// cross gap re-derives per-frame from the live FOV anyway)
+				this._applyCrosshairWeapon(this.weaponIndex)
 			})
 		}
 
