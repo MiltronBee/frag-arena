@@ -1,7 +1,7 @@
 import nengi from 'nengi'
 
 class WeaponFired {
-    constructor(sourceId, x, y, z, tx, ty, tz, weaponIndex, seed, heat) {
+    constructor(sourceId, x, y, z, tx, ty, tz, weaponIndex, seed, heat, aimFactor) {
         this.sourceId = sourceId
         this.x = x
 		this.y = y
@@ -15,6 +15,9 @@ class WeaponFired {
 		this.weaponIndex = weaponIndex || 0
 		this.seed = seed || 0
 		this.heat = heat || 0
+		// the shot's ADS ramp (0..1) so observers reproduce the SAME aimed spread
+		// (shotPattern's 4th arg) the server used for damage — not the wider hip cone.
+		this.aimFactor = aimFactor || 0
     }
 }
 
@@ -28,7 +31,8 @@ WeaponFired.protocol = {
 	tz: nengi.Float32,
 	weaponIndex: nengi.UInt8,
 	seed: nengi.UInt32,
-	heat: nengi.Float32
+	heat: nengi.Float32,
+	aimFactor: nengi.Float32
 }
 
 export default WeaponFired

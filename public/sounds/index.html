@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FRAG ARENA — SFX audition</title>
+<style>
+  :root { --bg:#0b0d12; --panel:#12161f; --line:#232a38; --txt:#dfe6f2; --dim:#7a8699; --acc:#3ddc84; --hot:#b16cff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:15px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif; padding:24px; }
+  h1 { font-size:20px; letter-spacing:.12em; margin:0 0 4px; }
+  .sub { color:var(--dim); margin:0 0 20px; font-size:13px; }
+  .mode { position:sticky; top:0; background:var(--bg); padding:10px 0; z-index:2; display:flex; gap:14px; align-items:center; border-bottom:1px solid var(--line); margin-bottom:18px; }
+  .mode label { color:var(--dim); font-size:13px; display:flex; gap:6px; align-items:center; cursor:pointer; }
+  .gun { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+  .gun h2 { margin:0 0 10px; font-size:15px; letter-spacing:.08em; color:var(--acc); text-transform:uppercase; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; }
+  button { background:#1a2130; border:1px solid var(--line); color:var(--txt); border-radius:8px; padding:8px 14px; font:600 13px system-ui; cursor:pointer; }
+  button:hover { border-color:var(--acc); }
+  button.current { border-color:var(--hot); color:var(--hot); }
+  button.playing { background:var(--acc); color:#08130c; border-color:var(--acc); }
+  .events { margin-top:26px; }
+  .events h2 { font-size:14px; color:var(--dim); letter-spacing:.08em; }
+  .note { color:var(--dim); font-size:12px; margin-top:16px; }
+  kbd { background:#1a2130; border:1px solid var(--line); border-radius:4px; padding:0 5px; }
+</style>
+</head>
+<body>
+<h1>FRAG ARENA — SFX AUDITION</h1>
+<p class="sub">CURRENT = what's live in game now. A–D = new ElevenLabs candidates per weapon. Pick a mode, click to play. Tell Claude your picks, e.g. <kbd>rifle B, shotgun A, keep pistol</kbd>.</p>
+
+<div class="mode">
+  <label><input type="radio" name="mode" value="mix" checked> GAME MIX (clip + synth crack + sub-thump — how it sounds in game)</label>
+  <label><input type="radio" name="mode" value="clip"> CLIP ONLY (raw ElevenLabs)</label>
+  <label><input type="radio" name="mode" value="burst"> BURST ×5 (rapid-fire overlap test, game mix)</label>
+</div>
+
+<div id="guns"></div>
+
+<div class="events">
+  <h2>EVENT SOUNDS (current live versions — clip only)</h2>
+  <div class="row" id="events"></div>
+</div>
+<p class="note">Candidates are 0.8s untrimmed; installed winners get trimmed (leading silence cut, ~0.55s cap with a slow fade) and sit over the same synth layers you hear in GAME MIX.</p>
+
+<script>
+const GUNS = ['rifle','smg','shotgun','pistol','plasma','flak']
+const LETTERS = ['A','B','C','D']
+// mirrors WeaponAudio SUB_THUMP (plasma/flak values from the live build)
+const SUB = {
+  rifle:{f0:100,f1:38,g:1.0,d:.09}, smg:{f0:85,f1:45,g:.7,d:.09},
+  shotgun:{f0:120,f1:30,g:1.4,d:.12}, pistol:{f0:110,f1:42,g:1.0,d:.09},
+  plasma:{f0:90,f1:50,g:.6,d:.08}, flak:{f0:125,f1:28,g:1.5,d:.13},
+}
+const EVENTS = ['grenade_explosion','weapon_swap','death','respawn','impact_flesh','pain_grunt','kill_confirm',
+  'rifle_reload','smg_reload','shotgun_reload','pistol_reload','plasma_reload','flak_reload']
+const V = '?v=' + Date.now()
+let ctx, noiseBuf
+const bufs = {}   // url -> AudioBuffer promise
+
+function ac() {
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const n = ctx.sampleRate * 0.5, b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0)
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1
+    noiseBuf = b
+  }
+  if (ctx.state !== 'running') ctx.resume()
+  return ctx
+}
+function load(url) {
+  if (!bufs[url]) bufs[url] = fetch(url + V).then(r => { if (!r.ok) throw 0; return r.arrayBuffer() }).then(ab => ac().decodeAudioData(ab))
+  return bufs[url]
+}
+// replicates WeaponAudio._fireLayers: clip body + highpass crack + sub sine sweep
+function playMix(buf, gun, t0) {
+  const c = ac(), t = t0 ?? c.currentTime
+  const src = c.createBufferSource(); src.buffer = buf
+  src.playbackRate.value = 1 + (Math.random() - .5) * .12
+  const bg = c.createGain(); bg.gain.value = 1.0
+  src.connect(bg); bg.connect(c.destination); src.start(t)
+  const crack = c.createBufferSource(); crack.buffer = noiseBuf
+  const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1200
+  const cg = c.createGain()
+  cg.gain.setValueAtTime(.45, t); cg.gain.exponentialRampToValueAtTime(.001, t + .015)
+  crack.connect(hp); hp.connect(cg); cg.connect(c.destination)
+  crack.start(t, Math.random() * .3); crack.stop(t + .03)
+  const s = SUB[gun] || SUB.rifle
+  const sub = c.createOscillator(); sub.type = 'sine'
+  sub.frequency.setValueAtTime(s.f0, t); sub.frequency.exponentialRampToValueAtTime(s.f1, t + .08)
+  const sg = c.createGain()
+  sg.gain.setValueAtTime(.55 * s.g, t); sg.gain.exponentialRampToValueAtTime(.001, t + s.d)
+  sub.connect(sg); sg.connect(c.destination); sub.start(t); sub.stop(t + s.d + .04)
+}
+function playClip(buf, t0) {
+  const c = ac(), t = t0 ?? c.currentTime
+  const src = c.createBufferSource(); src.buffer = buf
+  src.connect(c.destination); src.start(t)
+}
+async function trigger(btn, url, gun) {
+  const mode = document.querySelector('input[name=mode]:checked').value
+  btn.classList.add('playing'); setTimeout(() => btn.classList.remove('playing'), 600)
+  try {
+    const buf = await load(url)
+    const c = ac()
+    if (mode === 'clip' || !gun) playClip(buf)
+    else if (mode === 'mix') playMix(buf, gun)
+    else for (let i = 0; i < 5; i++) playMix(buf, gun, c.currentTime + i * 0.12)
+  } catch (e) { btn.textContent += ' ✗'; btn.disabled = true }
+}
+const gunsEl = document.getElementById('guns')
+for (const gun of GUNS) {
+  const div = document.createElement('div'); div.className = 'gun'
+  div.innerHTML = '<h2>' + gun + '</h2>'
+  const row = document.createElement('div'); row.className = 'row'
+  const cur = document.createElement('button')
+  cur.textContent = 'CURRENT'; cur.className = 'current'
+  cur.onclick = () => trigger(cur, '/assets/sfx/' + gun + '_fire.mp3', gun)
+  row.appendChild(cur)
+  for (const L of LETTERS) {
+    const b = document.createElement('button'); b.textContent = L
+    b.onclick = () => trigger(b, '/assets/sfx/candidates/' + gun + '_' + L + '.mp3', gun)
+    row.appendChild(b)
+  }
+  div.appendChild(row); gunsEl.appendChild(div)
+}
+const evEl = document.getElementById('events')
+for (const name of EVENTS) {
+  const b = document.createElement('button'); b.textContent = name.replace(/_/g, ' ')
+  b.onclick = () => trigger(b, '/assets/sfx/' + name + '.mp3', null)
+  evEl.appendChild(b)
+}
+</script>
+</body>
+</html>

@@ -72,7 +72,11 @@ export const fire = (entity) => {
 		// seed from pre-shot ammo, heat sampled before this shot's own bump
 		const seed = shotSeed(entity.nid || 0, index, state.magazineAmmo)
 		const heat = state.heat || 0
-		state.heat = Math.min(1, heat + (config.heatPerShot || 0))
+		// ADS (entity.aimFactor 0..1, deterministic from applyCommand) reduces heat
+		// accumulation per the weapon's heatMult, so aimed sustained fire blooms less.
+		const af = Math.min(1, Math.max(0, entity.aimFactor || 0))
+		const heatMul = (config.ads && config.ads.heatMult != null) ? (1 - (1 - config.ads.heatMult) * af) : 1
+		state.heat = Math.min(1, heat + (config.heatPerShot || 0) * heatMul)
 
 		// Consume 1 ammo
 		state.magazineAmmo -= 1
@@ -96,6 +100,7 @@ export const fire = (entity) => {
 		ray.config = config // attach scriptable object config dynamically
 		ray.seed = seed
 		ray.heat = heat
+		ray.aimFactor = af // ADS ramp — threaded into shotPattern (spread) + projectile spawn
 		return ray
 	} else {
 		console.log("WEAPON_FIRE_FAIL: onCooldown:", state.onCooldown, "magazineAmmo:", state.magazineAmmo)

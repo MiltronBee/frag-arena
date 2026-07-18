@@ -45,6 +45,11 @@ class PlayerCharacter {
 		this.slowTimer = 0
 		this.slowFactor = 0
 
+		// ADS aim ramp (0..1). NOT networked — both client (prediction) and server
+		// (authority) derive it deterministically from command.aimInput in applyCommand,
+		// so it reconciles exactly (like equipTimer). Drives ADS accuracy in weapon.fire().
+		this.aimFactor = 0
+
 		// Phase 2 swap commitment: seconds left before the just-equipped weapon can
 		// fire. Predicted + server-computed from the same switch event (not networked).
 		this.equipTimer = 0

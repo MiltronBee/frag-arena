@@ -37,15 +37,25 @@ const MANIFEST = {
   // cinematic gunshot. WebAudio layers a synth sub-thump + crack under these
   // (see WeaponAudio.fire), so the AI clip supplies the mid "body + mechanical".
   rifle_fire:    { text: 'heavy assault rifle single gunshot, huge punchy mechanical slap, sharp crisp transient crack, aggressive, dry, close up, arcade shooter', duration: 0.5, influence: 0.8 },
-  smg_fire:      { text: 'submachine gun single shot, tight snappy metallic crack, punchy rapid fire, aggressive, dry, close up', duration: 0.5, influence: 0.75 },
+  smg_fire:      { text: 'compact submachine gun single gunshot, sharp snappy metallic crack, punchy mechanical slap, aggressive, dry, close up, arcade shooter', duration: 0.5, influence: 0.8 },
   shotgun_fire:  { text: 'massive combat shotgun blast, booming explosive bass thump, heavy mechanical crunch, loud, dry, arcade shooter', duration: 0.8, influence: 0.85 },
   pistol_fire:   { text: 'heavy handgun single gunshot, loud sharp metallic crack, punchy slide snap, aggressive, dry, close up', duration: 0.5, influence: 0.8 },
+  plasma_fire:   { text: 'sci-fi plasma rifle single shot, hot energy bolt zap, punchy electric discharge crack, aggressive, dry, close up, arcade shooter', duration: 0.5, influence: 0.8 },
+  flak_fire:     { text: 'massive flak cannon single blast, explosive shrapnel burst, deep booming concussion, heavy mechanical clank, loud, dry, arcade shooter', duration: 0.8, influence: 0.85 },
 
   // ---- RELOAD (one full reload per weapon; duration ≈ weaponsConfig reloadTime) ----
   rifle_reload:  { text: 'assault rifle reloading, magazine out, fresh magazine in, charging handle racked', duration: 1.5, influence: 0.4 },
   smg_reload:    { text: 'submachine gun reloading, magazine swap and bolt', duration: 1.2, influence: 0.4 },
   shotgun_reload:{ text: 'pump shotgun reloading, shells loaded into the tube and pump racked', duration: 2.2, influence: 0.4 },
   pistol_reload: { text: 'pistol reloading, magazine drop, fresh magazine, slide racked', duration: 1.0, influence: 0.4 },
+  plasma_reload: { text: 'sci-fi energy weapon reloading, spent power cell ejected, fresh energy cell inserted, electric charge whine powering up', duration: 1.6, influence: 0.5 },
+  flak_reload:   { text: 'heavy cannon reloading, large metal shells loaded into breech, heavy bolt slammed shut', duration: 2.4, influence: 0.4 },
+
+  // ---- BIG EVENTS (grenade + player lifecycle; per SFX audit: clip-worthy) ----
+  grenade_explosion: { text: 'powerful grenade explosion, deep concussive boom, sharp blast crack with falling debris, punchy, dry, arcade shooter', duration: 1.2, influence: 0.8 },
+  weapon_swap:   { text: 'fast weapon swap handling foley, snappy gun slide rack and magazine seat, crisp mechanical clicks, aggressive, dry, close up, arcade shooter', duration: 0.5, influence: 0.5 },
+  death:         { text: 'video game player death sound, deep heavy impact thud with dramatic descending pitch fall, dark arcade game over sting, punchy, dry, close up', duration: 1.2, influence: 0.8 },
+  respawn:       { text: 'video game player respawn sound, bright rising energy whoosh, synthetic arcade materialization, quick ascending power-up sweep, punchy, dry, close up', duration: 1.0, influence: 0.75 },
 
   // ---- IMPACTS + FEEDBACK ----
   impact_flesh:  { text: 'heavy wet meat impact, bone crunching snap, squish, brutal gore hit, loud, close up', duration: 0.5, influence: 0.8 },

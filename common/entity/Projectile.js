@@ -57,6 +57,10 @@ class Projectile {
 		this.damage = 0
 		this.ownerNid = 0
 		this.lifeTime = 3.0
+		// Server-only collision radius for the projectile-vs-player hit test. Defaults
+		// to the historic hardcoded 0.75m; the spawn site may scale it down for aimed
+		// Plasma (ads.projSizeMult) so an ADS bolt is a thin, precise dart.
+		this.radius = 0.75
 		// Phase 2 (server-only): Flak shrapnel bounces off obstacles this many more
 		// times before dying; Plasma bolts carry a slow debuff to apply on a player hit.
 		this.bounceRemaining = 0

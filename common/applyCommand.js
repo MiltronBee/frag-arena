@@ -209,6 +209,23 @@ export default (entity, command) => {
 		}
 	}
 
+	// ADS aim ramp (deterministic — mirrors the plasma slow debuff above). aimFactor
+	// eases 0..1 toward the held aim state over the weapon's in/out time, and drives
+	// the weapon's ADS accuracy in weapon.fire()/firePattern. Weapons without an ads
+	// config clamp to 0. Runs identically on client (prediction) + server (authority),
+	// and re-derives on reconciliation replay, so hit-reg + tracers stay consistent.
+	{
+		const acfg = weapons[entity.currentWeaponIndex || 0]
+		const ads = acfg && acfg.ads
+		if (ads && command.aimInput) {
+			const step = ads.inTime > 0 ? delta / ads.inTime : 1
+			entity.aimFactor = Math.min(1, (entity.aimFactor || 0) + step)
+		} else {
+			const step = (ads && ads.outTime > 0) ? delta / ads.outTime : 1
+			entity.aimFactor = Math.max(0, (entity.aimFactor || 0) - step)
+		}
+	}
+
 	// advances the weapon-related timer(s) — use the clamped delta, not the raw
 	// client-supplied command.delta, or a spoofed huge delta drains cooldownTimer
 	// instantly (unlimited rate of fire)

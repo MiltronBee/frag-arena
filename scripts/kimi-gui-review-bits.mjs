@@ -111,7 +111,12 @@ async function ask(bit, n) {
       { role: 'user', content: `FOCUS (${n}/20): ${bit.t}\n\n${bit.q}\n\nHere is ONLY the relevant code:\n${bundle}` },
     ],
     temperature: 0.5,
-    max_tokens: 2600,
+    // kimi-k3 is a reasoning model: it spends completion tokens on a hidden
+    // `reasoning` field FIRST. At a full bit's size that reasoning alone can eat
+    // ~2k tokens, so a low cap truncates (finish=length) or returns content:null
+    // entirely -> the "empty body" retry loops forever. 8000 leaves room for
+    // reasoning (~1.3-1.9k) AND the full structured answer.
+    max_tokens: 8000,
   }
   const MAX = 40
   for (let attempt = 1; attempt <= MAX; attempt++) {

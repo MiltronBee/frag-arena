@@ -55,17 +55,17 @@
 const WEAPON_FX = {
   // 0 — Rifle: disciplined, sharp single report + crisp gold tracer.
   0: {
-    tracer: { color: [1.0, 0.86, 0.46], core: [1.0, 1.0, 0.85], width: 0.016, life: 42, chance: 1.0 },
-    muzzle: { color: [1.0, 0.80, 0.42], scale: 0.24, glowScale: 0.40, life: 40 },
+    tracer: { color: [1.0, 0.80, 0.34], core: [1.0, 0.96, 0.72], width: 0.018, life: 50, chance: 1.0 },
+    muzzle: { color: [1.0, 0.80, 0.42], scale: 0.24, glowScale: 0.40, life: 42 },
     impact: { scale: 0.22 },
     recoil: { back: 0.040, rise: 0.020, shake: 0.55 },
     // disciplined punch: small climb, subtle right drift, quick 220ms settle.
     camKick: { pitch: 0.45, yawDrift: 0.06, yawJitter: 0.05, climb: 0.15, climbMax: 1.8,
-               heatBias: 0.4, tension: 950, damping: 62 },
+               heatBias: 0.4, tension: 950, damping: 62, roll: 0.10 },
     vmKick: { back: 0.5, up: 0.06, pitch: 0.35, yaw: 0.06, tension: 280, damping: 23,
               roll: 0.010, variance: 0.2 },
     eject: { x: 0.14, y: -0.10, z: 0.55, delay: 0, size: 0.020, color: [0.85, 0.62, 0.22] },
-    light: { intensity: 1.7, range: 9, life: 70, decayPow: 2, jitter: 0.15 },
+    light: { intensity: 2.1, range: 9, life: 70, decayPow: 2, jitter: 0.15 },
     smoke: { chance: 0.45, scale: 0.15, life: 650, gray: 0.5 },
     report: { kind: 'ballistic', level: 0.85, bodyFreq: 220, bodyDrop: 62, noiseHz: 2200, noiseQ: 0.9, decay: 0.14, mech: 0.5 },
     projectile: null,
@@ -74,14 +74,14 @@ const WEAPON_FX = {
   // (chance<1) so full-auto cadence stays readable instead of a solid rope.
   // Minigun-lesson feel: tiny fast buzzy kicks, brass FOUNTAIN.
   1: {
-    tracer: { color: [1.0, 0.82, 0.44], core: [1.0, 0.98, 0.8], width: 0.012, life: 34, chance: 0.5 },
-    muzzle: { color: [1.0, 0.82, 0.45], scale: 0.17, glowScale: 0.26, life: 30 },
+    tracer: { color: [1.0, 0.66, 0.28], core: [1.0, 0.88, 0.60], width: 0.010, life: 30, chance: 0.5 },
+    muzzle: { color: [1.0, 0.82, 0.45], scale: 0.17, glowScale: 0.26, life: 26 },
     impact: { scale: 0.18 },
     recoil: { back: 0.024, rise: 0.012, shake: 0.34 },
     // rattly climb: lower per-shot pitch but higher heat bias + left drift; fast 160ms
     // recovery keeps the picture honest between the SMG's tight bursts.
     camKick: { pitch: 0.22, yawDrift: -0.04, yawJitter: 0.18, climb: 0.25, climbMax: 2.2,
-               heatBias: 0.6, tension: 1500, damping: 80 },
+               heatBias: 0.6, tension: 1500, damping: 80, roll: 0.16 },
     vmKick: { back: 0.22, up: 0.03, pitch: 0.16, yaw: 0.10, tension: 500, damping: 31,
               roll: 0.018, variance: 0.3 },
     eject: { x: 0.13, y: -0.11, z: 0.45, delay: 0, size: 0.016, color: [0.85, 0.62, 0.22] },
@@ -95,16 +95,16 @@ const WEAPON_FX = {
   // 2 — Shotgun (flak lesson): violent muzzle volume, HEAVY slow-recover shove,
   // then a pump rack (second kick + clack + shell out) ~350ms later.
   2: {
-    tracer: { color: [1.0, 0.72, 0.36], core: [1.0, 0.92, 0.7], width: 0.014, life: 38, chance: 1.0, pelletTracers: 4 },
-    muzzle: { color: [1.0, 0.72, 0.36], scale: 0.42, glowScale: 0.66, life: 48 },
-    impact: { scale: 0.24 },
+    tracer: { color: [1.0, 0.72, 0.36], core: [1.0, 0.92, 0.7], width: 0.010, life: 34, chance: 1.0, pelletTracers: 6 },
+    muzzle: { color: [1.0, 0.72, 0.36], scale: 0.42, glowScale: 0.66, life: 55 },
+    impact: { scale: 0.30 },
     recoil: { back: 0.090, rise: 0.048, shake: 1.15 },
     // heavy single shove: big one-shot pitch, no heat/climb term (single-shot cadence),
     // a wide random yaw jar, slow 380ms recovery + a small pump dip at 350ms so the
     // whole body agrees with the rack. fov = a ~-5% world-camera concussion punch
     // (zoom IN on blast, sells forward momentum): shotgun-ONLY, world camera only.
-    camKick: { pitch: 1.20, yawDrift: 0, yawJitter: 0.20, climb: 0, climbMax: 1.2,
-               heatBias: 0, tension: 380, damping: 39,
+    camKick: { pitch: 1.20, yawDrift: 0, yawJitter: 0.20, climb: 0, climbMax: 0,
+               heatBias: 0, tension: 380, damping: 39, roll: 0.30,
                pumpDip: { delay: 350, pitch: 0.15 },
                fov: { amount: -0.05, inMs: 50, outMs: 180 } },
     vmKick: { back: 1.0, up: 0.16, pitch: 0.65, yaw: 0.05, tension: 95, damping: 23,
@@ -118,19 +118,20 @@ const WEAPON_FX = {
   // 3 — Pistol (Enforcer lesson): hard single crack, snappy high muzzle flick,
   // laser-accurate. One clean hole per trigger pull.
   3: {
-    tracer: { color: [1.0, 0.86, 0.5], core: [1.0, 1.0, 0.88], width: 0.013, life: 40, chance: 1.0 },
-    muzzle: { color: [1.0, 0.82, 0.45], scale: 0.20, glowScale: 0.32, life: 36 },
+    tracer: { color: [1.0, 0.96, 0.82], core: [1.0, 1.0, 0.96], width: 0.012, life: 44, chance: 1.0 },
+    muzzle: { color: [1.0, 0.82, 0.45], scale: 0.20, glowScale: 0.32, life: 34 },
     impact: { scale: 0.20 },
     recoil: { back: 0.050, rise: 0.030, shake: 0.62 },
-    // snappy flick: every shot is a "first shot" (no climb/heat term), tight jitter,
-    // and a 120ms recovery that completes before the next click — the crosshair
-    // picture is honest again before you can re-fire (first-shot feel).
-    camKick: { pitch: 0, yawDrift: 0, yawJitter: 0, climb: 0, climbMax: 0,
-               heatBias: 0, tension: 1400, damping: 75 },
+    // snappy flick: one sharp upward crack per shot — every shot is a "first shot"
+    // (no climb/heat term), tight yaw jitter, and a ~110ms critically-damped (ζ≈1.0)
+    // recovery that completes before the next click — the crosshair picture is honest
+    // again before you can re-fire (first-shot feel). roll:0 keeps the Enforcer clean.
+    camKick: { pitch: 0.55, yawDrift: 0, yawJitter: 0.07, climb: 0, climbMax: 0,
+               heatBias: 0, tension: 1400, damping: 75, roll: 0 },
     vmKick: { back: 0.45, up: 0.11, pitch: 0.6, yaw: 0.04, tension: 450, damping: 30,
               roll: 0.008, variance: 0.16 },
     eject: { x: 0.20, y: -0.02, z: 0.60, delay: 0, size: 0.018, color: [0.85, 0.62, 0.22] },
-    light: { intensity: 1.9, range: 9, life: 80, decayPow: 2, jitter: 0.15 },
+    light: { intensity: 1.5, range: 8, life: 70, decayPow: 2, jitter: 0.15 },
     // the UT99 enforcer signature: one clean hole, one lazy smoke wisp
     smoke: { chance: 1.0, scale: 0.17, life: 950, gray: 0.5 },
     report: { kind: 'ballistic', level: 0.9, bodyFreq: 200, bodyDrop: 70, noiseHz: 2000, noiseQ: 1.1, decay: 0.12, mech: 0.6 },

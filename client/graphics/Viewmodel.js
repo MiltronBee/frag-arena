@@ -41,6 +41,15 @@ const S = {
   FIRING: 'firing',
   RELOADING: 'reloading',
   DISPOSED: 'disposed',
+  // ADS (aim-down-sights) sub-states. AIMING_IN/OUT are the one-shot transitions,
+  // AIMED is the settled sight-picture (looping breathing/walk aiming), ADS_FIRING
+  // is a one-shot fire_aiming that returns to AIMED (if still held) or exits. They
+  // are gen-guarded exactly like the hip states, so a stale aim-clip end callback
+  // can never drive the rig after a reload/swap/death supersedes it.
+  AIMING_IN: 'aiming_in',
+  AIMED: 'aimed',
+  AIMING_OUT: 'aiming_out',
+  ADS_FIRING: 'ads_firing',
 }
 
 // ---------------------------------------------------------------------------
@@ -102,6 +111,15 @@ export default class Viewmodel {
     this._reloading = false // kept in sync with _state === RELOADING (read by tests/HUD)
     this._drawn = false     // draw clip plays once per equipped instance
 
+    // ADS state. hasAds is resolved in _load() (weapon opted in AND its GLB carries
+    // all six baked aim clips). _aimWanted mirrors the held aim input; _aimLoop is
+    // which aimed locomotion loop ('breathe'|'walk') is currently running; _lastMoving
+    // is the last movement flag seen in update() (used when settling into AIMED).
+    this.hasAds = false
+    this._aimWanted = false
+    this._aimLoop = null
+    this._lastMoving = false
+
     // Spring-based procedural recoil state
     this.recoilPos = new BABYLON.Vector3(0, 0, 0)
     this.recoilPosVel = new BABYLON.Vector3(0, 0, 0)
@@ -113,6 +131,15 @@ export default class Viewmodel {
 
     this._basePos = new BABYLON.Vector3(spec.position.x, spec.position.y, spec.position.z)
     this._baseRotX = (spec.rotation && spec.rotation.x) || 0
+    // optional ADS holder framing (centered sight alignment). Falls back to the hip
+    // mount, so weapons with a neutral mount / no adsMount are unchanged. The holder
+    // blends base -> ads by the aim amount passed into update() (presentation only).
+    const _am = spec.adsMount || {}
+    const _ap = _am.position || spec.position
+    const _ar = _am.rotation || spec.rotation || {}
+    this._adsPos = new BABYLON.Vector3(_ap.x || 0, _ap.y || 0, _ap.z || 0)
+    this._adsRot = { x: _ar.x || 0, y: _ar.y || 0, z: _ar.z || 0 }
+    this._hasAimMount = !!spec.adsMount
     this._wantActive = false // shown only when this is the equipped weapon
     this._disposed = false
     this._cleanupDone = false
@@ -240,6 +267,26 @@ export default class Viewmodel {
     this.reloadAnim = this.groups[anims.reload]
     this.drawAnim = this.groups[anims.draw]
 
+    // ADS clips (optional). Present only on ads-enabled weapons whose GLB carries the
+    // full baked aim group (scripts/retro-blend-actions.json "aim"). If ANY is missing
+    // we treat the weapon as non-ADS, so setAim() is a hard no-op — never half-aimed.
+    this.aimStartAnim = this.groups[anims.aimStart]
+    this.aimPoseAnim = this.groups[anims.aimPose]
+    this.aimEndAnim = this.groups[anims.aimEnd]
+    this.fireAimingAnim = this.groups[anims.fireAiming]
+    this.breathingAimingAnim = this.groups[anims.breathingAiming]
+    this.walkAimingAnim = this.groups[anims.walkAiming]
+    this.hasAds = !!(this.spec.ads && this.aimStartAnim && this.aimPoseAnim &&
+      this.aimEndAnim && this.fireAimingAnim && this.breathingAimingAnim && this.walkAimingAnim)
+    // blend the aimed loops in from the transition's end pose so the handoff
+    // aim_start -> breathing/walk_aiming doesn't snap the arms.
+    ;[this.breathingAimingAnim, this.walkAimingAnim].forEach((g) => {
+      if (g) g.targetedAnimations.forEach((ta) => {
+        ta.animation.enableBlending = true
+        ta.animation.blendingSpeed = 0.1
+      })
+    })
+
     this.ready = true
     this._applyActive() // enter DRAWING/IDLE or HIDDEN depending on equip state
   }
@@ -323,7 +370,94 @@ export default class Viewmodel {
   _enterHidden() {
     ++this._gen // invalidate any pending end callbacks
     this._setState(S.HIDDEN)
+    // Drop aim on unequip/death: a freshly equipped weapon must NOT auto-remain
+    // aimed (brief), so we clear the held-aim intent — the player re-presses to aim
+    // the new gun. The Simulator likewise releases its aim on weapon switch.
+    this._aimWanted = false
+    this._aimLoop = null
     Object.values(this.groups).forEach((g) => this._rewindStop(g))
+  }
+
+  // ---- ADS sub-FSM ----------------------------------------------------------
+  // True while the rig is in any aimed state (transition or settled). Read by the
+  // Simulator/HUD/tests; the camera zoom + sensitivity are driven separately in the
+  // Simulator off the raw input, so aim ray safety never depends on this.
+  get isAiming() {
+    return this._state === S.AIMING_IN || this._state === S.AIMED ||
+           this._state === S.ADS_FIRING
+  }
+  get aimState() { return this._state }
+
+  // Held-aim input edge from the Simulator (RMB / touch). Only meaningful once the
+  // rig is the equipped, ready, ADS-capable weapon; otherwise a hard no-op.
+  setAim(down) {
+    if (this._disposed || !this.ready || !this._wantActive || !this.hasAds) return
+    down = !!down
+    if (down === this._aimWanted) return
+    this._aimWanted = down
+    if (down) {
+      // engage only from a settled hip idle, or reverse a live exit back in.
+      // From DRAWING/FIRING/RELOADING/ADS_FIRING we defer: those clips' end
+      // callbacks re-check _aimWanted and settle into aim.
+      if (this._state === S.IDLE || this._state === S.AIMING_OUT) this._enterAimIn()
+    } else {
+      if (this._state === S.AIMING_IN || this._state === S.AIMED) this._enterAimOut()
+      // from ADS_FIRING the fire_aiming end callback settles via _aimWanted
+    }
+  }
+
+  _stopAimLoops() {
+    if (this.breathingAimingAnim) this.breathingAimingAnim.stop()
+    if (this.walkAimingAnim) this.walkAimingAnim.stop()
+    this._aimLoop = null
+  }
+
+  _enterAimIn() {
+    const gen = ++this._gen
+    this._setState(S.AIMING_IN)
+    if (this.idleAnim) this.idleAnim.stop()
+    this._stopAimLoops()
+    this.aimEndAnim.stop()
+    this.aimStartAnim.stop()
+    this._onEndOnce(this.aimStartAnim, gen, () => {
+      if (!this._wantActive) return
+      if (this._aimWanted) this._enterAimed()
+      else this._enterAimOut() // released mid-transition -> clean reversible exit
+    })
+    this.aimStartAnim.start(false, 1.0)
+  }
+
+  _enterAimed() {
+    this._setState(S.AIMED)
+    this.aimStartAnim.stop()
+    this._aimLoop = null
+    this._updateAimedLocomotion(this._lastMoving) // start the correct aimed loop now
+  }
+
+  _enterAimOut() {
+    const gen = ++this._gen
+    this._setState(S.AIMING_OUT)
+    this._stopAimLoops()
+    this.aimStartAnim.stop()
+    this.aimEndAnim.stop()
+    this._onEndOnce(this.aimEndAnim, gen, () => {
+      if (!this._wantActive) return
+      if (this._aimWanted) this._enterAimIn() // re-pressed during exit
+      else { this._setState(S.IDLE); this._startIdleLoop() }
+    })
+    this.aimEndAnim.start(false, 1.0)
+  }
+
+  // pick breathing (stationary) vs walk (moving) aimed loop; only swaps on change.
+  _updateAimedLocomotion(moving) {
+    if (this._state !== S.AIMED) return
+    const want = moving ? 'walk' : 'breathe'
+    if (this._aimLoop === want) return
+    this._aimLoop = want
+    const on = moving ? this.walkAimingAnim : this.breathingAimingAnim
+    const off = moving ? this.breathingAimingAnim : this.walkAimingAnim
+    if (off) off.stop()
+    if (on) { on.stop(); on.start(true, 1.0) }
   }
 
   get isReloading() { return this._state === S.RELOADING }
@@ -359,7 +493,10 @@ export default class Viewmodel {
       this._rewindStop(this.idleAnim)
     }
     this._setState(S.IDLE)
-    if (this._wantActive) this._startIdleLoop()
+    if (this._wantActive) {
+      if (this._aimWanted && this.hasAds) this._enterAimIn()
+      else this._startIdleLoop()
+    }
   }
 
   // play the reload clip once (arms + gun bones together: mag out, charge, etc.),
@@ -372,8 +509,19 @@ export default class Viewmodel {
     this._setState(S.RELOADING)
     if (this.idleAnim) this.idleAnim.stop()
     if (this.fireAnim) this.fireAnim.stop() // fires the stale fire-end cb (gen-guarded no-op)
+    // reload immediately exits ADS (brief): stop the aim transitions + loops so the
+    // hip reload plays clean. The Simulator suppresses the zoom while reloading, so
+    // the camera and the arms agree.
+    if (this.hasAds) {
+      if (this.aimStartAnim) this.aimStartAnim.stop()
+      if (this.aimEndAnim) this.aimEndAnim.stop()
+      if (this.fireAimingAnim) this.fireAimingAnim.stop()
+      this._stopAimLoops()
+    }
     this.reloadAnim.stop()
     this._onEndOnce(this.reloadAnim, gen, () => {
+      // re-aim after reload only if the trigger for aim is still held
+      if (this._aimWanted && this.hasAds && this._wantActive) { this._enterAimIn(); return }
       this._setState(S.IDLE)
       if (this._wantActive) this._startIdleLoop()
     })
@@ -395,6 +543,11 @@ export default class Viewmodel {
   kick(profile) {
     if (this._disposed || !this.ready || !this._wantActive) return
     if (this._state === S.RELOADING || this._state === S.DRAWING) return
+
+    // aimed shots play fire_aiming and hold the sight picture; the recoil is also
+    // damped below so it doesn't fight the authored aimed-fire motion.
+    const aimed = this.hasAds && (this._state === S.AIMED ||
+      this._state === S.ADS_FIRING || this._state === S.AIMING_IN)
 
     // Inject procedural spring recoil velocities (backward kick in Z, slight
     // pitch up in X, slight horizontal jar)
@@ -432,6 +585,25 @@ export default class Viewmodel {
       this.recoilRotVel.y += (Math.random() - 0.5) * 0.08 * kickForce
     }
 
+    if (aimed) { this.recoilPosVel.scaleInPlace(0.6); this.recoilRotVel.scaleInPlace(0.6) }
+
+    // aimed fire: play fire_aiming once, then return to the sight picture (if still
+    // held) or exit ADS. The recoil above already fired, so the shot is never dropped.
+    if (aimed && this.fireAimingAnim) {
+      const gen = ++this._gen
+      this._setState(S.ADS_FIRING)
+      this._stopAimLoops()
+      if (this.idleAnim) this.idleAnim.stop()
+      this.fireAimingAnim.stop()
+      this._onEndOnce(this.fireAimingAnim, gen, () => {
+        if (!this._wantActive) return
+        if (this._aimWanted) this._enterAimed()
+        else this._enterAimOut()
+      })
+      this.fireAimingAnim.start(false, 1.0)
+      return
+    }
+
     if (!this.fireAnim) return
 
     const gen = ++this._gen
@@ -450,13 +622,20 @@ export default class Viewmodel {
     this.fireAnim.start(false, 1.0)
   }
 
-  update(delta, moving) {
+  update(delta, moving, adsT = 0) {
     if (this._disposed || !this.ready || !this.holder) return
 
     this._t += delta
+    this._lastMoving = moving
+    // keep the aimed locomotion loop in sync with movement while settled-aimed
+    if (this._state === S.AIMED) this._updateAimedLocomotion(moving)
 
-    // subtle idle/walk bob layered on top of any skeletal animation
-    const amp = moving ? 0.02 : 0.006
+    // subtle idle/walk bob layered on top of any skeletal animation. While aiming,
+    // damp it hard so it doesn't fight the authored breathing_aiming / walk_aiming.
+    const aiming = this.hasAds && (this._state === S.AIMING_IN || this._state === S.AIMED ||
+      this._state === S.ADS_FIRING || this._state === S.AIMING_OUT)
+    const bobScale = aiming ? 0.2 : 1
+    const amp = (moving ? 0.02 : 0.006) * bobScale
     const freq = moving ? 9 : 2.5
     const bobY = Math.sin(this._t * freq) * amp
     const bobX = Math.cos(this._t * freq * 0.5) * amp * 0.6
@@ -474,17 +653,21 @@ export default class Viewmodel {
     this.recoilRotVel.addInPlace(rotAcc.scale(dt))
     this.recoilRot.addInPlace(this.recoilRotVel.scale(dt))
 
-    // Apply bob + spring recoil to the ViewmodelRoot (holder)
-    this.holder.position.set(
-      this._basePos.x + bobX + this.recoilPos.x,
-      this._basePos.y + bobY + this.recoilPos.y,
-      this._basePos.z + this.recoilPos.z
-    )
-    this.holder.rotation.set(
-      this._baseRotX + this.recoilRot.x,
-      ((this.spec.rotation && this.spec.rotation.y) || 0) + this.recoilRot.y,
-      ((this.spec.rotation && this.spec.rotation.z) || 0) + this.recoilRot.z
-    )
+    // Blend the holder from the hip mount to the ADS (centered) mount by the aim
+    // amount, THEN add bob + spring recoil. For weapons without an adsMount this is a
+    // no-op (a=0). This is the presentation-only sight-alignment offset the brief
+    // allows — it never touches the camera orientation or the aim ray.
+    const a = this._hasAimMount ? Math.max(0, Math.min(1, adsT)) : 0
+    const baseRotY = (this.spec.rotation && this.spec.rotation.y) || 0
+    const baseRotZ = (this.spec.rotation && this.spec.rotation.z) || 0
+    const mx = this._basePos.x + (this._adsPos.x - this._basePos.x) * a
+    const my = this._basePos.y + (this._adsPos.y - this._basePos.y) * a
+    const mz = this._basePos.z + (this._adsPos.z - this._basePos.z) * a
+    const rX = this._baseRotX + (this._adsRot.x - this._baseRotX) * a
+    const rY = baseRotY + (this._adsRot.y - baseRotY) * a
+    const rZ = baseRotZ + (this._adsRot.z - baseRotZ) * a
+    this.holder.position.set(mx + bobX + this.recoilPos.x, my + bobY + this.recoilPos.y, mz + this.recoilPos.z)
+    this.holder.rotation.set(rX + this.recoilRot.x, rY + this.recoilRot.y, rZ + this.recoilRot.z)
   }
 
   _disposeLoadedResources() {

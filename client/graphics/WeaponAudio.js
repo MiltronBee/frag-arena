@@ -26,11 +26,15 @@ import { distanceGain } from './firingFx'
 const SFX_NAMES = [
   'rifle_fire', 'smg_fire', 'shotgun_fire', 'pistol_fire',
   'rifle_reload', 'smg_reload', 'shotgun_reload', 'pistol_reload',
+  'plasma_fire', 'flak_fire', 'plasma_reload', 'flak_reload',
+  'grenade_explosion', 'weapon_swap', 'death', 'respawn',
   'impact_flesh', 'pain_grunt', 'kill_confirm',
 ]
-// weapon index -> clip prefix (0=rifle,1=smg,2=shotgun,3=pistol). Any other index
-// (e.g. plasma) has no prefix -> procedural path.
-const WEAPON_PREFIX = ['rifle', 'smg', 'shotgun', 'pistol']
+// weapon index -> clip prefix (0=rifle,1=smg,2=shotgun,3=pistol,4=plasma,5=flak).
+// Any other index has no prefix -> procedural path. Plasma/Flak reloads were
+// previously SILENT (no prefix) and their fire was procedural-only; adding them
+// here routes fire()/reload() to the new AI clips.
+const WEAPON_PREFIX = ['rifle', 'smg', 'shotgun', 'pistol', 'plasma', 'flak']
 
 // Per-weapon synthesized SUB-THUMP (FX consult): a sine sweep layered under the
 // AI clip supplies the physical low-end punch that mp3 generation can't. f0->f1
@@ -40,6 +44,8 @@ const SUB_THUMP = {
   smg:     { f0: 85,  f1: 45, gain: 0.7, dur: 0.09 }, // lighter (high rate of fire)
   shotgun: { f0: 120, f1: 30, gain: 1.4, dur: 0.12 }, // deeper, longer chest thump
   pistol:  { f0: 110, f1: 42, gain: 1.0, dur: 0.09 },
+  plasma:  { f0: 90,  f1: 50, gain: 0.6, dur: 0.08 }, // energy zap, light punch
+  flak:    { f0: 125, f1: 28, gain: 1.5, dur: 0.13 }, // heaviest gun, deep chest thump
 }
 
 // Pure, testable: map a weapon's report preset + distance to bounded synth params.
@@ -68,6 +74,8 @@ export default class WeaponAudio {
     this._noise = null
     this._volume = this._readVolume()
     this._lastShotAt = -1
+    this._lastSwapAt = -1        // throttle weaponSwap() so scroll-cycling can't machine-gun it
+    this._lastUI = {}           // per-cue last-play time (s) for the procedural UI layer's throttle
     this._buf = {}              // name -> decoded AudioBuffer (absent = not loaded)
     this._samplesLoading = false
     this._samplesLoaded = false
@@ -297,7 +305,9 @@ export default class WeaponAudio {
     body.buffer = this._buf[prefix + '_fire']
     body.playbackRate.value = rate
     const bodyGain = ctx.createGain()
-    bodyGain.gain.value = Math.min(1.5, 0.9 * g)
+    // clip at full weight — it IS the gunshot (audition 2026-07-17: at 0.9 under a
+    // 0.7 crack the AI clip was masked and shots read as synthetic)
+    bodyGain.gain.value = Math.min(1.5, 1.0 * g)
     const sat = this._saturator()
     body.connect(sat); sat.connect(bodyGain); bodyGain.connect(dest)
     // the panner (if any) tears down with the body — the longest-lived layer.
@@ -311,7 +321,7 @@ export default class WeaponAudio {
     const hp = ctx.createBiquadFilter()
     hp.type = 'highpass'; hp.frequency.value = 1200
     const cg = ctx.createGain()
-    cg.gain.setValueAtTime(0.7 * g, t0)
+    cg.gain.setValueAtTime(0.45 * g, t0) // support, not mask (was 0.7 — buried the clip)
     cg.gain.exponentialRampToValueAtTime(0.001, t0 + 0.015)
     crack.connect(hp); hp.connect(cg); cg.connect(dest)
     this._teardownWhenDone([crack], [crack, hp, cg])
@@ -366,6 +376,26 @@ export default class WeaponAudio {
     const g = opts.pos ? 0.55 : 0.55 * distanceGain(opts.distance || 0)
     if (g <= 0.02) return
     this.playClip('pain_grunt', { gain: g, rate: 0.9 + Math.random() * 0.2, pos: opts.pos })
+  }
+
+  // Local weapon-swap clack (the player changed guns). 2D, sample-only. Throttled so
+  // fast scroll-wheel cycling through the roster doesn't machine-gun the clip.
+  weaponSwap() {
+    if (!this.ctx) return
+    const now = this.ctx.currentTime
+    if (now - this._lastSwapAt < 0.09) return // 90ms guard
+    this._lastSwapAt = now
+    this.playClip('weapon_swap', { gain: 0.7, rate: 1 + (Math.random() - 0.5) * 0.12 })
+  }
+
+  // Local-player death sting (a big first-person event). 2D, sample-only.
+  death() {
+    this.playClip('death', { gain: 0.9 })
+  }
+
+  // Local-player respawn/re-enter cue. 2D, sample-only.
+  respawn() {
+    this.playClip('respawn', { gain: 0.7 })
   }
 
   // `dest` is the destination node (this.comp for 2D, or a PannerNode for positional).
@@ -550,16 +580,52 @@ export default class WeaponAudio {
     this._teardownWhenDone(sources, nodes)
   }
 
-  // Phase 3: frag-grenade detonation — a punchy low boom (descending sine sub) layered
-  // with a filtered noise burst (the crack/debris). Positional when opts.pos is given
-  // (panner owns distance); otherwise 2D with the manual distanceGain. Procedural only,
-  // matching the impact() convention above (no sample dependency).
+  // Phase 3: frag-grenade detonation. When the AI clip is loaded, IT is the body
+  // (a real explosion crack/debris) with a procedural low sine sub-boom kept
+  // underneath for the felt low end the mp3 lacks below ~60Hz. When the clip is
+  // absent, the whole detonation stays procedural (the original noise+sine path).
+  // Positional when opts.pos is given (panner owns distance); otherwise 2D with the
+  // manual distanceGain. Matching the impact() convention.
   explosion(opts = {}) {
     if (!this.ctx) return
     const ctx = this.ctx, t0 = ctx.currentTime
     const positional = !!opts.pos
     const g = positional ? 0.9 : 0.9 * distanceGain(opts.distance || 0)
     if (g <= 0.002) return
+
+    // Sample path: play the AI clip + a procedural sub-boom under it, sharing ONE
+    // panner. The sub sine (dur 0.55) outlives the clip, so tear the panner down
+    // with the sub — the longest-lived source (the _fireLayers panner pattern).
+    if (this._buf.grenade_explosion) {
+      const panner = this._makePanner(opts.pos)
+      const dest = panner || this.comp
+      // clip through its own gain (playClip does this too, but we route to the shared
+      // panner here so both layers pan together and tear down as one graph)
+      const clip = ctx.createBufferSource()
+      clip.buffer = this._buf.grenade_explosion
+      clip.playbackRate.value = 0.94 + Math.random() * 0.12
+      const cg = ctx.createGain()
+      cg.gain.value = Math.max(0, Math.min(1.5, g))
+      clip.connect(cg); cg.connect(dest)
+      this._teardownWhenDone([clip], [clip, cg])
+      clip.start(t0)
+
+      // procedural low sub-boom sine sweep for the felt low end (routed to same dest)
+      const subDur = 0.55
+      const sub = ctx.createOscillator()
+      sub.type = 'sine'
+      sub.frequency.setValueAtTime(160, t0)
+      sub.frequency.exponentialRampToValueAtTime(38, t0 + subDur)
+      const sg = ctx.createGain()
+      sg.gain.setValueAtTime(0.9 * g, t0)
+      sg.gain.exponentialRampToValueAtTime(0.001, t0 + subDur)
+      sub.connect(sg); sg.connect(dest)
+      // the panner (if any) tears down with the sub — the longest-lived layer.
+      this._teardownWhenDone([sub], panner ? [sub, sg, panner] : [sub, sg])
+      sub.start(t0); sub.stop(t0 + subDur + 0.02)
+      return
+    }
+
     const panner = this._makePanner(opts.pos)
     const out = this._voiceOut(g, panner || this.comp)
 
@@ -696,5 +762,145 @@ export default class WeaponAudio {
     osc.connect(g); g.connect(out)
     this._teardownWhenDone([osc], [out, osc, g])
     osc.start(t0); osc.stop(t0 + (kill ? 0.14 : 0.08))
+  }
+
+  // ==== Procedural UI / feedback layer (Kimi K3 SFX spec, bit 1) =============
+  // SYNTHESIZED cues (no clips): high-frequency / latency-critical feedback that
+  // must never wait on buffer decode and never smear when spammed. Each self-
+  // throttles via _uiOk() and is 2D (straight to this.comp -> master limiter).
+
+  // true at most once per `minSec` for `key` — cheap per-cue throttle so held keys,
+  // hover sweeps and scroll cycling can't machine-gun a cue into a fatiguing buzz.
+  _uiOk(key, minSec) {
+    if (!this.ctx) return false
+    const now = this.ctx.currentTime
+    if (now - (this._lastUI[key] == null ? -9 : this._lastUI[key]) < minSec) return false
+    this._lastUI[key] = now
+    return true
+  }
+
+  // one short oscillator blip: `type` wave, freq sweep f0->f1 over dur, exp gain env.
+  // Returns {src, nodes} for the caller to hand to _teardownWhenDone.
+  _blip(type, f0, f1, dur, gain, t0, out) {
+    const ctx = this.ctx
+    const osc = ctx.createOscillator()
+    osc.type = type
+    osc.frequency.setValueAtTime(f0, t0)
+    if (f1 && f1 !== f0) osc.frequency.exponentialRampToValueAtTime(f1, t0 + dur)
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(gain, t0)
+    g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur)
+    osc.connect(g); g.connect(out)
+    osc.start(t0); osc.stop(t0 + dur + 0.02)
+    return { src: osc, nodes: [osc, g] }
+  }
+
+  // empty-mag trigger pull: metallic striker click + a wisp of mechanical noise.
+  dryFire() {
+    if (!this._uiOk('dry_fire', 0.09)) return
+    const t0 = this.ctx.currentTime, out = this._voiceOut(0.9)
+    const a = this._blip('square', 2400, 900, 0.03, 0.20, t0, out)
+    const sources = [a.src], nodes = [out, ...a.nodes]
+    if (this._noise) {
+      const n = this.ctx.createBufferSource(); n.buffer = this._noise
+      const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 3500
+      const ng = this.ctx.createGain()
+      ng.gain.setValueAtTime(0.10, t0); ng.gain.exponentialRampToValueAtTime(0.0008, t0 + 0.025)
+      n.connect(hp); hp.connect(ng); ng.connect(out)
+      n.start(t0); n.stop(t0 + 0.03)
+      sources.push(n); nodes.push(n, hp, ng)
+    }
+    this._teardownWhenDone(sources, nodes)
+  }
+
+  // local player took a hit: a low, muffled body thump (spectrally OPPOSITE the
+  // bright hitMarker so "I hit them" vs "I got hit" never confuse) + a lowpassed
+  // flesh wisp. Louder as HP drops (hpFrac 0..1). Self-throttled for SMG streams.
+  localHurt(hpFrac = 1) {
+    if (!this._uiOk('local_hurt', 0.07)) return
+    const t0 = this.ctx.currentTime
+    const lvl = 0.28 + 0.22 * (1 - Math.max(0, Math.min(1, hpFrac))) // 0.28..0.50
+    const out = this._voiceOut(lvl)
+    const a = this._blip('sine', 180, 70, 0.09, 0.35, t0, out)
+    const sources = [a.src], nodes = [out, ...a.nodes]
+    if (this._noise) {
+      const n = this.ctx.createBufferSource(); n.buffer = this._noise
+      const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500
+      const ng = this.ctx.createGain()
+      ng.gain.setValueAtTime(0.14, t0); ng.gain.exponentialRampToValueAtTime(0.0008, t0 + 0.05)
+      n.connect(lp); lp.connect(ng); ng.connect(out)
+      n.start(t0); n.stop(t0 + 0.06)
+      sources.push(n); nodes.push(n, lp, ng)
+    }
+    this._teardownWhenDone(sources, nodes)
+  }
+
+  // menu button click confirm: bright transient tick + a soft body, <50ms total.
+  uiClick() {
+    if (!this._uiOk('ui_click', 0.035)) return
+    const t0 = this.ctx.currentTime, out = this._voiceOut(0.9)
+    const a = this._blip('square', 1600, 1200, 0.012, 0.10, t0, out)
+    const b = this._blip('triangle', 820, 560, 0.045, 0.18, t0, out)
+    this._teardownWhenDone([a.src, b.src], [out, ...a.nodes, ...b.nodes])
+  }
+
+  // near-subliminal hover tick (short, soft, no sweep).
+  uiHover() {
+    if (!this._uiOk('ui_hover', 0.04)) return
+    const t0 = this.ctx.currentTime, out = this._voiceOut(0.9)
+    const a = this._blip('triangle', 1350, 1350, 0.018, 0.06, t0, out)
+    this._teardownWhenDone([a.src], [out, ...a.nodes])
+  }
+
+  // modal open (rising perfect fifth) / close (mirror, softer). Freqs chosen at
+  // 520/780 to stay clear of the mega-pickup reward tones (660/990).
+  menuOpen() {
+    if (!this._uiOk('menu', 0.12)) return
+    const t0 = this.ctx.currentTime, out = this._voiceOut(0.9)
+    const a = this._blip('triangle', 520, 520, 0.05, 0.16, t0, out)
+    const b = this._blip('triangle', 780, 780, 0.06, 0.16, t0 + 0.05, out)
+    this._teardownWhenDone([a.src, b.src], [out, ...a.nodes, ...b.nodes])
+  }
+  menuClose() {
+    if (!this._uiOk('menu', 0.12)) return
+    const t0 = this.ctx.currentTime, out = this._voiceOut(0.9)
+    const a = this._blip('triangle', 780, 780, 0.05, 0.14, t0, out)
+    const b = this._blip('triangle', 520, 520, 0.06, 0.14, t0 + 0.05, out)
+    this._teardownWhenDone([a.src, b.src], [out, ...a.nodes, ...b.nodes])
+  }
+
+  // grenade-throw whoosh: bandpassed noise sweeping up (the arm's doppler arc).
+  grenadeThrow() {
+    if (!this._uiOk('grenade_throw', 0.12) || !this._noise) return
+    const ctx = this.ctx, t0 = ctx.currentTime, out = this._voiceOut(0.9)
+    const n = ctx.createBufferSource(); n.buffer = this._noise
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2
+    bp.frequency.setValueAtTime(400, t0)
+    bp.frequency.exponentialRampToValueAtTime(1800, t0 + 0.2)
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(0.22, t0); g.gain.exponentialRampToValueAtTime(0.0008, t0 + 0.2)
+    n.connect(bp); bp.connect(g); g.connect(out)
+    n.start(t0); n.stop(t0 + 0.22)
+    this._teardownWhenDone([n], [out, n, bp, g])
+  }
+
+  // "PLAY unlocked" ready cue: a C-major rising arpeggio. PROCEDURAL on purpose —
+  // it fires the instant the asset pipeline finishes, when clips may not be decoded
+  // (and stays silent, harmlessly, if no user gesture has created the ctx yet).
+  readyGo() {
+    if (!this.ctx) return
+    const t0 = this.ctx.currentTime, out = this._voiceOut(0.9)
+    const notes = [[t0, 523.25, 0.18], [t0 + 0.07, 659.25, 0.18], [t0 + 0.14, 783.99, 0.20]]
+    const sources = [], nodes = [out]
+    notes.forEach(([t, f, gain]) => {
+      const osc = this.ctx.createOscillator()
+      osc.type = 'triangle'; osc.frequency.setValueAtTime(f, t)
+      const g = this.ctx.createGain()
+      g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0008, t + 0.22)
+      osc.connect(g); g.connect(out)
+      osc.start(t); osc.stop(t + 0.24)
+      sources.push(osc); nodes.push(osc, g)
+    })
+    this._teardownWhenDone(sources, nodes)
   }
 }

@@ -16,6 +16,7 @@ import applyCommand, { MAX_SPEED } from '../common/applyCommand'
 import setupObstacles from './setupObstacles'
 import { fire } from '../common/weapon'
 import { shotPattern, applyPattern } from '../common/firePattern'
+import { damageFalloffMult } from '../common/damageFalloff'
 import lagCompensatedHitscanCheck from './lagCompensatedHitscanCheck'
 import Projectile from '../common/entity/Projectile'
 import Grenade from '../common/entity/Grenade'
@@ -304,7 +305,7 @@ class GameInstance {
 			// nid/weapon/ammo on both sides), so the wall marks a player painted
 			// are the rays that judged damage. One entry for single-bullet
 			// weapons, a rosette for the shotgun.
-			const offsets = shotPattern(config, ray.seed, ray.heat)
+			const offsets = shotPattern(config, ray.seed, ray.heat, ray.aimFactor)
 			offsets.forEach(off => {
 				const d = applyPattern(ray.direction, off)
 				const pelletRay = new BABYLON.Ray(ray.origin, new BABYLON.Vector3(d.x, d.y, d.z))
@@ -319,7 +320,13 @@ class GameInstance {
 						if (victim instanceof PlayerCharacter && victim.isAlive &&
 							victim.client && !damagedThisPellet.has(victim.client)) {
 							damagedThisPellet.add(victim.client)
-							this.damagePlayer(victim.client, shooter, config.damage, config.name, config.index)
+							// Distance-based damage falloff (common/damageFalloff.js): opt-in
+							// per weapon, flat for weapons without a falloff window. Distance is
+							// shooter (ray.origin) -> victim position; ADS (ray.aimFactor, the
+							// ramp this shot fired with) extends the pistol's full-damage range.
+							const dist = BABYLON.Vector3.Distance(ray.origin, victim.mesh.position)
+							const dmg = Math.round(config.damage * damageFalloffMult(config, dist, ray.aimFactor))
+							this.damagePlayer(victim.client, shooter, dmg, config.name, config.index)
 						}
 					}
 				})
@@ -337,7 +344,8 @@ class GameInstance {
 				ray.direction.z,
 				config.index,
 				ray.seed,
-				ray.heat
+				ray.heat,
+				ray.aimFactor
 			))
 		} else if (config.type === 'projectile') {
 			// Projectile weapon. Flak (config.pellets > 1) fires a cone burst of
@@ -359,7 +367,16 @@ class GameInstance {
 				proj.dirX = d.x
 				proj.dirY = d.y
 				proj.dirZ = d.z
-				proj.speed = config.projectileSpeed || 30
+				// ADS speeds the bolt (aimFactor 0..1 * the weapon's projSpeedMult) so
+				// aimed shots need less lead at range (Hale). Non-ADS weapons unaffected.
+				const _af = Math.min(1, Math.max(0, ray.aimFactor || 0))
+				const _psm = (config.ads && config.ads.projSpeedMult) ? (1 + (config.ads.projSpeedMult - 1) * _af) : 1
+				proj.speed = (config.projectileSpeed || 30) * _psm
+				// ADS also THINS the bolt (aimFactor 0..1 * the weapon's projSizeMult):
+				// aimed = a smaller collision radius (a precise dart) vs the fat hip ball.
+				// hip (aimFactor 0) keeps the full default radius; non-ADS weapons unaffected.
+				const _pzm = (config.ads && config.ads.projSizeMult) ? (1 + (config.ads.projSizeMult - 1) * _af) : 1
+				proj.radius = proj.radius * _pzm
 				proj.damage = config.damage || 25
 				proj.ownerNid = entity.nid
 				proj.weaponIndex = config.index
@@ -745,8 +762,9 @@ class GameInstance {
 					const dz = target.z - proj.z
 					const dist = Math.hypot(dx, dy, dz)
 
-					// Collision cylinder check (height 1m, radius 0.75m)
-					if (dist < 0.75 && Math.abs(dy) < 1.0) {
+					// Collision cylinder check (height 1m, radius = proj.radius, default
+					// 0.75m; aimed Plasma bolts spawn with a smaller radius — see spawn).
+					if (dist < proj.radius && Math.abs(dy) < 1.0) {
 						let attacker = null
 						this.instance.clients.forEach(ac => {
 							if (ac.rawEntity && ac.rawEntity.nid === proj.ownerNid) attacker = ac

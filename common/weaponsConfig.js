@@ -5,12 +5,47 @@ const authoredMount = {
   anims: { idle: 'idle', fire: 'fire', reload: 'reload', draw: 'draw' }
 }
 
+// ADS (aim-down-sights). Weapons that opt in extend their anims with the six ADS
+// clips baked into the retro GLBs (scripts/retro-blend-actions.json "aim" group)
+// and carry an `ads` block. `fov` is the world-camera target in DEGREES (matching
+// this.fov / the user FOV setting); in/out are the zoom transition seconds; the
+// sensitivity multiplier scales look speed while aimed (never mutates the stored
+// setting). These are iron sights — modest zoom, not a scope.
+// Shotgun/Flak deliberately OMIT ads (no breathing_aiming source + the documented
+// shotgun base-orientation blocker), so they stay hip-fire only.
+const adsAnims = {
+  aimStart: 'aim_start', aimPose: 'aim_pose', aimEnd: 'aim_end',
+  fireAiming: 'fire_aiming', breathingAiming: 'breathing_aiming', walkAiming: 'walk_aiming'
+}
+// fov in DEGREES (composed onto the user FOV). in/out are transition seconds:
+// out is deliberately FASTER than in — snap into the sight, but drop back to hip
+// even faster so peripheral vision returns instantly (arena survival). FOV targets
+// stay >=75deg so you're never blind to flankers/vertical play. Look sensitivity
+// while aimed is NOT a fixed number — it's derived from the live zoom (focal-length
+// matched) in Simulator, so hand->pixel travel stays consistent. Numbers per an
+// id-gameplay-engineer review (scripts/gemini-id.mjs, Randall "Hitscan" Voss).
+// `extra` carries the ADS GAMEPLAY mults (consumed in weapon.fire/firePattern/applyCommand,
+// scaled by entity.aimFactor): spreadBaseMult/spreadHeatMult tighten the cone, heatMult
+// cuts bloom accumulation, projSpeedMult speeds projectiles. A mult of 1 (or absent) = no
+// effect. Sandbox numbers per a Bungie weapon-sandbox review (scripts/gemini-bungie.mjs).
+const withAds = (fov, inTime, outTime, extra = {}) => ({
+  anims: { ...authoredMount.anims, ...adsAnims },
+  ads: { fov, inTime, outTime, ...extra }
+})
+
 export const weapons = [
   {
     index: 0,
     name: 'Rifle',
     url: '/assets/weapons/retro_rifle_arms.glb',
     ...authoredMount,
+    // ADS gameplay: -40% sustained bloom, -30% heat/shot -> aimed = a sustained
+    // mid-range tracking tool; hip stays a burst weapon that sprays if held.
+    ...withAds(75, 0.08, 0.06, { spreadHeatMult: 0.6, heatMult: 0.7 }),
+    // ADS: sink the bulky receiver down + forward so the front sight stays on the
+    // crosshair but the body drops out of the lower-middle (downward-tracking blind
+    // spot per the id review). Presentation only; never touches the aim ray.
+    adsMount: { position: { x: 0.0, y: -0.03, z: 0.06 }, rotation: { x: 0, y: Math.PI / 2, z: 0 } },
     // draw re-enabled 2026-07-13: the old GLB's draw clip detached the gun from
     // the hands; the rebuilt full-pipeline GLB draws attached (0.26cm grip slip).
     muzzle: { x: 0.08, y: -0.13, z: 1.05 },
@@ -46,6 +81,9 @@ export const weapons = [
     name: 'SMG',
     url: '/assets/weapons/retro_smg_arms.glb',
     ...authoredMount,
+    // SMG stays hip-only for now: the full-set ADS rebuild rendered badly in live
+    // testing (its vendor rig has known quirks). Reverted to the original shipped GLB.
+    // Revisit with re-authored SMG arm clips before re-enabling ADS here.
     muzzle: { x: 0.08, y: -0.13, z: 0.90 },
     recoilForce: 0.6,
     drawTime: 0.25,
@@ -99,6 +137,12 @@ export const weapons = [
     name: 'Pistol',
     url: '/assets/weapons/retro_pistol_arms.glb',
     ...authoredMount,
+    // ADS gameplay: the pistol is already a hip laser (spreadBase 0.0015, no heat), so
+    // tightening the cone does little. Hale's stronger idea now shipped: ADS EXTENDS the
+    // damage-falloff range. rangeMult 1.75 pushes falloffStart/End out with aimFactor
+    // (common/damageFalloff.js), so the aimed pistol keeps its 3-shot kill far past where
+    // hip-fire drops off. spreadBaseMult:0 still snaps the last sliver of cone to zero.
+    ...withAds(80, 0.05, 0.04, { spreadBaseMult: 0.0, rangeMult: 1.75 }),
     isOneHanded: true,
     // The pistol grip is authored ~37deg below the camera line — steeper than the
     // 29deg bottom edge of the 1.0rad FOV — so at the shared mount the trigger
@@ -112,6 +156,12 @@ export const weapons = [
     position: { x: 0.10, y: 0.09, z: 0.05 },
     muzzle: { x: 0.18, y: -0.05, z: 0.75 },
     rotation: { x: 0, y: Math.PI / 2 - 0.06, z: 0.05 },
+    // ADS holder framing: the hip mount is deliberately shoved lower-RIGHT + canted
+    // for the classic pistol hip look, but that offset would push the aimed sights off
+    // the crosshair. While aiming, the viewmodel blends the holder to this CENTERED,
+    // un-canted mount (by the aim amount) so the iron sights land on the crosshair.
+    // Presentation only — never touches the aim ray. Tuned visually vs the crosshair.
+    adsMount: { position: { x: 0.0, y: 0.0, z: 0.0 }, rotation: { x: 0, y: Math.PI / 2, z: 0 } },
     recoilForce: 0.8,
     drawTime: 0.15,
 
@@ -130,6 +180,14 @@ export const weapons = [
     maxReserveAmmo: 36,
     damage: 34, // was 20 → 3-shot kill @ 100 HP
     range: 50,
+    // Damage falloff (common/damageFalloff.js): full 34 dmg (3-shot @ 100 HP) inside
+    // 20m, LINEAR down to 0.5x (17 dmg -> 6-shot) by 40m, floored beyond. Hip-fire is
+    // thus a mid-range finisher that goes soft at long range; ADS (rangeMult 1.75 above)
+    // pushes this window out to 35m/70m, so the aimed pistol keeps the 3-shot kill at
+    // range. Chosen so the 3-shot window is decided by AIM, not just distance.
+    falloffStart: 20,
+    falloffEnd: 40,
+    falloffMinMult: 0.5,
     // near-laser accurate with flat spread (no heat scaling): precision is the
     // whole point, so every shot lands where aimed and placement is rewarded.
     spreadBase: 0.0015,
@@ -148,6 +206,10 @@ export const weapons = [
     name: 'Plasma',              // HUD shows uppercased; keep short
     url: '/assets/weapons/retro_rifle_arms.glb',
     ...authoredMount,
+    // ADS gameplay: +35% projectile speed -> aimed bolts are easier to land at range
+    // (lead less), plus Hale's "thinner bolt" -> 0.6x collision radius at full ADS so
+    // aimed = a precise dart, hip = a fat area-denial ball (GameInstance spawn scales it).
+    ...withAds(75, 0.08, 0.06, { projSpeedMult: 1.35, projSizeMult: 0.6 }),
     muzzle: { x: 0.08, y: -0.13, z: 1.05 },
     recoilForce: 0.7,
     drawTime: 0.30,

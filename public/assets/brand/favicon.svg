@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="sol" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="256" y2="256">
+      <stop offset="0" stop-color="#14F195"/>
+      <stop offset="1" stop-color="#9945FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- dark tile: pins the favicon's environment regardless of browser tab theme -->
+  <rect width="256" height="256" rx="56" fill="#0B0D12"/>
+
+  <!-- reticle: same center/radius as logo, stroke 12->14; ticks pushed out
+       (pills span r=103-125), 8px gap to ring, near-bleed to tile edge -->
+  <g fill="none" stroke="url(#sol)" stroke-width="14" stroke-linecap="round">
+    <circle cx="128" cy="128" r="88"/>
+    <line x1="128" y1="10"  x2="128" y2="18"/>
+    <line x1="128" y1="238" x2="128" y2="246"/>
+    <line x1="10"  y1="128" x2="18"  y2="128"/>
+    <line x1="238" y1="128" x2="246" y2="128"/>
+  </g>
+
+  <!-- skull: silhouette identical to skull.svg; features use skull.svg's
+       enlarged "HUD" optical size; teeth and blood omitted at this size -->
+  <path fill="#F0EAD9" d="M128,54
+    C166,54 190,74 190,100
+    C194,112 186,126 174,136
+    L174,156
+    C172,174 150,186 128,187
+    C106,186 84,174 82,156
+    L82,136
+    C70,126 62,112 66,100
+    C66,74 90,54 128,54 Z"/>
+  <g fill="#0B0D12">
+    <path d="M142,97 L174,87 C180,97 179,111 170,118 C159,124 145,120 141,110 Z"/>
+    <path d="M114,97 L82,87 C76,97 77,111 86,118 C97,124 111,120 115,110 Z"/>
+    <path d="M120,126 L136,126 L128,150 Z"/>
+  </g>
+</svg>

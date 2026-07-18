@@ -111,12 +111,15 @@ export default class FragLayer {
     if (!el) return
     const peak = kill ? '0.3' : '0.2'
     const fade = kill ? 140 : 80
+    // Force a reflow to COMMIT the peak opacity as its own paint before the
+    // fade starts. The old single-rAF pattern let the browser coalesce the
+    // peak and the fade into one style pass, silently dropping the flash frame
+    // under load / low FPS — i.e. "the gun sometimes has no hit feedback".
     el.style.transition = 'none'
     el.style.opacity = peak
-    requestAnimationFrame(() => {
-      el.style.transition = 'opacity ' + fade + 'ms ease-out'
-      el.style.opacity = '0'
-    })
+    void el.offsetHeight // reflow: peak is now committed
+    el.style.transition = 'opacity ' + fade + 'ms ease-out'
+    el.style.opacity = '0'
   }
 
   // convenience: a display label for a smooth nid — the player's callsign,

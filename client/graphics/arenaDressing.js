@@ -52,7 +52,19 @@ export default class ArenaDressing {
 		// the emissive strip texture isn't wired in the kit's glTF materials;
 		// invertY=false matches the loader's glTF UV convention
 		this._trimEmissive = new BABYLON.Texture(BASE + 'T_Trim_01_Emissive.png', this.scene, false, false)
-		await Promise.all(PIECES.map(name => this._loadPiece(name)))
+		// STAGGER the piece imports. Every kit .gltf references the SAME shared
+		// trim-sheet textures (T_Trim_01/02_ORM etc.), and the browser CANNOT dedupe
+		// identical requests fired in parallel — a plain Promise.all fetched each
+		// multi-MB texture once PER piece (6x in the live waterfall). So we load ONE
+		// piece fully first, which warms all the shared trim textures into the HTTP
+		// cache; the remaining pieces then load with the existing concurrency and hit
+		// that cache instead of re-fetching. WallAstra_Straight is the pick because it
+		// references BOTH T_Trim_01_ORM and T_Trim_02_ORM (the two 6x-duplicated maps)
+		// plus the Trim_03 sheet — one sequential load warms the whole shared set.
+		const FIRST = 'WallAstra_Straight'
+		const rest = PIECES.filter(name => name !== FIRST)
+		if (PIECES.includes(FIRST)) await this._loadPiece(FIRST)
+		await Promise.all(rest.map(name => this._loadPiece(name)))
 		this._buildStatic()
 	}
 

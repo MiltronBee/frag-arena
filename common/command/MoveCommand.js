@@ -21,6 +21,7 @@ MoveCommand.protocol = {
 	reload: nengi.Boolean,
 	fireInput: nengi.Boolean,
 	throwInput: nengi.Boolean, // Phase 3: rising-edge frag-grenade throw (edge-triggered client-side)
+	aimInput: nengi.Boolean, // ADS held (RMB/touch). Ramps entity.aimFactor in applyCommand → drives ADS accuracy (weapon.fire/firePattern). Networked so the server validates hits with the same spread the client predicted.
     delta: nengi.Float32
 }
 

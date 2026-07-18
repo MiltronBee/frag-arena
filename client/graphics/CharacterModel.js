@@ -24,6 +24,57 @@ import { tpWeapons } from '../assets/assetManifest'
 // ---------------------------------------------------------------------------
 const _propCache = new Map() // url -> Promise<{ meshes: AbstractMesh[] }>
 
+// ---------------------------------------------------------------------------
+// SINGLE-FLIGHT body import. The preload warm (warmBody) and the first real
+// player's _load both want the same ~20MB hero_male.glb, and they fire close
+// enough together to race — the browser CANNOT dedupe two identical in-flight
+// requests, so the network waterfall showed the GLB fetched TWICE in parallel.
+//
+// We coalesce the FIRST import per url into one in-flight promise. A live
+// CharacterModel needs its OWN skeleton + animationGroups (Babylon 4.0.3 has no
+// instantiateModelsToScene, so copies can't be shared), so exactly one consumer
+// may "claim" the imported result and own its meshes; everyone else must import
+// their own copy — but by then the bytes are in the HTTP cache, so no second
+// network download happens. warmBody is a THROWAWAY consumer: it claims the
+// shared import only if no live model beat it to it, otherwise it piggybacks on
+// the live import (and disposes nothing — the live model owns it).
+// ---------------------------------------------------------------------------
+const _bodyFlight = new Map() // url -> { promise: Promise<result>, claimed: bool }
+
+function _importBodyRaw(scene, url) {
+  const slash = url.lastIndexOf('/') + 1
+  return BABYLON.SceneLoader.ImportMeshAsync('', url.slice(0, slash), url.slice(slash), scene)
+}
+
+// Return the single-flight import, starting it if none is running. Does NOT
+// claim ownership — caller decides whether to claim (own the meshes) or just
+// piggyback (warm path with nothing to dispose if a live model already claimed).
+function _bodyFlightPromise(scene, url) {
+  let flight = _bodyFlight.get(url)
+  if (!flight) {
+    flight = { promise: _importBodyRaw(scene, url), claimed: false }
+    _bodyFlight.set(url, flight)
+  }
+  return flight
+}
+
+// A live CharacterModel calls this for its own instance. If the shared in-flight
+// import is still unclaimed, take ownership of that result (no second fetch, no
+// second parse). If none exists yet (this live load beat the preload warm), START
+// the single-flight and immediately claim it, so a later warmBody piggybacks on
+// THIS import rather than firing its own duplicate 20MB fetch. Only when the flight
+// is already claimed by someone else do we import a fresh copy — which now hits the
+// browser cache the first import primed, so it's parse-only, no network download.
+async function _claimBodyImport(scene, url) {
+  let flight = _bodyFlight.get(url)
+  if (!flight) flight = _bodyFlightPromise(scene, url)
+  if (!flight.claimed) {
+    flight.claimed = true
+    return flight.promise
+  }
+  return _importBodyRaw(scene, url)
+}
+
 // The death clip (UAL1 Death01) is ~2.375s — nearly the full RESPAWN_DELAY_MS
 // (2.5s), so at 1x speed the fall barely fits before the respawn cancels the
 // corpse, and any network jitter on the Killed packet truncates it (the body
@@ -114,9 +165,14 @@ export async function warmProp(scene, url) {
 // browser cache AND a warmed shader program, so it lands without a hitch.
 export async function warmBody(scene, url) {
   if (!url) return
-  const slash = url.lastIndexOf('/') + 1
-  const result = await BABYLON.SceneLoader.ImportMeshAsync(
-    '', url.slice(0, slash), url.slice(slash), scene)
+  // Warm via the SINGLE-FLIGHT import so we don't race a real player's _load into
+  // a duplicate 20MB download. We claim the shared import only if no live model
+  // grabbed it first; if a live model already claimed it, we piggyback on the same
+  // in-flight promise (its shaders warm as it renders) and own nothing to dispose.
+  const flight = _bodyFlightPromise(scene, url)
+  const iOwnIt = !flight.claimed && (flight.claimed = true)
+  const result = await flight.promise
+  if (!iOwnIt) return // a live CharacterModel claimed this import — it owns the copy
   // never let the throwaway copy render even a single frame behind the load
   // overlay (it imports at origin, enabled by default).
   result.meshes.forEach((m) => { m.setEnabled(false); m.isPickable = false })
@@ -182,11 +238,11 @@ export default class CharacterModel {
   }
 
   async _load() {
-    const slash = this.spec.url.lastIndexOf('/') + 1
-    const rootUrl = this.spec.url.slice(0, slash)
-    const fileName = this.spec.url.slice(slash)
-
-    const result = await BABYLON.SceneLoader.ImportMeshAsync('', rootUrl, fileName, this.scene)
+    // Single-flight claim: if the preload warm's import for this url is still
+    // in-flight and unclaimed, we take ownership of that copy (no second 20MB
+    // fetch). Otherwise we import our own — hitting the browser cache the first
+    // import primed, so it's parse-only, never a duplicate network download.
+    const result = await _claimBodyImport(this.scene, this.spec.url)
     if (this.disposed) {
       result.meshes.forEach((m) => m.dispose())
       result.animationGroups.forEach((g) => g.dispose())

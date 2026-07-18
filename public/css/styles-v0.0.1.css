@@ -30,13 +30,15 @@
     --scrim: rgba(7, 9, 12, 0.72);
     --scrim-heavy: rgba(7, 9, 12, 0.88);
     --warn: #FFB020;
+    /* amber = high-damage / utility accent (bit 2 heavy-hit tier, bit 8 status) */
+    --amber: #FFB02E;
 
     /* ---- Halo: Combat Evolved ammo HUD (client-only presentation) ---- */
-    --halo-cyan: #8FE7F5;        /* dominant readout */
+    --halo-cyan: var(--hud-self);   /* legacy alias -> single cyan contract (bit 14) */
     --halo-cyan-dim: #6FD9E8;    /* reserve / separator */
     --halo-cyan-deep: #3FA9C4;   /* frame / brackets */
     --halo-tint: rgba(30, 120, 150, 0.22);   /* cyan wash over the scrim */
-    --glow-halo: 0 0 6px rgba(143, 231, 245, .65), 0 0 18px rgba(111, 217, 232, .35);
+    --glow-halo: 0 0 6px rgba(127, 233, 255, .65), 0 0 18px rgba(111, 217, 232, .35);
 
     /* ---- Spacing / radii / angles (DESIGN 2.3) ---- */
     --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
@@ -60,6 +62,20 @@
     --font-display: 'Chakra Petch', 'Arial Narrow', Impact, sans-serif;
     --font-hud: 'Teko', 'Arial Narrow', sans-serif;
     --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+    /* HUD numerals: Barlow Condensed reads a "0" as a zero (Teko's renders as "U").
+       Used for ammo/health/grenade counts with tabular-nums so widths never shift. */
+    --font-numeral: 'Barlow Condensed', 'DIN Alternate', var(--font-hud);
+
+    /* ---- HUD REWORK color law (HUD-REWORK-SPEC SHARED CONTRACT) ----
+       Flat scrim backplates (NO glow); calm self-colors muted so they never
+       out-shout the world; --hud-crit red always wins on critical states. */
+    --hud-scrim:  rgba(6, 10, 15, 0.82);   /* flat backplate, NO glow                 */
+    --hud-self:   #7FE9FF;   /* self/active systems: ammo, weapon accent (calm cyan)  */
+    --hud-vitals: var(--sol-teal);   /* health accent — SOL brand teal, kept for identity */
+    --hud-util:   #ffb84d;   /* utility/cooldown: grenades                            */
+    --hud-crit:   #ff3333;   /* CRITICAL: low HP, empty mag, reloading — always wins  */
+    --hud-warn:   #FFB020;   /* mid-tier warn (health 31-60, low-ammo amber)          */
+    --hud-over:   #FFCF6B;   /* overheal amber readout                                */
 
     /* clipped bottom-right corner (panels/buttons) */
     --clip-notch: polygon(0 0, 100% 0, 100% calc(100% - var(--notch)), calc(100% - var(--notch)) 100%, 0 100%);
@@ -136,7 +152,7 @@ a:focus-visible {
 }
 
 .brand-lockup, .match-strip { display: flex; align-items: center; }
-.brand-lockup { gap: 10px; min-width: 0; }
+.brand-lockup { gap: 10px; min-width: 0; opacity: 0.6; }
 
 .brand-mark { width: 30px; height: 30px; display: block; }
 
@@ -150,8 +166,12 @@ a:focus-visible {
     text-shadow: var(--text-shadow-hud);
 }
 
-/* connection chip (top-left cluster: ping + build). Restyled skewed scrim chip. */
+/* connection chip (top-left cluster: ping + build). Restyled skewed scrim chip.
+   BIT 8: data-state drives a status color system so connection reads at a glance
+   (green=online, amber pulse=connecting, red pulse=offline). Legacy
+   .connection-connected/.connection-disconnected classes kept as fallbacks. */
 .match-strip {
+    --status: var(--warn); /* default = connecting amber */
     min-height: 28px;
     padding: 0 12px;
     gap: 8px;
@@ -164,15 +184,36 @@ a:focus-visible {
     font-weight: 600;
     letter-spacing: 0.04em;
 }
+.match-strip[data-state="online"]  { --status: #3ddc84; }
+.match-strip[data-state="connecting"] { --status: var(--warn); }
+.match-strip[data-state="offline"] { --status: #ff4655; }
 
 .status-dot {
     width: 8px; height: 8px;
     border-radius: 50%;
-    background: var(--warn);
-    box-shadow: 0 0 8px rgba(255, 176, 32, .8);
+    background: var(--status);
+    box-shadow: 0 0 8px var(--status);
+    flex: none;
 }
+.match-strip[data-state]:not([data-state="online"]) .status-dot {
+    animation: status-pulse 1s ease-in-out infinite;
+}
+@keyframes status-pulse { 50% { opacity: 0.35; } }
+/* legacy state classes (kept working if JS still toggles them) */
 .connection-connected .status-dot { background: var(--sol-teal); box-shadow: var(--glow-teal); }
 .connection-disconnected .status-dot { background: var(--blood-bright); box-shadow: var(--glow-blood); }
+#connection-label { color: var(--status); display: inline-block; min-width: 12ch; }
+
+/* latency readout (BIT 8 — #ping-ms is new markup; JS writes the value + is-bad) */
+#ping-ms {
+    font-weight: 700;
+    color: var(--bone);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+}
+#ping-ms small { font-size: 10px; color: var(--bone-dim); margin-left: 2px; }
+#ping-ms.is-bad { color: #ff4655; }
+#frag-count, #player-count { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
 
 .status-divider { width: 1px; height: 12px; margin: 0 2px; background: var(--line); }
 
@@ -194,19 +235,29 @@ a:focus-visible {
        overflow:visible lets the shotgun ring (r≈49) and SMG bloom draw past 64. */
     width: 128px; height: 128px;
     transform: translate(-50%, -50%);
-    opacity: 0.92;
+    opacity: 1;
     overflow: visible;
     pointer-events: none;
     transition: opacity 140ms ease;
-    /* dark ink halo so the reticle reads on both bright floor and dark sky */
-    filter: drop-shadow(0 0 1px #07090C);
+    /* BIT 1: dual ink halo (tight hard edge + soft outer) so the reticle reads on
+       both bright floor and dark sky — the old single 1px shadow washed out. */
+    filter: drop-shadow(0 0 0.5px #07090C) drop-shadow(0 0 2px rgba(7, 9, 12, .85));
 }
-/* every reticle stroke gets a 1px ink outline for bright-scene legibility */
+/* every reticle stroke gets an ink outline UNDER the fill (paint-order) for
+   bright-scene legibility — thin filter halos alone wash out (BIT 1). */
 #crosshair .xh-tick,
-#crosshair .xh-dot { fill: var(--xhair-color); stroke: var(--xhair-outline); stroke-width: 0.75; }
-/* shotgun ring: bone stroke; radius (r) driven by JS via --xhair-ring, at the true
-   pellet-cone angle so "fit the target inside the ring → all pellets connect" holds */
-#crosshair .xh-ring-circle { stroke: var(--xhair-color); stroke-width: 2; r: var(--xhair-ring); }
+#crosshair .xh-dot {
+    fill: var(--xhair-color);
+    stroke: var(--xhair-outline);
+    stroke-width: 1;
+    paint-order: stroke fill;
+}
+/* shotgun ring: ink outline backing (BIT 1) + bone stroke on top; radius (r)
+   driven by JS via --xhair-ring, at the true pellet-cone angle so "fit the target
+   inside the ring → all pellets connect" holds. .xh-ring-outline is optional new
+   markup; the base .xh-ring-circle still works if only one circle is present. */
+#crosshair .xh-ring-outline { stroke: var(--xhair-outline); stroke-width: 3.5; r: var(--xhair-ring); opacity: .85; fill: none; }
+#crosshair .xh-ring-circle { stroke: var(--xhair-color); stroke-width: 2; r: var(--xhair-ring); fill: none; }
 /* dynamic-cross ticks slide outward by the live spread gap (instant, no transition) */
 #crosshair .xh-tick-up    { transform: translateY(calc(-1 * var(--xhair-spread))); }
 #crosshair .xh-tick-down  { transform: translateY(var(--xhair-spread)); }
@@ -242,21 +293,29 @@ a:focus-visible {
 #hit-marker i:nth-child(1) { transform: rotate(45deg); }
 #hit-marker i:nth-child(2) { transform: rotate(-45deg); }
 
-/* Doom-impact retiming (RECOIL-FEEDBACK-proposal §5.1): GROW-IN pops harder than
-   shrink-away. hit = fast 40ms grow to 1.0, 120ms out. kill = 50ms grow to 1.3,
-   ~100ms hold, 200ms out, keeping the 90° rotation. Total durations here match the
-   JS marker timers (Simulator._showHitMarker): hit 160ms, kill 350ms. */
+/* Doom-impact retiming (RECOIL-FEEDBACK-proposal §5.1): GROW-IN with a short
+   full-bright HOLD so rapid fire reads clearly. hit = bone, heavy = amber tier,
+   kill = blood + skull. Durations match the JS marker timers
+   (Simulator._showHitMarker): hit 160ms, heavy 170ms, KILL 450ms. */
 #hit-marker.hit-active { animation: hit-pop 160ms ease-out; }
-/* heavy hit (≥20 predicted dmg — pistol/shotgun): a slightly bigger pop */
+/* heavy hit (≥20 predicted dmg — pistol/shotgun): amber = high-damage tier
+   (Apex/CoD color language) + thicker ticks so the tier reads instantly. */
 #hit-marker.hit-active.hit-active-heavy { animation: hit-pop-heavy 170ms ease-out; }
-#hit-marker.kill-active { animation: kill-pop 350ms ease-out; }
+#hit-marker.hit-active.hit-active-heavy i {
+    height: 3px; width: 15px; margin: -1.5px 0 0 -7.5px;
+    background: var(--amber);
+    box-shadow: 0 0 6px rgba(255, 176, 46, .6), 0 0 4px rgba(7, 9, 12, .85);
+}
+#hit-marker.kill-active { animation: kill-pop 450ms ease-out; }
 #hit-marker.kill-active i {
     height: 3px; width: 17px; margin: -1.5px 0 0 -8.5px;
     background: var(--blood-bright);
     box-shadow: var(--glow-blood);
 }
 /* skull micro-icon that pops above the crosshair on a KILL confirm only (spec §5.1).
-   One absolutely-positioned child of #hit-marker; CSS-only, hidden unless kill-active. */
+   BIT 2: .hm-skull is now an inline SVG styled as a FILL target (not a radial mask)
+   — deterministic across browsers, no mask-composite eye-hole bug. Hidden
+   (opacity 0) unless kill-active. */
 #hit-marker .hm-skull {
     position: absolute;
     left: 50%; top: -18px;
@@ -264,53 +323,63 @@ a:focus-visible {
     margin-left: -7px;
     opacity: 0;
     pointer-events: none;
-    background: var(--blood-bright);
-    /* stylized skull silhouette via radial masks — no art asset */
-    -webkit-mask: radial-gradient(circle at 50% 38%, #000 46%, transparent 48%),
-                  radial-gradient(circle at 34% 44%, transparent 20%, #000 22%),
-                  radial-gradient(circle at 66% 44%, transparent 20%, #000 22%);
-    mask: radial-gradient(circle at 50% 38%, #000 46%, transparent 48%);
+    fill: var(--blood-bright);
     filter: drop-shadow(0 0 4px rgba(255, 42, 38, .9));
 }
-#hit-marker.kill-active .hm-skull { animation: skull-pop 350ms ease-out; }
+#hit-marker.kill-active .hm-skull { animation: skull-pop 450ms ease-out; }
 
 @keyframes hit-pop {
-    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
-    25% { opacity: 1; transform: translate(-50%, -50%) scale(1); }   /* ~40ms grow-in */
-    100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }  /* ~120ms hold-out */
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.55); }
+    22%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }  /* overshoot pop */
+    40%  { transform: translate(-50%, -50%) scale(1); }
+    65%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }    /* ~40ms bright hold */
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
 @keyframes hit-pop-heavy {
-    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
-    25% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
-    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15); }
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.55); }
+    22%  { opacity: 1; transform: translate(-50%, -50%) scale(1.32); }
+    40%  { transform: translate(-50%, -50%) scale(1.25); }
+    65%  { opacity: 1; transform: translate(-50%, -50%) scale(1.25); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.25); }
 }
 @keyframes kill-pop {
     0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7) rotate(0deg); }
-    14% { opacity: 1; transform: translate(-50%, -50%) scale(1.3) rotate(20deg); } /* ~50ms grow to 1.3 */
-    43% { opacity: 1; transform: translate(-50%, -50%) scale(1.3) rotate(45deg); } /* ~100ms hold */
-    100% { opacity: 0; transform: translate(-50%, -50%) scale(1) rotate(90deg); }  /* ~200ms out */
+    11% { opacity: 1; transform: translate(-50%, -50%) scale(1.3) rotate(20deg); } /* ~50ms grow to 1.3 */
+    36% { opacity: 1; transform: translate(-50%, -50%) scale(1.3) rotate(45deg); } /* hold */
+    62% { opacity: 1; transform: translate(-50%, -50%) scale(1.15) rotate(62deg); } /* opacity hold */
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1) rotate(90deg); }  /* out */
 }
 @keyframes skull-pop {
     0% { opacity: 0; transform: translateY(6px) scale(0.6); }
-    20% { opacity: 1; transform: translateY(0) scale(1); }
-    60% { opacity: 1; transform: translateY(0) scale(1); }
+    16% { opacity: 1; transform: translateY(0) scale(1); }
+    62% { opacity: 1; transform: translateY(0) scale(1); }
     100% { opacity: 0; transform: translateY(-4px) scale(1); }
 }
 
-/* ---- Health (DESIGN 3.5) + Ammo (DESIGN 3.6): skewed scrim wedges ---- */
-#health-panel, #weapon-panel {
+/* ---- Health (DESIGN 3.5): bottom-left scrim plate ---- */
+#health-panel {
     position: absolute;
     bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));
-    min-width: 190px;
-    padding: 12px 16px;
-    background: var(--scrim);
-    box-shadow: var(--edge-hairline);
+    left: calc(var(--sp-5) + env(safe-area-inset-left));
+    min-width: 228px;
+    padding: 14px 20px;
+    background: var(--hud-scrim);
+    box-shadow: none;
+    border-left: 3px solid var(--hud-vitals);
+    clip-path: none;
 }
 
-#health-panel {
-    left: calc(var(--sp-5) + env(safe-area-inset-left));
-    border-left: 2px solid var(--sol-teal);
-    clip-path: polygon(0 0, 100% 0, calc(100% - var(--notch)) 100%, 0 100%);
+/* ---- Bottom-right vitals stack (HUD-REWORK-SPEC): grenade plate (top) over the
+   weapon/ammo plate (bottom), flowing in a flex column. One anchor kills the old
+   66px magic offset on #grenade-panel; the children are now position:relative. ---- */
+#hud-right-group {
+    position: absolute;
+    bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));
+    right: calc(var(--sp-5) + env(safe-area-inset-right));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
 }
 /* ---- Halo: Combat Evolved ammo counter (client-only presentation) ----
    Top-right corner, just BELOW the match-status strip so it never collides with
@@ -320,40 +389,26 @@ a:focus-visible {
    weapon-class silhouette to the left. The #weapon-name / #magazine-ammo /
    #reserve-ammo / .ammo-separator / #reload-state ids + the .is-reloading toggle
    are unchanged — Simulator._updateHud still drives them. */
+/* CHROME DIET (HUD-REWORK-SPEC): flat --hud-scrim plate + ONE cyan accent border.
+   No outer glow, no inset glow, no gradient wash, no corner brackets, no clip-path
+   — only the DATA (numbers, icon) emits light. Flows inside #hud-right-group. */
 #weapon-panel {
-    bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));
-    right: calc(var(--sp-5) + env(safe-area-inset-right));
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 12px;
-    min-width: 0;
-    padding: 10px 16px 10px 14px;
+    gap: 14px;
+    min-width: 228px;
+    padding: 12px 20px 12px 17px;
     text-align: right;
-    background:
-        linear-gradient(180deg, var(--halo-tint), rgba(20, 90, 110, 0.08)),
-        var(--scrim);
-    border: 1px solid rgba(111, 217, 232, 0.35);
-    border-left: 2px solid var(--halo-cyan-deep);
-    box-shadow:
-        inset 0 0 0 1px rgba(143, 231, 245, 0.10),
-        inset 0 0 22px rgba(30, 120, 150, 0.18),
-        0 0 14px rgba(20, 90, 110, 0.35);
-    clip-path: polygon(0 0, 100% 0, calc(100% - var(--notch)) 100%, 0 100%);
+    background: var(--hud-scrim);
+    border: none;
+    border-left: 3px solid var(--hud-self);
+    box-shadow: none;
+    clip-path: none;
+    /* mute the calm cyan accent so it never out-shouts the world (color law) */
+    filter: saturate(0.85);
+    transition: border-left-color 150ms ease, filter 150ms ease;
 }
-
-/* Halo HUD chrome: thin cyan corner brackets (top-right + bottom-left). */
-#weapon-panel::before,
-#weapon-panel::after {
-    content: "";
-    position: absolute;
-    width: 14px; height: 14px;
-    border: 2px solid var(--halo-cyan);
-    opacity: 0.7;
-    filter: drop-shadow(0 0 3px rgba(143, 231, 245, .5));
-    pointer-events: none;
-}
-#weapon-panel::before { top: 3px; right: 3px; border-left: 0; border-bottom: 0; }
-#weapon-panel::after  { bottom: 3px; left: 3px; border-right: 0; border-top: 0; }
 
 /* Weapon-class silhouette. Loaded as a CSS mask (clean alpha shape in the SVG)
    so it can be tinted Halo-cyan here — an <img>-loaded SVG can't resolve
@@ -361,12 +416,14 @@ a:focus-visible {
    #weapon-panel (set by Simulator._applyWeaponIcon) picks the source. */
 #weapon-icon {
     flex: 0 0 auto;
-    width: 56px; height: 30px;
-    background-color: var(--halo-cyan);
-    filter: drop-shadow(0 0 5px rgba(143, 231, 245, .55));
+    width: 68px; height: 36px;
+    background-color: var(--hud-self);
+    /* CHROME DIET: no icon drop-shadow glow */
     -webkit-mask: var(--weap-icon, none) center / contain no-repeat;
             mask: var(--weap-icon, none) center / contain no-repeat;
-    transition: -webkit-mask-image 0s;
+    /* BIT 4/P4: real background-color transition so low-ammo/empty icon recolor
+       animates (the old `-webkit-mask-image 0s` was dead code). */
+    transition: background-color 150ms ease;
 }
 #weapon-panel[data-weapon="0"] { --weap-icon: url("../assets/hud/weap-rifle.svg"); }
 #weapon-panel[data-weapon="1"] { --weap-icon: url("../assets/hud/weap-smg.svg"); }
@@ -382,14 +439,15 @@ a:focus-visible {
 .health-readout { display: flex; align-items: baseline; gap: 6px; }
 
 #health-value {
-    font-family: var(--font-hud);
-    font-weight: 600;
-    font-size: 56px;
+    font-family: var(--font-numeral);
+    font-weight: 700;
+    font-size: 66px;
     line-height: 0.9;
     letter-spacing: 0.02em;
-    color: var(--bone);
+    color: #fff;
     text-shadow: var(--text-shadow-hud);
     font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
     transition: color 150ms ease;
 }
 .health-unit {
@@ -400,27 +458,68 @@ a:focus-visible {
     color: var(--bone-dim);
 }
 
+/* ---- Health track (BIT 3): three-layer bar in a clipped frame ----
+   #health-ghost (delayed catch-up damage smear) sits UNDER #health-fill (instant,
+   zero-lag on damage). JS drives --hp / --hp-ghost (scaleX) + toggles
+   body.mid-health / body.overheal. 25HP tick marks via ::after. */
 .health-track {
-    width: 140px;
-    height: 20px;
-    margin-top: 8px;
+    position: relative;
+    width: 168px;
+    height: 24px;
+    margin-top: 10px;
     overflow: hidden;
     border: 1px solid rgba(20, 241, 149, 0.25);
     background: rgba(20, 241, 149, 0.08);
 }
-#health-fill {
+.health-track > span,
+#health-ghost, #health-fill {
+    position: absolute;
+    inset: 0;
     display: block;
-    width: 100%; height: 100%;
     transform-origin: left center;
-    background: var(--sol-teal);
+    will-change: transform;
+}
+/* damage smear: lags the fill, so a burst-damage loss is briefly readable; on
+   heal it's covered by the fill and auto-hides (no direction test needed). */
+#health-ghost {
+    transform: scaleX(var(--hp-ghost, 1));
+    background: rgba(255, 228, 222, 0.9);
+    transition: transform .45s cubic-bezier(.2, .75, .3, 1) .15s;
+}
+#health-fill {
+    transform: scaleX(var(--hp, 1)); /* transform stays instant — zero-lag on damage */
+    width: 100%; height: 100%;
+    background: var(--hud-vitals);
     box-shadow: 0 0 8px rgba(20, 241, 149, .5);
     transition: transform 0ms, background-color 150ms ease;
 }
+/* 25HP tick marks — coarse read at a glance */
+.health-track::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(90deg,
+        transparent 0 calc(25% - 1px),
+        rgba(4, 6, 9, .9) calc(25% - 1px) 25%);
+}
 
-/* threshold recolor: warn <=60, blood <=30 (JS toggles body.low-health at <=30) */
-body.low-health #health-fill { background: var(--blood-bright); box-shadow: var(--glow-blood); }
-body.low-health #health-value { color: var(--blood-bright); animation: hp-pulse 1.2s ease-in-out infinite; }
-body.low-health .hud-skull { animation: hp-pulse 1.2s ease-in-out infinite; }
+/* threshold recolor (BIT 3): mid-health (31-60) amber warn, low-health (<=30)
+   crit red. JS toggles body.mid-health / body.low-health. */
+body.mid-health #health-fill { background: var(--hud-warn); box-shadow: 0 0 8px rgba(255, 176, 32, .55); }
+body.mid-health #health-value { color: var(--hud-warn); }
+body.low-health #health-fill { background: var(--hud-crit); box-shadow: var(--glow-blood); }
+/* crit readout stays FULLY OPAQUE (legible when it matters most) and pulses via a
+   GLOW instead of dropping opacity; faster .9s cadence for urgency. */
+body.low-health #health-value { color: var(--hud-crit); animation: hp-glow .9s ease-in-out infinite; }
+body.low-health .hud-skull { display: block; animation: hp-pulse .9s ease-in-out infinite; }
+
+@keyframes hp-glow {
+    0%, 100% { text-shadow: 0 0 6px rgba(255, 45, 64, .35), var(--text-shadow-hud); }
+    50%      { text-shadow: 0 0 22px rgba(255, 45, 64, .95), var(--text-shadow-hud); }
+}
+
+/* COLOR-LAW HIERARCHY: at critical HP the red health + red vignette must own the
+   peripheral read, so desaturate + dim the calm cyan weapon panel accent so it
+   never competes with the crit-red. */
+body.low-health #weapon-panel { filter: saturate(0.35) brightness(0.8); }
 
 @keyframes hp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
 
@@ -432,25 +531,19 @@ body.overheal #health-fill {
     box-shadow: 0 0 12px rgba(255, 191, 63, 0.85);
 }
 body.overheal .health-track { border-color: rgba(255, 191, 63, 0.55); }
-body.overheal #health-value { color: #ffd27a; text-shadow: 0 0 10px rgba(255, 191, 63, 0.6); }
-
-/* persistent low-HP edge vignette (DESIGN 3.5) */
-body.low-health #damage-flash {
-    opacity: 0.15;
-    transition-duration: 400ms;
-    background: radial-gradient(circle at center, transparent 58%, rgba(255, 51, 51, 0.55) 120%);
-}
+body.overheal #health-value { color: var(--hud-over); text-shadow: 0 0 10px rgba(255, 191, 63, 0.6); }
 
 /* small weapon-name label (Halo puts the class name quietly above the count) */
 #weapon-name {
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 12px;
+    font-size: 14px;
     line-height: 1;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: var(--halo-cyan-dim);
-    text-shadow: 0 1px 0 #07090C, 0 0 6px rgba(20, 90, 110, .6);
+    color: var(--hud-self);
+    opacity: 0.85;
+    text-shadow: var(--text-shadow-hud);
 }
 
 #ammo-counter {
@@ -459,127 +552,181 @@ body.low-health #damage-flash {
     justify-content: flex-end;
     gap: 6px;
     margin-top: 1px;
-    color: var(--halo-cyan);
-    font-family: var(--font-hud);
+    font-family: var(--font-numeral);
     font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
 }
-/* dominant magazine count — big Teko numerals, Halo cyan with a soft glow */
+/* dominant magazine count — Barlow Condensed so "30" never reads as "3U". White
+   digits ARE the light (chrome diet: data emits, frame doesn't). min-width locks
+   the width so 10->9 (digit-count change) doesn't shift the right-aligned layout. */
 #magazine-ammo {
-    font-size: 60px;
-    line-height: 0.82;
+    font-family: var(--font-numeral);
+    font-size: 54px;
+    line-height: 0.86;
     letter-spacing: 0.01em;
-    font-weight: 500;
-    color: var(--halo-cyan);
-    text-shadow: 0 1px 0 #07090C, var(--glow-halo);
-    transition: color 120ms ease, text-shadow 120ms ease;
+    font-weight: 700;
+    color: #fff;
+    min-width: 2ch;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    text-shadow: 0 1px 0 #07090C, 0 0 6px rgba(127, 233, 255, .35);
+    transition: color 120ms ease, text-shadow 120ms ease, opacity 120ms ease;
 }
 .ammo-separator, #reserve-ammo {
-    font-size: 26px;
-    font-weight: 500;
-    color: var(--halo-cyan-dim);
+    font-family: var(--font-numeral);
+    font-size: 24px;
+    font-weight: 600;
+    color: #cfd8dd;
     opacity: 0.75;
-    text-shadow: 0 1px 0 #07090C, 0 0 6px rgba(20, 90, 110, .5);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    text-shadow: 0 1px 0 #07090C;
 }
-.ammo-separator { display: none; }
-#reserve-ammo { position: relative; top: -4px; }
+/* BIT 4/P5: keep the separator (faint) so "30" gap "120" doesn't read as "30120";
+   drop the reserve baseline hack (#ammo-counter is already align-items:baseline). */
+.ammo-separator { display: inline; opacity: 0.4; }
+#reserve-ammo { position: relative; }
 
-/* reload label (DESIGN 3.6): blinks under the count when reloading. Halo's
-   low-ammo/reload cue flashes amber -> red. */
+/* reload label (DESIGN 3.6): shows under the count when reloading. COLOR LAW
+   (BIT 4/P1): reload is a NEUTRAL action -> amber, NOT crit-red. Red is reserved
+   for empty/damage. Amber pulse (not a hard blink) reads calmly. */
 #reload-state {
     min-height: 14px;
     margin-top: 3px;
-    color: var(--warn);
+    color: #ffc861;
     font-family: var(--font-display);
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    text-shadow: 0 0 8px rgba(255, 176, 32, .6);
+    text-shadow: 0 0 8px rgba(255, 200, 97, .55);
     opacity: 0;
     transform: translateY(2px);
     transition: opacity 120ms ease, transform 120ms ease;
 }
+/* BIT 4/P2: while reloading, dim the (now-meaningless) magazine number instead of
+   3.3Hz strobing the biggest element; slow-pulse the reload label instead. */
+#weapon-panel.is-reloading #magazine-ammo { animation: none; opacity: 0.35; }
 #weapon-panel.is-reloading #reload-state {
     opacity: 1;
     transform: translateY(0);
-    animation: reload-blink 0.3s steps(1) infinite;
+    animation: reload-pulse 0.9s ease-in-out infinite;
 }
-#weapon-panel.is-reloading #magazine-ammo {
-    animation: ammo-panic 0.3s steps(1) infinite;
-}
+@keyframes reload-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 
-@keyframes ammo-panic {
-    0%   { color: var(--warn);         text-shadow: 0 0 8px rgba(255, 176, 32, .8); }
-    50%  { color: var(--blood-bright); text-shadow: 0 0 8px rgba(255, 51, 51, .8); }
+/* AMMO STATE TIERS (BIT 4/P0): amber at <=25% mag, crit-red at empty. Icon color
+   follows. JS toggles .is-low-ammo / .is-empty on #weapon-panel. Empty reuses the
+   existing hp-pulse keyframes. */
+#weapon-panel.is-low-ammo #magazine-ammo {
+    color: #ffc861;
+    text-shadow: 0 1px 0 #07090C, 0 0 8px rgba(255, 200, 97, .5);
 }
-/* flash amber -> red while reloading (Halo low-ammo/reload cue) */
-@keyframes reload-blink {
-    0%, 49%   { color: var(--warn);         text-shadow: 0 0 8px rgba(255, 176, 32, .7); }
-    50%, 100% { color: var(--blood-bright); text-shadow: 0 0 8px rgba(255, 51, 51, .7); }
+#weapon-panel.is-low-ammo #weapon-icon { background-color: #ffc861; }
+#weapon-panel.is-empty #magazine-ammo {
+    color: var(--hud-crit);
+    text-shadow: 0 1px 0 #07090C, 0 0 10px rgba(255, 51, 51, .55);
+    animation: hp-pulse 1.2s ease-in-out infinite;
 }
-/* the whole plate warms to red while reloading */
-#weapon-panel.is-reloading { border-left-color: var(--blood-bright); }
-
-/* low-ammo warning: magazine count turns amber at <=25% capacity, before the gun runs dry */
-#weapon-panel.low-ammo #magazine-ammo {
-    color: var(--warn);
-    text-shadow: 0 1px 0 #07090C, 0 0 8px rgba(255, 176, 32, .6);
-    transition: color 120ms ease, text-shadow 120ms ease;
+#weapon-panel.is-empty #weapon-icon { background-color: var(--hud-crit); }
+#weapon-panel.is-empty #reload-state {
+    color: var(--hud-crit);
+    text-shadow: 0 0 8px rgba(255, 51, 51, .6);
 }
-#weapon-panel.low-ammo {
-    border-left-color: var(--warn);
-}
+/* empty mag is a critical state — the plate accent goes red (color law) */
+#weapon-panel.is-empty { border-left-color: var(--hud-crit); filter: saturate(1); }
+/* reloading is neutral: the plate accent warms to amber, NOT red (color law) */
+#weapon-panel.is-reloading { border-left-color: var(--amber); filter: saturate(1); }
 
 /* Phase 3: frag-grenade charge indicator. Small plate sitting directly ABOVE the
    weapon panel (bottom-right), matching the Halo-ish HUD chrome. #grenade-count is
    driven by Simulator._updateHud from the networked grenadeCharges. */
+/* CHROME DIET (HUD-REWORK-SPEC): flat --hud-scrim plate + ONE amber accent border
+   (utility color law). No edge hairline, no clip-path. Flows inside
+   #hud-right-group (top of the stack); position:relative, no magic 66px offset. */
 #grenade-panel {
-    position: absolute;
-    bottom: calc(var(--sp-5) + 66px + env(safe-area-inset-bottom));
-    right: calc(var(--sp-5) + env(safe-area-inset-right));
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 14px;
-    background: var(--scrim);
-    border: 1px solid rgba(111, 217, 232, 0.28);
-    border-left: 2px solid var(--halo-cyan-deep);
-    box-shadow: var(--edge-hairline);
-    clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
-    font-family: var(--font-hud, var(--font-display));
+    gap: 10px;
+    padding: 8px 17px;
+    background: var(--hud-scrim);
+    border: none;
+    border-left: 3px solid var(--hud-util);
+    box-shadow: none;
+    clip-path: none;
+    font-family: var(--font-numeral);
 }
 #grenade-icon {
-    font-size: 20px;
+    font-size: 24px;
     line-height: 1;
-    color: #ffb84d; /* warm ordnance amber */
+    color: var(--hud-util); /* warm ordnance amber (data emits) */
     text-shadow: 0 0 8px rgba(255, 140, 40, .55);
 }
 #grenade-count {
-    font-family: var(--font-hud, var(--font-display));
-    font-size: 22px;
+    font-family: var(--font-numeral);
+    font-size: 26px;
     font-weight: 700;
     letter-spacing: 0.5px;
-    color: var(--bone, #ece6d2);
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
 }
-#grenade-panel.is-empty {
-    opacity: 0.5;
+/* BIT 5: capacity pips (skewed tactical wedges). Full = amber glow, empty = outline
+   only — so 0 charges reads at a glance. JS toggles .is-full per pip + sets
+   #grenade-panel[data-charges]. */
+.grenade-pips { display: flex; gap: 4px; }
+.grenade-pips .pip {
+    width: 8px; height: 14px;
+    transform: skewX(-12deg);
+    box-shadow: inset 0 0 0 1px rgba(255, 179, 0, .4);
 }
-#grenade-panel.is-empty #grenade-count { color: var(--warn); }
+.grenade-pips .pip.is-full {
+    background: var(--hud-util);
+    box-shadow: 0 0 6px rgba(255, 179, 0, .55);
+}
+/* EMPTY STATE (both the legacy .is-empty class and data-charges="0"): drained
+   utility is NEUTRAL (muted), never red — red is for critical/damage only. */
+#grenade-panel.is-empty,
+#grenade-panel[data-charges="0"] {
+    border-left-color: rgba(255, 179, 0, .25);
+    opacity: 0.55;
+}
+#grenade-panel.is-empty #grenade-count,
+#grenade-panel[data-charges="0"] #grenade-count {
+    color: rgba(255, 255, 255, 0.3);
+    text-shadow: none;
+}
+#grenade-panel[data-charges="0"] .pip { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); }
 
-/* ---- Death / respawn card (DESIGN 4e) ---- */
+/* ---- Death / respawn card (DESIGN 4e) ----
+   BIT 6: real scale-slam entry (260ms) that's actually visible; exit is a fast
+   120ms opacity-only fade (no motion) so it clears for the respawn countdown.
+   visibility toggle keeps the stale card out of the a11y tree between deaths. */
 #combat-state {
     position: absolute;
-    top: 50%; left: 50%;
+    top: 44%; left: 50%;
     width: min(560px, calc(100vw - 40px));
     transform: translate(-50%, -50%);
     text-align: center;
     z-index: 20;
-    transition: opacity 160ms var(--ease-snap), transform 160ms var(--ease-snap);
+    visibility: visible;
+    filter: drop-shadow(0 2px 18px rgba(0, 0, 0, .85));
+    transition: opacity 120ms var(--ease-snap);
 }
 #combat-state.combat-state-hidden {
     opacity: 0;
-    transform: translate(-50%, -46%);
+    visibility: hidden;
     pointer-events: none;
+    transition: opacity 120ms var(--ease-snap), visibility 0s 120ms;
+}
+#combat-state:not(.combat-state-hidden) {
+    animation: combat-state-in 260ms var(--ease-snap) both;
+}
+@keyframes combat-state-in {
+    0%   { opacity: 0; transform: translate(-50%, calc(-50% - 16px)) scale(1.07); }
+    60%  { opacity: 1; transform: translate(-50%, -50%) scale(0.99); }
+    100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 .combat-skull {
     width: 72px; height: 72px;
@@ -608,20 +755,32 @@ body.low-health #damage-flash {
     text-transform: uppercase;
 }
 
-/* ---- Damage flash (DESIGN 5.1) ---- */
+/* ---- Damage flash (DESIGN 5.1 / BIT 7) ----
+   Directional incoming-damage wash: --dmg-angle (rad, JS sets on the hit event)
+   drives a conic slice toward the hit direction, over a soft red radial base.
+   .hit re-triggers the fade animation. Legacy body.player-hit / body.own-death
+   remain wired below for the health-driven paths. */
 #damage-flash {
     position: fixed;
     inset: 0;
     z-index: 20;
     pointer-events: none;
     opacity: 0;
-    background: radial-gradient(circle at center, transparent 40%, rgba(255, 51, 51, 0.72) 118%);
+    background:
+        conic-gradient(from calc(var(--dmg-angle, 0rad) - 0.5rad) at 50% 50%,
+            transparent 0rad,
+            rgba(255, 35, 35, 0.5) 0.5rad,
+            transparent 1rad),
+        radial-gradient(ellipse at center,
+            rgba(255, 25, 25, 0.15) 0%,
+            rgba(160, 0, 0, 0.4) 100%);
     transition: opacity 300ms ease-out;
 }
-/* incoming-damage flash, now SCALED by damage taken (spec §5.1: 10dmg≈15%, 50+≈35%).
+#damage-flash.hit { animation: dmg-flash 180ms ease-out; }
+@keyframes dmg-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+/* incoming-damage flash SCALED by damage taken (spec §5.1: 10dmg≈15%, 50+≈35%).
    FragLayer.onDamageTaken sets --damage-wash = clamp(damage/40, 0.35, 1) on the SAME
-   hit event, so a chip reads faint and a big hit reads hard. Falls back to full punch
-   if the var is unset (e.g. a health drop with no DamageTaken message). */
+   hit event, so a chip reads faint and a big hit reads hard. */
 body.player-hit #damage-flash { opacity: calc(0.35 * var(--damage-wash, 1)); transition-duration: 0ms; }
 
 /* own death: a stronger red wash that HOLDS until respawn (FragLayer toggles
@@ -630,6 +789,34 @@ body.own-death #damage-flash {
     opacity: calc(0.85 * var(--damage-wash, 1));
     transition-duration: 200ms;
     background: radial-gradient(circle at center, rgba(122, 16, 16, 0.35) 0%, rgba(200, 30, 30, 0.82) 120%);
+}
+/* persistent low-HP edge tint layered on the damage-flash (kept from DESIGN 3.5) */
+body.low-health #damage-flash {
+    opacity: 0.15;
+    transition-duration: 400ms;
+    background: radial-gradient(circle at center, transparent 58%, rgba(255, 51, 51, 0.55) 120%);
+}
+
+/* ---- Low-HP peripheral vignette (HUD-REWORK-SPEC / color law / BIT 7) ----
+   Persistent red edge glow that owns the peripheral read when health is critical.
+   JS toggles .active at <=30% HP (and clears it on respawn/death). Slow pulse so it
+   reads as "danger", not a static tint. */
+#low-hp-vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    box-shadow: inset 0 0 100px rgba(255, 0, 0, 0.85);
+    opacity: 0;
+    transition: opacity 400ms ease;
+}
+#low-hp-vignette.active {
+    opacity: 1;
+    animation: low-hp-pulse 1.2s ease-in-out infinite;
+}
+@keyframes low-hp-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 1; }
 }
 
 /* ============================================================================
@@ -650,11 +837,13 @@ body.own-death #damage-flash {
     z-index: 20;
 }
 
+/* BIT 9: overflow guard so a long callsign can't blow out the 320px column. */
 .kill-feed-row {
     display: flex;
     align-items: center;
     gap: 7px;
     height: 28px;
+    max-width: 100%;
     padding: 0 10px;
     background: var(--scrim);
     box-shadow: var(--edge-hairline);
@@ -663,13 +852,20 @@ body.own-death #damage-flash {
     font-size: 13px;
     font-weight: 600;
     color: var(--bone);
+    white-space: nowrap;
+    overflow: hidden;
     opacity: 0;
     transform: translateX(16px);
     transition: opacity 180ms ease, transform 180ms ease;
 }
 .kill-feed-row.kf-in { opacity: 1; transform: translateX(0); }
-.kill-feed-row.kf-out { opacity: 0; transform: translateX(16px); }
+.kill-feed-row.kf-out { opacity: 0; transform: translateX(16px); transition-duration: 120ms; transition-timing-function: ease-in; }
 
+.kill-feed-row .kf-killer, .kill-feed-row .kf-victim {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .kill-feed-row .kf-killer { color: var(--bone); }
 .kill-feed-row .kf-victim { color: var(--bone-dim); text-decoration: line-through; opacity: 0.85; }
 .kill-feed-row .kf-weapon {
@@ -679,11 +875,14 @@ body.own-death #damage-flash {
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
+    flex: none;
 }
 
-/* rows involving YOU: teal/blood left accent (DESIGN 3.7) */
+/* rows involving YOU: blood inset accent (BIT 9 — inset shadow, not border-left,
+   so the clip-path notch doesn't clip the accent and the text doesn't shift 2px). */
 .kill-feed-row.kill-feed-mine {
-    border-left: 2px solid var(--blood-bright);
+    border-left: 0;
+    box-shadow: inset 2px 0 0 var(--blood-bright), var(--edge-hairline);
     background: rgba(40, 12, 12, 0.78);
 }
 .kill-feed-row.kill-feed-mine .kf-killer { color: var(--sol-teal); }
@@ -692,16 +891,18 @@ body.own-death #damage-flash {
 /* suicide: no killer, lone victim + weapon; blood-dark accent (FragLayer adds
    .kill-feed-suicide on the row). */
 .kill-feed-row.kill-feed-suicide {
-    border-left: 2px solid var(--blood-dark);
+    border-left: 0;
+    box-shadow: inset 2px 0 0 var(--blood-dark), var(--edge-hairline);
     background: rgba(40, 12, 12, 0.6);
 }
 .kill-feed-row.kill-feed-suicide .kf-victim { text-decoration: none; }
 
-/* frag banner (DESIGN 3.8 / 5.1) */
+/* ---- Frag banner (DESIGN 3.8 / 5.1 / BIT 9) — the kill payoff. FragLayer adds
+   .fb-in (contract) to fire the pop; legacy .frag-banner-show still works. ---- */
 #frag-banner {
     position: absolute;
     top: 18%; left: 50%;
-    transform: translate(-50%, -50%) scale(0.85) skewX(var(--skew));
+    z-index: 21;
     padding: 8px 22px;
     text-align: center;
     background: rgba(122, 16, 16, 0.7);
@@ -713,10 +914,12 @@ body.own-death #damage-flash {
     letter-spacing: 0.04em;
     text-transform: uppercase;
     text-shadow: var(--glow-blood);
+    white-space: nowrap;
     opacity: 0;
     pointer-events: none;
-    z-index: 20;
+    transform: translate(-50%, -50%) scale(0.85) skewX(var(--skew));
 }
+#frag-banner.fb-in,
 #frag-banner.frag-banner-show { animation: frag-banner-pop 2700ms var(--ease-snap); }
 @keyframes frag-banner-pop {
     0% { opacity: 0; transform: translate(-50%, -50%) scale(1.4) skewX(-16deg); }
@@ -748,12 +951,11 @@ body.player-dead #crosshair { transform: translate(-50%, -50%) scale(0.7); }
     z-index: 40;
     display: flex;
     flex-direction: column;
-    height: 100dvh;
     padding: calc(var(--sp-5) + env(safe-area-inset-top)) calc(var(--sp-5) + env(safe-area-inset-right)) calc(var(--sp-5) + env(safe-area-inset-bottom)) calc(var(--sp-5) + env(safe-area-inset-left));
+    /* BIT 10/4: no backdrop-blur during the heaviest asset+shader load; the
+       gradient scrim is bumped up to compensate. */
     background:
-        radial-gradient(circle at 50% 42%, rgba(7, 9, 12, 0.4) 0%, rgba(7, 9, 12, 0.72) 60%, rgba(7, 9, 12, 0.88) 100%);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+        radial-gradient(circle at 50% 42%, rgba(7, 9, 12, 0.55) 0%, rgba(7, 9, 12, 0.84) 60%, rgba(7, 9, 12, 0.95) 100%);
     transition: opacity 220ms var(--ease-exit), visibility 220ms var(--ease-exit);
 }
 #entry-overlay:not(.is-visible) {
@@ -857,7 +1059,11 @@ body.player-dead #crosshair { transform: translate(-50%, -50%) scale(0.7); }
 .callsign::placeholder { color: var(--bone-dim); opacity: 0.7; }
 .callsign:focus { border-color: var(--sol-teal); box-shadow: var(--glow-teal); }
 
-/* PRIMARY / loading-locked PLAY button (DESIGN 3.1) — keeps id #enter-arena */
+/* ---- PRIMARY / loading-locked PLAY button (DESIGN 3.1 / BIT 10) — id #enter-arena.
+   The core payoff: the button FILLS with progress. Two layers over a shared dark
+   base: ::before = charge fill (width = --load-progress), ::after = unlock gradient
+   that opacity-crossfades in when loading ends (gradients can't transition, so we
+   fade a layer). Text is wrapped in .enter-label (z2). ---- */
 #enter-arena {
     position: relative;
     display: block;
@@ -869,7 +1075,7 @@ body.player-dead #crosshair { transform: translate(-50%, -50%) scale(0.7); }
     border-radius: var(--r-1);
     clip-path: var(--clip-notch);
     overflow: hidden;
-    background: var(--grad-sol);
+    background: var(--bg-2); /* shared dark base; unlock gradient fades in via ::after */
     color: var(--ink);
     font-family: var(--font-display);
     font-size: 20px;
@@ -877,36 +1083,43 @@ body.player-dead #crosshair { transform: translate(-50%, -50%) scale(0.7); }
     letter-spacing: 0.08em;
     text-transform: uppercase;
     cursor: pointer;
-    transition: transform 120ms var(--ease-snap), box-shadow 120ms var(--ease-snap), filter 120ms var(--ease-snap), background-color 150ms ease, color 150ms ease;
-}
-#enter-arena:hover:not([disabled]) { box-shadow: var(--glow-teal); filter: brightness(1.08); }
-#enter-arena:active:not([disabled]) { transform: translateY(1px) scale(.985); }
-
-/* loading-locked variant: dark fill, dim text, a 2px gradient underline that IS
-   the progress bar (width = --load-progress set by Simulator._setAssetProgress). */
-#enter-arena[data-loading="true"] {
-    background: var(--bg-2);
-    color: var(--bone-dim);
-    cursor: wait;
     box-shadow: var(--edge-hairline);
+    transition: transform 120ms var(--ease-snap), box-shadow 120ms var(--ease-snap), filter 120ms var(--ease-snap), color 150ms ease;
 }
-#enter-arena[data-loading="true"]::after {
+.enter-label { position: relative; z-index: 2; }
+/* charge layer: width = load progress */
+#enter-arena::before {
     content: "";
     position: absolute;
-    left: 0; bottom: 0;
-    height: 3px;
+    top: 0; left: 0; bottom: 0;
     width: var(--load-progress, 0%);
     background: var(--grad-sol);
-    transition: width 200ms linear;
+    opacity: 0;
+    transition: width 200ms linear, opacity 180ms ease;
 }
-#enter-arena[disabled] { pointer-events: none; }
+#enter-arena[data-loading="true"] { color: var(--bone-dim); cursor: wait; }
+#enter-arena[data-loading="true"]::before { opacity: 0.35; }
+/* unlock layer: full gradient crossfades in (replaces non-transitionable bg swap) */
+#enter-arena::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--grad-sol);
+    opacity: 0;
+    transition: opacity 200ms ease;
+}
+#enter-arena:not([data-loading="true"])::after { opacity: 1; }
+#enter-arena:hover:not([disabled]) { box-shadow: var(--glow-teal); filter: brightness(1.08); }
+#enter-arena:active:not([disabled]) { transform: translateY(1px) scale(.985); }
+#enter-arena:focus-visible { outline: none; box-shadow: var(--glow-teal); }
 
-/* unlock pulse when the gate opens (JS adds .enter-unlock once) */
-#enter-arena.enter-unlock { animation: enter-unlock 300ms var(--ease-snap); }
+/* unlock pulse when the gate opens (JS adds .enter-unlock once). BIT 10/5: add
+   scale + brightness so the "gate opens" is felt, not just a faint shadow. */
+#enter-arena.enter-unlock { animation: enter-unlock 420ms var(--ease-snap); }
 @keyframes enter-unlock {
-    0% { box-shadow: none; }
-    50% { box-shadow: var(--glow-teal); }
-    100% { box-shadow: none; }
+    0%   { transform: scale(1); filter: brightness(1); box-shadow: none; }
+    35%  { transform: scale(1.045); filter: brightness(1.3); box-shadow: var(--glow-teal); }
+    100% { transform: scale(1); filter: brightness(1); box-shadow: none; }
 }
 
 /* progress bar (DESIGN 3.3) */
@@ -926,17 +1139,19 @@ body.player-dead #crosshair { transform: translate(-50%, -50%) scale(0.7); }
     background: var(--grad-sol);
     transition: width 200ms linear;
 }
-/* ambient sheen sweep on the fill (menu only) */
+/* ambient sheen sweep on the fill (menu only). BIT 10: sweep in % so it doesn't
+   idle offscreen on sub-420px phones. */
 #entry-progress::after {
     content: "";
     position: absolute;
-    top: 0; left: 0; bottom: 0;
+    top: 0; bottom: 0;
+    left: 0;
     width: 40px;
     background: linear-gradient(90deg, transparent, rgba(236, 230, 210, 0.35), transparent);
     animation: sheen 1.2s linear infinite;
 }
 #entry-progress.is-hidden::after { display: none; }
-@keyframes sheen { from { transform: translateX(-40px); } to { transform: translateX(420px); } }
+@keyframes sheen { from { transform: translateX(-40px); } to { transform: translateX(calc(100% + 40px)); } }
 
 .progress-row {
     display: flex;
@@ -1012,13 +1227,19 @@ body.player-dead #crosshair { transform: translate(-50%, -50%) scale(0.7); }
     transition: color 120ms ease;
 }
 .btn-ghost:hover { color: var(--bone); text-decoration: underline; text-underline-offset: 4px; }
+/* BIT 11: visible keyboard focus for the ghost button (Tab nav). */
+.btn-ghost:focus-visible {
+    outline: 2px solid var(--sol-purple);
+    outline-offset: 3px;
+    color: var(--bone);
+    text-decoration: none;
+}
 
 .key-hints {
     font-family: var(--font-ui);
-    font-size: 11px;
+    font-size: 12px;
     letter-spacing: 0.04em;
     color: var(--bone-dim);
-    opacity: 0.7;
     text-align: center;
 }
 
@@ -1038,6 +1259,7 @@ body.player-dead #crosshair { transform: translate(-50%, -50%) scale(0.7); }
     transition: opacity 160ms var(--ease-snap), visibility 160ms var(--ease-snap);
 }
 #howto-modal.howto-closed { opacity: 0; visibility: hidden; pointer-events: none; }
+#howto-modal[hidden] { display: none; }
 .howto-panel {
     position: relative;
     width: min(460px, 100%);
@@ -1056,7 +1278,21 @@ body.player-dead #crosshair { transform: translate(-50%, -50%) scale(0.7); }
     font-size: 14px;
     color: var(--bone-dim);
 }
-.howto-list li b { color: var(--bone); font-family: var(--font-display); letter-spacing: 0.06em; }
+/* BIT 11: keycap chrome — key names read as physical keys, not bold README text. */
+.howto-list b {
+    display: inline-block;
+    padding: 2px 7px;
+    margin-right: 4px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: var(--r-1);
+    color: var(--bone);
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
 .howto-touch { display: none; }
 
 .panel-close {
@@ -1105,9 +1341,13 @@ body.menu-open::before {
     padding: var(--sp-6) var(--sp-5) var(--sp-5);
     clip-path: var(--clip-notch);
     transform: translate(-50%, -50%);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    /* BIT 12: custom thin scrollbar so the OS default gray bar doesn't ruin the
+       notch card. Card background is opaque, so no backdrop-blur needed. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-3) transparent;
 }
+#settings-menu::-webkit-scrollbar { width: 6px; }
+#settings-menu::-webkit-scrollbar-thumb { background: var(--bg-3); }
 #settings-menu.settings-closed {
     visibility: hidden;
     opacity: 0;
@@ -1163,33 +1403,56 @@ body.menu-open::before {
     font-variant-numeric: tabular-nums;
 }
 
-/* slider (DESIGN 4f): 4px track, gradient fill, bone thumb + ink outline */
+/* ---- slider (DESIGN 4f / BIT 12): 4px track drawn on the runnable-track with a
+   --fill-driven gradient (fill tracks the value), 28px hit area, bone thumb + ink
+   outline, hover/active/focus feedback. JS sets --fill = value%. ---- */
 .settings-row input[type="range"] {
     appearance: none;
     -webkit-appearance: none;
     width: 100%;
-    height: 4px;
-    border-radius: 0;
+    height: 28px;                 /* hit area; visual track stays 4px */
+    background: transparent;
     outline: none;
-    background: linear-gradient(to right, var(--sol-teal) 0%, var(--sol-purple) 100%) no-repeat,
+    cursor: pointer;
+    --fill: 50%;
+}
+.settings-row input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px;
+    background: linear-gradient(to right, var(--sol-teal), var(--sol-purple)) 0 0 / var(--fill) 100% no-repeat,
                 var(--bg-3);
-    background-blend-mode: normal;
 }
 .settings-row input[type="range"]::-webkit-slider-thumb {
     -webkit-appearance: none;
     width: 20px; height: 20px;
+    margin-top: -8px;             /* (4 - 20) / 2 */
     border: 2px solid var(--ink);
     border-radius: 50%;
     background: var(--bone);
     cursor: pointer;
+    transition: transform 120ms var(--ease-snap), box-shadow 120ms var(--ease-snap);
+}
+.settings-row input[type="range"]:hover::-webkit-slider-thumb,
+.settings-row input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.15); }
+.settings-row input[type="range"]:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px var(--bg-1), 0 0 12px var(--sol-teal);
+}
+/* Firefox: native progress layer, no JS needed there */
+.settings-row input[type="range"]::-moz-range-track { height: 4px; background: var(--bg-3); }
+.settings-row input[type="range"]::-moz-range-progress {
+    height: 4px;
+    background: linear-gradient(to right, var(--sol-teal), var(--sol-purple));
 }
 .settings-row input[type="range"]::-moz-range-thumb {
+    box-sizing: border-box;
     width: 20px; height: 20px;
     border: 2px solid var(--ink);
     border-radius: 50%;
     background: var(--bone);
     cursor: pointer;
 }
+
+/* BIT 12: FOV readout unit */
+#fov-val::after { content: "°"; margin-left: 1px; font-size: 13px; color: var(--bone-dim); }
 
 /* toggle checkbox (DESIGN 4f) */
 .settings-toggle-row label { justify-content: space-between; }
@@ -1291,6 +1554,7 @@ body.menu-open::before {
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;
 }
 #touch-controls {
@@ -1317,9 +1581,16 @@ body.player-dead #touch-controls {
     display: none;
     width: 120px; height: 120px;
     margin: -60px 0 0 -60px;
-    border: 1.5px solid rgba(236, 230, 210, 0.35);
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
     border-radius: 50%;
-    background: rgba(19, 24, 32, 0.4);
+    background:
+        radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 60%),
+        rgba(255, 255, 255, 0.04);
+    -webkit-backdrop-filter: blur(6px);
+            backdrop-filter: blur(6px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 4px 16px rgba(0, 0, 0, 0.35);
     pointer-events: none;
 }
 #touch-joy-base.active { display: block; }
@@ -1348,36 +1619,63 @@ body.player-dead #touch-controls {
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1.5px solid rgba(236, 230, 210, 0.35);
-    border-radius: var(--r-full);
-    background: rgba(19, 24, 32, 0.55);
-    color: var(--bone);
+    /* Premium glassmorphism: translucent glass plate, hairline rim, blur */
+    border: 1.5px solid rgba(255, 255, 255, 0.22);
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 50% 32%, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04) 62%),
+        rgba(255, 255, 255, 0.05);
+    -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+    color: #ffffff;
     font-family: var(--font-display);
     font-size: 19px;
     font-weight: 700;
-    opacity: 0.85;
-    transition: transform 80ms ease, background 80ms ease, border-color 80ms ease, opacity 80ms ease;
+    /* crisp glyphs: subtle inner top-light + firm drop shadow, no blur-mush */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.18),
+        0 4px 16px rgba(0, 0, 0, 0.4);
+    opacity: 0.9;
+    transition: transform 90ms ease, background 90ms ease, border-color 90ms ease, box-shadow 90ms ease, opacity 90ms ease;
 }
-#touch-jump.active, #touch-reload.active, #touch-switch.active, #touch-throw.active {
-    border-color: var(--sol-teal);
-    background: rgba(20, 241, 149, 0.18);
+/* :active — tint to self-cyan (--hud-self) and press-in */
+#touch-jump.active, #touch-reload.active, #touch-switch.active, #touch-gear.active {
+    border-color: var(--hud-self, #7fe9ff);
+    background:
+        radial-gradient(circle at 50% 32%, rgba(127, 233, 255, 0.30), rgba(127, 233, 255, 0.10) 66%),
+        rgba(127, 233, 255, 0.10);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 0 14px rgba(127, 233, 255, 0.45),
+        0 4px 16px rgba(0, 0, 0, 0.4);
     opacity: 1;
     transform: scale(0.92);
 }
 
-/* FIRE — primary action, pulled into the bottom-right thumb corner (96px). */
+/* FIRE — primary action, bottom-right thumb corner (96px). Carries the crit
+   identity: a bold red rim that reads as "shoot" without a heavy fill. */
 #touch-fire {
     right: calc(28px + env(safe-area-inset-right));
     bottom: calc(72px + env(safe-area-inset-bottom));
     width: 96px; height: 96px;
-    border-color: rgba(255, 51, 51, 0.75);
-    color: var(--blood-bright);
+    border-color: rgba(255, 51, 51, 0.55);
+    background:
+        radial-gradient(circle at 50% 32%, rgba(255, 90, 90, 0.16), rgba(255, 51, 51, 0.05) 60%),
+        rgba(255, 255, 255, 0.04);
+    color: var(--hud-crit, #ff3333);
     font-size: 34px;
+    opacity: 0.95;
 }
 #touch-fire.active {
-    border-color: var(--blood-bright);
-    background: rgba(255, 51, 51, 0.22);
-    box-shadow: var(--glow-blood);
+    border-color: var(--hud-crit, #ff3333);
+    background:
+        radial-gradient(circle at 50% 32%, rgba(255, 80, 80, 0.34), rgba(255, 51, 51, 0.12) 66%),
+        rgba(255, 51, 51, 0.10);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 0 18px rgba(255, 51, 51, 0.5),
+        0 4px 16px rgba(0, 0, 0, 0.45);
     opacity: 1;
     transform: scale(0.92);
 }
@@ -1412,12 +1710,18 @@ body.player-dead #touch-controls {
     bottom: calc(168px + env(safe-area-inset-bottom));
     width: 60px; height: 60px;
     font-size: 24px;
-    border-color: rgba(255, 176, 32, 0.6);
-    color: #ffb84d;
+    border-color: rgba(255, 184, 77, 0.5);
+    color: var(--hud-util, #ffb84d);
 }
 #touch-throw.active {
-    border-color: #ffb84d;
-    background: rgba(255, 140, 40, 0.2);
+    border-color: var(--hud-util, #ffb84d);
+    background:
+        radial-gradient(circle at 50% 32%, rgba(255, 184, 77, 0.30), rgba(255, 140, 40, 0.10) 66%),
+        rgba(255, 184, 77, 0.10);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 0 14px rgba(255, 184, 77, 0.45),
+        0 4px 16px rgba(0, 0, 0, 0.4);
     opacity: 1;
     transform: scale(0.92);
 }
@@ -1444,60 +1748,186 @@ body.player-dead #touch-controls {
     .brand-name { display: none; }
     .match-strip { min-height: 26px; padding: 0 9px; font-size: 11px; }
 
-    /* HP compacts to top-left (bottom corners are thumbs) */
-    #health-panel {
-        bottom: 120px;
-        top: auto;
-        left: calc(var(--sp-4) + env(safe-area-inset-left));
-        min-width: 0;
-        padding: 6px 10px;
-        clip-path: none;
-        background: var(--scrim);
-    }
-    #health-value { font-size: 30px; }
-    .health-unit { display: none; }
-    .health-track { width: 64px; height: 4px; margin-top: 4px; }
-    .hud-skull { width: 20px; height: 20px; }
+    /* ------------------------------------------------------------------ */
+    /* SLICK-AF MOBILE LAYOUT — vital readouts live in the bottom-CENTER   */
+    /* safe corridor, flanking the crosshair. Both thumb zones (left move, */
+    /* right fire-cluster) stay unobstructed. Flat plates, data emits      */
+    /* light (chrome diet). See overlap math in the note at end of block.  */
+    /* ------------------------------------------------------------------ */
 
-    /* Halo ammo counter, mobile — stays TOP-RIGHT but drops BELOW the #touch-gear
-       button (top:12/right:12, 48px) so they never overlap. Pure DISPLAY: no
-       pointer-events, reload/switch are dedicated touch buttons (#touch-reload /
-       #touch-switch). The cyan plate, icon, brackets + big Teko count carry over
-       from the base rule; only sizing/position is tightened here. */
-    #weapon-panel {
-        bottom: 120px;
+    /* Neutralize A's desktop bottom-right anchor: the group's children are
+       re-homed to the center corridor below, so the wrapper must not force
+       them into the thumb corner. Kept in flow (children are absolute). */
+    #hud-right-group {
+        position: static;
+        bottom: auto;
+        right: auto;
+        display: contents;
+    }
+
+    /* HP — bottom-center-LEFT, right-aligned toward the crosshair. Flat
+       scrim plate, teal accent on the crosshair-facing (right) edge; only
+       the number + fill glow. Anchored to the RIGHT so it grows leftward,
+       keeping it out of the left move zone on wide phones and clear of the
+       right thumb cluster on narrow ones (see overlap note). */
+    #health-panel {
+        position: absolute;
         top: auto;
-        right: calc(var(--sp-3) + env(safe-area-inset-right));
+        left: auto;
+        right: calc(50% + 150px);
+        bottom: calc(18px + env(safe-area-inset-bottom));
+        min-width: 0;
+        padding: 7px 15px 8px 12px;
+        clip-path: none;
+        background: var(--hud-scrim, var(--scrim));
+        border: none;
+        border-right: 3px solid var(--hud-vitals, var(--sol-teal));
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+        pointer-events: none;
+    }
+    .health-readout { justify-content: flex-end; }
+    #health-value {
+        font-family: var(--font-numeral, var(--font-hud));
+        font-size: 42px;
+        font-variant-numeric: tabular-nums;
+    }
+    .health-unit { display: none; }
+    .health-track { width: 92px; height: 6px; margin-top: 5px; margin-left: auto; }
+    .health-track::after { display: none; } /* ticks are illegible at 6px height */
+    .hud-skull { width: 24px; height: 24px; }
+
+    /* WEAPON / AMMO — bottom-center-RIGHT, left-aligned toward the crosshair.
+       Pure DISPLAY (no pointer-events; reload/switch are touch buttons).
+       Chrome diet: kill the Halo glow box-shadow + corner brackets + icon
+       drop-shadow; keep a single self-cyan accent on the crosshair-facing
+       (left) edge. Flat scrim plate. */
+    #weapon-panel {
+        position: absolute;
+        top: auto;
+        left: auto;
+        right: calc(50% + 6px);
+        bottom: calc(18px + env(safe-area-inset-bottom));
         min-width: 0;
         display: flex;
         flex-direction: row;
         align-items: center;
-        gap: 8px;
-        padding: 5px 10px 5px 8px;
+        gap: 10px;
+        padding: 7px 13px 8px 15px;
+        text-align: left;
+        clip-path: none;
+        background: var(--hud-scrim, var(--scrim));
+        border: none;
+        border-left: 3px solid var(--hud-self, var(--halo-cyan-deep));
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
         pointer-events: none;
     }
-    #weapon-panel::before { top: 2px; right: 2px; width: 10px; height: 10px; }
-    #weapon-panel::after  { bottom: 2px; left: 2px; width: 10px; height: 10px; }
-    #weapon-icon { width: 40px; height: 22px; }
+    #weapon-panel::before,
+    #weapon-panel::after { display: none; }
+    #weapon-icon {
+        width: 52px; height: 28px;
+        background-color: var(--hud-self, var(--halo-cyan));
+        filter: none;
+    }
+    .weapon-readout { align-items: flex-start; }
     #weapon-name {
         display: block;
-        font-size: 10px;
+        font-size: 12px;
         letter-spacing: 0.12em;
+        color: var(--hud-self, var(--halo-cyan-dim));
+        text-shadow: none;
     }
     #ammo-counter { margin-top: 0; gap: 4px; }
-    #magazine-ammo { font-size: 34px; }
-    .ammo-separator, #reserve-ammo { font-size: 15px; }
-    /* keep the .is-reloading reveal (the base #reload-state / .is-reloading rules
-       still apply); just tighten it for the compact top-right plate */
+    #magazine-ammo {
+        font-family: var(--font-numeral, var(--font-hud));
+        font-size: 46px;
+        color: #ffffff;
+        font-variant-numeric: tabular-nums;
+    }
+    .ammo-separator, #reserve-ammo {
+        font-family: var(--font-numeral, var(--font-hud));
+        font-size: 20px;
+        font-variant-numeric: tabular-nums;
+    }
+    /* keep the .is-reloading reveal (base #reload-state / .is-reloading rules
+       still apply); just tighten it for the compact center plate */
     #reload-state { min-height: 11px; margin-top: 1px; font-size: 9px; }
+
+    /* colour law: when health is critical, red must OWN the peripheral read —
+       dim the calm cyan weapon accent so it can't out-shout the red. */
+    body.low-health #weapon-panel { border-left-color: rgba(127, 233, 255, 0.35); }
+    body.low-health #weapon-icon,
+    body.low-health #weapon-name { opacity: 0.6; }
+
+    /* GRENADE — floats just ABOVE the ammo plate, sharing its left edge.
+       Flat plate, amber utility accent, chrome diet (no clip/glow). */
+    #grenade-panel {
+        position: absolute;
+        top: auto;
+        left: auto;
+        right: calc(50% + 6px);
+        bottom: calc(80px + env(safe-area-inset-bottom));
+        min-width: 0;
+        padding: 5px 12px 5px 10px;
+        clip-path: none;
+        background: var(--hud-scrim, var(--scrim));
+        border: none;
+        border-left: 3px solid var(--hud-util, #ffb84d);
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+        pointer-events: none;
+    }
+    #grenade-icon { color: var(--hud-util, #ffb84d); text-shadow: none; }
+    #grenade-count {
+        font-family: var(--font-numeral, var(--font-hud));
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* OVERLAP CHECK (thumb clearance). x = px from the screen's RIGHT     */
+    /* edge; y = px from the BOTTOM edge. safe-area insets shift every     */
+    /* element equally, so they cancel and are omitted below.             */
+    /*                                                                    */
+    /* Right thumb-cluster (buttons, from right edge):                    */
+    /*   fire   x[28..124]  y[72..168]                                    */
+    /*   reload x[44..104]  y[178..238]                                   */
+    /*   jump   x[140..204] y[168..232]                                   */
+    /*   throw  x[210..270] y[168..228]                                   */
+    /*   switch x[118..178] y[254..314]                                   */
+    /*   -> whole cluster lives at x ≤ 270 (right half only), y ≥ 72.     */
+    /*                                                                    */
+    /* Readouts anchor to CENTER and grow LEFTWARD (right-anchored):      */
+    /*   ammo/grenade right edge = 50% - 4  (just left of crosshair)      */
+    /*   HP right edge          = 50% - 132                              */
+    /* Their nearest-to-cluster point is the ammo/grenade RIGHT edge at   */
+    /* abs-x = center-4, i.e. x_from_right = screen - (center-4)          */
+    /*        = center + 4  (since center = screen/2).                    */
+    /* No overlap requires center+4 > 270  ->  center > 266  ->           */
+    /* screen width > 532px. The narrowest supported landscape phone is   */
+    /* ~568px CSS px (iPhone SE landscape); there center=284, so the ammo */
+    /* right edge sits at x=288 from the right — 18px clear of the        */
+    /* cluster's x≤270. Wider phones only widen the gap (640->54px,       */
+    /* 844->156px). Verified rects (568px, W_ammo≈120, W_hp≈100):         */
+    /*   AMMO abs-x[160..280]  clusterLeft abs-x=298  -> gap 18px  OK     */
+    /*   HP   abs-x[ 52..152]  (well left of center)  -> no cluster  OK   */
+    /* Vertically the readouts sit at bottom y[16..~70] (ammo) and        */
+    /* y[62..~96] (grenade); but they never enter the cluster's x-band    */
+    /* (x≤270 is the RIGHT side; readouts are center/left), so the y      */
+    /* overlap with fire (y≥72) is moot. HP & ammo & grenade collide with */
+    /* NONE of fire/reload/switch/jump/throw on any supported width.      */
+    /*                                                                    */
+    /* Left MOVE zone = left screen half; the joystick is FLOATING        */
+    /* (spawns at the touch point, pointer-events:none when idle) — the   */
+    /* HP plate in the lower-left-of-center is the conventional mobile-   */
+    /* shooter vitals slot and does not block the move thumb.             */
+    /* ------------------------------------------------------------------ */
 
     /* crosshair is now an inline SVG sized in user units; the spread-true parts
        already scale with viewport height (JS), so no fixed px override here —
        just a slight global shrink so the base ticks aren't chunky on phones */
     #crosshair { transform: translate(-50%, -50%) scale(0.875); }
 
-    #kill-feed { top: calc(46px + env(safe-area-inset-top)); gap: 4px; }
-    .kill-feed-row { height: 24px; font-size: 11px; }
+    #kill-feed { top: calc(46px + env(safe-area-inset-top)); gap: 4px; max-width: 210px; }
+    .kill-feed-row { height: 24px; padding: 0 8px; font-size: 12px; }
+    .kill-feed-row .kf-weapon { display: none; }
     #kill-feed .kill-feed-row:nth-child(n+4) { display: none; }
 
     #frag-banner { font-size: 26px; }
@@ -1522,6 +1952,7 @@ body.player-dead #touch-controls {
 @media (pointer: coarse) {
     .howto-desktop { display: none; }
     .howto-touch { display: block; }
+    .key-hints { display: none; } /* WASD hints are meaningless on touch */
 }
 
 /* hide player-count first on very narrow screens */
@@ -1548,11 +1979,13 @@ body.player-dead #touch-controls {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 100dvh;
     background: radial-gradient(circle at 50% 46%, #0a0d12 0%, var(--bg-0) 70%);
     transition: opacity 220ms var(--ease-exit), transform 220ms var(--ease-exit);
 }
 #splash.splash-out { opacity: 0; transform: scale(1.04); pointer-events: none; }
+/* BIT 13: dedicated leaving state that releases input immediately during fade. */
+#splash.is-leaving { pointer-events: none; animation: splash-out 0.22s ease-out forwards; }
+@keyframes splash-out { to { opacity: 0; visibility: hidden; } }
 
 .splash-inner {
     display: flex;
@@ -1623,9 +2056,15 @@ body.player-dead #touch-controls {
         transition-duration: 0.01ms !important;
     }
     #entry-progress::after { display: none; }
+    #splash, #splash * { animation-duration: 0.01ms !important; animation-delay: 0s !important; }
     body.low-health #health-value, body.low-health .hud-skull { animation: none; }
-    #weapon-panel.is-reloading #reload-state { animation: none; }
+    #weapon-panel.is-reloading #reload-state,
+    #weapon-panel.is-empty #magazine-ammo { animation: none; }
     body.player-hit #damage-flash { opacity: 0.2; }
+    /* keep the low-HP danger read as a steady (non-strobing) tint */
+    body.low-health #low-hp-vignette, #low-hp-vignette.active { animation: none; opacity: 0.7; }
+    #combat-state:not(.combat-state-hidden) { animation: none; }
+    #enter-arena.enter-unlock { animation-duration: 1ms; }
 }
 
 /* Floating overhead nametags. Subtle white callsigns above remote players;
@@ -1649,4 +2088,26 @@ body.player-dead #touch-controls {
     white-space: nowrap;
     display: none;
     user-select: none;
+}
+
+/* ADS aim button (touch): mirrors the fire button glass style; sits inboard of
+   fire, slightly smaller, and doubles as a drag-look surface (see TouchControls). */
+#touch-aim {
+    position: absolute; z-index: 32;
+    display: flex; align-items: center; justify-content: center;
+    right: calc(140px + env(safe-area-inset-right));
+    bottom: calc(150px + env(safe-area-inset-bottom));
+    width: 76px; height: 76px;
+    border: 1.5px solid rgba(255,255,255,0.22); border-radius: 50%;
+    background: radial-gradient(circle at 50% 32%, rgba(255,255,255,0.14), rgba(255,255,255,0.04) 62%), rgba(255,255,255,0.05);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    color: #fff; font-family: var(--font-display); font-size: 22px; font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 4px 16px rgba(0,0,0,0.4);
+    opacity: 0.9; transition: transform 90ms ease, background 90ms ease, border-color 90ms ease, opacity 90ms ease;
+}
+#touch-aim.active {
+    transform: scale(0.92);
+    background: radial-gradient(circle at 50% 32%, rgba(120,190,255,0.35), rgba(120,190,255,0.10) 62%), rgba(120,190,255,0.12);
+    border-color: rgba(140,200,255,0.7); opacity: 1;
 }

@@ -7,8 +7,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#07090C">
     <meta name="mobile-web-app-capable" content="yes">
-    <link rel="icon" type="image/svg+xml" href="assets/brand/logo.svg">
-    <link rel="icon" type="image/png" href="assets/sprites/crosshair.png">
+    <link rel="icon" type="image/svg+xml" href="assets/brand/favicon.svg">
+    <link rel="alternate icon" href="assets/brand/favicon-32.png" sizes="32x32">
+    <link rel="mask-icon" href="assets/brand/skull.svg" color="#14F195">
 
     <!-- UI fonts: Chakra Petch (display), Teko (HUD numerals), Inter (body).
          Preconnect + Google Fonts CSS in <head> so text is ready before the
@@ -16,9 +17,9 @@
          quickly); the preloader also awaits document.fonts before entry unlocks. -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,600;0,700;1,700&family=Inter:wght@400;600&family=Teko:wght@500;600&display=block">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Chakra+Petch:ital,wght@0,600;0,700;1,700&family=Inter:wght@400;600&family=Teko:wght@500;600&display=block">
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-8d0b60c728">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-465301bea4">
 </head>
 <body class="connection-connecting">
     <main id="game-shell">
@@ -35,6 +36,7 @@
                 <div class="match-strip">
                     <span class="status-dot" aria-hidden="true"></span>
                     <span id="connection-label">CONNECTING</span>
+                    <span id="ping-ms" aria-label="latency">--<small>MS</small></span>
                     <span class="status-divider" aria-hidden="true"></span>
                     <span id="player-count">0 PLAYERS</span>
                     <span class="status-divider" aria-hidden="true"></span>
@@ -66,7 +68,7 @@
                     <circle class="xh-dot" cx="0" cy="0" r="1"></circle>
                 </g>
             </svg>
-            <div id="hit-marker" aria-hidden="true"><i></i><i></i><span class="hm-skull"></span></div>
+            <div id="hit-marker" aria-hidden="true"><i></i><i></i><svg class="hm-skull" viewBox="0 0 14 14" aria-hidden="true"><path fill-rule="evenodd" d="M7 .8C4 .8 1.7 3.1 1.7 6c0 1.7.9 3.2 2.3 4.1v2.4h6v-2.4c1.4-.9 2.3-2.4 2.3-4.1C12.3 3.1 10 .8 7 .8zM4.6 8a1.4 1.4 0 1 1 0-2.8A1.4 1.4 0 0 1 4.6 8zm4.8 0a1.4 1.4 0 1 1 0-2.8A1.4 1.4 0 0 1 9.4 8zM7 8.4l-1 2h2z"/></svg></div>
 
             <section id="health-panel" aria-label="Player health">
                 <div class="hud-cluster">
@@ -77,37 +79,48 @@
                     </div>
                 </div>
                 <div class="health-track" aria-hidden="true">
+                    <span id="health-ghost"></span>
                     <span id="health-fill"></span>
                 </div>
             </section>
 
-            <section id="weapon-panel" data-weapon="0" aria-label="Weapon and ammunition">
-                <div id="weapon-icon" aria-hidden="true"></div>
-                <div class="weapon-readout">
-                    <div id="weapon-name">RIFLE</div>
-                    <div id="ammo-counter">
-                        <span id="magazine-ammo">30</span>
-                        <span class="ammo-separator">/</span>
-                        <span id="reserve-ammo">90</span>
+            <!-- Bottom-right vitals stack: grenade plate (top) over the weapon/ammo
+                 plate (bottom), flowing inside a flex column so the layout no longer
+                 relies on the old 66px magic offset. See Agent A / HUD-REWORK-SPEC. -->
+            <div id="hud-right-group">
+                <!-- Phase 3: frag-grenade charge count. Sits above the weapon panel;
+                     the count is driven by Simulator._updateHud from the networked
+                     grenadeCharges. Throw with G (desktop) or the mobile grenade button. -->
+                <section id="grenade-panel" data-charges="2" aria-label="Frag grenades">
+                    <span id="grenade-icon" aria-hidden="true">&#9788;</span>
+                    <span class="grenade-pips" aria-hidden="true"><i class="pip"></i><i class="pip"></i><i class="pip"></i></span>
+                    <span id="grenade-count">x2</span>
+                </section>
+
+                <section id="weapon-panel" data-weapon="0" aria-label="Weapon and ammunition">
+                    <div id="weapon-icon" aria-hidden="true"></div>
+                    <div class="weapon-readout">
+                        <div id="weapon-name">RIFLE</div>
+                        <div id="ammo-counter">
+                            <span id="magazine-ammo">30</span>
+                            <span class="ammo-separator">/</span>
+                            <span id="reserve-ammo">90</span>
+                        </div>
+                        <div id="reload-state" aria-live="assertive">RELOAD</div>
                     </div>
-                    <div id="reload-state" aria-live="assertive">RELOAD</div>
-                </div>
-            </section>
+                </section>
+            </div>
 
-            <!-- Phase 3: frag-grenade charge count. Sits beside the weapon panel;
-                 the count is driven by Simulator._updateHud from the networked
-                 grenadeCharges. Throw with G (desktop) or the mobile grenade button. -->
-            <section id="grenade-panel" aria-label="Frag grenades">
-                <span id="grenade-icon" aria-hidden="true">&#9788;</span>
-                <span id="grenade-count">x2</span>
-            </section>
-
-            <div id="combat-state" class="combat-state-hidden" role="status">
+            <div id="combat-state" class="combat-state-hidden" role="alert">
                 <img class="combat-skull" src="assets/brand/skull.svg" alt="" width="72" height="72" aria-hidden="true">
                 <div id="combat-title">YOU DIED</div>
                 <div id="combat-subtitle">RESPAWNING</div>
             </div>
         </div>
+
+        <!-- Low-HP peripheral vignette (Agent A CSS / Agent C JS). Empty layer that
+             JS toggles .active on when health is critical (<=30%). -->
+        <div id="low-hp-vignette" aria-hidden="true"></div>
 
         <div id="damage-flash" aria-hidden="true"></div>
 
@@ -133,9 +146,9 @@
 
                     <label class="field-label" for="callsign-input">CALLSIGN</label>
                     <input id="callsign-input" class="callsign" type="text" maxlength="24"
-                           autocomplete="off" spellcheck="false" placeholder="PLAYER">
+                           autocomplete="off" spellcheck="false" autocapitalize="characters" enterkeyhint="go" placeholder="PLAYER">
 
-                    <button id="enter-arena" type="button" data-loading="true" aria-disabled="true" disabled>LOADING… 0%</button>
+                    <button id="enter-arena" type="button" data-loading="true" aria-disabled="true" disabled><span class="enter-label">LOADING… 0%</span></button>
 
                     <div id="entry-progress" aria-hidden="true"><span id="entry-progress-fill"></span></div>
                     <div class="progress-row">
@@ -160,7 +173,7 @@
         </section>
 
         <!-- HOW TO PLAY (ghost modal, same panel spec) -->
-        <section id="howto-modal" class="howto-closed" aria-labelledby="howto-title">
+        <section id="howto-modal" class="howto-closed" role="dialog" aria-modal="true" aria-labelledby="howto-title">
             <div class="howto-panel">
                 <div class="card-strip" aria-hidden="true"></div>
                 <button id="howto-close" class="panel-close" type="button" aria-label="Close">✕</button>
@@ -202,6 +215,15 @@
             </div>
             <div class="settings-row settings-toggle-row" id="touch-invert-row">
                 <label for="touch-invert-y">INVERT LOOK (Y) <input type="checkbox" id="touch-invert-y"></label>
+            </div>
+
+            <div class="settings-group">AUDIO</div>
+            <div class="settings-row">
+                <label for="music-vol-slider">MUSIC VOLUME <span id="music-vol-val">35</span></label>
+                <input type="range" id="music-vol-slider" min="0" max="100" value="35">
+            </div>
+            <div class="settings-row settings-toggle-row">
+                <label for="music-mute">MUTE MUSIC <input type="checkbox" id="music-mute"></label>
             </div>
 
             <button id="resume-game" type="button">RESUME</button>
@@ -291,7 +313,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-8d0b60c728";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-8d0b60c728"></script>
+    <script>window.__BUILD_ID__="0.0.1-465301bea4";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-465301bea4"></script>
 </body>
 </html>

@@ -1,26 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
-  <!-- Mono-bone skull glyph derived from frag-arena-logo.svg (skull paths only).
-       Used as the HUD health icon and death-screen mark, loaded via <img>. The
-       fill is hardcoded bone (#ECE6D2), NOT currentColor: an <img>-loaded SVG is
-       isolated from the page, so currentColor/CSS vars don't resolve and the skull
-       rendered black-on-dark (invisible). Inline the SVG if runtime recolor is needed. -->
-  <g stroke="#1b1512" stroke-width="4" stroke-linejoin="round">
-    <path fill="#ECE6D2" d="M128,46
-      C166,46 194,74 194,112
-      C194,134 184,150 168,157
-      C165,168 161,177 154,183
-      C148,190 138,193 128,193
-      C118,193 108,190 102,183
-      C95,177 91,168 88,157
-      C72,150 62,134 62,112
-      C62,74 90,46 128,46 Z"/>
-  </g>
-  <g fill="#1b1512">
-    <ellipse cx="104" cy="112" rx="18" ry="15" transform="rotate(20 104 112)"/>
-    <ellipse cx="152" cy="112" rx="18" ry="15" transform="rotate(-20 152 112)"/>
-    <path d="M120,132 L136,132 L128,152 Z"/>
-    <rect x="114" y="171" width="4" height="20" rx="2"/>
-    <rect x="126" y="171" width="4" height="21" rx="2"/>
-    <rect x="138" y="171" width="4" height="20" rx="2"/>
+  <!-- Mono-bone skull glyph, silhouette synced with logo.svg, features
+       optically enlarged ~12% ("HUD" optical size) for small render sizes.
+       Used as the HUD health icon (26px) and death-screen mark (72px),
+       loaded via <img>. The fill is hardcoded bone (#F0EAD9), NOT
+       currentColor: an <img>-loaded SVG is isolated from the page, so
+       currentColor/CSS vars don't resolve and the skull renders
+       black-on-dark (invisible). Inline the SVG if runtime recolor is needed.
+       No blood here: a health icon that bleeds is wrong semantics - gore
+       belongs to the death screen FX, not the HUD. -->
+  <path fill="#F0EAD9" d="M128,54
+    C166,54 190,74 190,100
+    C194,112 186,126 174,136
+    L174,156
+    C172,174 150,186 128,187
+    C106,186 84,174 82,156
+    L82,136
+    C70,126 62,112 66,100
+    C66,74 90,54 128,54 Z"/>
+  <g fill="#1B1512">
+    <path d="M142,97 L174,87 C180,97 179,111 170,118 C159,124 145,120 141,110 Z"/>
+    <path d="M114,97 L82,87 C76,97 77,111 86,118 C97,124 111,120 115,110 Z"/>
+    <path d="M120,126 L136,126 L128,150 Z"/>
+    <rect x="105" y="158" width="6" height="20" rx="2"/>
+    <rect x="118" y="158" width="6" height="20" rx="2"/>
+    <rect x="131" y="158" width="6" height="20" rx="2"/>
+    <rect x="144" y="158" width="6" height="20" rx="2"/>
   </g>
 </svg>

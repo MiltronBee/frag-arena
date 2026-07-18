@@ -14,6 +14,7 @@ import { fire } from '../common/weapon'
 import { shotPattern, applyPattern } from '../common/firePattern'
 import Viewmodel from './graphics/Viewmodel'
 import WeaponAudio from './graphics/WeaponAudio'
+import MusicManager from './graphics/MusicManager'
 import FragLayer from './graphics/FragLayer'
 import MenuControls from './graphics/MenuControls'
 import { resolveWeaponFx } from './graphics/firingFx'
@@ -60,6 +61,12 @@ class Simulator {
 		// gesture (enter-arena / pointer-lock / touch).
 		this.audio = new WeaponAudio()
 
+		// background music (HTMLAudio, separate from the WebAudio SFX bus): menu
+		// theme on the entry screen, in-match track once the arena is entered. Like
+		// this.audio it stays silent until unlock() runs from a user gesture; the
+		// same pointerdown/touchstart/enter handlers below drive both.
+		this.music = new MusicManager()
+
 		// kill-feedback / "juice" layer (kill feed, frag banner, hitmarker upgrade,
 		// corpses, gibs, directional damage arc, own-death camera). Isolated from the
 		// sim: the message handlers below just forward events to it. See FragLayer.js.
@@ -90,6 +97,13 @@ class Simulator {
 		this._recoilDamping = 60
 		this._visClimb = 0
 		this._recoilFov = null // { t0, amount, inMs, outMs } transient FOV punch
+
+		// ADS (aim-down-sights) presentation state. _adsT eases 0(hip)..1(aimed) over
+		// the weapon's in/out time and drives the composed world-camera FOV + look
+		// sensitivity ONLY (never the aim ray). _adsSuppressUntilRelease forces a fresh
+		// aim press after a weapon switch so a newly equipped gun never auto-aims.
+		this._adsT = 0
+		this._adsSuppressUntilRelease = false
 		this._pumpDip = null // { t, vel } frame-clock shotgun/flak pump-dip timer
 
 		// first-person weapon, swap with 1-4 / Q / wheel. Only the EQUIPPED weapon's
@@ -133,7 +147,7 @@ class Simulator {
 		// button (see _syncEntryState) and drives the loading bar.
 		const arenaReady = (this.renderer.arenaDressing && this.renderer.arenaDressing._ready) || Promise.resolve()
 		preloadAssets(this.renderer, arenaReady, (frac, stage) => this._setAssetProgress(frac, stage))
-			.then(() => { this._assetsReady = true; this._setAssetProgress(1, 'FINALIZING'); this._syncEntryState() })
+			.then(() => { this._assetsReady = true; this._setAssetProgress(1, 'FINALIZING'); this._syncEntryState(); this.audio.readyGo() })
 
 		// dev-only tooling: the server ignores DevUpdateWeaponConfigCommand in
 		// production, so predicting with modified configs would only desync us
@@ -193,6 +207,9 @@ class Simulator {
 			this.myRawEntity.velY = 0
 			this.myRawEntity.velZ = 0
 
+			// local respawn cue (this message is our own re-entry — see guard above)
+			this.audio.respawn()
+
 			// clear own-death camera drop/roll + red wash (FragLayer owns them)
 			this.fragLayer.onRespawned()
 		})
@@ -208,6 +225,11 @@ class Simulator {
 		// broadcast: kill feed, frag banner, victim corpse/gib, own-death camera
 		client.on('message::Killed', message => {
 			this.fragLayer.onKilled(message)
+			// local-player death sting: gate on the LOCAL player being the victim
+			// (same iDied test FragLayer.onKilled uses, keyed by our smooth nid)
+			if (this.mySmoothEntity && message.victimNid === this.mySmoothEntity.nid) {
+				this.audio.death()
+			}
 		})
 
 		// victim-only: directional damage arc + scaled red screen wash
@@ -231,7 +253,7 @@ class Simulator {
 			const spec = weapons[message.weaponIndex]
 			const fx = resolveWeaponFx(spec)
 			if (spec && spec.type === 'hitscan') {
-				const offsets = shotPattern(spec, message.seed, message.heat)
+				const offsets = shotPattern(spec, message.seed, message.heat, message.aimFactor)
 				const maxTracers = (fx.tracer && fx.tracer.pelletTracers) || offsets.length
 				offsets.forEach((off, i) => {
 					const d = applyPattern({ x: message.tx, y: message.ty, z: message.tz }, off)
@@ -263,9 +285,13 @@ class Simulator {
 		})
 
 		this.input.onmousemove = (e) => {
-			// DIY camera control, first person shooter style
-			this.renderer.camera.rotation.x += e.movementY * 0.001 * this.sensitivity
-			this.renderer.camera.rotation.y += e.movementX * 0.001 * this.sensitivity
+			// DIY camera control, first person shooter style. While aimed, look speed is
+			// scaled by the weapon's ADS multiplier (smoothly, via _adsT) — this reduces
+			// how far a mouse delta rotates the camera; the fire ray is still whatever the
+			// camera ends up pointing at, so aim stays authoritative.
+			const s = this.sensitivity * this._adsSensFactor()
+			this.renderer.camera.rotation.x += e.movementY * 0.001 * s
+			this.renderer.camera.rotation.y += e.movementX * 0.001 * s
 
 			// prevent us from doing flips
 			if (this.renderer.camera.rotation.x > Math.PI * 0.499) {
@@ -288,8 +314,11 @@ class Simulator {
 	// the same as the mouse path above (no flips past ~±89.8°).
 	applyTouchLookDelta(yawRad, pitchRad) {
 		const cam = this.renderer.camera
-		cam.rotation.y += yawRad
-		cam.rotation.x += pitchRad
+		// while aimed, scale touch look speed by the weapon's ADS multiplier (same
+		// smooth _adsT curve as the mouse path) — presentation only, aim ray unaffected.
+		const s = this._adsSensFactor()
+		cam.rotation.y += yawRad * s
+		cam.rotation.x += pitchRad * s
 
 		if (cam.rotation.x > Math.PI * 0.499) {
 			cam.rotation.x = Math.PI * 0.499
@@ -390,10 +419,16 @@ class Simulator {
 		if (camKick.climb) this._visClimb = Math.min(this._visClimb + camKick.climb, camKick.climbMax || 1.2)
 		const yaw = (camKick.yawDrift || 0) + (Math.random() - 0.5) * 2 * (camKick.yawJitter || 0)
 		this._recoilVel.y += yaw * scale * this._springImpulseGain()
-		// subtle roll, random sign, tiny magnitude (readability): reuse yawJitter as a
-		// roll seed proportion so heavier guns roll a touch more.
-		const rollDeg = (camKick.yawJitter || 0) * 0.6
-		this._recoilVel.z += (Math.random() - 0.5) * 2 * rollDeg * scale * this._springImpulseGain()
+		// subtle roll, RANDOM sign, tiny magnitude (readability). Prefer the explicit
+		// per-weapon camKick.roll (degrees) when the config supplies it; otherwise fall
+		// back to a yawJitter-derived seed so heavier guns roll a touch more even on
+		// presets that predate the roll channel. Random sign keeps it a shimmer, not a
+		// systematic lean. Fed through _recoilVel.z / the return spring exactly like
+		// pitch & yaw, so it rides the same apply-late/remove-first path in update() and
+		// is never live when getForwardRay() is read → fire-ray byte-identical.
+		const rollDeg = camKick.roll != null ? camKick.roll : (camKick.yawJitter || 0) * 0.6
+		const rollSign = Math.random() < 0.5 ? -1 : 1
+		this._recoilVel.z += rollSign * rollDeg * scale * this._springImpulseGain()
 
 		// shotgun-only FOV concussion punch (world camera; the vmCamera has its own
 		// fixed fov so the gun never distorts). Does NOT touch rotation → aim-safe.
@@ -456,9 +491,31 @@ class Simulator {
 	// Compose the transient shotgun FOV punch onto the LIVE base fov each frame (never
 	// mutate the stored base). Ease in fast, out slow. World camera only. Aim-safe (FOV
 	// is not orientation — getForwardRay() direction is unaffected by field of view).
+	// cubic ease-out for the ADS transition — a linear FOV lerp reads cheap and jerks
+	// at the endpoints (constant angular velocity); ease-out gives it weight.
+	_adsEase(t) { return 1 - Math.pow(1 - t, 3) }
+
+	// look-speed multiplier while aimed. FOCAL-LENGTH ("0%") matched, not a fixed
+	// magic number: scale by the ratio of half-FOV tangents at the current (eased)
+	// zoom so hand->pixel travel stays consistent as the view zooms in. 1.0 at hip.
+	// Never mutates the stored sensitivity. (id-gameplay review: gemini-id.mjs.)
+	_adsSensFactor() {
+		const ads = weapons[this.weaponIndex] && weapons[this.weaponIndex].ads
+		if (!ads || !this._adsT) return 1
+		const t = this._adsEase(this._adsT)
+		const curFov = this.fov + (ads.fov - this.fov) * t
+		return Math.tan((curFov * Math.PI) / 360) / Math.tan((this.fov * Math.PI) / 360)
+	}
+
 	_applyRecoilFov() {
 		const cam = this.renderer.camera
-		const base = (this.fov * Math.PI) / 180
+		// Composed world-camera FOV: base user FOV -> ADS interpolation -> transient
+		// recoil punch. FOV is not orientation, so getForwardRay() is unaffected by any
+		// of it → the aim ray + MoveCommand stay byte-identical whether aimed or not.
+		const ads = weapons[this.weaponIndex] && weapons[this.weaponIndex].ads
+		const t = this._adsEase(this._adsT || 0)
+		const fovDeg = ads ? (this.fov + (ads.fov - this.fov) * t) : this.fov
+		const base = (fovDeg * Math.PI) / 180
 		const p = this._recoilFov
 		if (!p) { if (cam.fov !== base) cam.fov = base; return }
 		const age = performance.now() - p.t0
@@ -479,13 +536,13 @@ class Simulator {
 	// flash the crosshair hit marker. One reused timer (cleared each call) so repeated
 	// hits never pile up timers. kill = the skull/rotating red-X kill treatment; `heavy`
 	// (≥20 predicted dmg — pistol/shotgun) gets a slightly bigger pop. Durations here
-	// MUST match the CSS keyframes (hit-pop 160ms, kill-pop 350ms) so the class is
+	// MUST match the CSS keyframes (hit-pop 160ms, kill-pop 450ms) so the class is
 	// removed exactly when the grow-in/out animation ends.
 	_showHitMarker(kill, heavy) {
 		const el = document.getElementById('hit-marker')
 		if (!el) return
 		el.classList.remove('hit-active', 'kill-active', 'hit-active-heavy')
-		void el.offsetWidth // restart the CSS animation
+		void el.offsetWidth // restart the CSS animation (SMG-rate re-triggers must not drop the marker)
 		if (kill) {
 			el.classList.add('kill-active')
 		} else {
@@ -495,7 +552,7 @@ class Simulator {
 		clearTimeout(this._hitMarkerTimer)
 		this._hitMarkerTimer = setTimeout(() => {
 			el.classList.remove('hit-active', 'kill-active', 'hit-active-heavy')
-		}, kill ? 350 : 160)
+		}, kill ? 450 : 160)
 	}
 
 	// plasma bolt bookkeeping (called from the Projectile factory). Each bolt is
@@ -676,7 +733,16 @@ class Simulator {
 		const n = weapons.length
 		index = ((index % n) + n) % n
 		if (index === this.weaponIndex) return
+		// swap accepted (past the same-weapon / normalized-index guards): play the
+		// swap clack. weaponSwap() self-throttles so scroll-cycling can't spam it.
+		this.audio.weaponSwap()
 		this.weaponIndex = index
+		// force a fresh aim press on the new weapon (don't inherit held ADS) AND snap
+		// the camera to hip INSTANTLY — never show a half-zoomed newly-equipped gun
+		// (the swap "sleeper" bug from the id review). _adsT is a global player state,
+		// not per-weapon, so this is a clean hard reset.
+		this._adsSuppressUntilRelease = true
+		this._adsT = 0
 		this._queueViewmodelSwap(index)
 		this._pumpDip = null // drop any pending pump-dip so it can't fire on the new gun
 
@@ -850,6 +916,17 @@ class Simulator {
 
 			/* begin movement */
 			const { forwards, left, backwards, right, jump } = input
+
+			// ADS held-aim intent for BOTH the networked command (gameplay accuracy) and
+			// the local presentation below — computed ONCE so they never disagree. Clear
+			// the post-swap suppression once aim is released; a dodge descopes instantly
+			// and re-suppresses (Hale: dodge-descope, no move-speed penalty).
+			if (this._adsSuppressUntilRelease && !input.aimDown) this._adsSuppressUntilRelease = false
+			if (dodge) this._adsSuppressUntilRelease = true
+			const _wcfg = weapons[this.weaponIndex]
+			const aimHeld = !!(_wcfg && _wcfg.ads) && input.aimDown && !this._adsSuppressUntilRelease &&
+				!this.myRawEntity.weaponsState[this.weaponIndex].reloading && !this._wasDead
+
 			const command = new MoveCommand({
 				camRayX: camRay.x,
 				camRayY: camRay.y,
@@ -859,6 +936,7 @@ class Simulator {
 				weaponIndex: this.weaponIndex,
 				reload: input.reload && !this._reloadHeld,
 				fireInput: input.mouseDown,
+				aimInput: aimHeld,
 				// Phase 3: edge-triggered frag-grenade throw (only the rising edge — so
 				// holding G doesn't dump both charges). Same pattern as reload above.
 				throwInput: input.throwInput && !this._throwHeld,
@@ -914,11 +992,17 @@ class Simulator {
 
 			const state = this.myRawEntity.weaponsState[this.weaponIndex]
 			this._reloadHeld = input.reload
+			// grenade-throw whoosh on the rising edge, only when a charge is available
+			if (input.throwInput && !this._throwHeld && (this.myRawEntity.grenadeCharges || 0) > 0) this.audio.grenadeThrow()
 			this._throwHeld = input.throwInput
 
 			/* shooting (blocked while the reload animation runs) */
 			if (input.mouseDown && !state.reloading) {
 				const ray = fire(this.myRawEntity)
+				// empty-mag dry-fire click (self-throttled). fire() returns null both on
+				// an empty magazine and on fire-rate cooldown, so gate on ammo to avoid
+				// clicking between live shots while the trigger is held.
+				if (!ray && state.magazineAmmo <= 0) this.audio.dryFire()
 				if (ray) {
 					// send shot to the server
 					this.client.addCommand(new FireCommand())
@@ -937,7 +1021,7 @@ class Simulator {
 					// tracer + wall mark) IS the server's damage pattern — instant
 					// feedback, no round trip. Flesh hits flash the predicted marker.
 					if (ray.config.type === 'hitscan') {
-						const offsets = shotPattern(ray.config, ray.seed, ray.heat)
+						const offsets = shotPattern(ray.config, ray.seed, ray.heat, ray.aimFactor)
 						const maxTracers = (fx.tracer && fx.tracer.pelletTracers) || offsets.length
 						let hitFlesh = false
 						offsets.forEach((off, i) => {
@@ -984,7 +1068,20 @@ class Simulator {
 			}
 
 			// bob the equipped weapon each frame (based on movement)
-			if (this.viewmodel) this.viewmodel.update(delta, forwards || backwards || left || right)
+			// ADS presentation: reuse the SAME held-aim intent that went into the command
+			// (aimHeld) so gameplay accuracy and the visuals never disagree; the viewmodel
+			// additionally needs its baked ADS clips (hasAds). Eases _adsT, which the
+			// composed FOV + sensitivity + holder mount read. Pure presentation — the aim
+			// ray + MoveCommand were already committed above from the recoil-free camera.
+			const wcfg = _wcfg
+			const adsWant = aimHeld && !!(this.viewmodel && this.viewmodel.hasAds)
+			if (this.viewmodel) this.viewmodel.setAim(adsWant)
+			const adsTime = (wcfg.ads ? (adsWant ? wcfg.ads.inTime : wcfg.ads.outTime) : 0.18) || 0.0001
+			this._adsT = adsWant
+				? Math.min(1, this._adsT + delta / adsTime)
+				: Math.max(0, this._adsT - delta / adsTime)
+
+			if (this.viewmodel) this.viewmodel.update(delta, forwards || backwards || left || right, this._adsEase(this._adsT || 0))
 
 			// VISUAL camera recoil, applied AFTER the fire ray + MoveCommand aim were
 			// read (above) and after prediction — so the render picture shows the kick
@@ -1085,6 +1182,20 @@ class Simulator {
 				: state === 'disconnected' ? 'OFFLINE' : 'CONNECTING'
 		}
 
+		// bit 8: status-color law — drive .match-strip[data-state] so the strip color
+		// (green=online / amber-pulse=connecting / red-pulse=offline) reads at a glance,
+		// no text parse needed. Map our internal states to the contract vocabulary.
+		// Element owned by the HTML agent — guard for null.
+		const matchStrip = document.querySelector('.match-strip')
+		if (matchStrip) {
+			matchStrip.dataset.state = state === 'connected'
+				? 'online'
+				: state === 'disconnected' ? 'offline' : 'connecting'
+		}
+		// #ping-ms is driven per-frame in _updateHud from nengi's client.averagePing
+		// (RTT via the framework's Ping/Pong timesync) — not here, since latency updates
+		// continuously rather than only on connection-state changes.
+
 		if (state === 'disconnected') {
 			this._arenaEntered = false
 			body.classList.remove('arena-entered')
@@ -1092,6 +1203,7 @@ class Simulator {
 			if (overlay) overlay.classList.add('is-visible')
 			this._closeSettings()
 			if (document.pointerLockElement) document.exitPointerLock()
+			this.music.play('menu') // back on the entry screen -> menu theme
 		}
 
 		this._syncEntryState()
@@ -1128,6 +1240,7 @@ class Simulator {
 			const locked = document.pointerLockElement === this.input.canvasEle
 			if (locked) {
 				this.audio.resume() // ensure audio is live once we're in the arena
+				this.music.play('match') // crossfade menu theme -> in-match track
 				this._arenaEntered = true
 				document.body.classList.add('arena-entered')
 				const overlay = document.getElementById('entry-overlay')
@@ -1139,16 +1252,38 @@ class Simulator {
 			}
 		})
 
+		// Procedural UI SFX (Kimi bit 2): ONE delegated pair covers every menu button
+		// (PLAY / HOW TO / RESUME / settings / sliders) — no per-handler wiring. Uses
+		// pointerdown (not click) for ~40ms faster feedback, capture phase so a handler's
+		// stopPropagation can't swallow it. The audio methods self-throttle and no-op
+		// before the AudioContext exists, so the very first PLAY press is silently safe.
+		document.addEventListener('pointerdown', (e) => {
+			const t = e.target
+			if (t && t.closest && t.closest('button, [data-sfx]')) this.audio.uiClick()
+		}, true)
+		const canHover = typeof window.matchMedia !== 'function' || window.matchMedia('(hover:hover)').matches
+		document.addEventListener('pointerover', (e) => {
+			if (!canHover) return // no hover cue on touch/coarse pointers
+			const t = e.target
+			const btn = t && t.closest && t.closest('button, [data-sfx]')
+			if (btn && btn !== this._lastHoverEl) { this._lastHoverEl = btn; this.audio.uiHover() }
+		}, true)
+
 		// Mobile has no pointer lock, so the desktop resume path above never runs
 		// there. After any OS audio interruption (screen dim, notification, app
 		// switch, iOS call/Siri) the AudioContext suspends and nothing recovers it —
 		// audio goes permanently silent. Resume on touch-reachable events. resume()
 		// already guards on state, so these are cheap + idempotent.
-		document.addEventListener('touchstart', () => this.audio.resume(), { passive: true })
-		document.addEventListener('pointerdown', () => this.audio.resume())
+		document.addEventListener('touchstart', () => { this.audio.resume(); this.music.unlock() }, { passive: true })
+		document.addEventListener('pointerdown', () => { this.audio.resume(); this.music.unlock() })
 		document.addEventListener('visibilitychange', () => {
 			if (document.visibilityState === 'visible') this.audio.resume()
 		})
+
+		// start on the menu theme: play() only records the desired track, so it's
+		// silent until the first gesture unlock() above — then Arena Signal loops
+		// under the entry screen until the player enters the arena.
+		this.music.play('menu')
 
 		this._syncEntryState()
 	}
@@ -1198,7 +1333,10 @@ class Simulator {
 			button.setAttribute('data-loading', ready ? 'false' : 'true')
 			button.setAttribute('aria-disabled', ready ? 'false' : 'true')
 			const label = ready ? 'PLAY' : (this._connectionState === 'disconnected' ? 'CONNECTION LOST' : 'LOADING… ' + pct + '%')
-			if (button.textContent !== label) button.textContent = label
+			// text lives in the .enter-label span so the CSS load-fill layers (::before/::after)
+			// aren't clobbered; fall back to the button itself if the span is absent.
+			const labelEl = button.querySelector('.enter-label') || button
+			if (labelEl.textContent !== label) labelEl.textContent = label
 			if (ready && !this._enterUnlocked) {
 				this._enterUnlocked = true
 				button.classList.add('enter-unlock')
@@ -1219,6 +1357,7 @@ class Simulator {
 	_enterArena() {
 		if (this._connectionState !== 'connected' || !this._arenaReady) return
 		this.audio.resume() // WebAudio needs a user gesture — this click is one
+		this.music.unlock() // same gesture unlocks the music player
 		this._arenaEntered = true
 		document.body.classList.add('arena-entered')
 		this._closeSettings()
@@ -1226,6 +1365,7 @@ class Simulator {
 		const overlay = document.getElementById('entry-overlay')
 		if (this.isTouch) {
 			if (overlay) overlay.classList.remove('is-visible')
+			this.music.play('match') // touch has no pointer-lock event — switch here
 			if (this.touchControls) this.touchControls.enterFullscreen()
 		} else {
 			this.input.requestPointerLock()
@@ -1234,13 +1374,23 @@ class Simulator {
 
 	_openSettings() {
 		const menu = document.getElementById('settings-menu')
-		if (menu) menu.classList.remove('settings-closed')
+		// menu-open cue only on a genuine closed->open transition (these methods are
+		// called idempotently from several paths — don't double-tone).
+		if (menu) {
+			const wasClosed = menu.classList.contains('settings-closed')
+			menu.classList.remove('settings-closed')
+			if (wasClosed && this.audio) this.audio.menuOpen()
+		}
 		document.body.classList.add('menu-open')
 	}
 
 	_closeSettings() {
 		const menu = document.getElementById('settings-menu')
-		if (menu) menu.classList.add('settings-closed')
+		if (menu) {
+			const wasOpen = !menu.classList.contains('settings-closed')
+			menu.classList.add('settings-closed')
+			if (wasOpen && this.audio) this.audio.menuClose()
+		}
 		document.body.classList.remove('menu-open')
 	}
 
@@ -1269,6 +1419,23 @@ class Simulator {
 			if (count) count.textContent = `${playerCount} ${playerCount === 1 ? 'PLAYER' : 'PLAYERS'}`
 		}
 
+		// bit 8: live latency readout. nengi measures RTT via its server timesync
+		// (Ping/Pong chunks) and exposes the smoothed value as client.averagePing (ms).
+		// Write the top-strip #ping-ms, flag >120ms as bad. Update only on change so we
+		// don't touch the DOM every frame. The markup is "<text>--</text><small>MS</small>",
+		// so patch the leading text node to keep the MS unit. Element owned by the HTML agent.
+		const ping = Math.round(this.client.averagePing || 0)
+		if (ping !== this._lastPing) {
+			this._lastPing = ping
+			const pingEl = document.getElementById('ping-ms')
+			if (pingEl) {
+				const node = pingEl.firstChild
+				if (node && node.nodeType === 3) node.nodeValue = String(ping)
+				else pingEl.textContent = String(ping)
+				pingEl.classList.toggle('is-bad', ping > 120)
+			}
+		}
+
 		if (!this.myRawEntity) return
 		if (!this._arenaReady) this.setArenaReady()
 
@@ -1282,20 +1449,57 @@ class Simulator {
 		const healthFill = document.getElementById('health-fill')
 		if (healthValue) healthValue.textContent = Math.round(health)
 		// fill is full at >=100 (base bar maxed); the overheal color/glow signals the extra
-		if (healthFill) healthFill.style.transform = `scaleX(${Math.min(1, health / 100)})`
+		const healthScale = Math.min(1, health / 100)
+		if (healthFill) healthFill.style.transform = `scaleX(${healthScale})`
 		document.body.classList.toggle('overheal', overheal)
-		document.body.classList.toggle('low-health', health > 0 && health <= 30)
+		// damage-ghost trail (bit 3): a lagging white bar behind the fill makes burst
+		// damage readable (Apex/Valorant-style). Drive it with the SAME scaleX as the
+		// fill; the CSS transition delay makes it drain behind. On a HEAL (scale rising
+		// vs last frame) suppress the lag so the ghost snaps up instead of leaving a
+		// stale trail below the new fill. Element owned by the HTML agent — guard for null.
+		const healthGhost = document.getElementById('health-ghost')
+		if (healthGhost) {
+			const healing = this._lastHealth !== null && health > this._lastHealth
+			healthGhost.style.transition = healing ? 'none' : ''
+			healthGhost.style.transform = `scaleX(${healthScale})`
+		}
+		// three-band health color law: mid-health (warn) sits between full and crit.
+		// crit (low-health, <=30) is toggled below and must win, so mid is strictly 30<hp<=60.
+		document.body.classList.toggle('mid-health', health <= 60 && health > 30)
+		// third critical-state channel (spec AGENT C): pulsing red full-screen vignette,
+		// fired by the SAME threshold as the health-panel red so both channels read
+		// together. health is clamped 0..150, so a dead player (health===0) fails the
+		// `> 0` guard and the vignette clears on death; it clears on respawn too once HP
+		// climbs back above 30. Element + its CSS are owned by Agent A (guard for null).
+		const lowHealth = health > 0 && health <= 30
+		document.body.classList.toggle('low-health', lowHealth)
+		const vignette = document.getElementById('low-hp-vignette')
+		if (vignette) vignette.classList.toggle('active', lowHealth)
 
 		// hit flash on a health drop — but NOT when the drop is just the overheal band
 		// decaying (prev >100 shrinking while still >=100 is the 2/s overheal decay, not
 		// an incoming hit), which would otherwise strobe the damage flash every step.
 		const overhealDecayTick = this._lastHealth > 100 && health >= 100
 		if (this._lastHealth !== null && health < this._lastHealth && !overhealDecayTick) {
+			// local-hurt audio: low muffled body thump, louder as HP drops (Kimi SFX bit 1,
+			// spectrally opposite the bright hitMarker). Self-throttled for SMG streams.
+			this.audio.localHurt(Math.max(0, Math.min(1, health / 100)))
 			clearTimeout(this._hitFlashTimer)
 			document.body.classList.add('player-hit')
 			this._hitFlashTimer = setTimeout(() => {
 				document.body.classList.remove('player-hit')
 			}, 90)
+			// bit 7: full-screen damage flash. Non-directional here — the DIRECTIONAL
+			// arc + --dmg-angle live in FragLayer.onDamageTaken (which has the attacker
+			// yaw); this is the always-fires fallback pop keyed off any HP drop, with a
+			// reflow restart so rapid consecutive hits each re-trigger. Element owned by
+			// the HTML agent — guard for null.
+			const dmgFlash = document.getElementById('damage-flash')
+			if (dmgFlash) {
+				dmgFlash.classList.remove('hit')
+				void dmgFlash.offsetWidth // restart the CSS animation
+				dmgFlash.classList.add('hit')
+			}
 		}
 		this._lastHealth = health
 
@@ -1338,7 +1542,15 @@ class Simulator {
 			const text = 'x' + n
 			if (grenadeCount.textContent !== text) grenadeCount.textContent = text
 			const panel = document.getElementById('grenade-panel')
-			if (panel) panel.classList.toggle('is-empty', n <= 0)
+			if (panel) {
+				panel.classList.toggle('is-empty', n <= 0)
+				// bit 5: pip strip mirrors the live charge count. data-charges lets CSS
+				// react to the count; each .pip lights .is-full while its index < n.
+				// Pips owned by the HTML agent — guard (querySelectorAll is [] if absent).
+				panel.dataset.charges = n
+				const pips = panel.querySelectorAll('.grenade-pips .pip')
+				for (let i = 0; i < pips.length; i++) pips[i].classList.toggle('is-full', i < n)
+			}
 		}
 
 		const weapon = weapons[this.weaponIndex]
@@ -1354,11 +1566,16 @@ class Simulator {
 		if (reserve) reserve.textContent = state.reserveAmmo
 		if (weaponPanel) {
 			weaponPanel.classList.toggle('is-reloading', !!state.reloading)
-			// pre-empty warning: warn the player at <=25% mag so they can reload
-			// before running dry mid-fight (empty is covered by .is-reloading)
-			const lowAmmoThreshold = Math.ceil((weapon ? weapon.magazineCapacity : 1) * 0.25)
-			const isLowAmmo = state.magazineAmmo > 0 && state.magazineAmmo <= lowAmmoThreshold && !state.reloading
-			weaponPanel.classList.toggle('low-ammo', isLowAmmo)
+			// bit 4: 3-tier ammo state (contract names is-low-ammo / is-empty).
+			// LOW MAG (<=25%, still loaded): steady amber warning so the player can
+			// top off before running dry. EMPTY (0, not reloading): red panic owns it.
+			// Both suppress while reloading (that channel = is-reloading).
+			const magazineCapacity = weapon ? weapon.magazineCapacity : 1
+			const lowAmmoThreshold = Math.ceil(magazineCapacity * 0.25)
+			const isLowAmmo = !state.reloading && state.magazineAmmo > 0 && state.magazineAmmo <= lowAmmoThreshold
+			const isEmpty = !state.reloading && state.magazineAmmo === 0
+			weaponPanel.classList.toggle('is-low-ammo', isLowAmmo)
+			weaponPanel.classList.toggle('is-empty', isEmpty)
 		}
 	}
 
@@ -1393,6 +1610,27 @@ class Simulator {
 				sensVal.textContent = val.toFixed(2)
 				localStorage.setItem('sens', val)
 			})
+		}
+
+		// AUDIO: music volume (0..100 in the UI, 0..1 in the manager) + mute. Reads
+		// the live values from MusicManager (already loaded from localStorage) so the
+		// controls reflect the persisted state each time the menu opens.
+		const musicSlider = document.getElementById('music-vol-slider')
+		const musicVal = document.getElementById('music-vol-val')
+		if (musicSlider && musicVal) {
+			const pct = Math.round(this.music.baseVolume * 100)
+			musicSlider.value = pct
+			musicVal.textContent = pct
+			musicSlider.addEventListener('input', (e) => {
+				const p = parseInt(e.target.value, 10)
+				musicVal.textContent = p
+				this.music.setVolume(p / 100)
+			})
+		}
+		const musicMute = document.getElementById('music-mute')
+		if (musicMute) {
+			musicMute.checked = this.music.muted
+			musicMute.addEventListener('change', (e) => this.music.setMuted(e.target.checked))
 		}
 
 		// touch-only look settings: independent sensitivity + invert-Y. These rows

@@ -45,6 +45,7 @@ const keystate = () => {
 		reload: false,
 		throwInput: false,
 		mouseDown: false,
+		aimDown: false, // held RMB (desktop) / aim button (touch) — ADS
 		dodge: null // a dodgeable action name when a double-tap fired this frame
 	}
 }
@@ -121,8 +122,16 @@ class InputSystem {
 				return // Don't shoot on the lock click
 			}
 
-			this._currentState.mouseDown = true
-			this.frameState.mouseDown = true
+			// distinguish buttons EXPLICITLY: left (0) fires, right (2) aims. The old
+			// generic handler set mouseDown on any button, so right-click fired — ADS
+			// needs RMB, so fire must not steal it.
+			if (event.button === 2) {
+				this._currentState.aimDown = true
+				this.frameState.aimDown = true
+			} else if (event.button === 0) {
+				this._currentState.mouseDown = true
+				this.frameState.mouseDown = true
+			}
 		})
 
 		document.addEventListener('pointerlockchange', () => {
@@ -134,11 +143,23 @@ class InputSystem {
 				this.pointerLocked = false
 				this._currentState.mouseDown = false
 				this.frameState.mouseDown = false
+				// aim must never stick across a lock loss (brief)
+				this._currentState.aimDown = false
+				this.frameState.aimDown = false
 			}
 		})
 
-		document.addEventListener('mouseup', () => {
+		document.addEventListener('mouseup', event => {
+			if (event.button === 2) this._currentState.aimDown = false
+			else if (event.button === 0) this._currentState.mouseDown = false
+		})
+
+		// window blur (alt-tab, OS switch) must clear held aim + fire so they can't
+		// stick while the tab is backgrounded (brief: aim can't get stuck).
+		window.addEventListener('blur', () => {
 			this._currentState.mouseDown = false
+			this._currentState.aimDown = false
+			this.frameState.aimDown = false
 		})
 	}
 
@@ -156,6 +177,7 @@ class InputSystem {
 		this.frameState.reload = this._currentState.reload
 		this.frameState.throwInput = this._currentState.throwInput
 		this.frameState.mouseDown = this._currentState.mouseDown
+		this.frameState.aimDown = this._currentState.aimDown
 		this.frameState.jump = this._currentState.jump
 		this.frameState.justReleasedR = false
 		this.frameState.dodge = null

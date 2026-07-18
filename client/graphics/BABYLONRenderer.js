@@ -75,6 +75,9 @@ class BABYLONRenderer {
 		// mobile and applies uniformly to world + viewmodel cameras.
 		const ip = this.scene.imageProcessingConfiguration
 		ip.toneMappingEnabled = true
+		// STANDARD tonemap. ACES was tried (2026-07-17) and reverted: it crushed the
+		// midtones and the arena read near-black on real displays even with exposure
+		// raised to 1.3. Scene legibility beats highlight rolloff here.
 		ip.contrast = 1.35
 		ip.exposure = 1.05
 		ip.vignetteEnabled = true
@@ -118,9 +121,15 @@ class BABYLONRenderer {
 		sun.intensity = 1.65
 		sun.diffuse = new BABYLON.Color3(1.0, 0.82, 0.6)        // low warm key
 		sun.specular = new BABYLON.Color3(0.6, 0.5, 0.4)
+		// 1024 shadow map on every tier: the 2048 desktop map (tried 2026-07-17) cost
+		// real frame time for a marginal sharpness gain and was reverted after a live
+		// perf regression (janked frames delay message-driven SFX into audible bursts).
+		// shadowOrthoScale stays tightened so more texels land on the 60u playfield.
+		this._isMobile = /Mobi|Android/i.test((typeof navigator !== 'undefined' && navigator.userAgent) || '')
 		this.shadowGenerator = new BABYLON.ShadowGenerator(1024, sun)
 		this.shadowGenerator.useBlurExponentialShadowMap = true
 		this.shadowGenerator.blurKernel = 16
+		sun.shadowOrthoScale = 0.35
 		// a bright light that lights ONLY the first-person viewmodel (from the camera's
 		// side), so arms/gun are always legible even when the scene key light is behind
 		// them. Viewmodels register their meshes into includedOnlyMeshes.
@@ -153,6 +162,10 @@ class BABYLONRenderer {
 		this._muzzleLight = new BABYLON.PointLight('muzzleFlashLight', new BABYLON.Vector3(0, -100, 0), this.scene)
 		this._muzzleLight.intensity = 0
 		this._muzzleLight.range = 10
+		// GLTF (inverse-square) falloff instead of the default linear: a hotter core
+		// near the muzzle and a softer edge, so the flash "licks" walls more naturally
+		// than a hard linear ramp (Babylon 4.0.3 exposes Light.FALLOFF_GLTF = 2).
+		this._muzzleLight.falloffType = BABYLON.Light.FALLOFF_GLTF
 		this._muzzleLight.diffuse = new BABYLON.Color3(1, 0.8, 0.45)
 		this._muzzleLight.specular = new BABYLON.Color3(0.25, 0.2, 0.12)
 		this._muzzleLightPulse = null // { t0, life, peak } — decayed in update()
@@ -169,8 +182,10 @@ class BABYLONRenderer {
 		const skyMesh = this.scene.getMeshByName('sky_mesh')
 		if (skyMesh) skyMesh.applyFog = false
 
-		// --- distance fog: dark slate, a touch denser — swallows the far arena into
-		// gloom for depth without hiding mid-range targets
+		// --- distance fog: dark slate, subtle. LINEAR fogStart 22 / fogEnd 78 was
+		// tried (2026-07-17) and reverted — in a ~60u arena it buried most of the view
+		// in near-black fog ("can't see anything"). EXP2 @ 0.008 keeps depth without
+		// eating target visibility.
 		this.scene.fogMode = BABYLON.Scene.FOGMODE_EXP2
 		this.scene.fogColor = new BABYLON.Color3(0.05, 0.05, 0.08)
 		this.scene.fogDensity = 0.008
@@ -328,6 +343,20 @@ class BABYLONRenderer {
 			gp.rotation.x = Math.PI / 2 // lay the plane flat on the floor
 			this._pool.ground.push(gp)
 		}
+		// --- SELECTIVE glow: bloom ONLY the additive FX pools (muzzle core, glow halo,
+		// tracers) so flashes/streaks read as hot light without a full-scene rendering
+		// pipeline that would clobber the material-level image processing tuned above.
+		// GlowLayer's includedOnlyMeshes whitelist keeps world + viewmodel crisp. Skipped
+		// entirely on the low FX tier (mobile) to protect the fill-rate budget — this is
+		// the only tier check needed since low never allocates the blur chain.
+		if (this._fxTier !== 'low') {
+			this._glowLayer = new BABYLON.GlowLayer('fxGlow', this.scene, { mainTextureRatio: 0.5, blurKernelSize: 32 })
+			this._glowLayer.intensity = 0.9
+			for (const s of this._pool.muzzle) this._glowLayer.addIncludedOnlyMesh(s)
+			for (const s of this._pool.glow) this._glowLayer.addIncludedOnlyMesh(s)
+			for (const t of this._pool.tracer) this._glowLayer.addIncludedOnlyMesh(t)
+		}
+
 		// compile the shaders now so the first shot never binds an unready effect
 		this._pool.tracer[0].material.forceCompilation(this._pool.tracer[0])
 		this._pool.muzzle[0].material.forceCompilation(this._pool.muzzle[0])

@@ -26,7 +26,14 @@
         "reload":   { "arms": "Arms_Reload",   "gun": ["Rifle_Reload"],    "runtime": "reload" },
         "draw":     { "arms": "Arms_Draw",     "gun": ["Rifle_Draw"],      "runtime": "draw" },
         "hide":     { "arms": "Arms_Hide",     "gun": ["Rifle_Hide"] },
-        "interact": { "arms": "Arms_BasePose", "gun": ["Rifle_Interact"] }
+        "interact": { "arms": "Arms_BasePose", "gun": ["Rifle_Interact"] },
+
+        "aim_start":        { "arms": "Arms_AimStart",      "gun": ["Rifle_AimStart"],         "group": "aim", "runtime": "aim_start" },
+        "aim_pose":         { "arms": "Arms_AimPose",       "gun": ["Rifle_AimPose"],          "group": "aim", "runtime": "aim_pose" },
+        "aim_end":          { "arms": "Arms_AimEnd",        "gun": ["Rifle_AimEnd"],           "group": "aim", "runtime": "aim_end" },
+        "fire_aiming":      { "arms": "Arms_AimFireAiming", "gun": ["Rifle_AimFire"],          "group": "aim", "runtime": "fire_aiming" },
+        "breathing_aiming": { "arms": "Arms_AimPose",       "gun": ["Rifle_Breathing_Aiming"], "group": "aim", "loop": true, "runtime": "breathing_aiming" },
+        "walk_aiming":      { "arms": "Arms_AimPose",       "gun": ["Rifle_Walk_Aiming"],      "group": "aim", "loop": true, "runtime": "walk_aiming" }
       }
     },
     "Pistol": {
@@ -40,7 +47,14 @@
         "reload":   { "arms": "Arms_Reload",   "gun": ["Pistol_Reload"],      "runtime": "reload" },
         "draw":     { "arms": "Arms_Draw",     "gun": ["Pistol_Draw"],        "runtime": "draw" },
         "hide":     { "arms": "Arms_Hide",     "gun": ["Pistol_Hide"] },
-        "interact": { "arms": "Arms_BasePose", "gun": ["Pistol_Interaction"] }
+        "interact": { "arms": "Arms_BasePose", "gun": ["Pistol_Interaction"] },
+
+        "aim_start":        { "arms": "Arms_BasePose",   "gun": ["Pistol_AimStart"],         "group": "aim", "runtime": "aim_start" },
+        "aim_pose":         { "arms": "Arms_AimPose",    "gun": ["Pistol_AimPose"],          "group": "aim", "runtime": "aim_pose" },
+        "aim_end":          { "arms": "Arms_BasePose",   "gun": ["Pistol_AimEnd"],           "group": "aim", "runtime": "aim_end" },
+        "fire_aiming":      { "arms": "Arms_FireAiming", "gun": ["Pistol_Aiming_Fire"],      "group": "aim", "runtime": "fire_aiming" },
+        "breathing_aiming": { "arms": "Arms_AimPose",    "gun": ["Pistol_Breathing_Aiming"], "group": "aim", "loop": true, "runtime": "breathing_aiming" },
+        "walk_aiming":      { "arms": "Arms_AimPose",    "gun": ["Pistol_Walk_Aiming"],      "group": "aim", "loop": true, "runtime": "walk_aiming" }
       }
     },
     "SMG": {
@@ -54,7 +68,14 @@
         "reload":   { "arms": "Arms_Reload",   "gun": ["Smg_Reload"],      "runtime": "reload" },
         "draw":     { "arms": "Arms_Draw",     "gun": ["Smg_Draw"],        "runtime": "draw" },
         "hide":     { "arms": "Arms_Hide",     "gun": ["Smg_Hide"] },
-        "interact": { "arms": "Arms_BasePose", "gun": ["Smg_Interaction"] }
+        "interact": { "arms": "Arms_BasePose", "gun": ["Smg_Interaction"] },
+
+        "aim_start":        { "arms": "Arms_BasePose", "gun": ["AimStart"],                       "group": "aim", "runtime": "aim_start" },
+        "aim_pose":         { "arms": "Arms_BasePose", "gun": ["AimPose"],                        "group": "aim", "runtime": "aim_pose" },
+        "aim_end":          { "arms": "Arms_BasePose", "gun": ["AimEnd"],                         "group": "aim", "runtime": "aim_end" },
+        "fire_aiming":      { "arms": "Arms_Fire",     "gun": ["AimPose", "Smg_FireAiming"],      "group": "aim", "runtime": "fire_aiming" },
+        "breathing_aiming": { "arms": "Arms_BasePose", "gun": ["AimPose", "Smg_BreathingAiming"], "group": "aim", "loop": true, "runtime": "breathing_aiming" },
+        "walk_aiming":      { "arms": "Arms_BasePose", "gun": ["AimPose", "Smg_WalkAiming"],      "group": "aim", "loop": true, "runtime": "walk_aiming" }
       }
     },
     "Shotgun": {
@@ -71,7 +92,14 @@
         "reload":        { "chain": ["reload_start", "reload_insert", "reload_insert", "reload_end"], "runtime": "reload" },
         "draw":          { "arms": "arms_DrawWeapon", "gun": ["movement_DrawWeapon"], "runtime": "draw" },
         "hide":          { "arms": "arms_HideWeapon", "gun": ["movement_hideWeapon"] },
-        "interact":      { "arms": "arms_basePose",   "gun": ["movement_Interaction"] }
+        "interact":      { "arms": "arms_basePose",   "gun": ["movement_Interaction"] },
+
+        "aim_start":        { "arms": "arms_basePose", "gun": ["shotgun01_AimStart"],                            "group": "aim", "runtime": "aim_start" },
+        "aim_pose":         { "arms": "arms_basePose", "gun": ["shotgun01_AimPose"],                             "group": "aim", "runtime": "aim_pose" },
+        "aim_end":          { "arms": "arms_basePose", "gun": ["shotgun01_AimEnd"],                              "group": "aim", "runtime": "aim_end" },
+        "fire_aiming":      { "arms": "arms_Fire",     "gun": ["movement_Fire_Aiming", "shotgun01_fire_Aiming"], "group": "aim", "runtime": "fire_aiming" },
+        "breathing_aiming": { "arms": "arms_basePose", "gun": ["shotgun01_AimPose"],                             "group": "aim", "loop": true, "runtime": "breathing_aiming" },
+        "walk_aiming":      { "arms": "arms_basePose", "gun": ["movement_walking_Aiming", "shotgun01_AimPose"],  "group": "aim", "loop": true, "runtime": "walk_aiming" }
       }
     }
   }

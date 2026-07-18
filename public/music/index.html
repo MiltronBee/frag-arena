@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Frag Arena — Music Prompt Kit</title>
+<style>
+  :root{
+    --bg:#0a0c10; --panel:#12161d; --panel2:#0e1218; --ink:#e8edf4; --dim:#93a1b5;
+    --line:#232b36; --accent:#ff7a1a; --accent2:#39d0ff; --ok:#3fe08a; --mono:#c9d6e6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#16202c 0%,var(--bg) 60%);
+       color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+       -webkit-font-smoothing:antialiased;padding:0 0 120px}
+  .wrap{max-width:920px;margin:0 auto;padding:0 20px}
+  header{padding:54px 0 26px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  h1{font-size:30px;letter-spacing:-.5px;margin:0 0 6px;font-weight:800}
+  h1 .tag{color:var(--accent)}
+  .sub{color:var(--dim);font-size:15px;max-width:640px}
+  h2{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);
+     margin:44px 0 6px;font-weight:700}
+  h3{font-size:19px;margin:26px 0 2px;font-weight:700}
+  .role{color:var(--dim);font-size:13px;margin:0 0 12px}
+  .meta{display:inline-flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}
+  .chip{font:11px/1 ui-monospace,Menlo,monospace;color:var(--mono);background:#0c1017;
+        border:1px solid var(--line);border-radius:20px;padding:6px 10px}
+  .chip b{color:var(--accent)}
+  .block{position:relative;background:var(--panel);border:1px solid var(--line);
+         border-radius:10px;margin:10px 0}
+  .block .label{font:10px/1 ui-monospace,monospace;letter-spacing:1.5px;text-transform:uppercase;
+        color:var(--dim);padding:10px 14px 0}
+  pre{margin:0;padding:12px 14px 16px;white-space:pre-wrap;word-break:break-word;
+      font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;color:var(--mono)}
+  .copy{position:absolute;top:8px;right:8px;background:#1a212c;color:var(--ink);
+        border:1px solid var(--line);border-radius:7px;padding:6px 12px;font-size:12px;
+        cursor:pointer;transition:.15s}
+  .copy:hover{border-color:var(--accent);color:var(--accent)}
+  .copy.done{border-color:var(--ok);color:var(--ok)}
+  .neg{color:#e89a9a}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--accent2);font-size:11px;letter-spacing:1px;text-transform:uppercase}
+  td code,.i code{font:12px/1.4 ui-monospace,monospace;color:var(--accent);background:#0c1017;
+        padding:1px 5px;border-radius:4px}
+  .i{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent2);
+     border-radius:8px;padding:14px 16px;margin:14px 0;color:var(--dim);font-size:14px}
+  .i b{color:var(--ink)}
+  ul{margin:8px 0;padding-left:20px;color:var(--dim)}
+  li{margin:4px 0}
+  a{color:var(--accent2);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .foot{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:640px){.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Frag Arena — Music Prompt Kit <span class="tag">// UT99-style</span></h1>
+  <p class="sub">Copy/paste prompts for Suno/Udio, one per game state, modeled on how Unreal Tournament
+  actually did it. Tap any block to copy. The combat family shares <b>140 BPM / E minor</b> so tracks
+  crossfade and layer cleanly.</p>
+</header>
+
+<div class="i">
+  <b>The one rule that makes everything work:</b> lock every combat-family clip (combat, low-health,
+  overtime) to the <b>same BPM and key (140 BPM, E minor)</b>. That's what lets you crossfade between
+  intensity tiers and stack the low-health layer on top of the running combat bed without clashing —
+  the same trick Doom 2016 used. Menu / warmup / stingers can float free.
+</div>
+
+<!-- ============ STATES ============ -->
+<h2>Per-State Prompts</h2>
+
+<h3>1 · Main Menu / Title</h3>
+<p class="role">Iconic, cinematic — the one theme players remember. Loops forever, no urgency.
+Reference: <em>UT Title theme</em>.</p>
+<div class="meta">
+  <span class="chip">loop <b>~90s</b></span><span class="chip">~120 BPM</span>
+  <span class="chip">free key</span><span class="chip">instrumental</span>
+</div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">Suno / Udio prompt</div>
+<pre>Cinematic electronic anthem for a futuristic arena blood-sport, in the style of the Unreal Tournament title theme. Heroic hybrid of orchestral brass/string samples and driving electronic beat, ~120 BPM, wide and grand, sense of spectacle and anticipation — "the world is watching." Tracker/demoscene texture, punchy sampled instruments. Confident, iconic, brand-defining. Seamless loop, no vocals, no build/drop.</pre>
+</div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">tag version</div>
+<pre>cinematic electronic, orchestral hybrid, heroic, arena sport anthem, 120 BPM, 90s Unreal Tournament title, tracker, instrumental, seamless loop <span class="neg">— no vocals, no drop</span></pre>
+</div>
+
+<h3>2 · Warmup / Lobby / Countdown</h3>
+<p class="role">Bridge between menu calm and match tension — keeps energy warm while players load in.
+Reference: <em>Mission Landing</em>, <em>Into the Darkness</em> (atmospheric intro → drops into the loop).</p>
+<div class="meta">
+  <span class="chip">loop <b>~60s</b></span><span class="chip">~110–125 BPM</span>
+  <span class="chip">free key</span><span class="chip">instrumental</span>
+</div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">Suno / Udio prompt</div>
+<pre>Anticipatory pre-match electronic groove for an arena shooter warmup screen. Mid-tempo ~115 BPM, brooding atmospheric pads with a steady pulse building underneath, tense but restrained — "get ready." Light industrial texture, sparse metallic percussion, rising energy without fully kicking in. Tracker-flavored samples. Seamless loop, no vocals.</pre>
+</div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">tag version</div>
+<pre>atmospheric electronic, mid-tempo, 115 BPM, brooding, rising tension, industrial, arena warmup, instrumental, seamless loop <span class="neg">— no vocals</span></pre>
+</div>
+
+<h3>3 · Combat <span style="color:var(--accent);font-size:13px">★ the workhorse</span></h3>
+<p class="role">The core loop — sustains adrenaline through the whole match. This is where UT lived almost
+entirely. Reference: <em>Foregone Destruction</em> (CTF/objective, melodic), <em>Run</em> / <em>Botpack #9</em>
+(DM, gritty), <em>Mechanism Eight</em> (techno).</p>
+<div class="meta">
+  <span class="chip">loop <b>60–90s</b></span><span class="chip"><b>140 BPM</b></span>
+  <span class="chip"><b>E minor</b></span><span class="chip">instrumental</span>
+</div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">Suno / Udio prompt — driving/DM flavor</div>
+<pre>Relentless drum-and-bass / breakbeat combat music for a fast arena shooter, in the style of late-90s Unreal Tournament (Michiel van den Bos). 140 BPM, key of E minor. Chopped amen breakbeat, rolling acid sub-bass, detuned saw-lead stabs, metallic industrial percussion. Adrenaline-pumping, aggressive, propulsive, never lets up. Tracker/demoscene texture — dry punchy sampled instruments, tight staccato phrasing. Instrumental, steady energy, no dramatic build or drop. Seamless loop.</pre>
+</div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">Suno / Udio prompt — melodic/CTF flavor (same BPM+key)</div>
+<pre>Melodic liquid drum-and-bass for arena CTF, style of "Foregone Destruction" from Unreal Tournament. 140 BPM, key of E minor. Fast emotional breakbeat, soaring synth melody over rolling bassline, sense of wide-open space and long flag runs — epic and driving but melodic. Tracker texture. Instrumental, steady, seamless loop.</pre>
+</div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">tag version</div>
+<pre>industrial breakbeat, drum and bass, 140 BPM, E minor, amen break, acid bassline, saw stabs, 90s Unreal Tournament arena FPS, aggressive, driving, tracker, instrumental, seamless loop <span class="neg">— no vocals, no build, no drop</span></pre>
+</div>
+
+<h3>4 · Low-Health Intensity Overlay</h3>
+<p class="role">Personal alarm — warns without a UI glance. Generate as a <b>layer you fade on top of the
+running combat bed</b>, not a replacement. MUST match combat BPM+key.</p>
+<div class="meta">
+  <span class="chip">loop <b>60–90s</b></span><span class="chip"><b>140 BPM</b></span>
+  <span class="chip"><b>E minor</b></span><span class="chip">silence-friendly stem</span>
+</div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">Suno / Udio prompt</div>
+<pre>High-intensity music LAYER to stack over an existing arena combat loop — 140 BPM, key of E minor, designed to play on top of a drum-and-bass bed. Add urgent extra percussion, a pulsing heartbeat-like sub thump, and a rising distorted synth-siren tension line. Alarming, near-death panic, "everything is on fire." Sparse enough to sit over existing drums — no full mix, no melody hook. Instrumental, seamless loop, consistent energy.</pre>
+</div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">tag version</div>
+<pre>intensity overlay stem, 140 BPM, E minor, urgent percussion, heartbeat pulse, distorted synth siren, near-death alarm, sparse, instrumental, seamless loop <span class="neg">— no melody, no full mix, no vocals</span></pre>
+</div>
+
+<h3>5 · Overtime / Sudden Death</h3>
+<p class="role">Peak urgency — escalates the whole arena. A distinct high-intensity variant of the combat bed.</p>
+<div class="meta">
+  <span class="chip">loop <b>60s</b></span><span class="chip"><b>140–150 BPM</b></span>
+  <span class="chip"><b>E minor</b></span><span class="chip">instrumental</span>
+</div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">Suno / Udio prompt</div>
+<pre>Peak-intensity sudden-death version of an arena combat loop. 145 BPM, key of E minor, style of Unreal Tournament breakbeat but pushed to the edge — frantic amen-break rolls, overdriven bass, an alarm-like synth siren, maximum aggression, "every frag decides it." Chaotic but locked-in. Tracker texture, instrumental, steady relentless energy, seamless loop.</pre>
+</div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">tag version</div>
+<pre>frantic breakbeat, 145 BPM, E minor, amen rolls, overdriven bass, synth siren, sudden death, chaotic, aggressive, arena FPS, instrumental, seamless loop <span class="neg">— no vocals</span></pre>
+</div>
+
+<h3>6 · Round / Match End Sting</h3>
+<p class="role">Punctuation — a short one-shot that clears the palette before the result screen. Not a loop.</p>
+<div class="meta"><span class="chip">one-shot <b>3–6s</b></span><span class="chip">no loop</span></div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">Suno / Udio prompt</div>
+<pre>Short electronic sting marking the end of an arena FPS round — 4 seconds, one-shot, style of Unreal Tournament. A decisive synth hit with a filtered breakbeat tail resolving to silence. Punctuation, not a loop. Instrumental, no vocals.</pre>
+</div>
+
+<h3>7 · Victory Screen</h3>
+<p class="role">Emotional payoff — makes winning worth chasing. Pair with announcer VO in the UT spirit
+("You have won the match").</p>
+<div class="meta"><span class="chip">one-shot <b>4–8s</b></span><span class="chip">or short loop</span></div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">Suno / Udio prompt</div>
+<pre>Triumphant electronic victory fanfare for an arena shooter, style of late-90s Unreal Tournament. 5–8 seconds, distorted synth-brass stabs, a big drum hit, rising heroic resolution — earned, euphoric, "champion." Tracker texture, instrumental, no vocals. Clean ending (or loopable if extended).</pre>
+</div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">tag version</div>
+<pre>triumphant electronic fanfare, synth brass, big drum hit, heroic, arena victory, UT99, instrumental <span class="neg">— no vocals</span></pre>
+</div>
+
+<h3>8 · Defeat Screen</h3>
+<p class="role">Acknowledges the loss without punishing — don't discourage the rematch. Pair with
+"You have lost the match" VO.</p>
+<div class="meta"><span class="chip">one-shot <b>4–8s</b></span></div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">Suno / Udio prompt</div>
+<pre>Somber but not crushing defeat sting for an arena shooter. 5–8 seconds, a deflating minor-key synth pad with a low industrial hit fading to quiet — acknowledges the loss, keeps dignity, leaves room to want a rematch. Tracker texture, instrumental, no vocals.</pre>
+</div>
+
+<h3>9 · Spectator / Idle</h3>
+<p class="role">Fills dead air (respawn wait, killcam) without competing with match SFX. Low and unobtrusive.</p>
+<div class="meta"><span class="chip">loop <b>~60s</b></span><span class="chip">low/mid tempo</span></div>
+<div class="block">
+  <button class="copy">copy</button>
+  <div class="label">Suno / Udio prompt</div>
+<pre>Low, unobtrusive ambient electronic loop for an arena shooter spectator/respawn screen. Slow atmospheric pads, distant tribal percussion, sparse and spacious — background presence only, never demands attention, leaves the high-mid range open for gameplay SFX. Tracker texture, instrumental, seamless loop, no vocals.</pre>
+</div>
+
+<!-- ============ REFERENCE ============ -->
+<h2>UT99 Reference — What Played Where</h2>
+<div class="i" style="border-left-color:var(--accent)">
+  Feed these real track names into Suno/Udio as style anchors. <b>Note:</b> UT99 had <b>no</b> dedicated
+  warmup/victory/defeat music — it used the map's combat loop + announcer VO. States 6–8 above <em>extend</em>
+  the UT model; the rest are faithful to it.
+</div>
+<table>
+  <tr><th>Track</th><th>Composer</th><th>Genre</th><th>Use as anchor for</th></tr>
+  <tr><td><b>UT Title / Menu</b></td><td>Brandon + van den Bos</td><td>cinematic-electronic hybrid</td><td>Main Menu</td></tr>
+  <tr><td><b>Foregone Destruction</b></td><td>van den Bos</td><td>melodic liquid DnB</td><td>Combat (CTF/objective)</td></tr>
+  <tr><td><b>Run / Botpack #9</b></td><td>van den Bos</td><td>fast breakbeat/DnB</td><td>Combat (DM)</td></tr>
+  <tr><td><b>Mechanism Eight</b></td><td>Sega (Necros)</td><td>~129 BPM techno/electro</td><td>Combat (techno)</td></tr>
+  <tr><td><b>Razorback</b></td><td>Hajba (Skaven)</td><td>electronic rock / industrial</td><td>Combat (aggressive)</td></tr>
+  <tr><td><b>Skyward Fire / Mission Landing</b></td><td>van den Bos</td><td>atmospheric intro → loop</td><td>Warmup</td></tr>
+  <tr><td><b>Nether Animal</b></td><td>van den Bos</td><td>tribal percussion</td><td>Spectator/idle</td></tr>
+  <tr><td><b>Colossus</b></td><td>—</td><td>tense techno in 7/8</td><td>Overtime (unease)</td></tr>
+</table>
+<p class="role" style="margin-top:10px">Palette: tracker/module music (dry, punchy, sampled) · breakbeat &amp; DnB ·
+techno ~129 BPM · light industrial · tribal percussion · combat ~125–140 BPM (DnB feels faster via double-time
+breaks over a ~85 half-time pulse) · amen breaks, acid basslines, saw stabs, metallic hits.</p>
+
+<!-- ============ ENGINE MODEL ============ -->
+<h2>How UT Switched Music (the model to copy)</h2>
+<p class="role">UT played <b>one tracker module per level</b>, internally divided into numbered
+<b>song sections</b> (Section 0 ≈ ambient, 1 ≈ combat, 2 ≈ intro). The engine just said "jump to section N
+with transition T"; the module's own loop kept it seamless. Copy the <b>transition enum 1:1</b>:</p>
+<table>
+  <tr><th>Transition</th><th>Behavior</th><th>Use for</th></tr>
+  <tr><td><code>MTRAN_Instant</code></td><td>hard switch (~0.33s micro-fade)</td><td>combat hits NOW — low-health, overtime start</td></tr>
+  <tr><td><code>MTRAN_Segue</code></td><td>switch at next bar, no volume fade</td><td>musical section change, same track</td></tr>
+  <tr><td><code>MTRAN_FastFade</code></td><td>~1.0s crossfade</td><td>quick but non-jarring swap</td></tr>
+  <tr><td><code>MTRAN_Fade</code></td><td>~3.0s crossfade</td><td>state → state (default)</td></tr>
+  <tr><td><code>MTRAN_SlowFade</code></td><td>~5.0s crossfade</td><td>combat → calm cooldown, mood shift</td></tr>
+</table>
+<div class="i">
+  <b>Key gotcha UT left to you:</b> the engine had <em>no</em> automatic "enemy nearby → combat music"
+  detector — mappers wired it by hand. Build the policy layer yourself: <code>EXPLORE → COMBAT</code> on
+  damage/enemy-proximity (<code>MTRAN_Instant</code>), with a <b>5–8s cooldown/hysteresis</b> before dropping
+  back (<code>MTRAN_SlowFade</code>) so it doesn't flip-flop. Keep music state <b>client-local</b>, driven by
+  each client's own view of combat.
+</div>
+
+<!-- ============ WEBAUDIO ============ -->
+<h2>WebAudio — the 80/20 for Frag Arena</h2>
+<ul>
+  <li><b>Ship the UT model first:</b> one combat loop + menu theme + victory/defeat stingers. That alone delivers the arena feel.</li>
+  <li><b>Gapless loops:</b> <code>AudioBufferSourceNode</code> with <code>loop=true</code> + trimmed <code>loopStart/loopEnd</code>. Re-firing <code>&lt;audio&gt;</code> leaves audible gaps — don't.</li>
+  <li><b>Crossfade states:</b> each state gets its own permanent <code>GainNode</code> into a music bus; ramp out/in with an <b>equal-power</b> curve (<code>setValueCurveAtTime</code>) to avoid the mid-fade volume dip. 1.5–3s for state changes, ~0.3s for combat↔low-health.</li>
+  <li><b>Low-health = vertical layer:</b> start the overlay stem at gain 0, phase-locked to the combat bed (same <code>ctx.currentTime</code>, same BPM+key), fade it in. Biggest "modern feel" win for least effort.</li>
+  <li><b>Duck music under SFX:</b> separate music/SFX gains; on loud events <code>setTargetAtTime(0.35, t, 0.05)</code> then restore. In a competitive FPS, footsteps/reloads are gameplay info — <b>never let music mask them</b>; keep the combat bed low/mid-heavy.</li>
+  <li><b>Clock hygiene:</b> schedule against <code>ctx.currentTime</code>, not <code>setTimeout</code>. Call <code>ctx.resume()</code> inside the first user gesture (the Play/Enter click); preload + decode all buffers up front.</li>
+</ul>
+
+<!-- ============ GEN TIPS ============ -->
+<h2>Generation Tips</h2>
+<ul>
+  <li><b>Udio</b> tends to win on clean instrumentals + section regeneration (good for extracting a loop); use <b>Suno</b> for the menu hero theme. Generate 3–4 takes per prompt — they vary a lot.</li>
+  <li><b>These tools don't output true seamless loops.</b> Always trim to a clean bar boundary at a zero-crossing in Audacity/a DAW, and crossfade the seam if it clicks. Budget this step per clip.</li>
+  <li><b>Consistency for crossfade:</b> put the exact <code>140 BPM, key of E minor</code> in every combat-family prompt. Non-negotiable for layering.</li>
+  <li><b>Stems for layering:</b> either regenerate variants at fixed BPM/key, or run one combat take through a stem splitter (Demucs) to get drums/bass/lead as vertical layers.</li>
+  <li>Always add <code>instrumental</code> / <code>no vocals</code> and, for loops, <code>no build, no drop, steady energy</code>.</li>
+</ul>
+
+<div class="foot">
+  Synthesized from 3 research passes on the UT99 / Unreal Engine 1 music system · combat family keyed to
+  <b>140 BPM E minor</b> · <a href="/">← back to Frag Arena</a><br>
+  Sources: Liandri Archives, BeyondUnreal &amp; OldUnreal wikis, unreal.fandom.com, MDN WebAudio,
+  GDC "DOOM: Behind the Music", web.dev "A tale of two clocks".
+</div>
+
+</div>
+
+<script>
+document.querySelectorAll('.copy').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var pre = btn.parentElement.querySelector('pre');
+    var text = pre.innerText.trim();
+    navigator.clipboard.writeText(text).then(function(){
+      btn.textContent='copied'; btn.classList.add('done');
+      setTimeout(function(){btn.textContent='copy'; btn.classList.remove('done');},1400);
+    });
+  });
+});
+</script>
+</body>
+</html>

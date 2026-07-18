@@ -1,0 +1,135 @@
+FRAG ARENA — HUD LAYOUT / OVERLAP AUDIT
+
+The dev's complaint, verbatim: "Our HUD looks bad. Stuff on top of other stuff. Bad
+positioning, etc." Your job: audit LAYOUT, OVERLAP, and POSITIONING first and hardest,
+then legibility. North star = Overwatch-grade readability at UT99 speed.
+
+I'm giving you (a) the real DOM, (b) the real CSS values for every HUD element, and
+(c) 3 screenshots of what the player actually sees. Read the screenshots like a
+teamfight: fix on the crosshair, then snap to each element.
+
+SCREENSHOTS ATTACHED (in order):
+  1. hud-desktop.png       — 1280x720, healthy state (100 HP), no target framed.
+  2. hud-desktop-lowhp.png — same, HP forced to 18 (low-HP cue test).
+  3. hud-mobile.png        — 844x390 iPhone viewport, touch controls visible.
+
+=====================================================================
+THE DOM (public/index.html, inside #arena-hud, aria-live=polite)
+=====================================================================
+#arena-hud            fixed; inset:0; z-index:10; pointer-events:none  (overlay root)
+  header#top-hud      TOP EDGE, full width, flex space-between:
+      .brand-lockup       -> logo img (30x30) + "FRAG ARENA" wordmark  [TOP-LEFT]
+      .match-strip        -> status dot + #connection-label + divider +
+                             #player-count + divider + #frag-count       [TOP-RIGHT]
+  svg#crosshair        CENTER, per-weapon spread-reactive reticle (data-weapon 0-4)
+  #hit-marker          CENTER, overlays crosshair; hit/kill pop animations + skull
+  section#health-panel BOTTOM-LEFT: skull img(26) + #health-value "100" + "HP" unit,
+                       then .health-track > #health-fill (the bar)
+  section#weapon-panel BOTTOM-RIGHT: #weapon-icon (56x30 silhouette) + .weapon-readout
+                       ( #weapon-name "RIFLE" / #ammo-counter[ #magazine-ammo "30"
+                         .ammo-separator "/" #reserve-ammo "90" ] / #reload-state "RELOAD" )
+  section#grenade-panel BOTTOM-RIGHT, ABOVE weapon-panel: #grenade-icon (amber ☼) + #grenade-count "x2"
+  #combat-state        CENTER, hidden until death: skull(72) + "YOU DIED" / "RESPAWNING"
+#damage-flash          fixed sibling, full-screen red flash on damage
+#kill-feed             TOP-RIGHT stack of .kill-feed-row (below the match-strip)
+#frag-banner           CENTER-ish big frag text on kill
+
+=====================================================================
+THE REAL CSS (public/css/styles-v0.0.1.css) — exact values
+=====================================================================
+--sp-5 is the standard HUD inset (~20px). --scrim = translucent dark plate.
+
+#arena-hud   { position:fixed; inset:0; z-index:10; pointer-events:none; }
+
+#top-hud     { position:absolute; top:sp-5; left:sp-5; right:sp-5;
+               display:flex; justify-content:space-between; gap:20px; }
+  .brand-name { font-size:14px; letter-spacing:.12em; uppercase; }
+  .match-strip{ min-height:28px; padding:0 12px; gap:8px; background:scrim; }  // one long chip
+
+#health-panel,#weapon-panel { position:absolute; bottom:sp-5; min-width:190px;
+               padding:12px 16px; background:scrim; box-shadow:edge-hairline; }
+#health-panel{ left:sp-5; border-left:2px solid teal;
+               clip-path: polygon(0 0,100% 0,calc(100% - notch) 100%,0 100%); }
+
+#weapon-panel{ bottom:sp-5; right:sp-5; display:flex; align-items:center; gap:12px;
+               padding:10px 16px 10px 14px; text-align:right;
+               background: halo-cyan-tint gradient over scrim;
+               border:1px solid rgba(111,217,232,.35); border-left:2px solid cyan-deep;
+               box-shadow: inset glow + 0 0 14px cyan;   // GLOWY CHROME
+               clip-path: polygon(0 0,100% 0,calc(100% - notch) 100%,0 100%); }
+#weapon-panel::before { top:3px; right:3px; 14x14 cyan corner bracket, drop-shadow glow }
+#weapon-panel::after  { bottom:3px; left:3px; 14x14 cyan corner bracket, drop-shadow glow }
+#weapon-icon { width:56px; height:30px; cyan mask + drop-shadow glow }
+#magazine-ammo : big Teko-style condensed numeral (renders "30" as "3U"-looking — SEE SHOT)
+                 .low-ammo and .is-reloading recolor it.
+
+#grenade-panel{ position:absolute; bottom: calc(sp-5 + 66px); right:sp-5;
+               display:flex; gap:8px; padding:6px 14px; background:scrim;
+               border:1px solid rgba(111,217,232,.28); border-left:2px solid cyan-deep;
+               clip-path: polygon(0 0,100% 0,calc(100% - 10px) 100%,0 100%); }
+  #grenade-icon { font-size:20px; amber #ffb84d glow }
+  #grenade-count{ font-size:22px; bone }
+  // NOTE: this sits 66px above the weapon-panel bottom, SAME right edge -> stacked column bottom-right.
+
+Z-INDEX MAP (only layers): #arena-hud root=10; #hit-marker=20; #combat-state=20;
+  #kill-feed=20; #frag-banner=20; #touch-controls=30; #touch-joy=31; menus=49/50.
+  -> Every in-HUD panel inherits the single z-index:10 root and relies purely on
+     screen-position to not collide. There is NO per-element stacking discipline.
+
+=====================================================================
+MOBILE OVERRIDES  @media (max-width:767px),(pointer:coarse)
+=====================================================================
+#top-hud       { right: 56px (clears a top-right gear button); .brand-name hidden }
+#health-panel  { bottom:120px; top:auto; left:sp-4; min-width:0; padding:6px 10px;
+                 clip-path:none }   // moved UP off the thumb zone, still LEFT
+#weapon-panel  { bottom:120px; top:auto; right:sp-3; padding:5px 10px 5px 8px;
+                 pointer-events:none; #magazine-ammo font-size:34px }
+#grenade-panel { NOT overridden -> stays bottom: sp-5 + 66px, right: sp-5 }  // low-right
+#touch-controls{ fixed; inset:0; z-index:30 }  // sits ABOVE the HUD panels
+  #touch-move-zone left half, #touch-look-zone right half (full height)
+  Fire / reload / switch / jump / grenade BUTTONS live bottom-right + right side
+  (see screenshot: orange fire button + reload + jump cluster bottom-right).
+#kill-feed     { top:46px; rows shrink; only first 3 rows shown }
+
+=====================================================================
+KNOWN / SUSPECTED PROBLEMS (confirm, correct, or add from the shots)
+=====================================================================
+1. BOTTOM-RIGHT COLUMN PILE-UP (desktop): #weapon-panel (bottom:sp-5) and
+   #grenade-panel (bottom:sp-5+66px) share the exact same right edge and stack as a
+   2-high column. In the screenshot the grenade "x2" and stray numerals crowd the
+   weapon panel's top-right corner bracket. Is 66px enough separation, or do the
+   glow/brackets/clip-paths visually merge into one cluttered blob?
+2. AMMO LEGIBILITY: the magazine numeral font renders "30" as something that reads
+   "3U" in the shot. Under motion, can a player read the mag count in one glance?
+3. MOBILE COLLISION: #weapon-panel (bottom:120px, right) + #grenade-panel
+   (bottom:~86px, right, NOT repositioned for mobile) + the touch FIRE/RELOAD/SWITCH
+   buttons all occupy the bottom-right. The screenshot shows the cyan ammo plate
+   sitting right on top of / behind the touch buttons. Name the colliding pairs.
+4. TOP-RIGHT competition: .match-strip (ONLINE / N PLAYERS / FRAGS-DEATHS) AND
+   #kill-feed both anchor top-right. Do they collide or read as two separate things?
+5. NO COLOR LAW: everything is cyan/teal/bone. Health is teal, weapon is cyan,
+   grenade is amber. There is no ally-blue / enemy-red / self-feedback mapping.
+6. GLOWY CHROME: weapon panel has inset glow + outer 14px cyan glow + glowing corner
+   brackets + drop-shadowed icon. Is this the "panel chrome competes with action"
+   failure, or acceptable identity?
+7. STACKING MODEL: all panels live at one z-index and only avoid overlap by hardcoded
+   px offsets (66px here, 120px there, 56px there). Is that the root cause of the
+   "stuff on top of stuff" — no grid, no anchoring system, just magic numbers?
+
+MOBILE IS A FIRST-CLASS TARGET — MAKE IT LOOK SLICK AF. The dev specifically wants the
+mobile interface to look premium, not like a desktop HUD crammed onto a phone. Treat
+the phone layout as its own design, not an afterthought media-query. In the mobile
+screenshot: the cyan ammo plate collides with the touch fire/reload buttons bottom-
+right, the touch buttons are plain grey circles with unicode glyphs (◉ ▲ ⟳ ⇄ ☀), and
+the whole thing reads as functional-but-cheap. Prescribe a mobile layout that a modern
+mobile shooter (CoD Mobile, Apex Mobile, Overwatch's own mobile-friendly readability)
+would ship: button visual language, sizing, safe-area framing, where each HUD cluster
+lives so NOTHING overlaps the thumbs, and how to make it feel expensive. Give a
+dedicated MOBILE section with concrete values.
+
+DELIVERABLE: give the layout/overlap audit as the spine. For every collision name the
+two elements, the region they fight over, and the exact fix (anchor + offset, or a
+merge into one cluster, or a z-order). Then the ammo-legibility fix (exact font-size /
+font-family / letter-spacing), the color law, and the chrome diet — all with concrete
+CSS values an engineer can paste. Cover desktop AND mobile, with mobile getting its own
+"make it slick" section.

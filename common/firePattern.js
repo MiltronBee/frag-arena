@@ -29,8 +29,17 @@ export const shotSeed = (nid, weaponIndex, magazineAmmo) =>
 
 // Angular offsets (radians) for every pellet of one shot, as {dx, dy} in the
 // aim-perpendicular plane. heat is 0..1 (sustained-fire bloom, see weapon.js).
-export const shotPattern = (config, seed, heat = 0) => {
+// aimFactor (0..1) is the ADS ramp (entity.aimFactor, computed identically on both
+// sides in applyCommand). It tightens the cone per the weapon's ads gameplay mults —
+// spreadBaseMult toward its aimed floor, spreadHeatMult on the sustained bloom. Both
+// the server's damage rays and the client's predicted tracers pass the SAME aimFactor,
+// so ADS accuracy stays prediction-consistent.
+export const shotPattern = (config, seed, heat = 0, aimFactor = 0) => {
 	const rand = rng(seed)
+	const af = Math.min(1, Math.max(0, aimFactor))
+	const ads = config.ads
+	const baseMul = (ads && ads.spreadBaseMult != null) ? (1 - (1 - ads.spreadBaseMult) * af) : 1
+	const heatMul = (ads && ads.spreadHeatMult != null) ? (1 - (1 - ads.spreadHeatMult) * af) : 1
 	const jitter = spread => ({
 		dx: (rand() - 0.5) * 2 * spread,
 		dy: (rand() - 0.5) * 2 * spread
@@ -42,7 +51,7 @@ export const shotPattern = (config, seed, heat = 0) => {
 		const ring = config.pellets - 1
 		const radius = config.ringRadius || 0.055
 		const rJit = config.ringJitter || 0.018
-		const out = [jitter((config.spreadBase || 0.004))]
+		const out = [jitter((config.spreadBase || 0.004) * baseMul)]
 		for (let i = 0; i < ring; i++) {
 			const baseAngle = (i / ring) * Math.PI * 2
 			const angle = baseAngle + (rand() - 0.5) * 0.5
@@ -52,7 +61,7 @@ export const shotPattern = (config, seed, heat = 0) => {
 		return out
 	}
 
-	const spread = (config.spreadBase || 0) + (config.spreadHeat || 0) * Math.min(1, Math.max(0, heat))
+	const spread = (config.spreadBase || 0) * baseMul + (config.spreadHeat || 0) * heatMul * Math.min(1, Math.max(0, heat))
 	return [jitter(spread)]
 }
 

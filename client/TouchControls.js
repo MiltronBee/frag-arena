@@ -43,6 +43,8 @@ class TouchControls {
 		this._lookLast = null
 		this._fireId = null  // touch identifier owning the fire button (also aims)
 		this._fireLast = null
+		this._aimId = null   // touch identifier owning the ADS aim button (also drag-looks)
+		this._aimLast = null
 		this._triedFullscreen = false
 
 		this._reloadPulseTimer = null   // pending release of a reload input pulse
@@ -52,6 +54,7 @@ class TouchControls {
 		this._bindJoystick()
 		this._bindLook()
 		this._bindFire()
+		this._bindAim()
 		this._bindButtons()
 	}
 
@@ -71,6 +74,7 @@ class TouchControls {
 		this.joyKnob = el('div', 'touch-joy-knob', this.joyBase)
 
 		this.fireBtn = el('div', 'touch-fire', root, '◉')
+		this.aimBtn = el('div', 'touch-aim', root, '◎') // ADS hold (also drag-looks)
 		this.jumpBtn = el('div', 'touch-jump', root, '▲')
 		this.reloadBtn = el('div', 'touch-reload', root, '⟳')
 		this.switchBtn = el('div', 'touch-switch', root, '⇄')
@@ -237,6 +241,51 @@ class TouchControls {
 			this._fireId = null
 			this._fireLast = null
 			s.mouseDown = false
+			btn.classList.remove('active')
+		}
+		btn.addEventListener('touchend', end, { passive: false })
+		btn.addEventListener('touchcancel', end, { passive: false })
+	}
+
+	/* aim (ADS): held while the thumb is down, and the SAME finger can drag to keep
+	   looking — identical ergonomics to the fire button. end/cancel always release
+	   aim so it can never stick (matches the brief's touch requirements). Writes the
+	   same aimDown flag the desktop RMB path uses, so the Simulator/Viewmodel treat
+	   both identically. */
+	_bindAim() {
+		const btn = this.aimBtn
+		const s = this.input._currentState
+
+		btn.addEventListener('touchstart', (e) => {
+			e.preventDefault()
+			this._tryFullscreen()
+			if (this._aimId !== null) return
+			const t = e.changedTouches[0]
+			this._aimId = t.identifier
+			this._aimLast = { x: t.clientX, y: t.clientY, t: e.timeStamp }
+			s.aimDown = true
+			this.input.frameState.aimDown = true
+			btn.classList.add('active')
+			if (navigator.vibrate) navigator.vibrate(8)
+		}, { passive: false })
+
+		btn.addEventListener('touchmove', (e) => {
+			e.preventDefault()
+			const t = this._findTouch(e, this._aimId)
+			if (!t) return
+			const dx = t.clientX - this._aimLast.x
+			const dy = t.clientY - this._aimLast.y
+			const dt = e.timeStamp - this._aimLast.t
+			this._aimLast = { x: t.clientX, y: t.clientY, t: e.timeStamp }
+			this._applyLook(dx, dy, dt)
+		}, { passive: false })
+
+		const end = (e) => {
+			if (!this._findTouch(e, this._aimId)) return
+			e.preventDefault()
+			this._aimId = null
+			this._aimLast = null
+			s.aimDown = false
 			btn.classList.remove('active')
 		}
 		btn.addEventListener('touchend', end, { passive: false })
