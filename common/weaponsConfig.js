@@ -39,9 +39,9 @@ export const weapons = [
     name: 'Rifle',
     url: '/assets/weapons/retro_rifle_arms.glb',
     ...authoredMount,
-    // ADS gameplay: -40% sustained bloom, -30% heat/shot -> aimed = a sustained
-    // mid-range tracking tool; hip stays a burst weapon that sprays if held.
-    ...withAds(75, 0.08, 0.06, { spreadHeatMult: 0.6, heatMult: 0.7 }),
+    // ADS gameplay: tighter base cone (-50%), -40% sustained bloom, -30% heat/shot
+    // -> aimed = a precise sustained mid-range tracker; hip is a looser burst weapon.
+    ...withAds(75, 0.08, 0.06, { spreadBaseMult: 0.5, spreadHeatMult: 0.6, heatMult: 0.7 }),
     // ADS: sink the bulky receiver down + forward so the front sight stays on the
     // crosshair but the body drops out of the lower-middle (downward-tracking blind
     // spot per the id review). Presentation only; never touches the aim ray.
@@ -137,11 +137,11 @@ export const weapons = [
     name: 'Pistol',
     url: '/assets/weapons/retro_pistol_arms.glb',
     ...authoredMount,
-    // ADS gameplay: the pistol is already a hip laser (spreadBase 0.0015, no heat), so
-    // tightening the cone does little. Hale's stronger idea now shipped: ADS EXTENDS the
-    // damage-falloff range. rangeMult 1.75 pushes falloffStart/End out with aimFactor
-    // (common/damageFalloff.js), so the aimed pistol keeps its 3-shot kill far past where
-    // hip-fire drops off. spreadBaseMult:0 still snaps the last sliver of cone to zero.
+    // ADS gameplay: the pistol now carries a real HIP cone (spreadBase below), and ADS
+    // is how you make it precise -- spreadBaseMult:0 snaps the aimed cone to a dead
+    // laser, so aiming is a genuine accuracy gain (loose from the hip -> pinpoint aimed).
+    // ADS also EXTENDS the damage-falloff range (rangeMult 1.75, common/damageFalloff.js)
+    // so the aimed pistol keeps its 3-shot kill far past where hip-fire drops off.
     ...withAds(80, 0.05, 0.04, { spreadBaseMult: 0.0, rangeMult: 1.75 }),
     isOneHanded: true,
     // The pistol grip is authored ~37deg below the camera line — steeper than the
@@ -188,9 +188,10 @@ export const weapons = [
     falloffStart: 20,
     falloffEnd: 40,
     falloffMinMult: 0.5,
-    // near-laser accurate with flat spread (no heat scaling): precision is the
-    // whole point, so every shot lands where aimed and placement is rewarded.
-    spreadBase: 0.0015,
+    // HIP now has a real cone (was 0.0015 near-laser) so ADS is a meaningful accuracy
+    // gain: loose from the hip, pinpoint when aimed (ads.spreadBaseMult:0). No heat --
+    // it's a precise single-shot finisher, not a sprayer; placement is rewarded.
+    spreadBase: 0.005,
     spreadHeat: 0
   },
   // ---------------------------------------------------------------------------
@@ -206,10 +207,10 @@ export const weapons = [
     name: 'Plasma',              // HUD shows uppercased; keep short
     url: '/assets/weapons/retro_rifle_arms.glb',
     ...authoredMount,
-    // ADS gameplay: +35% projectile speed -> aimed bolts are easier to land at range
-    // (lead less), plus Hale's "thinner bolt" -> 0.6x collision radius at full ADS so
-    // aimed = a precise dart, hip = a fat area-denial ball (GameInstance spawn scales it).
-    ...withAds(75, 0.08, 0.06, { projSpeedMult: 1.35, projSizeMult: 0.6 }),
+    // ADS gameplay: tighter cone (-60% base, -50% bloom) + 35% faster + 0.6x collision
+    // radius at full ADS -> aimed = a precise fast dart; hip = a loose, slow, fat
+    // area-denial ball. (GameInstance spawn scales speed/size; firePattern the cone.)
+    ...withAds(75, 0.08, 0.06, { projSpeedMult: 1.35, projSizeMult: 0.6, spreadBaseMult: 0.4, spreadHeatMult: 0.5 }),
     muzzle: { x: 0.08, y: -0.13, z: 1.05 },
     recoilForce: 0.7,
     drawTime: 0.30,

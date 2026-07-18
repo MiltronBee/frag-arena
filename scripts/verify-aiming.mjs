@@ -125,6 +125,16 @@ try {
   await page.evaluate(() => window.gameClient.simulator.viewmodel.setAim(false))
   await pump(1400)
   check('release after re-aim -> idle', (await state()) === 'idle', 'state=' + (await state()))
+
+  // REGRESSION: pressing ADS mid hip-fire must settle to AIMED when the shot ends, not
+  // hip idle (the "FOV zooms but no aim animation" bug). Ensure idle, hip-fire, press
+  // aim DURING the shot, let it finish -> must be aimed.
+  await pump(600) // fully idle
+  await page.evaluate(() => window.gameClient.simulator.viewmodel.kick({ back: 0.5, up: 0.06, pitch: 0.35 }))
+  check('hip fire (aim released) -> firing', (await state()) === 'firing', 'state=' + (await state()))
+  await page.evaluate(() => window.gameClient.simulator.viewmodel.setAim(true)) // press ADS mid-shot
+  await pump(1600)
+  check('ADS pressed during hip-fire settles to AIMED (bug fix)', (await state()) === 'aimed', 'state=' + (await state()))
 } finally {
   await browser.close(); server.close()
 }

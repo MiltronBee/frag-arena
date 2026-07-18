@@ -324,6 +324,18 @@ export default class Viewmodel {
     this.idleAnim.start(true, 1.0)
   }
 
+  // Where a one-shot clip (fire/draw/reload) hands back to a steady state. If aim is
+  // being held (the camera is already zooming in the Simulator off the same intent),
+  // enter ADS instead of hip idle — otherwise the FOV zooms while the arms stay in
+  // hip idle (the "ADS zoomed but no aim animation" bug when RMB is pressed during a
+  // shot or a draw). Non-ADS / not-held falls through to the normal idle loop.
+  _settleAfterClip() {
+    if (!this._wantActive) return
+    if (this._aimWanted && this.hasAds) { this._enterAimIn(); return }
+    this._setState(S.IDLE)
+    this._startIdleLoop()
+  }
+
   // equip/unequip this weapon: toggle visibility and idle animation
   setActive(active) {
     if (this._disposed) return
@@ -354,9 +366,7 @@ export default class Viewmodel {
       if (this.idleAnim) this.idleAnim.stop()
       this.drawAnim.stop()
       this._onEndOnce(this.drawAnim, gen, () => {
-        if (!this._wantActive) return
-        this._setState(S.IDLE)
-        this._startIdleLoop()
+        this._settleAfterClip() // enter ADS if aim is held, else hip idle
       })
       this.drawAnim.start(false, 1.0)
     } else {
@@ -616,8 +626,7 @@ export default class Viewmodel {
     this.fireAnim.stop()
     this._onEndOnce(this.fireAnim, gen, () => {
       if (this._state !== S.FIRING || !this._wantActive) return
-      this._setState(S.IDLE)
-      this._startIdleLoop()
+      this._settleAfterClip() // enter ADS if aim is held (fixes zoom-but-no-aim), else idle
     })
     this.fireAnim.start(false, 1.0)
   }
