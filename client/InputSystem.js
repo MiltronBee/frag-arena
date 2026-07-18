@@ -118,7 +118,13 @@ class InputSystem {
 			}
 
 			if (!this.pointerLocked) {
-				_pointerLock(this.canvasEle)
+				// Only auto-lock mid-match (arena-entered). On the entry menu this
+				// handler used to grab the pointer on ANY plate click, which fired
+				// pointerlockchange -> arena-entered and warped the player into the
+				// arena. PLAY's own handler (_enterArena) requests the lock explicitly.
+				if (document.body.classList.contains('arena-entered')) {
+					_pointerLock(this.canvasEle)
+				}
 				return // Don't shoot on the lock click
 			}
 

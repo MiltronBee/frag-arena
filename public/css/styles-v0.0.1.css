@@ -1413,7 +1413,10 @@ body.player-dead #crosshair { transform: translate(-50%, -50%) scale(0.7); }
 @keyframes arming-dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
 #enter-arena.is-ready-cta .plate-label { color: var(--sol-teal); animation: cta-pulse 0.9s ease-in-out infinite; }
 @keyframes cta-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
-#enter-arena.enter-unlock { animation: enter-unlock 420ms var(--ease-snap); }
+/* .enter-unlock replaces the menu-rise reveal animation on this plate (higher
+   specificity), which was holding [data-reveal]'s opacity at 1 via its `both`
+   fill — so pin opacity here or the plate vanishes the moment the gate opens. */
+#enter-arena.enter-unlock { animation: enter-unlock 420ms var(--ease-snap); opacity: 1; }
 @keyframes enter-unlock {
     0%   { transform: none; box-shadow: var(--edge-hairline); }
     35%  { transform: translateX(2px) scale(1.02); box-shadow: var(--edge-hairline), var(--glow-teal); }
@@ -1783,8 +1786,10 @@ body.menu-reveal [data-reveal] {
 /* full-screen scrim behind the settings card while the pause menu is open
    (DESIGN 4f: scrim-heavy + blur). Driven by body.menu-open (already toggled by
    Simulator._openSettings/_closeSettings), so it never clips against the card's
-   clip-path. z49 = just under the z50 card. */
-body.menu-open::before {
+   clip-path. z49 = just under the z50 card. Must live INSIDE #game-shell: the
+   shell is position:fixed and forms its own stacking context, so a scrim hung
+   off body would paint over the z50 card (its z-index can't escape the shell). */
+body.menu-open #game-shell::before {
     content: "";
     position: fixed;
     inset: 0;
