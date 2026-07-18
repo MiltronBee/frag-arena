@@ -38,19 +38,26 @@ export default class ProgressReadout {
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     // header readout (menu). Cached lazily — the element may not exist yet at ctor.
-    this._liveEl = null
+    // Split-size digits: the integer part (.seg-int) is rendered LARGE, the fractional
+    // part (.seg-frac) SMALL, gas-pump style; we write into the two sub-spans so the
+    // ghost "888"/".88" underlay overlays the live glyphs exactly.
+    this._intEl = null
+    this._fracEl = null
     this._pctEl = null
     this._wrapEl = null
-    this._splashEl = null
+    this._splashIntEl = null
+    this._splashFracEl = null
   }
 
   _cacheEls() {
-    if (!this._liveEl) this._liveEl = document.getElementById('seg-live')
+    if (!this._intEl) this._intEl = document.getElementById('seg-int')
+    if (!this._fracEl) this._fracEl = document.getElementById('seg-frac')
     if (!this._pctEl) this._pctEl = document.getElementById('seg-pct')
     if (!this._wrapEl) this._wrapEl = document.getElementById('entry-seg')
     // splash echo may be removed once the splash dismisses — re-query each frame is
     // cheap and self-heals (returns null once gone → guarded below).
-    this._splashEl = document.getElementById('splash-seg')
+    this._splashIntEl = document.getElementById('splash-seg-int')
+    this._splashFracEl = document.getElementById('splash-seg-frac')
   }
 
   // Recompute the 0..100 target from the live gate state on the simulator. Called
@@ -102,25 +109,28 @@ export default class ProgressReadout {
     this._paint()
   }
 
-  // format the displayed value as a fixed "NN.NN" (always 2+2 digits so the ghost
-  // "888.88" lines up and digits never jitter width). Disconnected → dashes.
-  _text() {
-    if (this._disconnected) return '--.--'
+  // format the displayed value into split int/frac parts. The integer part varies
+  // 1..3 chars ("0".."100") and is rendered LARGE; the frac (".NN") is rendered small.
+  // Disconnected → int "--", frac ".--" (the leading dot keeps the small-glyph column
+  // aligned with the live/ghost layout). Returns { int, frac }.
+  _parts() {
+    if (this._disconnected) return { int: '--', frac: '.--' }
     let v = this._display
     if (v < 0) v = 0
     if (v > 100) v = 100
-    // clamp the shown precision to 2dp; pad the integer part to 2 so "8.30" reads
-    // "08.30" and aligns with the 2-digit ghost 88.88.
+    // 2dp; the integer part is NOT zero-padded (gas-pump meters show "0".."100"),
+    // the reserved fixed width + right-alignment stops any jitter as it grows.
     const s = v.toFixed(2)
-    const [int, frac] = s.split('.')
-    return int.padStart(2, '0') + '.' + frac
+    const dot = s.indexOf('.')
+    return { int: s.slice(0, dot), frac: s.slice(dot) }
   }
 
   _paint() {
-    const txt = this._text()
+    const { int, frac } = this._parts()
 
-    // ---- menu header readout ----
-    if (this._liveEl && this._liveEl.textContent !== txt) this._liveEl.textContent = txt
+    // ---- menu header readout (split large int / small frac) ----
+    if (this._intEl && this._intEl.textContent !== int) this._intEl.textContent = int
+    if (this._fracEl && this._fracEl.textContent !== frac) this._fracEl.textContent = frac
     if (this._wrapEl) {
       // state attr drives the amber/green/red LED styling (CSS).
       const state = this._disconnected ? 'lost' : (this._open ? 'ready' : 'loading')
@@ -131,7 +141,8 @@ export default class ProgressReadout {
       if (this._pctEl) this._pctEl.style.visibility = this._disconnected ? 'hidden' : 'visible'
     }
 
-    // ---- splash echo (guard: node removed once splash dismisses) ----
-    if (this._splashEl && this._splashEl.textContent !== txt) this._splashEl.textContent = txt
+    // ---- splash echo (guard: nodes removed once splash dismisses) ----
+    if (this._splashIntEl && this._splashIntEl.textContent !== int) this._splashIntEl.textContent = int
+    if (this._splashFracEl && this._splashFracEl.textContent !== frac) this._splashFracEl.textContent = frac
   }
 }

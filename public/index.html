@@ -24,7 +24,7 @@
          stylesheet + LICENSE at public/assets/fonts/DSEG-LICENSE.txt. -->
     <link rel="preload" as="font" type="font/woff2" href="assets/fonts/DSEG7Classic-Bold.woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-f1eac3aac6">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-9f4e5824dc">
 </head>
 <body class="connection-connecting">
     <main id="game-shell">
@@ -156,8 +156,15 @@
                          uplink is lost. Driven per-frame by ProgressReadout.js. -->
                     <span class="entry-seg" id="entry-seg" data-state="loading" aria-hidden="true">
                         <span class="seg-stack">
-                            <span class="seg-ghost">888.88</span>
-                            <span class="seg-live" id="seg-live">00.00</span>
+                            <!-- ghost underlay: split large "888" + small ".88" so it
+                                 overlays the live glyphs exactly (gas-pump split size) -->
+                            <span class="seg-ghost">
+                                <span class="seg-int">888</span><span class="seg-frac">.88</span>
+                            </span>
+                            <!-- live digits: large integer part, small fractional part -->
+                            <span class="seg-live" id="seg-live">
+                                <span class="seg-int" id="seg-int">0</span><span class="seg-frac" id="seg-frac">.00</span>
+                            </span>
                         </span>
                         <span class="seg-pct" id="seg-pct">%</span>
                     </span>
@@ -247,6 +254,18 @@
                 <div class="key-hints" aria-hidden="true">
                     ↑↓ select · ENTER deploy · then: WASD move · SPACE jump · 1–4 weapons · CLICK fire
                 </div>
+            </div>
+
+            <!-- Fake intrusion-log terminal feed (Part D). Pure flavor: while the gate is
+                 closed it appends invented hacker lines on a randomized cadence, finishes
+                 with a green "ACCESS GRANTED" climax on READY, or a red "UPLINK LOST" on
+                 disconnect. aria-hidden — the accessible status is #entry-status. Driven by
+                 IntrusionFeed.js (started by Simulator alongside ProgressReadout); it reads
+                 the same gate state, never duplicating gate logic. Hidden below a height
+                 threshold on mobile so it can't collide with the plates/footer. -->
+            <div class="hack-feed" id="hack-feed" aria-hidden="true">
+                <div class="hack-feed-head"><span class="hack-dot"></span><span id="hack-feed-title">BREAKING INTO SECURE NETWORK</span><span class="hack-ellipsis" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></div>
+                <div class="hack-feed-lines" id="hack-feed-lines"></div>
             </div>
         </section>
 
@@ -478,7 +497,11 @@
             </div>
             <!-- small segment-display % echo (Part B), fed by Simulator once booted.
                  "00.00" until the bundle wires it up; guarded (node removed on dismiss). -->
-            <span class="splash-seg" aria-hidden="true"><span class="splash-seg-live" id="splash-seg">00.00</span><span class="splash-seg-pct">%</span></span>
+            <span class="splash-seg" aria-hidden="true"><span class="splash-seg-live" id="splash-seg"><span class="seg-ghost"><span class="seg-int">888</span><span class="seg-frac">.88</span></span><span class="seg-int" id="splash-seg-int">0</span><span class="seg-frac" id="splash-seg-frac">.00</span></span><span class="splash-seg-pct">%</span></span>
+            <!-- fake intrusion-log ticker (Part D) — one cycling line near the corner
+                 readout, aria-hidden flavor (the real status is #entry-status). Filled
+                 by IntrusionFeed via Simulator; guarded (node removed on dismiss). -->
+            <div class="splash-hack" id="splash-hack" aria-hidden="true"></div>
             <div class="splash-foot">built on Solana · v0.x</div>
         </section>
     </main>
@@ -576,7 +599,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-f1eac3aac6";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-f1eac3aac6"></script>
+    <script>window.__BUILD_ID__="0.0.1-9f4e5824dc";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-9f4e5824dc"></script>
 </body>
 </html>

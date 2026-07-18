@@ -18,6 +18,7 @@ import MusicManager from './graphics/MusicManager'
 import FragLayer from './graphics/FragLayer'
 import MenuControls from './graphics/MenuControls'
 import ProgressReadout from './graphics/ProgressReadout'
+import IntrusionFeed from './graphics/IntrusionFeed'
 import { resolveWeaponFx } from './graphics/firingFx'
 import { assets, weapons } from './assets/assetManifest'
 import preloadAssets from './graphics/assetPreloader'
@@ -149,6 +150,13 @@ class Simulator {
 		// one 0..100 target, eases the shown value each frame, holds 99.99 while assets
 		// are done but server gates are pending, and mirrors onto the splash echo.
 		this._progress = new ProgressReadout(this)
+
+		// fake "hacking into a secure system" terminal feed (Part D). Pure flavor: appends
+		// invented intrusion-log lines while the gate is closed, climaxes green on READY /
+		// red on disconnect. Reads the same gate fields ProgressReadout does; owns its own
+		// randomized cadence timers (stopped on arena entry). aria-hidden theater only.
+		this._intrusionFeed = new IntrusionFeed(this)
+		this._intrusionFeed.start()
 
 		// SPLASH audio-unlock race (Part A). The inline splash controller can't reach
 		// audio.resume()/music.unlock() (they live here in the bundle). Expose a hook it
@@ -1427,6 +1435,8 @@ class Simulator {
 		this.music.unlock() // same gesture unlocks the music player
 		this._arenaEntered = true
 		document.body.classList.add('arena-entered')
+		// kill the intrusion-feed timers — the overlay is going away, no perpetual work.
+		if (this._intrusionFeed) this._intrusionFeed.stop()
 		this._closeSettings()
 
 		const overlay = document.getElementById('entry-overlay')
