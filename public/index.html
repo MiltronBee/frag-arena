@@ -19,7 +19,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Chakra+Petch:ital,wght@0,600;0,700;1,700&family=Inter:wght@400;600&family=Teko:wght@500;600&display=block">
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-02267268d1">
+    <!-- DSEG7 Classic (keshikan's DSEG, SIL OFL) — the segment-display readout font.
+         Preloaded so the LED digits paint without a swap flash. See @font-face in the
+         stylesheet + LICENSE at public/assets/fonts/DSEG-LICENSE.txt. -->
+    <link rel="preload" as="font" type="font/woff2" href="assets/fonts/DSEG7Classic-Bold.woff2" crossorigin>
+
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-f1eac3aac6">
 </head>
 <body class="connection-connecting">
     <main id="game-shell">
@@ -124,50 +129,123 @@
 
         <div id="damage-flash" aria-hidden="true"></div>
 
-        <!-- ENTRY / MAIN MENU (doubles as the loading screen). The PLAY button
-             (#enter-arena) is the loading-locked primary: its fill = load
-             progress until the triple gate opens, then it unlocks to PLAY. -->
+        <!-- ENTRY / MAIN MENU — a place, not a progress dialog. Connection + asset
+             preload run silently behind this screen; the PLAY plate (#enter-arena)
+             always reads PLAY. A tiny uplink LED (#entry-status) in the header is the
+             ONLY load surface. The vertical plates are keyboard/mouse/touch navigable
+             (wiring in MenuControls.js). -->
         <section id="entry-overlay" class="is-visible" aria-labelledby="entry-title">
+            <!-- Menu background hook (Part C). Art drops in via the --menu-bg CSS var
+                 (see styles-v0.0.1.css: uncomment + point at the file). A dark scrim
+                 gradient sits over it (.entry-bg::after) so the menu stays legible with
+                 ANY art; empty/transparent today, falling back to the existing scrim. -->
+            <div class="entry-bg" aria-hidden="true"></div>
             <div class="entry-header">
                 <img class="entry-logo" src="assets/brand/logo.svg" alt="Frag Arena" width="52" height="52">
                 <span class="entry-wordmark">FRAG ARENA</span>
                 <div class="entry-meta">
-                    <span id="entry-ping" class="entry-ping">PING --</span>
-                    <span class="entry-build" id="entry-build">v0.x</span>
+                    <!-- uplink LED: the sole loading surface (driven by _syncEntryState) -->
+                    <span class="entry-uplink" data-ready="false">
+                        <span class="uplink-led" aria-hidden="true"></span>
+                        <span id="entry-status" role="status" aria-live="polite">ESTABLISHING UPLINK…</span>
+                    </span>
+                    <!-- Segment-display fractional progress readout (Part B). A ghost
+                         "888.88" sits behind the live digits so unlit segments read like
+                         real hardware; the % sign is a normal span (DSEG7 has no %).
+                         Amber while loading, green when READY, red "--.--" when the
+                         uplink is lost. Driven per-frame by ProgressReadout.js. -->
+                    <span class="entry-seg" id="entry-seg" data-state="loading" aria-hidden="true">
+                        <span class="seg-stack">
+                            <span class="seg-ghost">888.88</span>
+                            <span class="seg-live" id="seg-live">00.00</span>
+                        </span>
+                        <span class="seg-pct" id="seg-pct">%</span>
+                    </span>
+                    <span class="entry-metaline">
+                        <span id="entry-ping" class="entry-ping">PING --</span>
+                        <span class="entry-build" id="entry-build">v0.x</span>
+                    </span>
                 </div>
             </div>
 
             <div class="entry-content">
-                <div class="menu-card">
-                    <div class="card-strip" aria-hidden="true"></div>
+                <!-- title lockup: emblem · kicker · wordmark · rule -->
+                <div class="entry-lockup" data-reveal>
+                    <div class="lockup-kicker">LIVE MULTIPLAYER · SOLANA</div>
+                    <h1 id="entry-title" class="lockup-word">FRAG ARENA</h1>
+                    <div class="lockup-rule" aria-hidden="true"></div>
+                </div>
 
-                    <div class="entry-kicker">LIVE MULTIPLAYER</div>
-                    <h1 id="entry-title" class="visually-quiet">FRAG ARENA</h1>
-
+                <!-- callsign (compact, above the plates) -->
+                <div class="callsign-field" data-reveal>
                     <label class="field-label" for="callsign-input">CALLSIGN</label>
                     <input id="callsign-input" class="callsign" type="text" maxlength="24"
                            autocomplete="off" spellcheck="false" autocapitalize="characters" enterkeyhint="go" placeholder="PLAYER">
+                </div>
 
-                    <button id="enter-arena" type="button" data-loading="true" aria-disabled="true" disabled><span class="enter-label">LOADING… 0%</span></button>
+                <!-- vertical plate menu. #enter-arena keeps its id (the PLAY plate).
+                     data-menu-plate marks keyboard-navigable entries; data-action wires
+                     the section it opens (handled in MenuControls). -->
+                <nav class="menu-plates" role="menu" aria-label="Main menu">
+                    <button id="enter-arena" class="menu-plate" type="button" role="menuitem"
+                            data-menu-plate data-action="play" data-reveal>
+                        <span class="plate-edge" aria-hidden="true"></span>
+                        <span class="plate-body">
+                            <span class="enter-label plate-label">PLAY</span>
+                            <span class="plate-sub">enter the arena</span>
+                        </span>
+                        <span class="plate-chevron" aria-hidden="true"></span>
+                    </button>
+                    <button class="menu-plate" type="button" role="menuitem"
+                            data-menu-plate data-action="settings" data-reveal>
+                        <span class="plate-edge" aria-hidden="true"></span>
+                        <span class="plate-body">
+                            <span class="plate-label">SETTINGS</span>
+                            <span class="plate-sub">controls &amp; audio</span>
+                        </span>
+                        <span class="plate-chevron" aria-hidden="true"></span>
+                    </button>
+                    <button class="menu-plate" type="button" role="menuitem"
+                            data-menu-plate data-action="issuance" data-reveal>
+                        <span class="plate-edge" aria-hidden="true"></span>
+                        <span class="plate-body">
+                            <span class="plate-label">ISSUANCE</span>
+                            <span class="plate-sub">token &amp; supply</span>
+                        </span>
+                        <span class="plate-chevron" aria-hidden="true"></span>
+                    </button>
+                    <button class="menu-plate" type="button" role="menuitem"
+                            data-menu-plate data-action="whitepaper" data-reveal>
+                        <span class="plate-edge" aria-hidden="true"></span>
+                        <span class="plate-body">
+                            <span class="plate-label">WHITEPAPER</span>
+                            <span class="plate-sub">how frag arena works</span>
+                        </span>
+                        <span class="plate-chevron" aria-hidden="true"></span>
+                    </button>
+                    <button class="menu-plate" type="button" role="menuitem"
+                            data-menu-plate data-action="roadmap" data-reveal>
+                        <span class="plate-edge" aria-hidden="true"></span>
+                        <span class="plate-body">
+                            <span class="plate-label">ROADMAP</span>
+                            <span class="plate-sub">what ships next</span>
+                        </span>
+                        <span class="plate-chevron" aria-hidden="true"></span>
+                    </button>
+                </nav>
 
-                    <div id="entry-progress" aria-hidden="true"><span id="entry-progress-fill"></span></div>
-                    <div class="progress-row">
-                        <span id="entry-stage" class="entry-stage">LOADING…</span>
-                        <span id="entry-status" role="status" aria-live="polite">CONNECTING TO ARENA</span>
-                    </div>
-
-                    <div class="menu-actions">
-                        <button id="wallet-connect" class="btn-wallet" type="button">
-                            <span class="wallet-tick" aria-hidden="true"></span>
-                            <span class="wallet-sym" id="wallet-symbol">TBD</span>
-                            CONNECT
-                        </button>
-                        <button id="how-to-play" class="btn-ghost" type="button">HOW TO PLAY</button>
-                    </div>
+                <!-- secondary actions: wallet stub + how-to (NOT plates) -->
+                <div class="menu-actions" data-reveal>
+                    <button id="wallet-connect" class="btn-wallet" type="button">
+                        <span class="wallet-tick" aria-hidden="true"></span>
+                        <span class="wallet-sym" id="wallet-symbol">TBD</span>
+                        CONNECT
+                    </button>
+                    <button id="how-to-play" class="btn-ghost" type="button">HOW TO PLAY</button>
                 </div>
 
                 <div class="key-hints" aria-hidden="true">
-                    WASD move · SPACE jump · 1–4 weapons · CLICK fire · ESC settings
+                    ↑↓ select · ENTER deploy · then: WASD move · SPACE jump · 1–4 weapons · CLICK fire
                 </div>
             </div>
         </section>
@@ -195,9 +273,84 @@
             </div>
         </section>
 
+        <!-- ISSUANCE (token & supply) — reuses the ghost-modal chrome. -->
+        <section id="issuance-modal" class="info-modal info-closed" role="dialog" aria-modal="true" aria-labelledby="issuance-title">
+            <div class="howto-panel">
+                <div class="card-strip" aria-hidden="true"></div>
+                <button class="panel-close" type="button" aria-label="Close" data-modal-close>✕</button>
+                <div class="menu-kicker">TOKEN</div>
+                <h2 id="issuance-title">ISSUANCE</h2>
+                <div class="token-plate">
+                    <span class="token-tick" aria-hidden="true"></span>
+                    <span class="token-sym" id="issuance-symbol">TBD</span>
+                    <span class="token-note">arena token</span>
+                </div>
+                <ul class="info-rows">
+                    <li><span>SUPPLY</span><b>TO BE ANNOUNCED</b></li>
+                    <li><span>DISTRIBUTION</span><b>TO BE ANNOUNCED</b></li>
+                    <li><span>UTILITY</span><b>TO BE ANNOUNCED</b></li>
+                </ul>
+                <p class="info-note">An earn-by-fragging economy: skill in the arena is what mints value. Details land here as the token is finalized.</p>
+            </div>
+        </section>
+
+        <!-- WHITEPAPER (how frag arena works) -->
+        <section id="whitepaper-modal" class="info-modal info-closed" role="dialog" aria-modal="true" aria-labelledby="whitepaper-title">
+            <div class="howto-panel">
+                <div class="card-strip" aria-hidden="true"></div>
+                <button class="panel-close" type="button" aria-label="Close" data-modal-close>✕</button>
+                <div class="menu-kicker">DOCUMENT</div>
+                <h2 id="whitepaper-title">WHITEPAPER</h2>
+                <div class="info-section">
+                    <h3>THE GAME</h3>
+                    <p>A fast, skill-based arena FPS in the late-'90s tradition — browser-native, zero install, instant frags.</p>
+                </div>
+                <div class="info-section">
+                    <h3>THE ECONOMY</h3>
+                    <p>Play is the product. A token rides on a sticky game; issuance details are TBA and will never gate the fun.</p>
+                </div>
+                <div class="info-section">
+                    <h3>THE STACK</h3>
+                    <p>Babylon.js rendering over an authoritative netcode server, settled on Solana rails.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ROADMAP (what ships next) -->
+        <section id="roadmap-modal" class="info-modal info-closed" role="dialog" aria-modal="true" aria-labelledby="roadmap-title">
+            <div class="howto-panel">
+                <div class="card-strip" aria-hidden="true"></div>
+                <button class="panel-close" type="button" aria-label="Close" data-modal-close>✕</button>
+                <div class="menu-kicker">TIMELINE</div>
+                <h2 id="roadmap-title">ROADMAP</h2>
+                <ol class="roadmap-list">
+                    <li class="is-current">
+                        <span class="phase-tag">PHASE 0</span>
+                        <span class="phase-name">ARENA CORE</span>
+                        <span class="phase-line">Live multiplayer, weapons, movement — playable now.</span>
+                    </li>
+                    <li>
+                        <span class="phase-tag">PHASE 1</span>
+                        <span class="phase-name">PERSISTENCE &amp; IDENTITY</span>
+                        <span class="phase-line">Named players, profiles, saved loadouts.</span>
+                    </li>
+                    <li>
+                        <span class="phase-tag">PHASE 2</span>
+                        <span class="phase-name">TOKEN ISSUANCE</span>
+                        <span class="phase-line">Earn-by-fragging economy goes live.</span>
+                    </li>
+                    <li>
+                        <span class="phase-tag">PHASE 3</span>
+                        <span class="phase-name">RANKED &amp; TOURNAMENTS</span>
+                        <span class="phase-line">Competitive ladders and prize events.</span>
+                    </li>
+                </ol>
+            </div>
+        </section>
+
         <section id="settings-menu" class="settings-closed" aria-labelledby="settings-title">
             <div class="card-strip" aria-hidden="true"></div>
-            <div class="menu-kicker">MATCH PAUSED</div>
+            <div class="menu-kicker" id="settings-kicker">MATCH PAUSED</div>
             <h2 id="settings-title">SETTINGS</h2>
 
             <div class="settings-group">CONTROLS</div>
@@ -226,7 +379,7 @@
                 <label for="music-mute">MUTE MUSIC <input type="checkbox" id="music-mute"></label>
             </div>
 
-            <button id="resume-game" type="button">RESUME</button>
+            <button id="resume-game" type="button"><span class="resume-label">RESUME</span></button>
         </section>
 
         <section id="dev-inspector" class="dev-closed" aria-labelledby="dev-title">
@@ -268,42 +421,152 @@
             </div>
         </section>
 
-        <!-- SPLASH: instant brand cover over the boot. Logo draw-in, auto-advances
-             (~1.9s) and is skippable by any input after 0.8s. The menu is mounted
-             underneath and asset loading starts immediately — the splash is pure
-             theater over it. Inline so it paints before the JS bundle runs. -->
+        <!-- SPLASH: console-style partner boot cards (Part A). A sequence of "POWERED
+             BY" publisher-logo cards over near-black. Card 1 (SOLANA) is the GATE: it
+             holds indefinitely with a blinking "TAP TO INITIALIZE" prompt — that tap is
+             the AUDIO UNLOCK (resumes WebAudio + starts ARENA SIGNAL, the queued 'menu'
+             theme). Cards 2–5 self-advance (~1.2s) and are tap/keypress-skippable. After
+             the last card the splash dismisses like before (fade out, remove node, set
+             body.menu-reveal so the menu's staggered rise-in plays). Loading runs behind
+             the whole time — the splash never blocks on it. Inline so it paints before
+             the JS bundle runs. -->
         <section id="splash" aria-hidden="true">
-            <div class="splash-inner">
-                <img class="splash-logo" src="assets/brand/logo.svg" alt="Frag Arena" width="180" height="180">
-                <div class="splash-wordmark">FRAG ARENA</div>
-                <div class="splash-rule" aria-hidden="true"></div>
-                <div class="splash-tagline">LOAD. FRAG. REPEAT.</div>
+            <!-- one card element; the controller swaps which .splash-card is active -->
+            <div class="splash-stage">
+                <!-- 1 · SOLANA — GATE CARD (holds until tap; tap = audio unlock) -->
+                <div class="splash-card is-active" data-card="solana">
+                    <div class="splash-kicker">POWERED BY</div>
+                    <div class="splash-logos"><img class="splash-logo" src="assets/brand/partners/solana.svg" alt="Solana"></div>
+                    <div class="splash-gate">
+                        <div class="splash-prompt">TAP TO INITIALIZE</div>
+                        <div class="splash-subcap">&#128266; AUDIO UPLINK ENABLED ON TAP</div>
+                    </div>
+                </div>
+                <!-- 2 · METAPLEX -->
+                <div class="splash-card" data-card="metaplex">
+                    <div class="splash-kicker">POWERED BY</div>
+                    <div class="splash-logos"><img class="splash-logo" src="assets/brand/partners/metaplex.svg" alt="Metaplex"></div>
+                </div>
+                <!-- 3 · HELIUS -->
+                <div class="splash-card" data-card="helius">
+                    <div class="splash-kicker">POWERED BY</div>
+                    <div class="splash-logos"><img class="splash-logo" src="assets/brand/partners/helius.svg" alt="Helius"></div>
+                </div>
+                <!-- 4 · TENSOR + MAGIC EDEN (paired; stack on narrow screens) -->
+                <div class="splash-card" data-card="markets">
+                    <div class="splash-kicker">TRADING ON</div>
+                    <div class="splash-logos splash-logos-pair">
+                        <div class="splash-pair-item">
+                            <img class="splash-logo splash-logo-mark" src="assets/brand/partners/tensor.svg" alt="">
+                            <span class="splash-wordmark-txt">TENSOR</span>
+                        </div>
+                        <div class="splash-pair-item">
+                            <img class="splash-logo" src="assets/brand/partners/magic-eden.svg" alt="Magic Eden">
+                        </div>
+                    </div>
+                </div>
+                <!-- 5 · PUMP.FUN (pill mark + styled wordmark) -->
+                <div class="splash-card" data-card="pump">
+                    <div class="splash-kicker">TRADING ON</div>
+                    <div class="splash-logos">
+                        <div class="splash-pair-item">
+                            <img class="splash-logo splash-logo-mark" src="assets/brand/partners/pump-fun.svg" alt="">
+                            <span class="splash-wordmark-txt">PUMP.FUN</span>
+                        </div>
+                    </div>
+                </div>
             </div>
+            <!-- small segment-display % echo (Part B), fed by Simulator once booted.
+                 "00.00" until the bundle wires it up; guarded (node removed on dismiss). -->
+            <span class="splash-seg" aria-hidden="true"><span class="splash-seg-live" id="splash-seg">00.00</span><span class="splash-seg-pct">%</span></span>
             <div class="splash-foot">built on Solana · v0.x</div>
         </section>
     </main>
 
     <script>
-      // Splash controller (0 JS deps): draw-in runs via CSS; auto-advance after
-      // ~1.9s, skippable by any input after 0.8s. Dismissing only fades the splash
-      // layer — it does NOT resume audio or lock the pointer (that stays gated to
-      // the PLAY button / pointer-lock wiring in Simulator, unchanged).
+      // Splash controller (0 JS deps, inline so it runs before the bundle). Advances a
+      // sequence of partner "boot cards". Card 1 (SOLANA) is the GATE: it holds until a
+      // user gesture, and THAT gesture is the audio unlock — the inline handler calls
+      // window.__onSplashGesture (installed by Simulator when the bundle boots) which
+      // resumes WebAudio + starts ARENA SIGNAL. If the bundle isn't up yet, the tap
+      // still advances the cards; Simulator's own one-shot document gesture listener
+      // performs the unlock on the next gesture (see _installSplashAudioUnlock). Cards
+      // 2..N self-advance and are tap/keypress-skippable. Dismissing fades the splash
+      // AND flags the menu's staggered rise-in (body.menu-reveal).
       (function () {
         var splash = document.getElementById('splash')
         if (!splash) return
+        var cards = splash.querySelectorAll('.splash-card')
+        var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        var AUTO_MS = reduced ? 900 : 1200
+        var idx = 0
         var dismissed = false
+        var autoTimer = null
+
+        function show(i) {
+          for (var j = 0; j < cards.length; j++) {
+            cards[j].classList.toggle('is-active', j === i)
+          }
+        }
+        function scheduleAuto() {
+          clearTimeout(autoTimer)
+          // card 0 (Solana) is the GATE — never auto-advances.
+          if (idx === 0) return
+          autoTimer = setTimeout(next, AUTO_MS)
+        }
+        function next() {
+          if (dismissed) return
+          if (idx >= cards.length - 1) { dismiss(); return }
+          idx++
+          show(idx)
+          scheduleAuto()
+        }
         function dismiss() {
           if (dismissed) return
           dismissed = true
+          clearTimeout(autoTimer)
+          document.body.classList.add('menu-reveal')
           splash.classList.add('splash-out')
           setTimeout(function () { if (splash.parentNode) splash.parentNode.removeChild(splash) }, 320)
         }
-        var canSkip = false
-        setTimeout(function () { canSkip = true }, 800)
-        setTimeout(dismiss, 1900)
-        var skip = function () { if (canSkip) dismiss() }
-        window.addEventListener('pointerdown', skip, { passive: true })
-        window.addEventListener('keydown', skip)
+
+        function onGesture() {
+          if (dismissed) return
+          if (idx === 0) {
+            // GATE tap: unlock audio so ARENA SIGNAL starts AT THE TAP. If the bundle
+            // isn't up yet, the hook is absent — Simulator's own one-shot listener
+            // catches the next gesture (unlock/resume are idempotent).
+            if (typeof window.__onSplashGesture === 'function') {
+              try { window.__onSplashGesture() } catch (e) {}
+            }
+            idx = 1
+            show(idx)
+            scheduleAuto()
+          } else {
+            next()
+          }
+        }
+        // The gesture fires on the SPLASH element (bubble phase). We stopPropagation so
+        // it can't reach InputSystem's document-level pointerdown, which would otherwise
+        // requestPointerLock() on the canvas and prematurely enter the arena while the
+        // splash is up. The audio unlock is UNAFFECTED: Simulator's one-shot listener +
+        // window.__onSplashGesture both run in the CAPTURE phase (document), which
+        // completes before this bubble handler — so audio still unlocks at the tap.
+        splash.addEventListener('pointerdown', function (e) {
+          e.stopPropagation()
+          onGesture()
+        })
+        // keydown advances too. NOT stopped/captured: keydown can't trigger pointer
+        // lock (only pointerdown does), and letting it bubble means Simulator's one-shot
+        // document listener still catches it for the audio-unlock fallback race.
+        window.addEventListener('keydown', function (e) {
+          if (dismissed) return
+          if (e.key === 'Tab') return // let focus traversal work
+          onGesture()
+        })
+
+        show(0)
+
         // stamp the build id into the splash/menu version tags once the bundle sets it
         setTimeout(function () {
           var b = window.__BUILD_ID__
@@ -313,7 +576,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-02267268d1";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-02267268d1"></script>
+    <script>window.__BUILD_ID__="0.0.1-f1eac3aac6";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-f1eac3aac6"></script>
 </body>
 </html>

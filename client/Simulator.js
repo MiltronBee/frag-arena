@@ -17,6 +17,7 @@ import WeaponAudio from './graphics/WeaponAudio'
 import MusicManager from './graphics/MusicManager'
 import FragLayer from './graphics/FragLayer'
 import MenuControls from './graphics/MenuControls'
+import ProgressReadout from './graphics/ProgressReadout'
 import { resolveWeaponFx } from './graphics/firingFx'
 import { assets, weapons } from './assets/assetManifest'
 import preloadAssets from './graphics/assetPreloader'
@@ -138,9 +139,25 @@ class Simulator {
 		}
 		this._setupGameUI()
 
-		// menu-as-loadscreen affordances (callsign, wallet plate, how-to-play).
-		// Presentation-only; never touches the entry gate / netcode.
-		this._menuControls = new MenuControls()
+		// main-menu affordances: callsign, wallet stub, how-to, plate keyboard nav +
+		// selection, and the ISSUANCE / WHITEPAPER / ROADMAP / SETTINGS section wiring.
+		// Presentation-only; it calls back into two Simulator methods (openSettings +
+		// menu audio ticks) but never touches the entry gate / netcode.
+		this._menuControls = new MenuControls(this)
+
+		// nerdy fake-hardware LED loading readout (Part B). Blends the real gates into
+		// one 0..100 target, eases the shown value each frame, holds 99.99 while assets
+		// are done but server gates are pending, and mirrors onto the splash echo.
+		this._progress = new ProgressReadout(this)
+
+		// SPLASH audio-unlock race (Part A). The inline splash controller can't reach
+		// audio.resume()/music.unlock() (they live here in the bundle). Expose a hook it
+		// calls on the Solana card tap; if the tap lands BEFORE the bundle boots, this
+		// won't exist yet — so we ALSO install a one-shot document gesture listener that
+		// performs the unlock on the very next gesture anywhere. Both are idempotent and
+		// coexist with the existing PLAY-click / pointer-lock unlock paths (further
+		// fallbacks). Common case: bundle up in <1s, the tap itself unlocks.
+		this._installSplashAudioUnlock()
 
 		// preload the heavy GLBs (third-person body + weapons) while the player is
 		// on the entry screen, so nothing big downloads mid-match. Gates the ENTER
@@ -1166,6 +1183,10 @@ class Simulator {
 
 		this._updateCrosshairSpread()
 		this._updateHud()
+		// nerdy LED loading readout: ease the shown value toward the blended gate
+		// target and paint the menu header + splash echo (runs every frame regardless
+		// of whether we've entered the arena; no-ops cheaply once READY).
+		if (this._progress) this._progress.update(delta)
 		this.renderer.update()
 	}
 
@@ -1216,11 +1237,35 @@ class Simulator {
 		this._syncEntryState()
 	}
 
+	// Audio-unlock plumbing for the inline splash (Part A). The Solana GATE card
+	// holds until a user gesture; THAT gesture must resume WebAudio + unlock the music
+	// so ARENA SIGNAL (already play()-queued as 'menu') audibly starts AT THE TAP.
+	//   - window.__onSplashGesture: the inline handler calls this on the Solana tap. If
+	//     the bundle is already booted, the tap itself does the unlock (WebAudio needs a
+	//     LIVE gesture; a stale flag can't unlock it).
+	//   - one-shot document listener: covers the race where the tap lands before the
+	//     bundle boots (hook absent → the visual still advances, but no unlock yet). The
+	//     NEXT gesture anywhere performs the unlock. Removes itself after firing once.
+	_installSplashAudioUnlock() {
+		const doUnlock = () => { this.audio.resume(); this.music.unlock() }
+		// hook the inline splash calls on the gate tap (idempotent)
+		window.__onSplashGesture = doUnlock
+		// one-shot fallback for a tap that beat the bundle
+		const once = () => {
+			doUnlock()
+			document.removeEventListener('pointerdown', once, true)
+			document.removeEventListener('keydown', once, true)
+		}
+		document.addEventListener('pointerdown', once, true)
+		document.addEventListener('keydown', once, true)
+	}
+
 	_setupGameUI() {
 		this._arenaEntered = false
 		this._arenaReady = false
 		this._assetsReady = false
-		this._assetProgress = 0 // 0..1, drives the loading bar
+		this._assetProgress = 0 // 0..1, preload fraction (no longer drives a bar)
+		this._pendingPlay = false // player clicked PLAY before the gate opened
 		this._connectionState = 'connecting'
 		this._lastHealth = null
 		this._wasDead = false
@@ -1229,7 +1274,10 @@ class Simulator {
 		const resumeButton = document.getElementById('resume-game')
 		if (enterButton) enterButton.addEventListener('click', () => this._enterArena())
 		if (resumeButton) resumeButton.addEventListener('click', () => {
-			if (this.isTouch) {
+			// From the MAIN MENU the button is "BACK" — just close, never grab pointer
+			// lock (that would fall through to the arena). Mid-match (touch) also just
+			// closes; mid-match desktop re-locks the pointer to resume play.
+			if (!this._arenaEntered || this.isTouch) {
 				this._closeSettings()
 			} else {
 				this.input.requestPointerLock()
@@ -1288,74 +1336,93 @@ class Simulator {
 		this._syncEntryState()
 	}
 
-	// Drive the loading bar + the loading-locked PLAY button as heavy assets are
-	// imported and GPU-warmed. `stage` is a human label (MAP / CHARACTERS /
-	// WEAPONS / SOUNDS / EFFECTS / FINALIZING) shown under the bar. total may be 0
-	// on the initial 0/0 call — guard the divide.
+	// Track heavy-asset preload progress. The loading bar was REMOVED (the menu is a
+	// place, not a progress dialog) — this now only records fraction/stage state and
+	// re-runs the entry gate; the sole visible surface is the uplink LED in
+	// _syncEntryState. `stage` is a human label (MAP / CHARACTERS / … / FINALIZING).
 	_setAssetProgress(frac, stage) {
 		this._assetProgress = Math.max(0, Math.min(1, frac || 0))
 		if (stage) this._assetStage = stage
-		const pct = Math.round(this._assetProgress * 100)
-
-		const fill = document.getElementById('entry-progress-fill')
-		if (fill) fill.style.width = pct + '%'
-
-		// the PLAY button doubles as a progress bar until assets are ready: its
-		// ::after underline width mirrors the load fraction (see CSS
-		// #enter-arena[data-loading]). Label shows LOADING… NN% while locked.
-		const button = document.getElementById('enter-arena')
-		if (button) button.style.setProperty('--load-progress', pct + '%')
-
-		const label = document.getElementById('entry-stage')
-		if (label) {
-			const map = { MAP: 'LOADING MAP…', CHARACTERS: 'LOADING CHARACTERS…', WEAPONS: 'LOADING WEAPONS…', SOUNDS: 'LOADING SOUNDS…', EFFECTS: 'LOADING EFFECTS…', FINALIZING: 'FINALIZING…' }
-			label.textContent = this._assetsReady ? '' : (map[this._assetStage] || 'LOADING…')
-		}
-
 		this._syncEntryState()
 	}
 
+	// Present the triple gate (connected && _arenaReady && _assetsReady) with NO
+	// progress bar: the PLAY plate always reads PLAY; the only load surface is the
+	// header uplink LED (#entry-status + .entry-uplink[data-ready]). If the player
+	// clicks PLAY before the gate opens (_pendingPlay), the plate shows a brief
+	// "DEPLOYING…" micro-state, then — since a stale pointer-lock gesture can be
+	// rejected by Chrome — flips to a pulsing "READY — CLICK TO DEPLOY" so the next
+	// click enters immediately (see _enterArena's pending path).
 	_syncEntryState() {
 		const connected = this._connectionState === 'connected'
 		const ready = connected && this._arenaReady && this._assetsReady
 		const button = document.getElementById('enter-arena')
 		const status = document.getElementById('entry-status')
-		const bar = document.getElementById('entry-progress')
-		const pct = Math.round(this._assetProgress * 100)
+		const uplink = document.querySelector('.entry-uplink')
 
 		if (button) {
-			// Triple gate unchanged: not clickable until connected && arena && assets.
-			button.disabled = !ready
-			// Loading-locked variant (DESIGN 3.1): while locked the button is a
-			// progress bar; at 100% ready it unlocks to the primary PLAY CTA with a
-			// one-shot glow pulse. data-loading drives the CSS locked styling; the
-			// gradient fill width tracks --load-progress (set in _setAssetProgress).
-			button.setAttribute('data-loading', ready ? 'false' : 'true')
-			button.setAttribute('aria-disabled', ready ? 'false' : 'true')
-			const label = ready ? 'PLAY' : (this._connectionState === 'disconnected' ? 'CONNECTION LOST' : 'LOADING… ' + pct + '%')
-			// text lives in the .enter-label span so the CSS load-fill layers (::before/::after)
-			// aren't clobbered; fall back to the button itself if the span is absent.
 			const labelEl = button.querySelector('.enter-label') || button
-			if (labelEl.textContent !== label) labelEl.textContent = label
-			if (ready && !this._enterUnlocked) {
-				this._enterUnlocked = true
-				button.classList.add('enter-unlock')
+			let label = 'PLAY'
+			if (!ready) {
+				// gate still closed — no % on the plate. If a play intent is pending,
+				// show the arming micro-state instead of the neutral label.
+				button.disabled = true
+				button.setAttribute('data-loading', 'true')
+				button.setAttribute('aria-disabled', 'true')
+				button.classList.toggle('is-arming', !!this._pendingPlay)
+				label = this._pendingPlay ? 'DEPLOYING…' : 'PLAY'
+			} else {
+				// gate open.
+				button.disabled = false
+				button.setAttribute('data-loading', 'false')
+				button.setAttribute('aria-disabled', 'false')
+				button.classList.remove('is-arming')
+				if (this._pendingPlay) {
+					// a click landed while locked — DON'T auto-enter (stale user gesture
+					// can be rejected by pointer lock). Prompt a fresh click.
+					button.classList.add('is-ready-cta')
+					label = 'READY — CLICK TO DEPLOY'
+				} else {
+					label = 'PLAY'
+				}
+				if (!this._enterUnlocked) {
+					this._enterUnlocked = true
+					button.classList.add('enter-unlock')
+				}
 			}
+			if (labelEl.textContent !== label) labelEl.textContent = label
 		}
-		// show the loading bar until everything's ready, then hide it
-		if (bar) bar.classList.toggle('is-hidden', ready || this._connectionState === 'disconnected')
+
+		// uplink LED: the sole load surface. data-ready flips the LED green + label.
+		if (uplink) uplink.setAttribute('data-ready', ready ? 'true' : 'false')
 		if (status) {
 			let text
-			if (this._connectionState === 'disconnected') text = 'CONNECTION LOST'
-			else if (ready) text = 'ARENA READY'
-			else if (!this._assetsReady) text = 'LOADING ASSETS ' + pct + '%'
-			else text = 'CONNECTING TO ARENA'
-			status.textContent = text
+			if (this._connectionState === 'disconnected') text = 'UPLINK LOST'
+			else if (ready) text = 'READY'
+			else text = 'ESTABLISHING UPLINK…'
+			if (status.textContent !== text) status.textContent = text
 		}
 	}
 
 	_enterArena() {
-		if (this._connectionState !== 'connected' || !this._arenaReady) return
+		// Resume audio on ANY PLAY click — this click is a valid user gesture even if
+		// the gate is still closed, so the menu theme can start browsing music.
+		this.audio.resume()
+		this.music.unlock()
+
+		const ready = this._connectionState === 'connected' && this._arenaReady && this._assetsReady
+		if (!ready) {
+			// Gate not open yet: record a pending intent so the plate shows the arming
+			// micro-state, then (on gate-open) the "READY — CLICK TO DEPLOY" prompt.
+			this._pendingPlay = true
+			this._syncEntryState()
+			return
+		}
+		// Gate open. Clear any pending/ready-cta state and enter for real.
+		this._pendingPlay = false
+		const btn = document.getElementById('enter-arena')
+		if (btn) btn.classList.remove('is-arming', 'is-ready-cta')
+
 		this.audio.resume() // WebAudio needs a user gesture — this click is one
 		this.music.unlock() // same gesture unlocks the music player
 		this._arenaEntered = true
@@ -1381,6 +1448,15 @@ class Simulator {
 			menu.classList.remove('settings-closed')
 			if (wasClosed && this.audio) this.audio.menuOpen()
 		}
+		// Context-sensitive chrome: from the MAIN MENU (not yet in a match) the panel
+		// reads "MAIN MENU" / "BACK"; paused mid-match it reads "MATCH PAUSED" /
+		// "RESUME". Same panel, small conditional — the RESUME button's click handler
+		// already branches on isTouch/pointer-lock, which no-ops correctly on the menu.
+		const inMatch = this._arenaEntered
+		const kicker = document.getElementById('settings-kicker')
+		if (kicker) kicker.textContent = inMatch ? 'MATCH PAUSED' : 'MAIN MENU'
+		const resumeLabel = document.querySelector('#resume-game .resume-label')
+		if (resumeLabel) resumeLabel.textContent = inMatch ? 'RESUME' : 'BACK'
 		document.body.classList.add('menu-open')
 	}
 
