@@ -24,7 +24,7 @@
          stylesheet + LICENSE at public/assets/fonts/DSEG-LICENSE.txt. -->
     <link rel="preload" as="font" type="font/woff2" href="assets/fonts/DSEG7Classic-Bold.woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-9e89d4dade">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-17d53095f1">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -568,27 +568,10 @@
         function onGesture() {
           if (dismissed) return
           if (idx === 0) {
-            // GATE tap: start ARENA SIGNAL AT THE TAP. Play the inline #bg-menu element
-            // DIRECTLY off this live gesture — this works even if the bundle (and its
-            // MusicManager) hasn't booted yet, which is the common case on mobile. The
-            // MusicManager adopts this same element on boot, so there's no double-play.
-            // Honor the saved volume/mute so it matches the Settings sliders.
-            try {
-              var bg = document.getElementById('bg-menu')
-              if (bg) {
-                var mv = parseFloat(localStorage.getItem('musicVolume'))
-                if (isNaN(mv)) mv = 0.35
-                bg.volume = localStorage.getItem('musicMuted') === '1' ? 0 : Math.max(0, Math.min(1, mv))
-                var pr = bg.play()
-                if (pr && pr.catch) pr.catch(function () {})
-              }
-            } catch (e) {}
-            // If the bundle IS up, also resume the WebAudio SFX bus + mark the manager
-            // unlocked (idempotent). If it isn't, Simulator's one-shot listener catches
-            // the next gesture for the SFX side; music already started above.
-            if (typeof window.__onSplashGesture === 'function') {
-              try { window.__onSplashGesture() } catch (e) {}
-            }
+            // GATE tap: start ARENA SIGNAL AT THE TAP (also re-attempted on click/
+            // touchend below — Android Chrome rejects an <audio> play() from
+            // pointerdown but allows it from click/touchend on the same tap).
+            startMenuAudio()
             idx = 1
             show(idx)
             scheduleAuto()
@@ -596,6 +579,41 @@
             next()
           }
         }
+        // Start (or retry) the inline #bg-menu track off a live gesture — works even
+        // before the bundle + its MusicManager boot (MusicManager adopts this exact
+        // element on boot, so no double-play). Honors the saved volume/mute. Idempotent
+        // via the .paused guard, so calling it from several gesture types is safe.
+        function detachMenuAudioKick() {
+          window.removeEventListener('click', startMenuAudio, true)
+          window.removeEventListener('touchend', startMenuAudio, true)
+        }
+        function startMenuAudio() {
+          try {
+            var sim = window.gameClient && window.gameClient.simulator
+            var m = sim && sim.music
+            // Once MusicManager owns playback and we've LEFT the menu track (entered the
+            // arena -> 'match'), STOP and detach: re-playing the now-paused #bg-menu here
+            // would blast the menu theme over the match on every in-game tap.
+            if (m && m.current && m.current !== 'menu') { detachMenuAudioKick(); return }
+            var bg = document.getElementById('bg-menu')
+            if (bg && bg.paused) {
+              var mv = parseFloat(localStorage.getItem('musicVolume'))
+              if (isNaN(mv)) mv = 0.35
+              bg.volume = localStorage.getItem('musicMuted') === '1' ? 0 : Math.max(0, Math.min(1, mv))
+              var pr = bg.play()
+              if (pr && pr.catch) pr.catch(function () {})
+            }
+          } catch (e) {}
+          if (typeof window.__onSplashGesture === 'function') {
+            try { window.__onSplashGesture() } catch (e) {}
+          }
+        }
+        // click + touchend are the gestures Android/iOS reliably honor for <audio>
+        // playback (pointerdown/touchstart get NotAllowedError on some builds). Capture
+        // phase, whole-window. They only bootstrap the MENU track; startMenuAudio
+        // detaches them once the match takes over.
+        window.addEventListener('click', startMenuAudio, true)
+        window.addEventListener('touchend', startMenuAudio, true)
         // The gesture fires on the SPLASH element (bubble phase). We stopPropagation so
         // it can't reach InputSystem's document-level pointerdown, which would otherwise
         // requestPointerLock() on the canvas and prematurely enter the arena while the
@@ -626,7 +644,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-9e89d4dade";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-9e89d4dade"></script>
+    <script>window.__BUILD_ID__="0.0.1-17d53095f1";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-17d53095f1"></script>
 </body>
 </html>

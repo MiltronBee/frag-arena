@@ -1353,8 +1353,19 @@ class Simulator {
 		// switch, iOS call/Siri) the AudioContext suspends and nothing recovers it —
 		// audio goes permanently silent. Resume on touch-reachable events. resume()
 		// already guards on state, so these are cheap + idempotent.
-		document.addEventListener('touchstart', () => { this.audio.resume(); this.music.unlock() }, { passive: true })
-		document.addEventListener('pointerdown', () => { this.audio.resume(); this.music.unlock() })
+		//
+		// IMPORTANT: include click + touchend, not just pointerdown/touchstart.
+		// Android Chrome (confirmed via on-device logging) REJECTS an HTMLAudio
+		// play() started from pointerdown/touchstart with NotAllowedError but ALLOWS
+		// it from click/touchend on the same tap — which is why the menu music (all
+		// pointerdown/touchstart-driven) stayed silent while match music (kicked from
+		// the PLAY button's click) played. music.unlock() now retries on every gesture.
+		const kickAudio = () => { this.audio.resume(); this.music.unlock() }
+		document.addEventListener('touchstart', kickAudio, { passive: true })
+		document.addEventListener('touchend', kickAudio, { passive: true })
+		document.addEventListener('pointerdown', kickAudio)
+		document.addEventListener('pointerup', kickAudio)
+		document.addEventListener('click', kickAudio)
 		document.addEventListener('visibilitychange', () => {
 			if (document.visibilityState === 'visible') this.audio.resume()
 		})

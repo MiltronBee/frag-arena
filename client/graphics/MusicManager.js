@@ -96,8 +96,15 @@ export default class MusicManager {
 
   // Called from a genuine user gesture. Kicks the desired track's playback (the
   // browser now permits it) and starts the per-frame volume easing.
+  //
+  // NB: deliberately NO early-return on `this.unlocked`. Some mobile browsers
+  // (observed on Android Chrome) REJECT an HTMLAudio play() attempted from
+  // pointerdown/touchstart with NotAllowedError, yet ALLOW it from a later
+  // click/touchend on the SAME tap. So every gesture must be free to RE-attempt
+  // playback — `_start()` no-ops when the track is already rolling, so retrying is
+  // cheap. Gating on a one-shot `unlocked` flag would strand the track silent after
+  // the first (rejected) pointerdown attempt.
   unlock() {
-    if (this.unlocked) return
     this.unlocked = true
     if (this.current) this._start(this.current)
     this._ensureRaf()
