@@ -95,6 +95,12 @@ class Simulator {
 		this._recoil = new BABYLON.Vector3(0, 0, 0)      // current spring offset (pitch=x, yaw=y, roll=z)
 		this._recoilVel = new BABYLON.Vector3(0, 0, 0)
 		this._recoilApplied = new BABYLON.Vector3(0, 0, 0) // what we added to the camera last frame
+		// reusable basis vectors + scratch for the per-frame spatial-audio listener
+		// sync (see update()), so orienting the WebAudio listener never allocates.
+		this._FWD = new BABYLON.Vector3(0, 0, 1)  // Vector3.Forward() (LH), cached
+		this._UP = new BABYLON.Vector3(0, 1, 0)   // Vector3.Up(), cached
+		this._lfwdScratch = new BABYLON.Vector3()
+		this._lupScratch = new BABYLON.Vector3()
 		this._recoilTension = 900
 		this._recoilDamping = 60
 		this._visClimb = 0
@@ -1151,9 +1157,10 @@ class Simulator {
 		if (this.audio && this.audio.ready) {
 			const cm = this.renderer.camera.getWorldMatrix()
 			const lpos = this.renderer.camera.position
-			const lfwd = BABYLON.Vector3.TransformNormal(BABYLON.Vector3.Forward(), cm)
-			const lup = BABYLON.Vector3.TransformNormal(BABYLON.Vector3.Up(), cm)
-			this.audio.updateListener(lpos, lfwd, lup)
+			// TransformNormalToRef into pooled scratch (no per-frame Vector3 alloc).
+			BABYLON.Vector3.TransformNormalToRef(this._FWD, cm, this._lfwdScratch)
+			BABYLON.Vector3.TransformNormalToRef(this._UP, cm, this._lupScratch)
+			this.audio.updateListener(lpos, this._lfwdScratch, this._lupScratch)
 		}
 
 		// drive other players' character visuals (position/yaw follow + idle/run anim)
@@ -1280,16 +1287,32 @@ class Simulator {
 
 		const enterButton = document.getElementById('enter-arena')
 		const resumeButton = document.getElementById('resume-game')
+		const closeButton = document.getElementById('settings-close')
 		if (enterButton) enterButton.addEventListener('click', () => this._enterArena())
-		if (resumeButton) resumeButton.addEventListener('click', () => {
-			// From the MAIN MENU the button is "BACK" — just close, never grab pointer
-			// lock (that would fall through to the arena). Mid-match (touch) also just
-			// closes; mid-match desktop re-locks the pointer to resume play.
+		// Shared dismiss for RESUME/BACK, the ✕, and Escape. From the MAIN MENU the
+		// bottom button reads "BACK" — just close, never grab pointer lock (that would
+		// fall through to the arena). Mid-match (touch) also just closes; mid-match
+		// desktop re-locks the pointer to resume play.
+		const dismissSettings = () => {
 			if (!this._arenaEntered || this.isTouch) {
 				this._closeSettings()
 			} else {
 				this.input.requestPointerLock()
 			}
+		}
+		if (resumeButton) resumeButton.addEventListener('click', dismissSettings)
+		// The ✕ is the always-reachable close (the RESUME button can scroll off-screen
+		// on phones). It ALWAYS just closes — even mid-match desktop, where re-locking
+		// the pointer would be a surprising outcome for an explicit "close" affordance.
+		if (closeButton) closeButton.addEventListener('click', () => this._closeSettings())
+		// Escape closes an open settings panel (MenuControls' Escape only covers the
+		// info modals). Guarded on the panel being open, so the SAME Escape that
+		// releases pointer lock to OPEN the pause menu (panel still closed at keydown
+		// time) doesn't instantly close it again.
+		document.addEventListener('keydown', (e) => {
+			if (e.key !== 'Escape') return
+			const m = document.getElementById('settings-menu')
+			if (m && !m.classList.contains('settings-closed')) this._closeSettings()
 		})
 
 		document.addEventListener('pointerlockchange', () => {
@@ -1456,6 +1479,9 @@ class Simulator {
 		if (menu) {
 			const wasClosed = menu.classList.contains('settings-closed')
 			menu.classList.remove('settings-closed')
+			// open at the top so the sticky ✕ (and title) are in view — a persisted
+			// scroll position could otherwise start the panel mid-content on reopen.
+			menu.scrollTop = 0
 			if (wasClosed && this.audio) this.audio.menuOpen()
 		}
 		// Context-sensitive chrome: from the MAIN MENU (not yet in a match) the panel

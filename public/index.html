@@ -24,9 +24,16 @@
          stylesheet + LICENSE at public/assets/fonts/DSEG-LICENSE.txt. -->
     <link rel="preload" as="font" type="font/woff2" href="assets/fonts/DSEG7Classic-Bold.woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-30de0a4767">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-9e89d4dade">
 </head>
 <body class="connection-connecting">
+    <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
+         tap — a live user gesture — can start it even when app.js hasn't booted yet.
+         Browsers only unlock audio on a LIVE gesture, never retroactively, so a tap
+         that beats the bundle would otherwise be wasted and the menu stays silent on
+         mobile. The bundle's MusicManager ADOPTS this exact element (see its ctor),
+         so there is no double-play and the menu->match crossfade still works. -->
+    <audio id="bg-menu" src="/assets/music/arena-signal.mp3" loop preload="auto" playsinline></audio>
     <main id="game-shell">
         <canvas id="main-canvas" aria-label="Degen Tournament game view"></canvas>
 
@@ -369,6 +376,11 @@
 
         <section id="settings-menu" class="settings-closed" aria-labelledby="settings-title">
             <div class="card-strip" aria-hidden="true"></div>
+            <!-- Always-visible close control. The RESUME button lives at the bottom of a
+                 panel that scrolls on phones, so it can end up off-screen / unreachable;
+                 this ✕ sticks to the top-right of the panel so there is ALWAYS a tap
+                 target to close settings (mirrors the modals' ✕). Wired in Simulator. -->
+            <button id="settings-close" class="settings-close" type="button" aria-label="Close settings">&#215;</button>
             <div class="menu-kicker" id="settings-kicker">MATCH PAUSED</div>
             <h2 id="settings-title">SETTINGS</h2>
 
@@ -556,9 +568,24 @@
         function onGesture() {
           if (dismissed) return
           if (idx === 0) {
-            // GATE tap: unlock audio so ARENA SIGNAL starts AT THE TAP. If the bundle
-            // isn't up yet, the hook is absent — Simulator's own one-shot listener
-            // catches the next gesture (unlock/resume are idempotent).
+            // GATE tap: start ARENA SIGNAL AT THE TAP. Play the inline #bg-menu element
+            // DIRECTLY off this live gesture — this works even if the bundle (and its
+            // MusicManager) hasn't booted yet, which is the common case on mobile. The
+            // MusicManager adopts this same element on boot, so there's no double-play.
+            // Honor the saved volume/mute so it matches the Settings sliders.
+            try {
+              var bg = document.getElementById('bg-menu')
+              if (bg) {
+                var mv = parseFloat(localStorage.getItem('musicVolume'))
+                if (isNaN(mv)) mv = 0.35
+                bg.volume = localStorage.getItem('musicMuted') === '1' ? 0 : Math.max(0, Math.min(1, mv))
+                var pr = bg.play()
+                if (pr && pr.catch) pr.catch(function () {})
+              }
+            } catch (e) {}
+            // If the bundle IS up, also resume the WebAudio SFX bus + mark the manager
+            // unlocked (idempotent). If it isn't, Simulator's one-shot listener catches
+            // the next gesture for the SFX side; music already started above.
             if (typeof window.__onSplashGesture === 'function') {
               try { window.__onSplashGesture() } catch (e) {}
             }
@@ -599,7 +626,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-30de0a4767";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-30de0a4767"></script>
+    <script>window.__BUILD_ID__="0.0.1-9e89d4dade";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-9e89d4dade"></script>
 </body>
 </html>

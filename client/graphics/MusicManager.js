@@ -36,22 +36,36 @@ export default class MusicManager {
     // one long-lived <audio> per track; loop + preload so re-entering a state is
     // instant and never re-fetches. volume starts at 0 so the first fade-in is clean.
     this.tracks = {}
+    this._preUnlocked = false
     for (const key of Object.keys(TRACKS)) {
-      const el = new Audio()
-      el.src = TRACKS[key]
+      // Adopt an inline <audio id="bg-<key>"> if the page shipped one (the menu track
+      // does). On mobile the splash gate may have already STARTED it off the first tap,
+      // before this bundle booted — reusing that exact element means no double-play and,
+      // crucially, no lost gesture: we inherit its live, already-unlocked playback
+      // instead of newing up a fresh element the browser would refuse to play.
+      const adopted = typeof document !== 'undefined' && document.getElementById('bg-' + key)
+      const el = adopted || new Audio()
+      if (!el.getAttribute('src')) el.src = TRACKS[key]
       el.loop = true
       el.preload = 'auto'
-      el.volume = 0
+      const alreadyPlaying = !!(adopted && !el.paused)
+      // A fresh (or idle) element starts silent so its first fade-in is clean. Don't
+      // stomp the volume of an element that's already audibly rolling from the gate
+      // tap — let _ease glide from wherever it is.
+      if (!alreadyPlaying) el.volume = 0
       // fire-and-forget: a failed fetch/decode must never break gameplay, so a
       // missing track just stays silent (mirrors WeaponAudio's sample fallback).
       el.addEventListener('error', () => { this._failed = this._failed || {}; this._failed[key] = true })
       this.tracks[key] = el
+      // Adopted a track that's already playing => audio is already unlocked. Record it
+      // so play('match') later actually starts instead of waiting for a gesture.
+      if (alreadyPlaying) this._preUnlocked = true
     }
 
     this.baseVolume = this._loadVolume()
     this.muted = localStorage.getItem('musicMuted') === '1'
     this.current = null       // key of the track that SHOULD be audible (or null)
-    this.unlocked = false
+    this.unlocked = this._preUnlocked
     this._rafId = null
     this._lastTs = null
   }

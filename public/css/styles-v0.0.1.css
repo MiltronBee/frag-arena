@@ -1819,6 +1819,36 @@ body.menu-open #game-shell::before {
 }
 #settings-menu::-webkit-scrollbar { width: 6px; }
 #settings-menu::-webkit-scrollbar-thumb { background: var(--bg-3); }
+
+/* Always-reachable close (✕). The panel scrolls on small screens and the bottom
+   RESUME button can fall off-screen, so this sticks to the panel's top-right and
+   stays tappable at any scroll position. 44px touch target. */
+.settings-close {
+    position: sticky;
+    top: 0;
+    float: right;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin: -10px -8px 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--bone);
+    font-size: 30px;
+    line-height: 1;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 120ms var(--ease-snap), background 120ms var(--ease-snap), transform 120ms var(--ease-snap);
+}
+.settings-close:hover { background: var(--bg-3); color: var(--bone); }
+.settings-close:active { transform: scale(.92); }
+.settings-close:focus-visible { outline: 2px solid var(--sol-teal, var(--bone)); outline-offset: 2px; }
+
 #settings-menu.settings-closed {
     visibility: hidden;
     opacity: 0;
