@@ -1,0 +1,65 @@
+import { defineConfig } from 'vite'
+import path from 'node:path'
+
+const VERSION = '0.0.1'
+const ROOT = __dirname
+const ENTRY = path.resolve(ROOT, 'client/clientMain.js')
+
+export default defineConfig(({ command }) => {
+  const isBuild = command === 'build'
+  return {
+    root: isBuild ? ROOT : path.resolve(ROOT, 'public'),
+    publicDir: false,                 // §4 collision fix: do not let Vite own public/
+    base: '/',
+    define: {
+      // Vite does NOT shim process.env; Simulator.js:185 reads process.env.NODE_ENV
+      'process.env.NODE_ENV': JSON.stringify(isBuild ? 'production' : 'development'),
+    },
+    resolve: {
+      alias: {
+        // nengi's browser client imports Node's built-in `events` (EventEmitter);
+        // webpack 4 auto-polyfilled Node builtins, Vite/Rollup does not. Map to the
+        // pure-JS `events` polyfill package so the client bundle gets a real
+        // EventEmitter (R9-class fix; a real polyfill, not an empty stub).
+        events: path.resolve(ROOT, 'node_modules/events/events.js'),
+      },
+    },
+    optimizeDeps: {
+      include: ['babylonjs', 'babylonjs-loaders'], // UMD/CJS — pre-bundle for dev
+    },
+    server: {
+      port: 8080,
+      strictPort: true,
+      proxy: { '/ws': { target: 'ws://localhost:8079', ws: true, changeOrigin: true } }, // optional; client dials :8079 directly
+      fs: { allow: [ROOT] },
+    },
+    build: {
+      outDir: path.resolve(ROOT, 'public/js'),
+      emptyOutDir: false,
+      target: 'es2019',
+      sourcemap: true,
+      minify: 'esbuild',
+      rollupOptions: {
+        input: ENTRY,
+        output: {
+          format: 'iife',                       // plain <script src>, matches index.html
+          entryFileNames: `app-v${VERSION}.js`, // pin: app-v0.0.1.js
+          inlineDynamicImports: true,           // single file so stamp-build hashes one
+        },
+      },
+    },
+    plugins: [devSourceEntry(isBuild, ROOT)],
+  }
+})
+
+function devSourceEntry(isBuild, root) {
+  return {
+    name: 'dev-source-entry',
+    apply: 'serve',
+    transformIndexHtml(html) {
+      return html.replace(
+        /<script src="js\/app-v[0-9.]+\.js[^"]*"><\/script>/,
+        `<script type="module" src="/@fs/${path.resolve(root, 'client/clientMain.js')}"></script>`)
+    },
+  }
+}
