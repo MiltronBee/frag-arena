@@ -2049,6 +2049,46 @@ body.menu-open #game-shell::before {
 #settings-menu, #dev-inspector { touch-action: auto; }
 
 /* ============================================================================
+   FRAG ARENA — TOUCH DESIGN TOKENS v1.0 (single source of truth)
+   Smoked glass / machined edge / one-red discipline / physical press.
+   ============================================================================ */
+:root {
+    /* --- surface: smoked glass (alpha base only; NEVER backdrop-filter) --- */
+    --tc-glass-hi: rgba(24, 30, 40, 0.78);
+    --tc-glass-lo: rgba(11, 14, 20, 0.66);
+    --tc-sheen: radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 55%);
+
+    /* --- strokes: bright outer rim + dark inner seam = "double stroke" --- */
+    --tc-rim: rgba(255, 255, 255, 0.16);
+    --tc-rim-strong: rgba(255, 255, 255, 0.28);
+    --tc-edge-light: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    --tc-inner-stroke: inset 0 0 0 1px rgba(8, 11, 16, 0.55);
+    --tc-drop: 0 6px 18px rgba(0, 0, 0, 0.45);
+
+    /* --- ink & accent discipline (one red family owns fire + danger) --- */
+    --tc-ink: #e8edf2;
+    --tc-ink-dim: rgba(232, 237, 242, 0.55);
+    --tc-accent-fire: var(--hud-crit, #ff3333);
+    --tc-accent-self: var(--hud-self, #7fe9ff);
+    --tc-accent-util: var(--hud-util, #ffb84d);
+
+    /* --- motion --- */
+    --tc-t-press: 90ms;
+    --tc-t-state: 160ms;
+    --tc-ease-press: cubic-bezier(0.30, 0.00, 0.20, 1.00);
+    --tc-ease-out: cubic-bezier(0.22, 1.00, 0.36, 1.00);
+
+    /* --- icon system: 24px grid / stroke 2 / round caps, tinted via mask --- */
+    --tc-icon-fire: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M22 12h-4M6 12H2M12 6V2M12 22v-4'/%3E%3C/svg%3E");
+    --tc-icon-aim: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M3 7V5a2 2 0 0 1 2-2h2'/%3E%3Cpath d='M17 3h2a2 2 0 0 1 2 2v2'/%3E%3Cpath d='M21 17v2a2 2 0 0 1-2 2h-2'/%3E%3Cpath d='M7 21H5a2 2 0 0 1-2-2v-2'/%3E%3C/svg%3E");
+    --tc-icon-jump: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m17 11-5-5-5 5'/%3E%3Cpath d='m17 18-5-5-5 5'/%3E%3C/svg%3E");
+    --tc-icon-reload: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3C/svg%3E");
+    --tc-icon-switch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 3 4 7l4 4'/%3E%3Cpath d='M4 7h16'/%3E%3Cpath d='m16 21 4-4-4-4'/%3E%3Cpath d='M20 17H4'/%3E%3C/svg%3E");
+    --tc-icon-throw: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='14' r='6'/%3E%3Cpath d='M9.8 8.2V6h4.4v2.2'/%3E%3Cpath d='M15.8 6h-1.6'/%3E%3Ccircle cx='17.4' cy='6' r='1.6'/%3E%3C/svg%3E");
+    --tc-icon-gear: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
+}
+
+/* ============================================================================
    TOUCH CONTROLS (z30) — DESIGN 3.2 / 4d. Restyle only; ids preserved.
    ============================================================================ */
 #touch-controls, #touch-controls * {
@@ -2075,123 +2115,158 @@ body.player-dead #touch-controls {
 #touch-move-zone { left: 0; }
 #touch-look-zone { right: 0; }
 
-/* floating joystick */
+/* floating joystick — smoked-glass puck. No backdrop-filter: the WebGL canvas
+   repaints every frame, so blur re-samples it per frame. Glass is faked with
+   alpha base + sheen + dual stroke + inner falloff. */
 #touch-joy-base {
     position: absolute;
     z-index: 31;
     display: none;
     width: 120px; height: 120px;
     margin: -60px 0 0 -60px;
-    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    border: 1.5px solid var(--tc-rim);
     border-radius: 50%;
     background:
-        radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 60%),
-        rgba(255, 255, 255, 0.04);
-    -webkit-backdrop-filter: blur(6px);
-            backdrop-filter: blur(6px);
+        var(--tc-sheen),
+        linear-gradient(165deg, var(--tc-glass-hi), var(--tc-glass-lo));
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.12),
-        0 4px 16px rgba(0, 0, 0, 0.35);
+        var(--tc-edge-light),
+        var(--tc-inner-stroke),
+        inset 0 -12px 20px rgba(0, 0, 0, 0.30),
+        var(--tc-drop);
     pointer-events: none;
 }
 #touch-joy-base.active { display: block; }
+/* machined-dial detail: travel guide ring + dead-zone dot (paint-only, free) */
+#touch-joy-base::before {
+    content: '';
+    position: absolute;
+    inset: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 50%;
+}
+#touch-joy-base::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 4px; height: 4px;
+    margin: -2px 0 0 -2px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.20);
+}
 #touch-joy-knob {
     position: absolute;
     top: 50%; left: 50%;
     width: 52px; height: 52px;
+    border: 1px solid var(--tc-rim-strong);
     border-radius: 50%;
-    background: rgba(19, 24, 32, 0.6);
-    border: 2px solid transparent;
-    background-image: linear-gradient(rgba(19,24,32,0.6), rgba(19,24,32,0.6)), var(--grad-sol);
-    background-origin: border-box;
-    background-clip: padding-box, border-box;
-    box-shadow: var(--glow-teal);
+    background:
+        radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 60%),
+        linear-gradient(165deg, rgba(36, 43, 56, 0.94), rgba(17, 21, 29, 0.90));
+    box-shadow:
+        var(--tc-edge-light),
+        0 0 0 1px rgba(8, 11, 16, 0.50),
+        0 4px 12px rgba(0, 0, 0, 0.50),
+        0 0 12px rgba(127, 233, 255, 0.20);
     transform: translate(-50%, -50%);
 }
 
-/* thumb buttons — circles (DESIGN 3.2). Set: fire + jump + reload + switch +
-   gear. Reload + switch live INSIDE the touch overlay (z32, above the z31 look
-   zone) so their taps register; the weapon plate is now a pure display. All
-   right-side buttons are laid out as distinct, non-overlapping ≥44px (HIG)
-   targets in the thumb arc, safe-area aware, landscape-first. */
-#touch-fire, #touch-jump, #touch-reload, #touch-switch, #touch-throw, #touch-gear {
+/* thumb buttons — smoked-glass pucks. Visual weight ladder (size / opacity /
+   rim strength): FIRE 96px .96 > secondaries 60-64px .88 > GEAR 48px .62.
+   Icons live in ::before (SVG mask tinted by currentColor); the legacy unicode
+   glyph is hidden via font-size:0. No backdrop-filter (WebGL repaint cost). */
+#touch-fire, #touch-aim, #touch-jump, #touch-reload, #touch-switch, #touch-throw, #touch-gear {
     position: absolute;
     z-index: 32;
     display: flex;
     align-items: center;
     justify-content: center;
-    /* Premium glassmorphism: translucent glass plate, hairline rim, blur */
-    border: 1.5px solid rgba(255, 255, 255, 0.22);
+    border: 1.5px solid var(--tc-rim);
     border-radius: 50%;
     background:
-        radial-gradient(circle at 50% 32%, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04) 62%),
-        rgba(255, 255, 255, 0.05);
-    -webkit-backdrop-filter: blur(8px);
-            backdrop-filter: blur(8px);
-    color: #ffffff;
-    font-family: var(--font-display);
-    font-size: 19px;
-    font-weight: 700;
-    /* crisp glyphs: subtle inner top-light + firm drop shadow, no blur-mush */
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+        var(--tc-sheen),
+        linear-gradient(165deg, var(--tc-glass-hi), var(--tc-glass-lo));
+    color: var(--tc-ink);
+    font-size: 0;               /* legacy unicode glyph hidden; icon lives in ::before */
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.18),
-        0 4px 16px rgba(0, 0, 0, 0.4);
-    opacity: 0.9;
-    transition: transform 90ms ease, background 90ms ease, border-color 90ms ease, box-shadow 90ms ease, opacity 90ms ease;
+        var(--tc-edge-light),
+        var(--tc-inner-stroke),
+        inset 0 -10px 18px rgba(0, 0, 0, 0.28),
+        var(--tc-drop);
+    opacity: 0.88;
+    transition:
+        transform var(--tc-t-press) var(--tc-ease-press),
+        box-shadow var(--tc-t-press) var(--tc-ease-press),
+        border-color var(--tc-t-state) var(--tc-ease-out),
+        opacity var(--tc-t-state) var(--tc-ease-out),
+        color var(--tc-t-state) var(--tc-ease-out);
 }
-/* :active — tint to self-cyan (--hud-self) and press-in */
-#touch-jump.active, #touch-reload.active, #touch-switch.active, #touch-gear.active {
-    border-color: var(--hud-self, #7fe9ff);
-    background:
-        radial-gradient(circle at 50% 32%, rgba(127, 233, 255, 0.30), rgba(127, 233, 255, 0.10) 66%),
-        rgba(127, 233, 255, 0.10);
+/* icon layer — SVG mask tinted by currentColor: state recolors are free */
+#touch-fire::before, #touch-aim::before, #touch-jump::before, #touch-reload::before,
+#touch-switch::before, #touch-throw::before, #touch-gear::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-color: currentColor;
+    -webkit-mask-image: var(--tc-icon);
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: var(--tc-icon-size, 44%);
+            mask: var(--tc-icon) no-repeat center / var(--tc-icon-size, 44%);
+}
+#touch-fire   { --tc-icon: var(--tc-icon-fire);   --tc-icon-size: 40%; }
+#touch-aim    { --tc-icon: var(--tc-icon-aim); }
+#touch-jump   { --tc-icon: var(--tc-icon-jump); }
+#touch-reload { --tc-icon: var(--tc-icon-reload); }
+#touch-switch { --tc-icon: var(--tc-icon-switch); }
+#touch-throw  { --tc-icon: var(--tc-icon-throw); }
+#touch-gear   { --tc-icon: var(--tc-icon-gear);   --tc-icon-size: 46%; }
+
+/* :active — physical press: sink in 90ms, steady 1px accent ring, no glow spam */
+#touch-aim.active, #touch-jump.active, #touch-reload.active, #touch-switch.active, #touch-gear.active {
+    border-color: var(--tc-accent-self);
+    color: #ffffff;
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.22),
-        0 0 14px rgba(127, 233, 255, 0.45),
-        0 4px 16px rgba(0, 0, 0, 0.4);
+        inset 0 2px 8px rgba(0, 0, 0, 0.42),
+        var(--tc-inner-stroke),
+        0 0 0 1px rgba(127, 233, 255, 0.30),
+        0 2px 8px rgba(0, 0, 0, 0.40);
     opacity: 1;
-    transform: scale(0.92);
+    transform: scale(0.90);
 }
 
-/* FIRE — primary action, bottom-right thumb corner (96px). Carries the crit
-   identity: a bold red rim that reads as "shoot" without a heavy fill. */
+/* FIRE — primary action (96px, heaviest weight). Red rim + red-tinted plate;
+   the icon stays accent-red at rest, white on press. */
 #touch-fire {
     right: calc(28px + env(safe-area-inset-right));
     bottom: calc(72px + env(safe-area-inset-bottom));
     width: 96px; height: 96px;
-    border-color: rgba(255, 51, 51, 0.55);
+    border-color: rgba(255, 59, 48, 0.60);
     background:
-        radial-gradient(circle at 50% 32%, rgba(255, 90, 90, 0.16), rgba(255, 51, 51, 0.05) 60%),
-        rgba(255, 255, 255, 0.04);
-    color: var(--hud-crit, #ff3333);
-    font-size: 34px;
-    opacity: 0.95;
+        radial-gradient(120% 90% at 50% 0%, rgba(255, 96, 80, 0.16), rgba(255, 96, 80, 0) 55%),
+        linear-gradient(165deg, rgba(46, 22, 24, 0.80), rgba(20, 12, 14, 0.70));
+    color: var(--tc-accent-fire);
+    opacity: 0.96;
 }
 #touch-fire.active {
-    border-color: var(--hud-crit, #ff3333);
-    background:
-        radial-gradient(circle at 50% 32%, rgba(255, 80, 80, 0.34), rgba(255, 51, 51, 0.12) 66%),
-        rgba(255, 51, 51, 0.10);
+    border-color: #ff6b5e;
+    color: #ffffff;
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.22),
-        0 0 18px rgba(255, 51, 51, 0.5),
-        0 4px 16px rgba(0, 0, 0, 0.45);
+        inset 0 2px 10px rgba(60, 8, 6, 0.55),
+        var(--tc-inner-stroke),
+        0 0 0 1px rgba(255, 59, 48, 0.45),
+        0 2px 10px rgba(0, 0, 0, 0.45);
     opacity: 1;
-    transform: scale(0.92);
+    transform: scale(0.90);
 }
-/* thumb-arc secondaries, all clear of each other and of fire (see rect map in
-   TouchControls review): no two share a rect.
-     fire   : right[28..124]  bottom[72..168]   (96px)
-     reload : right[44..104]  bottom[178..238]  (60px)  — directly above fire
-     jump   : right[140..204] bottom[168..232]  (64px)  — up-left of fire
-     switch : right[118..178] bottom[254..314]  (60px)  — above jump
-     gear   : top-right corner (top-anchored, no conflict) */
+/* thumb-arc secondaries — rects unchanged from the prior map:
+   fire x[28..124] y[72..168] / reload x[44..104] y[178..238] /
+   jump x[140..204] y[168..232] / switch x[118..178] y[254..314] /
+   throw x[210..270] y[168..228] / gear top-right corner */
 #touch-reload {
     right: calc(44px + env(safe-area-inset-right));
     bottom: calc(178px + env(safe-area-inset-bottom));
     width: 60px; height: 60px;
-    font-size: 26px;
 }
 #touch-jump {
     right: calc(140px + env(safe-area-inset-right));
@@ -2202,35 +2277,75 @@ body.player-dead #touch-controls {
     right: calc(118px + env(safe-area-inset-right));
     bottom: calc(254px + env(safe-area-inset-bottom));
     width: 60px; height: 60px;
-    font-size: 24px;
 }
-/* THROW — frag grenade. Right of jump (rect right[210..270] bottom[168..228]);
-   clear of fire/reload/jump/switch. Amber ordnance tint to read as "grenade". */
+/* AIM (ADS) — now in the base selector + given a rect. x[140..200] y[72..132]:
+   16px clear of fire (x<=124), 36px clear of jump (y>=168). */
+#touch-aim {
+    right: calc(140px + env(safe-area-inset-right));
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    width: 60px; height: 60px;
+}
+/* ADS selected — persistent steady ring (needs JS to toggle .is-selected;
+   the .active press state above already fires on touch regardless). */
+#touch-aim.is-selected {
+    border-color: var(--tc-accent-self);
+    color: var(--tc-accent-self);
+    opacity: 1;
+    box-shadow:
+        var(--tc-edge-light),
+        var(--tc-inner-stroke),
+        0 0 0 2px rgba(127, 233, 255, 0.35),
+        var(--tc-drop);
+}
+/* THROW — frag grenade, amber ordnance tint */
 #touch-throw {
     right: calc(210px + env(safe-area-inset-right));
     bottom: calc(168px + env(safe-area-inset-bottom));
     width: 60px; height: 60px;
-    font-size: 24px;
-    border-color: rgba(255, 184, 77, 0.5);
-    color: var(--hud-util, #ffb84d);
+    border-color: rgba(255, 184, 77, 0.45);
+    color: var(--tc-accent-util);
 }
 #touch-throw.active {
-    border-color: var(--hud-util, #ffb84d);
-    background:
-        radial-gradient(circle at 50% 32%, rgba(255, 184, 77, 0.30), rgba(255, 140, 40, 0.10) 66%),
-        rgba(255, 184, 77, 0.10);
+    border-color: var(--tc-accent-util);
+    color: #ffffff;
     box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.22),
-        0 0 14px rgba(255, 184, 77, 0.45),
-        0 4px 16px rgba(0, 0, 0, 0.4);
+        inset 0 2px 8px rgba(0, 0, 0, 0.42),
+        var(--tc-inner-stroke),
+        0 0 0 1px rgba(255, 184, 77, 0.35),
+        0 2px 8px rgba(0, 0, 0, 0.40);
     opacity: 1;
-    transform: scale(0.92);
+    transform: scale(0.90);
 }
+/* GEAR — quietest rung of the ladder */
 #touch-gear {
     top: calc(12px + env(safe-area-inset-top));
     right: calc(12px + env(safe-area-inset-right));
     width: 48px; height: 48px;
-    opacity: 0.8;
+    opacity: 0.62;
+}
+
+/* --- STATE SYSTEM: cooldown ring + disabled ------------------------------- */
+/* COOLDOWN — reload / grenade recharge. JS hook:
+   btn.classList.add('is-cooling'); btn.style.setProperty('--cd', remaining/total); */
+@property --cd { syntax: '<number>'; initial-value: 0; inherits: false; }
+
+#touch-reload.is-cooling, #touch-throw.is-cooling { color: var(--tc-ink-dim); }
+#touch-reload.is-cooling::after, #touch-throw.is-cooling::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    background: conic-gradient(var(--_cd-accent, var(--tc-accent-self)) calc(var(--cd, 0) * 1turn), rgba(255, 255, 255, 0.07) 0);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+            mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+}
+#touch-throw.is-cooling::after { --_cd-accent: var(--tc-accent-util); }
+
+/* DISABLED — no ammo / no grenade: desaturated, silent, non-interactive */
+#touch-controls .is-disabled {
+    opacity: 0.30;
+    filter: saturate(0);
+    pointer-events: none;
 }
 
 /* ============================================================================
@@ -2431,12 +2546,36 @@ body.player-dead #touch-controls {
 
     /* kill feed drops BELOW the top-right vitals stack (grenade+weapon) so it
        no longer shares the corner the ammo plate now occupies. */
-    #kill-feed { top: calc(178px + env(safe-area-inset-top)); gap: 4px; max-width: 210px; }
+    #kill-feed { top: calc(206px + env(safe-area-inset-top)); gap: 4px; max-width: 210px; } /* clear grenade plate (group bottom ~195) */
     .kill-feed-row { height: 24px; padding: 0 8px; font-size: 12px; }
     .kill-feed-row .kf-weapon { display: none; }
     #kill-feed .kill-feed-row:nth-child(n+4) { display: none; }
 
     #frag-banner { font-size: 26px; }
+
+    /* === AAA type & plate pass (override; later in the same media query) === */
+    #health-panel, #weapon-panel, #grenade-panel {
+        background: linear-gradient(180deg, rgba(15, 19, 26, 0.74), rgba(9, 12, 17, 0.62));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 4px 14px rgba(0, 0, 0, 0.50);
+    }
+    #health-value {
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.60);
+    }
+    #magazine-ammo {
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.60);
+    }
+    .ammo-separator, #reserve-ammo { font-weight: 500; color: rgba(232, 237, 242, 0.50); }
+    #weapon-name { font-weight: 600; font-size: 10px; letter-spacing: 0.20em; }
+    #reload-state { font-weight: 600; letter-spacing: 0.28em; }
+    #grenade-count { font-weight: 700; }
+    .match-strip { font-weight: 600; letter-spacing: 0.08em; }
+    .kill-feed-row { font-weight: 500; }
+    /* crosshair: 1px dark lift so the ticks survive bright skyboxes */
+    #crosshair { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.65)); }
 }
 
 /* menu reflow on mobile (DESIGN 4b mobile) */
@@ -2746,24 +2885,65 @@ body.player-dead #touch-controls {
     user-select: none;
 }
 
-/* ADS aim button (touch): mirrors the fire button glass style; sits inboard of
-   fire, slightly smaller, and doubles as a drag-look surface (see TouchControls). */
-#touch-aim {
-    position: absolute; z-index: 32;
-    display: flex; align-items: center; justify-content: center;
-    right: calc(140px + env(safe-area-inset-right));
-    bottom: calc(150px + env(safe-area-inset-bottom));
-    width: 76px; height: 76px;
-    border: 1.5px solid rgba(255,255,255,0.22); border-radius: 50%;
-    background: radial-gradient(circle at 50% 32%, rgba(255,255,255,0.14), rgba(255,255,255,0.04) 62%), rgba(255,255,255,0.05);
-    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-    color: #fff; font-family: var(--font-display); font-size: 22px; font-weight: 700;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.55);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 4px 16px rgba(0,0,0,0.4);
-    opacity: 0.9; transition: transform 90ms ease, background 90ms ease, border-color 90ms ease, opacity 90ms ease;
+/* ADS aim button (touch): styling now lives in the main TOUCH CONTROLS block
+   (base selector + #touch-aim rect + .active/.is-selected states) under the
+   v1.0 design tokens. Old standalone block removed to avoid overriding it. */
+
+
+/* ============================================================================
+   TOUCH CONTROL LAYOUT v2 — ergonomics pass (geometry contract).
+   Thumb-rest origin = fire center (bottom-right). Core keys (fire/aim/reload/
+   jump) inside the reach arc; switch/throw on the outer stretch ring (low-freq).
+   Three layouts: base(landscape) / portrait / short-landscape. Portrait keeps
+   every key RIGHT of screen centre (clear of the floating joystick). All rects
+   derive from the contract vars — change one size, nothing overlaps.
+   ============================================================================ */
+#touch-controls {
+    --tc-r: calc(20px + env(safe-area-inset-right));
+    --tc-b: calc(20px + env(safe-area-inset-bottom));
+    --tc-fire: 88px;
+    --tc-aim: 58px;
+    --tc-sec: 54px;   /* jump / reload / switch / throw */
+    --tc-gear: 46px;
+    --tc-gap: 16px;
 }
-#touch-aim.active {
-    transform: scale(0.92);
-    background: radial-gradient(circle at 50% 32%, rgba(120,190,255,0.35), rgba(120,190,255,0.10) 62%), rgba(120,190,255,0.12);
-    border-color: rgba(140,200,255,0.7); opacity: 1;
+#touch-fire   { width: var(--tc-fire); height: var(--tc-fire); }
+#touch-aim    { width: var(--tc-aim);  height: var(--tc-aim); }
+#touch-jump, #touch-reload, #touch-switch, #touch-throw { width: var(--tc-sec); height: var(--tc-sec); }
+#touch-gear   { width: var(--tc-gear); height: var(--tc-gear); }
+
+/* ---- BASE = LANDSCAPE. 3-column arc; wide so it spreads sideways, not up. ---
+   col1(x≈r): fire + reload | col2: aim + jump | col3(inboard): switch + throw */
+#touch-fire   { right: var(--tc-r); bottom: var(--tc-b); top: auto; left: auto; }
+#touch-reload { right: calc(var(--tc-r) + (var(--tc-fire) - var(--tc-sec)) / 2); bottom: calc(var(--tc-b) + var(--tc-fire) + var(--tc-gap)); top: auto; left: auto; }
+#touch-aim    { right: calc(var(--tc-r) + var(--tc-fire) + var(--tc-gap)); bottom: var(--tc-b); top: auto; left: auto; }
+#touch-jump   { right: calc(var(--tc-r) + var(--tc-fire) + var(--tc-gap) + (var(--tc-aim) - var(--tc-sec)) / 2); bottom: calc(var(--tc-b) + var(--tc-aim) + var(--tc-gap)); top: auto; left: auto; }
+#touch-switch { right: calc(var(--tc-r) + var(--tc-fire) + var(--tc-aim) + var(--tc-gap) * 2); bottom: var(--tc-b); top: auto; left: auto; }
+#touch-throw  { right: calc(var(--tc-r) + var(--tc-fire) + var(--tc-aim) + var(--tc-gap) * 2 + (var(--tc-aim) - var(--tc-sec)) / 2); bottom: calc(var(--tc-b) + var(--tc-sec) + var(--tc-gap)); top: auto; left: auto; }
+#touch-gear   { top: calc(12px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); bottom: auto; left: auto; }
+
+/* ---- PORTRAIT (tall, narrow). 2 columns × 3 rows, hugging the right edge.
+        Inboard column R = r+fire+gap keeps its left edge > 50% even on 360px. -- */
+@media (orientation: portrait) {
+    #touch-controls { --tc-fire: 84px; --tc-aim: 56px; --tc-sec: 52px; --tc-b: calc(88px + env(safe-area-inset-bottom)); }
+    /* right column (centered over fire): fire(bottom) / reload(mid) / switch(top) */
+    #touch-fire   { right: var(--tc-r); bottom: var(--tc-b); }
+    #touch-reload { right: calc(var(--tc-r) + (var(--tc-fire) - var(--tc-sec)) / 2); bottom: calc(var(--tc-b) + var(--tc-fire) + var(--tc-gap)); }
+    #touch-switch { right: calc(var(--tc-r) + (var(--tc-fire) - var(--tc-sec)) / 2); bottom: calc(var(--tc-b) + var(--tc-fire) + var(--tc-sec) + var(--tc-gap) * 2); }
+    /* inboard column: aim(bottom) / jump(mid) / throw(top) */
+    #touch-aim    { right: calc(var(--tc-r) + var(--tc-fire) + var(--tc-gap)); bottom: var(--tc-b); }
+    #touch-jump   { right: calc(var(--tc-r) + var(--tc-fire) + var(--tc-gap)); bottom: calc(var(--tc-b) + var(--tc-aim) + var(--tc-gap)); }
+    #touch-throw  { right: calc(var(--tc-r) + var(--tc-fire) + var(--tc-gap)); bottom: calc(var(--tc-b) + var(--tc-aim) + var(--tc-sec) + var(--tc-gap) * 2); }
+}
+
+/* ---- SHORT LANDSCAPE (height ≤ 460, coarse = any phone held sideways).
+        Shrink the contract; the base 3-col arc recomputes compact. ---------- */
+@media (max-height: 460px) and (pointer: coarse) {
+    #touch-controls {
+        --tc-fire: 76px;
+        --tc-aim: 52px;
+        --tc-sec: 48px;
+        --tc-gap: 14px;
+        --tc-b: calc(16px + env(safe-area-inset-bottom));
+    }
 }

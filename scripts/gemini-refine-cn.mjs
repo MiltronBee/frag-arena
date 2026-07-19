@@ -20,7 +20,7 @@ const res = await fetch(url, {
   body: JSON.stringify({
     systemInstruction: { parts: [{ text: SYS }] },
     contents: [{ role: 'user', parts: [{ text: `请润色以下草稿：\n\n${draft}` }] }],
-    generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
+    generationConfig: { temperature: 0.3, maxOutputTokens: 8192 },
   }),
 })
 const json = await res.json()
