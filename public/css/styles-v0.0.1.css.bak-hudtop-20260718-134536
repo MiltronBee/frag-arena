@@ -1,0 +1,2705 @@
+/* ============================================================================
+   FRAG ARENA — UI/HUD stylesheet. "Neon autopsy at 120fps."
+   Implements _work/ui/DESIGN-spec.md tokens + components over the Babylon canvas.
+   Filename is load-bearing: scripts/stamp-build.mjs regexes styles-v*.css and
+   rewrites the ?v= stamp — keep the pattern.
+   MUST-PRESERVE ids/classes/body-classes from _work/ui/AUDIT-current-ui.md are
+   preserved verbatim below; only presentation is changed.
+   ============================================================================ */
+
+:root {
+    color-scheme: dark;
+
+    /* ---- Color tokens (DESIGN 2.1) ---- */
+    --sol-teal: #14F195;
+    --sol-mid: #00D18F;
+    --sol-purple: #9945FF;
+    --grad-sol: linear-gradient(100deg, #14F195 0%, #00D18F 55%, #9945FF 100%);
+    --grad-sol-v: linear-gradient(180deg, #14F195 0%, #00D18F 55%, #9945FF 100%);
+    --blood: #C81E1E;
+    --blood-bright: #FF3333;
+    --blood-dark: #7A1010;
+    --bone: #ECE6D2;
+    --bone-dim: #A8A395;
+    --ink: #1B1512;
+    --bg-0: #07090C;
+    --bg-1: #0B0E12;
+    --bg-2: #131820;
+    --bg-3: #1C2430;
+    --line: #2A3342;
+    --scrim: rgba(7, 9, 12, 0.72);
+    --scrim-heavy: rgba(7, 9, 12, 0.88);
+    --warn: #FFB020;
+    /* amber = high-damage / utility accent (bit 2 heavy-hit tier, bit 8 status) */
+    --amber: #FFB02E;
+
+    /* ---- Halo: Combat Evolved ammo HUD (client-only presentation) ---- */
+    --halo-cyan: var(--hud-self);   /* legacy alias -> single cyan contract (bit 14) */
+    --halo-cyan-dim: #6FD9E8;    /* reserve / separator */
+    --halo-cyan-deep: #3FA9C4;   /* frame / brackets */
+    --halo-tint: rgba(30, 120, 150, 0.22);   /* cyan wash over the scrim */
+    --glow-halo: 0 0 6px rgba(127, 233, 255, .65), 0 0 18px rgba(111, 217, 232, .35);
+
+    /* ---- Spacing / radii / angles (DESIGN 2.3) ---- */
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+    --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
+    --r-0: 0; --r-1: 4px; --r-full: 999px;
+    --skew: -12deg;
+    --notch: 12px;
+
+    /* ---- Glow & shadow (DESIGN 2.4) ---- */
+    --glow-teal: 0 0 8px rgba(20, 241, 149, .55), 0 0 24px rgba(20, 241, 149, .25);
+    --glow-purple: 0 0 8px rgba(153, 69, 255, .55), 0 0 24px rgba(153, 69, 255, .25);
+    --glow-blood: 0 0 10px rgba(255, 51, 51, .6), 0 0 28px rgba(200, 30, 30, .3);
+    --text-shadow-hud: 0 1px 0 #07090C, 0 0 6px rgba(7, 9, 12, .9);
+    --edge-hairline: inset 0 0 0 1px var(--line);
+
+    /* ---- Motion (DESIGN 5) ---- */
+    --ease-snap: cubic-bezier(.2, .9, .3, 1);
+    --ease-exit: cubic-bezier(.6, 0, .9, .4);
+
+    /* ---- Fonts (DESIGN 2.2) ---- */
+    --font-display: 'Chakra Petch', 'Arial Narrow', Impact, sans-serif;
+    --font-hud: 'Teko', 'Arial Narrow', sans-serif;
+    --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+    /* HUD numerals: Barlow Condensed reads a "0" as a zero (Teko's renders as "U").
+       Used for ammo/health/grenade counts with tabular-nums so widths never shift. */
+    --font-numeral: 'Barlow Condensed', 'DIN Alternate', var(--font-hud);
+
+    /* ---- HUD REWORK color law (HUD-REWORK-SPEC SHARED CONTRACT) ----
+       Flat scrim backplates (NO glow); calm self-colors muted so they never
+       out-shout the world; --hud-crit red always wins on critical states. */
+    --hud-scrim:  rgba(6, 10, 15, 0.82);   /* flat backplate, NO glow                 */
+    --hud-self:   #7FE9FF;   /* self/active systems: ammo, weapon accent (calm cyan)  */
+    --hud-vitals: var(--sol-teal);   /* health accent — SOL brand teal, kept for identity */
+    --hud-util:   #ffb84d;   /* utility/cooldown: grenades                            */
+    --hud-crit:   #ff3333;   /* CRITICAL: low HP, empty mag, reloading — always wins  */
+    --hud-warn:   #FFB020;   /* mid-tier warn (health 31-60, low-ammo amber)          */
+    --hud-over:   #FFCF6B;   /* overheal amber readout                                */
+
+    /* clipped bottom-right corner (panels/buttons) */
+    --clip-notch: polygon(0 0, 100% 0, 100% calc(100% - var(--notch)), calc(100% - var(--notch)) 100%, 0 100%);
+    /* mirrored: clipped top-left (kill-feed rows) */
+    --clip-notch-tl: polygon(var(--notch) 0, 100% 0, 100% 100%, 0 100%, 0 var(--notch));
+
+    font-family: var(--font-ui);
+
+    /* ---- Menu background hook (Part C). Drop art in by uncommenting + pointing this
+       var at the file; the dark scrim gradient over it (.entry-bg::after) keeps the
+       menu legible with any art. Empty today → falls back to the existing overlay
+       scrim. Example:
+       --menu-bg: url('../assets/brand/menu-bg.jpg'); */
+    --menu-bg: none;
+}
+
+* { box-sizing: border-box; }
+
+/* ---- DSEG7 Classic (keshikan's DSEG, SIL OFL — see public/assets/fonts/DSEG-LICENSE.txt).
+   The segment-display readout font. font-display:swap so the monospace fallback shows
+   until the (tiny, preloaded) woff2 arrives. ---- */
+@font-face {
+    font-family: 'DSEG7 Classic';
+    src: url('../assets/fonts/DSEG7Classic-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--bg-0);
+    color: var(--bone);
+    overscroll-behavior: none;
+}
+
+button, input, select { font: inherit; color: inherit; }
+
+/* Focus-visible: 2px teal outline, offset 2px — on everything interactive
+   (DESIGN 2.4, non-negotiable for menus). */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+a:focus-visible {
+    outline: 2px solid var(--sol-teal);
+    outline-offset: 2px;
+}
+
+.visually-quiet {
+    position: absolute;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+#game-shell, #main-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#main-canvas { display: block; touch-action: none; outline: none; }
+
+/* ============================================================================
+   HUD LAYER (z10) — DESIGN 3
+   ============================================================================ */
+
+#arena-hud {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    user-select: none;
+}
+
+#top-hud {
+    position: absolute;
+    top: calc(var(--sp-5) + env(safe-area-inset-top));
+    left: calc(var(--sp-5) + env(safe-area-inset-left));
+    right: calc(var(--sp-5) + env(safe-area-inset-right));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.brand-lockup, .match-strip { display: flex; align-items: center; }
+.brand-lockup { gap: 10px; min-width: 0; opacity: 0.6; }
+
+.brand-mark { width: 30px; height: 30px; display: block; }
+
+.brand-name {
+    color: var(--bone);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-shadow: var(--text-shadow-hud);
+}
+
+/* connection chip (top-left cluster: ping + build). Restyled skewed scrim chip.
+   BIT 8: data-state drives a status color system so connection reads at a glance
+   (green=online, amber pulse=connecting, red pulse=offline). Legacy
+   .connection-connected/.connection-disconnected classes kept as fallbacks. */
+.match-strip {
+    --status: var(--warn); /* default = connecting amber */
+    min-height: 28px;
+    padding: 0 12px;
+    gap: 8px;
+    background: var(--scrim);
+    box-shadow: var(--edge-hairline);
+    clip-path: var(--clip-notch);
+    color: var(--bone-dim);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+.match-strip[data-state="online"]  { --status: #3ddc84; }
+.match-strip[data-state="connecting"] { --status: var(--warn); }
+.match-strip[data-state="offline"] { --status: #ff4655; }
+
+.status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--status);
+    box-shadow: 0 0 8px var(--status);
+    flex: none;
+}
+.match-strip[data-state]:not([data-state="online"]) .status-dot {
+    animation: status-pulse 1s ease-in-out infinite;
+}
+@keyframes status-pulse { 50% { opacity: 0.35; } }
+/* legacy state classes (kept working if JS still toggles them) */
+.connection-connected .status-dot { background: var(--sol-teal); box-shadow: var(--glow-teal); }
+.connection-disconnected .status-dot { background: var(--blood-bright); box-shadow: var(--glow-blood); }
+#connection-label { color: var(--status); display: inline-block; min-width: 12ch; }
+
+/* latency readout (BIT 8 — #ping-ms is new markup; JS writes the value + is-bad) */
+#ping-ms {
+    font-weight: 700;
+    color: var(--bone);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+}
+#ping-ms small { font-size: 10px; color: var(--bone-dim); margin-left: 2px; }
+#ping-ms.is-bad { color: #ff4655; }
+#frag-count, #player-count { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+
+.status-divider { width: 1px; height: 12px; margin: 0 2px; background: var(--line); }
+
+/* ---- Crosshair (DESIGN 3.9 / CROSSHAIR-proposal.md) — per-weapon, spread-reactive.
+   Inline SVG (keeps the #crosshair id + centering anchor + death-fade). data-weapon
+   picks the reticle; --xhair-spread (px, JS per-frame from predicted heat) drives the
+   dynamic-cross gap; --xhair-ring (px) is the shotgun cone radius (set on switch/resize).
+   NOTE: the 140ms transition is scoped to OPACITY ONLY — the spread/gap must move
+   instantly per-frame (no easing/rubber-band); the death-fade opacity still eases. ---- */
+#crosshair {
+    --xhair-color: var(--bone);
+    --xhair-outline: var(--ink);
+    --xhair-spread: 4px;   /* dynamic-cross inner-edge gap (JS-driven) */
+    --xhair-ring: 49px;    /* shotgun cone radius in px (JS-driven, @1080p ref) */
+    position: absolute;
+    top: 50%; left: 50%;
+    /* 128px box over a -64..64 viewBox → 1 SVG user unit = 1 CSS px, so the
+       JS-computed spread/ring values (px) map 1:1 into the reticle geometry.
+       overflow:visible lets the shotgun ring (r≈49) and SMG bloom draw past 64. */
+    width: 128px; height: 128px;
+    transform: translate(-50%, -50%);
+    opacity: 1;
+    overflow: visible;
+    pointer-events: none;
+    transition: opacity 140ms ease;
+    /* BIT 1: dual ink halo (tight hard edge + soft outer) so the reticle reads on
+       both bright floor and dark sky — the old single 1px shadow washed out. */
+    filter: drop-shadow(0 0 0.5px #07090C) drop-shadow(0 0 2px rgba(7, 9, 12, .85));
+}
+/* every reticle stroke gets an ink outline UNDER the fill (paint-order) for
+   bright-scene legibility — thin filter halos alone wash out (BIT 1). */
+#crosshair .xh-tick,
+#crosshair .xh-dot {
+    fill: var(--xhair-color);
+    stroke: var(--xhair-outline);
+    stroke-width: 1;
+    paint-order: stroke fill;
+}
+/* shotgun ring: ink outline backing (BIT 1) + bone stroke on top; radius (r)
+   driven by JS via --xhair-ring, at the true pellet-cone angle so "fit the target
+   inside the ring → all pellets connect" holds. .xh-ring-outline is optional new
+   markup; the base .xh-ring-circle still works if only one circle is present. */
+#crosshair .xh-ring-outline { stroke: var(--xhair-outline); stroke-width: 3.5; r: var(--xhair-ring); opacity: .85; fill: none; }
+#crosshair .xh-ring-circle { stroke: var(--xhair-color); stroke-width: 2; r: var(--xhair-ring); fill: none; }
+/* dynamic-cross ticks slide outward by the live spread gap (instant, no transition) */
+#crosshair .xh-tick-up    { transform: translateY(calc(-1 * var(--xhair-spread))); }
+#crosshair .xh-tick-down  { transform: translateY(var(--xhair-spread)); }
+#crosshair .xh-tick-left  { transform: translateX(calc(-1 * var(--xhair-spread))); }
+#crosshair .xh-tick-right { transform: translateX(var(--xhair-spread)); }
+/* per-weapon group visibility (weapon indices: 0 Rifle · 1 SMG · 2 Shotgun · 3 Pistol) */
+#crosshair .xh { display: none; }
+#crosshair[data-weapon="0"] .xh-cross,
+#crosshair[data-weapon="1"] .xh-cross,
+#crosshair[data-weapon="3"] .xh-cross { display: block; }
+#crosshair[data-weapon="2"] .xh-ring { display: block; }
+/* Pistol (3) has no center dot; SMG (1) dot is mandatory (aim point at full bloom) */
+#crosshair[data-weapon="3"] .xh-cross .xh-dot { display: none; }
+
+/* ---- Hit marker (DESIGN 3.9 / 5.1) — bone on hit, blood on kill ---- */
+#hit-marker {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 26px; height: 26px;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 20;
+}
+#hit-marker i {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 13px; height: 2px;
+    margin: -1px 0 0 -6.5px;
+    background: var(--bone);
+    box-shadow: 0 0 4px rgba(7, 9, 12, .85);
+}
+#hit-marker i:nth-child(1) { transform: rotate(45deg); }
+#hit-marker i:nth-child(2) { transform: rotate(-45deg); }
+
+/* Doom-impact retiming (RECOIL-FEEDBACK-proposal §5.1): GROW-IN with a short
+   full-bright HOLD so rapid fire reads clearly. hit = bone, heavy = amber tier,
+   kill = blood + skull. Durations match the JS marker timers
+   (Simulator._showHitMarker): hit 160ms, heavy 170ms, KILL 450ms. */
+#hit-marker.hit-active { animation: hit-pop 160ms ease-out; }
+/* heavy hit (≥20 predicted dmg — pistol/shotgun): amber = high-damage tier
+   (Apex/CoD color language) + thicker ticks so the tier reads instantly. */
+#hit-marker.hit-active.hit-active-heavy { animation: hit-pop-heavy 170ms ease-out; }
+#hit-marker.hit-active.hit-active-heavy i {
+    height: 3px; width: 15px; margin: -1.5px 0 0 -7.5px;
+    background: var(--amber);
+    box-shadow: 0 0 6px rgba(255, 176, 46, .6), 0 0 4px rgba(7, 9, 12, .85);
+}
+#hit-marker.kill-active { animation: kill-pop 450ms ease-out; }
+#hit-marker.kill-active i {
+    height: 3px; width: 17px; margin: -1.5px 0 0 -8.5px;
+    background: var(--blood-bright);
+    box-shadow: var(--glow-blood);
+}
+/* skull micro-icon that pops above the crosshair on a KILL confirm only (spec §5.1).
+   BIT 2: .hm-skull is now an inline SVG styled as a FILL target (not a radial mask)
+   — deterministic across browsers, no mask-composite eye-hole bug. Hidden
+   (opacity 0) unless kill-active. */
+#hit-marker .hm-skull {
+    position: absolute;
+    left: 50%; top: -18px;
+    width: 14px; height: 14px;
+    margin-left: -7px;
+    opacity: 0;
+    pointer-events: none;
+    fill: var(--blood-bright);
+    filter: drop-shadow(0 0 4px rgba(255, 42, 38, .9));
+}
+#hit-marker.kill-active .hm-skull { animation: skull-pop 450ms ease-out; }
+
+@keyframes hit-pop {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.55); }
+    22%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }  /* overshoot pop */
+    40%  { transform: translate(-50%, -50%) scale(1); }
+    65%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }    /* ~40ms bright hold */
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes hit-pop-heavy {
+    0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.55); }
+    22%  { opacity: 1; transform: translate(-50%, -50%) scale(1.32); }
+    40%  { transform: translate(-50%, -50%) scale(1.25); }
+    65%  { opacity: 1; transform: translate(-50%, -50%) scale(1.25); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.25); }
+}
+@keyframes kill-pop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7) rotate(0deg); }
+    11% { opacity: 1; transform: translate(-50%, -50%) scale(1.3) rotate(20deg); } /* ~50ms grow to 1.3 */
+    36% { opacity: 1; transform: translate(-50%, -50%) scale(1.3) rotate(45deg); } /* hold */
+    62% { opacity: 1; transform: translate(-50%, -50%) scale(1.15) rotate(62deg); } /* opacity hold */
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(1) rotate(90deg); }  /* out */
+}
+@keyframes skull-pop {
+    0% { opacity: 0; transform: translateY(6px) scale(0.6); }
+    16% { opacity: 1; transform: translateY(0) scale(1); }
+    62% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-4px) scale(1); }
+}
+
+/* ---- Health (DESIGN 3.5): bottom-left scrim plate ---- */
+#health-panel {
+    position: absolute;
+    bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));
+    left: calc(var(--sp-5) + env(safe-area-inset-left));
+    min-width: 228px;
+    padding: 14px 20px;
+    background: var(--hud-scrim);
+    box-shadow: none;
+    border-left: 3px solid var(--hud-vitals);
+    clip-path: none;
+}
+
+/* ---- Bottom-right vitals stack (HUD-REWORK-SPEC): grenade plate (top) over the
+   weapon/ammo plate (bottom), flowing in a flex column. One anchor kills the old
+   66px magic offset on #grenade-panel; the children are now position:relative. ---- */
+#hud-right-group {
+    position: absolute;
+    bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));
+    right: calc(var(--sp-5) + env(safe-area-inset-right));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+/* ---- Halo: Combat Evolved ammo counter (client-only presentation) ----
+   Top-right corner, just BELOW the match-status strip so it never collides with
+   the top-left brand/connection cluster or the health panel (bottom-left). A
+   translucent cyan-tinted plate with an angular clipped corner + a cyan bracket
+   frame, a big Teko magazine count in Halo cyan, a dimmer reserve line, and a
+   weapon-class silhouette to the left. The #weapon-name / #magazine-ammo /
+   #reserve-ammo / .ammo-separator / #reload-state ids + the .is-reloading toggle
+   are unchanged — Simulator._updateHud still drives them. */
+/* CHROME DIET (HUD-REWORK-SPEC): flat --hud-scrim plate + ONE cyan accent border.
+   No outer glow, no inset glow, no gradient wash, no corner brackets, no clip-path
+   — only the DATA (numbers, icon) emits light. Flows inside #hud-right-group. */
+#weapon-panel {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 228px;
+    padding: 12px 20px 12px 17px;
+    text-align: right;
+    background: var(--hud-scrim);
+    border: none;
+    border-left: 3px solid var(--hud-self);
+    box-shadow: none;
+    clip-path: none;
+    /* mute the calm cyan accent so it never out-shouts the world (color law) */
+    filter: saturate(0.85);
+    transition: border-left-color 150ms ease, filter 150ms ease;
+}
+
+/* Weapon-class silhouette. Loaded as a CSS mask (clean alpha shape in the SVG)
+   so it can be tinted Halo-cyan here — an <img>-loaded SVG can't resolve
+   currentColor/CSS vars (see public/assets/brand/skull.svg). data-weapon on
+   #weapon-panel (set by Simulator._applyWeaponIcon) picks the source. */
+#weapon-icon {
+    flex: 0 0 auto;
+    width: 68px; height: 36px;
+    background-color: var(--hud-self);
+    /* CHROME DIET: no icon drop-shadow glow */
+    -webkit-mask: var(--weap-icon, none) center / contain no-repeat;
+            mask: var(--weap-icon, none) center / contain no-repeat;
+    /* BIT 4/P4: real background-color transition so low-ammo/empty icon recolor
+       animates (the old `-webkit-mask-image 0s` was dead code). */
+    transition: background-color 150ms ease;
+}
+#weapon-panel[data-weapon="0"] { --weap-icon: url("../assets/hud/weap-rifle.svg"); }
+#weapon-panel[data-weapon="1"] { --weap-icon: url("../assets/hud/weap-smg.svg"); }
+#weapon-panel[data-weapon="2"] { --weap-icon: url("../assets/hud/weap-shotgun.svg"); }
+#weapon-panel[data-weapon="3"] { --weap-icon: url("../assets/hud/weap-pistol.svg"); }
+#weapon-panel[data-weapon="4"] { --weap-icon: url("../assets/hud/weap-sniper.svg"); }
+
+.weapon-readout { display: flex; flex-direction: column; align-items: flex-end; }
+
+.hud-cluster { display: flex; align-items: center; gap: 10px; }
+.hud-skull { display: none; width: 26px; height: 26px; color: var(--bone); opacity: 0.9; filter: drop-shadow(0 0 4px rgba(7,9,12,.9)); }
+
+.health-readout { display: flex; align-items: baseline; gap: 6px; }
+
+#health-value {
+    font-family: var(--font-numeral);
+    font-weight: 700;
+    font-size: 66px;
+    line-height: 0.9;
+    letter-spacing: 0.02em;
+    color: #fff;
+    text-shadow: var(--text-shadow-hud);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    transition: color 150ms ease;
+}
+.health-unit {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--bone-dim);
+}
+
+/* ---- Health track (BIT 3): three-layer bar in a clipped frame ----
+   #health-ghost (delayed catch-up damage smear) sits UNDER #health-fill (instant,
+   zero-lag on damage). JS drives --hp / --hp-ghost (scaleX) + toggles
+   body.mid-health / body.overheal. 25HP tick marks via ::after. */
+.health-track {
+    position: relative;
+    width: 168px;
+    height: 24px;
+    margin-top: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(20, 241, 149, 0.25);
+    background: rgba(20, 241, 149, 0.08);
+}
+.health-track > span,
+#health-ghost, #health-fill {
+    position: absolute;
+    inset: 0;
+    display: block;
+    transform-origin: left center;
+    will-change: transform;
+}
+/* damage smear: lags the fill, so a burst-damage loss is briefly readable; on
+   heal it's covered by the fill and auto-hides (no direction test needed). */
+#health-ghost {
+    transform: scaleX(var(--hp-ghost, 1));
+    background: rgba(255, 228, 222, 0.9);
+    transition: transform .45s cubic-bezier(.2, .75, .3, 1) .15s;
+}
+#health-fill {
+    transform: scaleX(var(--hp, 1)); /* transform stays instant — zero-lag on damage */
+    width: 100%; height: 100%;
+    background: var(--hud-vitals);
+    box-shadow: 0 0 8px rgba(20, 241, 149, .5);
+    transition: transform 0ms, background-color 150ms ease;
+}
+/* 25HP tick marks — coarse read at a glance */
+.health-track::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(90deg,
+        transparent 0 calc(25% - 1px),
+        rgba(4, 6, 9, .9) calc(25% - 1px) 25%);
+}
+
+/* threshold recolor (BIT 3): mid-health (31-60) amber warn, low-health (<=30)
+   crit red. JS toggles body.mid-health / body.low-health. */
+body.mid-health #health-fill { background: var(--hud-warn); box-shadow: 0 0 8px rgba(255, 176, 32, .55); }
+body.mid-health #health-value { color: var(--hud-warn); }
+body.low-health #health-fill { background: var(--hud-crit); box-shadow: var(--glow-blood); }
+/* crit readout stays FULLY OPAQUE (legible when it matters most) and pulses via a
+   GLOW instead of dropping opacity; faster .9s cadence for urgency. */
+body.low-health #health-value { color: var(--hud-crit); animation: hp-glow .9s ease-in-out infinite; }
+body.low-health .hud-skull { display: block; animation: hp-pulse .9s ease-in-out infinite; }
+
+@keyframes hp-glow {
+    0%, 100% { text-shadow: 0 0 6px rgba(255, 45, 64, .35), var(--text-shadow-hud); }
+    50%      { text-shadow: 0 0 22px rgba(255, 45, 64, .95), var(--text-shadow-hud); }
+}
+
+/* COLOR-LAW HIERARCHY: at critical HP the red health + red vignette must own the
+   peripheral read, so desaturate + dim the calm cyan weapon panel accent so it
+   never competes with the crit-red. */
+body.low-health #weapon-panel { filter: saturate(0.35) brightness(0.8); }
+
+@keyframes hp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+/* Phase 4 mega-health OVERHEAL (>100): the fill + readout + track glow read as an
+   amber "power" state distinct from the teal base bar, so 100-150 HP is obvious.
+   JS toggles body.overheal in Simulator._updateHud. */
+body.overheal #health-fill {
+    background: #ffbf3f;
+    box-shadow: 0 0 12px rgba(255, 191, 63, 0.85);
+}
+body.overheal .health-track { border-color: rgba(255, 191, 63, 0.55); }
+body.overheal #health-value { color: var(--hud-over); text-shadow: 0 0 10px rgba(255, 191, 63, 0.6); }
+
+/* small weapon-name label (Halo puts the class name quietly above the count) */
+#weapon-name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--hud-self);
+    opacity: 0.85;
+    text-shadow: var(--text-shadow-hud);
+}
+
+#ammo-counter {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 1px;
+    font-family: var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+}
+/* dominant magazine count — Barlow Condensed so "30" never reads as "3U". White
+   digits ARE the light (chrome diet: data emits, frame doesn't). min-width locks
+   the width so 10->9 (digit-count change) doesn't shift the right-aligned layout. */
+#magazine-ammo {
+    font-family: var(--font-numeral);
+    font-size: 54px;
+    line-height: 0.86;
+    letter-spacing: 0.01em;
+    font-weight: 700;
+    color: #fff;
+    min-width: 2ch;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    text-shadow: 0 1px 0 #07090C, 0 0 6px rgba(127, 233, 255, .35);
+    transition: color 120ms ease, text-shadow 120ms ease, opacity 120ms ease;
+}
+.ammo-separator, #reserve-ammo {
+    font-family: var(--font-numeral);
+    font-size: 24px;
+    font-weight: 600;
+    color: #cfd8dd;
+    opacity: 0.75;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    text-shadow: 0 1px 0 #07090C;
+}
+/* BIT 4/P5: keep the separator (faint) so "30" gap "120" doesn't read as "30120";
+   drop the reserve baseline hack (#ammo-counter is already align-items:baseline). */
+.ammo-separator { display: inline; opacity: 0.4; }
+#reserve-ammo { position: relative; }
+
+/* reload label (DESIGN 3.6): shows under the count when reloading. COLOR LAW
+   (BIT 4/P1): reload is a NEUTRAL action -> amber, NOT crit-red. Red is reserved
+   for empty/damage. Amber pulse (not a hard blink) reads calmly. */
+#reload-state {
+    min-height: 14px;
+    margin-top: 3px;
+    color: #ffc861;
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-shadow: 0 0 8px rgba(255, 200, 97, .55);
+    opacity: 0;
+    transform: translateY(2px);
+    transition: opacity 120ms ease, transform 120ms ease;
+}
+/* BIT 4/P2: while reloading, dim the (now-meaningless) magazine number instead of
+   3.3Hz strobing the biggest element; slow-pulse the reload label instead. */
+#weapon-panel.is-reloading #magazine-ammo { animation: none; opacity: 0.35; }
+#weapon-panel.is-reloading #reload-state {
+    opacity: 1;
+    transform: translateY(0);
+    animation: reload-pulse 0.9s ease-in-out infinite;
+}
+@keyframes reload-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+/* AMMO STATE TIERS (BIT 4/P0): amber at <=25% mag, crit-red at empty. Icon color
+   follows. JS toggles .is-low-ammo / .is-empty on #weapon-panel. Empty reuses the
+   existing hp-pulse keyframes. */
+#weapon-panel.is-low-ammo #magazine-ammo {
+    color: #ffc861;
+    text-shadow: 0 1px 0 #07090C, 0 0 8px rgba(255, 200, 97, .5);
+}
+#weapon-panel.is-low-ammo #weapon-icon { background-color: #ffc861; }
+#weapon-panel.is-empty #magazine-ammo {
+    color: var(--hud-crit);
+    text-shadow: 0 1px 0 #07090C, 0 0 10px rgba(255, 51, 51, .55);
+    animation: hp-pulse 1.2s ease-in-out infinite;
+}
+#weapon-panel.is-empty #weapon-icon { background-color: var(--hud-crit); }
+#weapon-panel.is-empty #reload-state {
+    color: var(--hud-crit);
+    text-shadow: 0 0 8px rgba(255, 51, 51, .6);
+}
+/* empty mag is a critical state — the plate accent goes red (color law) */
+#weapon-panel.is-empty { border-left-color: var(--hud-crit); filter: saturate(1); }
+/* reloading is neutral: the plate accent warms to amber, NOT red (color law) */
+#weapon-panel.is-reloading { border-left-color: var(--amber); filter: saturate(1); }
+
+/* Phase 3: frag-grenade charge indicator. Small plate sitting directly ABOVE the
+   weapon panel (bottom-right), matching the Halo-ish HUD chrome. #grenade-count is
+   driven by Simulator._updateHud from the networked grenadeCharges. */
+/* CHROME DIET (HUD-REWORK-SPEC): flat --hud-scrim plate + ONE amber accent border
+   (utility color law). No edge hairline, no clip-path. Flows inside
+   #hud-right-group (top of the stack); position:relative, no magic 66px offset. */
+#grenade-panel {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 17px;
+    background: var(--hud-scrim);
+    border: none;
+    border-left: 3px solid var(--hud-util);
+    box-shadow: none;
+    clip-path: none;
+    font-family: var(--font-numeral);
+}
+#grenade-icon {
+    font-size: 24px;
+    line-height: 1;
+    color: var(--hud-util); /* warm ordnance amber (data emits) */
+    text-shadow: 0 0 8px rgba(255, 140, 40, .55);
+}
+#grenade-count {
+    font-family: var(--font-numeral);
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+}
+/* BIT 5: capacity pips (skewed tactical wedges). Full = amber glow, empty = outline
+   only — so 0 charges reads at a glance. JS toggles .is-full per pip + sets
+   #grenade-panel[data-charges]. */
+.grenade-pips { display: flex; gap: 4px; }
+.grenade-pips .pip {
+    width: 8px; height: 14px;
+    transform: skewX(-12deg);
+    box-shadow: inset 0 0 0 1px rgba(255, 179, 0, .4);
+}
+.grenade-pips .pip.is-full {
+    background: var(--hud-util);
+    box-shadow: 0 0 6px rgba(255, 179, 0, .55);
+}
+/* EMPTY STATE (both the legacy .is-empty class and data-charges="0"): drained
+   utility is NEUTRAL (muted), never red — red is for critical/damage only. */
+#grenade-panel.is-empty,
+#grenade-panel[data-charges="0"] {
+    border-left-color: rgba(255, 179, 0, .25);
+    opacity: 0.55;
+}
+#grenade-panel.is-empty #grenade-count,
+#grenade-panel[data-charges="0"] #grenade-count {
+    color: rgba(255, 255, 255, 0.3);
+    text-shadow: none;
+}
+#grenade-panel[data-charges="0"] .pip { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18); }
+
+/* ---- Death / respawn card (DESIGN 4e) ----
+   BIT 6: real scale-slam entry (260ms) that's actually visible; exit is a fast
+   120ms opacity-only fade (no motion) so it clears for the respawn countdown.
+   visibility toggle keeps the stale card out of the a11y tree between deaths. */
+#combat-state {
+    position: absolute;
+    top: 44%; left: 50%;
+    width: min(560px, calc(100vw - 40px));
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 20;
+    visibility: visible;
+    filter: drop-shadow(0 2px 18px rgba(0, 0, 0, .85));
+    transition: opacity 120ms var(--ease-snap);
+}
+#combat-state.combat-state-hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 120ms var(--ease-snap), visibility 0s 120ms;
+}
+#combat-state:not(.combat-state-hidden) {
+    animation: combat-state-in 260ms var(--ease-snap) both;
+}
+@keyframes combat-state-in {
+    0%   { opacity: 0; transform: translate(-50%, calc(-50% - 16px)) scale(1.07); }
+    60%  { opacity: 1; transform: translate(-50%, -50%) scale(0.99); }
+    100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.combat-skull {
+    width: 72px; height: 72px;
+    color: var(--bone);
+    filter: drop-shadow(var(--glow-blood));
+    margin-bottom: 8px;
+}
+#combat-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-style: italic;
+    font-size: clamp(30px, 6vh, 44px);
+    line-height: 1;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--blood-bright);
+    text-shadow: var(--glow-blood);
+}
+#combat-subtitle {
+    margin-top: 12px;
+    color: var(--bone-dim);
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+/* ---- Damage flash (DESIGN 5.1 / BIT 7) ----
+   Directional incoming-damage wash: --dmg-angle (rad, JS sets on the hit event)
+   drives a conic slice toward the hit direction, over a soft red radial base.
+   .hit re-triggers the fade animation. Legacy body.player-hit / body.own-death
+   remain wired below for the health-driven paths. */
+#damage-flash {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+    opacity: 0;
+    background:
+        conic-gradient(from calc(var(--dmg-angle, 0rad) - 0.5rad) at 50% 50%,
+            transparent 0rad,
+            rgba(255, 35, 35, 0.5) 0.5rad,
+            transparent 1rad),
+        radial-gradient(ellipse at center,
+            rgba(255, 25, 25, 0.15) 0%,
+            rgba(160, 0, 0, 0.4) 100%);
+    transition: opacity 300ms ease-out;
+}
+#damage-flash.hit { animation: dmg-flash 180ms ease-out; }
+@keyframes dmg-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+/* incoming-damage flash SCALED by damage taken (spec §5.1: 10dmg≈15%, 50+≈35%).
+   FragLayer.onDamageTaken sets --damage-wash = clamp(damage/40, 0.35, 1) on the SAME
+   hit event, so a chip reads faint and a big hit reads hard. */
+body.player-hit #damage-flash { opacity: calc(0.35 * var(--damage-wash, 1)); transition-duration: 0ms; }
+
+/* own death: a stronger red wash that HOLDS until respawn (FragLayer toggles
+   body.own-death; --damage-wash scales its punch — preserve the var). */
+body.own-death #damage-flash {
+    opacity: calc(0.85 * var(--damage-wash, 1));
+    transition-duration: 200ms;
+    background: radial-gradient(circle at center, rgba(122, 16, 16, 0.35) 0%, rgba(200, 30, 30, 0.82) 120%);
+}
+/* persistent low-HP edge tint layered on the damage-flash (kept from DESIGN 3.5) */
+body.low-health #damage-flash {
+    opacity: 0.15;
+    transition-duration: 400ms;
+    background: radial-gradient(circle at center, transparent 58%, rgba(255, 51, 51, 0.55) 120%);
+}
+
+/* ---- Low-HP peripheral vignette (HUD-REWORK-SPEC / color law / BIT 7) ----
+   Persistent red edge glow that owns the peripheral read when health is critical.
+   JS toggles .active at <=30% HP (and clears it on respawn/death). Slow pulse so it
+   reads as "danger", not a static tint. */
+#low-hp-vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    box-shadow: inset 0 0 100px rgba(255, 0, 0, 0.85);
+    opacity: 0;
+    transition: opacity 400ms ease;
+}
+#low-hp-vignette.active {
+    opacity: 1;
+    animation: low-hp-pulse 1.2s ease-in-out infinite;
+}
+@keyframes low-hp-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 1; }
+}
+
+/* ============================================================================
+   FRAG LAYER (z20) — kill feed / frag banner / damage arc (FragLayer.js).
+   Restyle only; class hooks preserved.
+   ============================================================================ */
+
+#kill-feed {
+    position: absolute;
+    top: calc(var(--sp-8) + env(safe-area-inset-top));
+    right: calc(var(--sp-5) + env(safe-area-inset-right));
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-items: flex-end;
+    max-width: 320px;
+    pointer-events: none;
+    z-index: 20;
+}
+
+/* BIT 9: overflow guard so a long callsign can't blow out the 320px column. */
+.kill-feed-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 28px;
+    max-width: 100%;
+    padding: 0 10px;
+    background: var(--scrim);
+    box-shadow: var(--edge-hairline);
+    clip-path: var(--clip-notch-tl);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--bone);
+    white-space: nowrap;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(16px);
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+.kill-feed-row.kf-in { opacity: 1; transform: translateX(0); }
+.kill-feed-row.kf-out { opacity: 0; transform: translateX(16px); transition-duration: 120ms; transition-timing-function: ease-in; }
+
+.kill-feed-row .kf-killer, .kill-feed-row .kf-victim {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.kill-feed-row .kf-killer { color: var(--bone); }
+.kill-feed-row .kf-victim { color: var(--bone-dim); text-decoration: line-through; opacity: 0.85; }
+.kill-feed-row .kf-weapon {
+    color: var(--bone-dim);
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    flex: none;
+}
+
+/* rows involving YOU: blood inset accent (BIT 9 — inset shadow, not border-left,
+   so the clip-path notch doesn't clip the accent and the text doesn't shift 2px). */
+.kill-feed-row.kill-feed-mine {
+    border-left: 0;
+    box-shadow: inset 2px 0 0 var(--blood-bright), var(--edge-hairline);
+    background: rgba(40, 12, 12, 0.78);
+}
+.kill-feed-row.kill-feed-mine .kf-killer { color: var(--sol-teal); }
+.kill-feed-row.kill-feed-mine .kf-victim { color: var(--blood-bright); }
+
+/* suicide: no killer, lone victim + weapon; blood-dark accent (FragLayer adds
+   .kill-feed-suicide on the row). */
+.kill-feed-row.kill-feed-suicide {
+    border-left: 0;
+    box-shadow: inset 2px 0 0 var(--blood-dark), var(--edge-hairline);
+    background: rgba(40, 12, 12, 0.6);
+}
+.kill-feed-row.kill-feed-suicide .kf-victim { text-decoration: none; }
+
+/* ---- Frag banner (DESIGN 3.8 / 5.1 / BIT 9) — the kill payoff. FragLayer adds
+   .fb-in (contract) to fire the pop; legacy .frag-banner-show still works. ---- */
+#frag-banner {
+    position: absolute;
+    top: 18%; left: 50%;
+    z-index: 21;
+    padding: 8px 22px;
+    text-align: center;
+    background: rgba(122, 16, 16, 0.7);
+    color: var(--bone);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-style: italic;
+    font-size: clamp(26px, 4.5vh, 34px);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-shadow: var(--glow-blood);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(0.85) skewX(var(--skew));
+}
+#frag-banner.fb-in,
+#frag-banner.frag-banner-show { animation: frag-banner-pop 2700ms var(--ease-snap); }
+@keyframes frag-banner-pop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(1.4) skewX(-16deg); }
+    5% { opacity: 1; transform: translate(-50%, -50%) scale(1) skewX(var(--skew)); }
+    88% { opacity: 1; transform: translate(-50%, -50%) scale(1) skewX(var(--skew)); }
+    100% { opacity: 0; transform: translate(-50%, -60%) scale(0.98) skewX(var(--skew)); }
+}
+
+/* directional damage arc canvas */
+#damage-arc {
+    position: fixed;
+    inset: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 20;
+}
+
+/* dead-state dimming */
+body.player-dead #crosshair, body.player-dead #weapon-panel { opacity: 0.18; }
+body.player-dead #crosshair { transform: translate(-50%, -50%) scale(0.7); }
+
+/* ============================================================================
+   ENTRY / MAIN MENU (z40) — the loading screen (DESIGN 4b)
+   ============================================================================ */
+
+#entry-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    padding: calc(var(--sp-5) + env(safe-area-inset-top)) calc(var(--sp-5) + env(safe-area-inset-right)) calc(var(--sp-5) + env(safe-area-inset-bottom)) calc(var(--sp-5) + env(safe-area-inset-left));
+    /* BIT 10/4: no backdrop-blur during the heaviest asset+shader load; the
+       gradient scrim is bumped up to compensate. */
+    background:
+        radial-gradient(circle at 50% 42%, rgba(7, 9, 12, 0.55) 0%, rgba(7, 9, 12, 0.84) 60%, rgba(7, 9, 12, 0.95) 100%);
+    transition: opacity 220ms var(--ease-exit), visibility 220ms var(--ease-exit);
+}
+#entry-overlay:not(.is-visible) {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* ---- Menu background hook (Part C). A full-bleed art layer BEHIND the menu content
+   (the overlay's own radial scrim still sits under this via #entry-overlay background).
+   --menu-bg is `none` today (transparent → the existing scrim shows through); set the
+   var (see :root) to drop art. The ::after scrim darkens whatever art loads so the
+   plates/title stay legible. ---- */
+.entry-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image: var(--menu-bg);
+    background-size: cover;
+    background-position: center;
+    pointer-events: none;
+}
+.entry-bg::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    /* legibility scrim over any art: darker at edges, a touch of clearing at center */
+    background:
+        linear-gradient(180deg, rgba(7,9,12,0.78) 0%, rgba(7,9,12,0.62) 45%, rgba(7,9,12,0.88) 100%),
+        radial-gradient(circle at 50% 42%, rgba(7,9,12,0.30) 0%, rgba(7,9,12,0.78) 100%);
+}
+/* keep the menu content above the art layer */
+.entry-header, .entry-content { position: relative; z-index: 1; }
+
+/* header row: logo + wordmark left, ping/build right */
+.entry-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.entry-logo { width: 52px; height: 52px; display: block; }
+.entry-wordmark {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--bone);
+}
+.entry-meta {
+    margin-left: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    color: var(--bone-dim);
+}
+.entry-metaline { display: flex; align-items: baseline; gap: 10px; }
+.entry-ping { letter-spacing: 0.06em; }
+.entry-build { font-size: 11px; opacity: 0.5; }
+
+/* uplink LED — the ONLY loading surface. Amber pulsing while connecting; flips to a
+   steady green tick + "READY" when the triple gate opens (JS sets data-ready). */
+.entry-uplink {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--warn);
+    transition: color 200ms ease;
+}
+.uplink-led {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--warn);
+    box-shadow: 0 0 8px var(--warn);
+    animation: uplink-pulse 1.1s ease-in-out infinite;
+}
+@keyframes uplink-pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+.entry-uplink[data-ready="true"] { color: var(--sol-teal); }
+.entry-uplink[data-ready="true"] .uplink-led {
+    background: var(--sol-teal);
+    box-shadow: var(--glow-teal);
+    animation: none;
+}
+
+/* ---- Segment-display fractional progress readout (Part B). A DSEG7 LED "NN.NN" plus
+   a small normal-font "%" (DSEG has no %). A dim all-segments ghost "888.88" sits
+   behind the live digits (absolute, same font/size) so unlit segments read like real
+   hardware. Amber while loading, green when READY, red dashes when the uplink is lost.
+   Fixed width so digits never jitter. ---- */
+.entry-seg {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    --seg-color: var(--warn);
+    --seg-glow: rgba(255, 176, 32, 0.55);
+}
+.entry-seg[data-state="ready"] { --seg-color: var(--sol-teal); --seg-glow: rgba(20, 241, 149, 0.6); }
+.entry-seg[data-state="lost"]  { --seg-color: #ff3b3b;        --seg-glow: rgba(255, 59, 59, 0.55); }
+.seg-stack {
+    position: relative;
+    display: inline-block;
+    font-family: 'DSEG7 Classic', ui-monospace, monospace;
+    font-weight: 700;
+    font-size: 15px;   /* base = the LARGE integer digits (gas-pump split size) */
+    line-height: 1;
+    letter-spacing: 0.02em;
+    /* Fixed width reserved for the WIDEST case: 3 large integer chars ("100") + the
+       small ".88" fraction. Large "1"≈0.62em, "8"≈0.78em → "100" ≈ 3×0.78 for safety,
+       small frac ".88" ≈ 0.62·1.9 ≈ 1.18em → ~3.5em total. Locked so 1→3 digit swings
+       and the "--" disconnect state never shift the layout. */
+    width: 3.5em;
+    text-align: right;
+    /* baseline-align the large int + small frac so they read as one meter */
+    white-space: nowrap;
+}
+/* split-size sub-spans: integer part LARGE (base size), fractional part SMALL,
+   both baseline-aligned so ghost + live overlay exactly. */
+.seg-int { font-size: 1em; }
+.seg-frac { font-size: 0.56em; }   /* small digits ≈ integer / 1.78 */
+.seg-ghost {
+    position: absolute;
+    inset: 0;
+    text-align: right;
+    color: var(--seg-color);
+    opacity: 0.12;               /* unlit segments — faint hardware ghost */
+    pointer-events: none;
+}
+.seg-live {
+    position: relative;
+    color: var(--seg-color);
+    text-shadow: 0 0 6px var(--seg-glow);   /* glow on the lit digits */
+}
+/* the split sub-spans sit in one baseline-aligned row (ghost + live both) */
+.seg-ghost, .seg-live {
+    display: block;
+    text-align: right;
+}
+.seg-ghost .seg-frac,
+.seg-live .seg-frac,
+.seg-ghost .seg-int,
+.seg-live .seg-int { vertical-align: baseline; }
+.seg-pct {
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--seg-color);
+    opacity: 0.85;
+    letter-spacing: 0.02em;
+}
+@media (prefers-reduced-motion: reduce) {
+    .seg-live { text-shadow: none; }
+}
+
+/* ---- Fake intrusion-log terminal feed (Part D). Bottom-left of #entry-overlay: a
+   small monospace panel, green-on-dark phosphor (distinct from the amber uplink LED
+   but within the design language). ~4-6 visible lines; older lines dim toward the top
+   (JS grades opacity) and new lines slide in from the bottom. Green "ACCESS GRANTED"
+   climax on READY, red "UPLINK LOST" on disconnect (tone classes below). aria-hidden
+   theater — the accessible status stays #entry-status. ---- */
+.hack-feed {
+    position: absolute;
+    left: calc(var(--sp-5) + env(safe-area-inset-left));
+    bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));
+    z-index: 1;
+    width: min(340px, 42vw);
+    padding: 8px 12px 9px;
+    background: rgba(4, 12, 8, 0.62);
+    border-left: 2px solid rgba(20, 241, 149, 0.5);
+    box-shadow: inset 0 0 0 1px rgba(20, 241, 149, 0.08);
+    pointer-events: none;
+    font-family: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+    color: #6effb0;
+    overflow: hidden;
+}
+.hack-feed-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(110, 255, 176, 0.7);
+}
+.hack-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--sol-teal);
+    box-shadow: 0 0 6px rgba(20, 241, 149, 0.8);
+    animation: hack-dot-blink 1.1s steps(2, start) infinite;
+}
+@keyframes hack-dot-blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+/* animated ellipsis after the title: dots light cumulatively — "." → ".." → "..." —
+   then the cycle resets. Each dot is visible for the tail of the loop, staggered by
+   thirds; terminal states (granted/lost) freeze all three solid. */
+.hack-ellipsis span:nth-child(1) { opacity: 1; }
+.hack-ellipsis span:nth-child(2) { animation: hack-ellipsis-2 1.6s infinite; }
+.hack-ellipsis span:nth-child(3) { animation: hack-ellipsis-3 1.6s infinite; }
+@keyframes hack-ellipsis-2 { 0%, 33.2% { opacity: 0; } 33.3%, 100% { opacity: 1; } }
+@keyframes hack-ellipsis-3 { 0%, 66.5% { opacity: 0; } 66.6%, 100% { opacity: 1; } }
+.hack-feed.hack-done .hack-ellipsis span,
+.hack-feed.hack-lost .hack-ellipsis span { animation: none; opacity: 1; }
+.hack-feed.hack-done .hack-feed-head { color: rgba(140, 255, 190, 0.95); }
+.hack-feed.hack-done .hack-dot { animation: none; opacity: 1; }
+.hack-feed.hack-lost .hack-feed-head { color: rgba(255, 110, 110, 0.9); }
+.hack-feed.hack-lost .hack-dot { animation: none; background: #ff5252; box-shadow: 0 0 6px rgba(255, 82, 82, 0.8); }
+.hack-feed-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    /* height reserves ~6 lines; overflow hidden so scroll-up reads as a terminal */
+    max-height: 96px;
+    overflow: hidden;
+}
+.hack-line {
+    font-size: 11px;
+    line-height: 1.3;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: rgba(110, 255, 176, 0.85);
+    text-shadow: 0 0 5px rgba(20, 241, 149, 0.28);
+    animation: hack-line-in 220ms var(--ease-snap) both;
+}
+@keyframes hack-line-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+/* tone variants (JS adds the class). ok = brighter green bracket lines; warn = amber
+   phosphor; granted = bright green climax; lost = red trace. */
+.hack-line.hack-ok { color: #9dffc9; text-shadow: 0 0 6px rgba(20, 241, 149, 0.4); }
+.hack-line.hack-warn { color: #ffcf6b; text-shadow: 0 0 6px rgba(255, 176, 46, 0.35); }
+.hack-line.hack-granted {
+    color: #14F195;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 10px rgba(20, 241, 149, 0.7);
+}
+.hack-line.hack-lost {
+    color: #ff5555;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 10px rgba(255, 51, 51, 0.6);
+}
+/* reduced motion: no slide-in / scroll animation — lines still swap on cadence */
+.hack-line.no-anim { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+    .hack-line { animation: none !important; }
+    .hack-dot { animation: none !important; }
+    .hack-ellipsis span { animation: none !important; opacity: 1 !important; }
+}
+
+/* ---- Splash ticker (Part D): one single cycling intrusion line near the corner
+   segment readout. Green phosphor, sits just above the splash-seg. ---- */
+.splash-hack {
+    position: absolute;
+    right: calc(20px + env(safe-area-inset-right));
+    bottom: calc(46px + env(safe-area-inset-bottom));
+    max-width: min(60vw, 360px);
+    font-family: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+    font-size: 11px;
+    letter-spacing: 0.01em;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: rgba(110, 255, 176, 0.8);
+    text-shadow: 0 0 5px rgba(20, 241, 149, 0.3);
+    opacity: 0.85;
+    pointer-events: none;
+    animation: hack-line-in 200ms var(--ease-snap) both;
+}
+.splash-hack.hack-ok { color: #9dffc9; }
+.splash-hack.hack-warn { color: #ffcf6b; }
+.splash-hack.hack-granted { color: #14F195; font-weight: 700; text-shadow: 0 0 10px rgba(20, 241, 149, 0.7); }
+.splash-hack.hack-lost { color: #ff5555; font-weight: 700; text-shadow: 0 0 10px rgba(255, 51, 51, 0.6); }
+.splash-hack.no-anim { animation: none; }
+
+.entry-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    width: 100%;
+}
+
+/* ---- Title lockup: emblem-less (logo lives in the header) kicker · wordmark · rule.
+   The big FRAG ARENA mark sells the arena-shooter attitude — italic display caps. ---- */
+.entry-lockup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.lockup-kicker {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--sol-teal);
+}
+.lockup-word {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-style: italic;
+    font-size: clamp(40px, 7vw, 72px);
+    line-height: 0.92;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--bone);
+    text-shadow: 0 2px 0 #07090C, 0 0 24px rgba(20, 241, 149, 0.14);
+}
+.lockup-rule {
+    width: 220px;
+    max-width: 60vw;
+    height: 2px;
+    background: var(--grad-sol);
+    box-shadow: var(--glow-teal);
+}
+
+/* compact callsign field above the plates */
+.callsign-field { width: min(420px, 100%); }
+.callsign-field .field-label { margin-top: 0; }
+
+/* ---- Vertical plate menu (UT99 flavor: chamfered plates, LABEL + sub-caption,
+   selection = accent edge + bracket glow). ---- */
+.menu-plates {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(420px, 100%);
+}
+.menu-plate {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 60px;
+    padding: 0 18px;
+    background: var(--bg-1);
+    border: 0;
+    box-shadow: var(--edge-hairline);
+    clip-path: var(--clip-notch-tl);
+    color: var(--bone);
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform 120ms var(--ease-snap), box-shadow 140ms var(--ease-snap), background-color 140ms ease;
+}
+/* accent edge bar — grows on selection */
+.plate-edge {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--line);
+    transition: width 140ms var(--ease-snap), background-color 140ms ease, box-shadow 140ms ease;
+}
+.plate-body { display: flex; flex-direction: column; gap: 1px; flex: 1; padding-left: 6px; }
+.plate-label {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-style: italic;
+    font-size: 22px;
+    line-height: 1;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--bone);
+}
+.plate-sub {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bone-dim);
+}
+/* chevron bracket — the UT99 selection cursor */
+.plate-chevron {
+    width: 12px; height: 12px;
+    flex: none;
+    border-top: 2px solid var(--sol-teal);
+    border-right: 2px solid var(--sol-teal);
+    transform: rotate(45deg);
+    opacity: 0;
+    transition: opacity 140ms ease, transform 140ms var(--ease-snap);
+}
+/* SELECTED state (hover / keyboard) */
+.menu-plate.is-selected,
+.menu-plate:hover {
+    background: var(--bg-2);
+    box-shadow: var(--edge-hairline), var(--glow-teal);
+    transform: translateX(2px);
+}
+.menu-plate.is-selected .plate-edge,
+.menu-plate:hover .plate-edge {
+    width: 5px;
+    background: var(--grad-sol-v);
+    box-shadow: var(--glow-teal);
+}
+.menu-plate.is-selected .plate-chevron,
+.menu-plate:hover .plate-chevron {
+    opacity: 1;
+    transform: rotate(45deg) translate(1px, -1px);
+}
+.menu-plate:focus-visible { outline: none; }
+.menu-plate:active { transform: translateX(2px) scale(.99); }
+
+/* PLAY plate keeps id #enter-arena — give it the gradient treatment so it reads as
+   the primary. The .enter-label span holds the (JS-driven) label. */
+#enter-arena.menu-plate .plate-edge { background: var(--grad-sol-v); width: 5px; }
+#enter-arena.menu-plate .plate-label { color: var(--sol-teal); }
+#enter-arena.menu-plate.is-selected,
+#enter-arena.menu-plate:hover { background: var(--bg-2); }
+/* PLAY micro-states while the gate is still closed */
+#enter-arena.is-arming { cursor: wait; }
+#enter-arena.is-arming .plate-label { color: var(--warn); }
+#enter-arena.is-arming .plate-label::after {
+    content: "";
+    animation: arming-dots 1s steps(4, end) infinite;
+}
+@keyframes arming-dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+#enter-arena.is-ready-cta .plate-label { color: var(--sol-teal); animation: cta-pulse 0.9s ease-in-out infinite; }
+@keyframes cta-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+/* .enter-unlock replaces the menu-rise reveal animation on this plate (higher
+   specificity), which was holding [data-reveal]'s opacity at 1 via its `both`
+   fill — so pin opacity here or the plate vanishes the moment the gate opens. */
+#enter-arena.enter-unlock { animation: enter-unlock 420ms var(--ease-snap); opacity: 1; }
+@keyframes enter-unlock {
+    0%   { transform: none; box-shadow: var(--edge-hairline); }
+    35%  { transform: translateX(2px) scale(1.02); box-shadow: var(--edge-hairline), var(--glow-teal); }
+    100% { transform: none; box-shadow: var(--edge-hairline); }
+}
+
+@keyframes card-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ---- Staggered rise-in reveal (body.menu-reveal, set when the splash lifts). Each
+   [data-reveal] element rises with an index-based delay. prefers-reduced-motion
+   collapses these to instant (see the a11y block). ---- */
+[data-reveal] { opacity: 0; }
+body.menu-reveal [data-reveal] {
+    animation: menu-rise 360ms var(--ease-snap) both;
+}
+.entry-lockup[data-reveal]      { animation-delay: 40ms; }
+.callsign-field[data-reveal]    { animation-delay: 120ms; }
+.menu-plate[data-reveal]:nth-of-type(1) { animation-delay: 180ms; }
+.menu-plate[data-reveal]:nth-of-type(2) { animation-delay: 240ms; }
+.menu-plate[data-reveal]:nth-of-type(3) { animation-delay: 300ms; }
+.menu-plate[data-reveal]:nth-of-type(4) { animation-delay: 360ms; }
+.menu-plate[data-reveal]:nth-of-type(5) { animation-delay: 420ms; }
+.menu-actions[data-reveal]      { animation-delay: 480ms; }
+@keyframes menu-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+/* 2px gradient top strip — the panel signature */
+.card-strip {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--grad-sol);
+}
+
+.entry-kicker, .menu-kicker {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--sol-teal);
+}
+
+.field-label {
+    display: block;
+    margin: 20px 0 6px;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bone-dim);
+}
+
+.callsign {
+    width: 100%;
+    height: 48px;
+    padding: 0 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-1);
+    color: var(--bone);
+    font-family: var(--font-display);
+    font-size: 16px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    outline: none;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.callsign::placeholder { color: var(--bone-dim); opacity: 0.7; }
+.callsign:focus { border-color: var(--sol-teal); box-shadow: var(--glow-teal); }
+
+/* PLAY plate label (id #enter-arena is now .menu-plate above; the JS-driven text
+   lives in this span). Kept as a class since the plate styling handles the rest. */
+.enter-label { position: relative; z-index: 2; }
+
+/* #entry-status now lives in the header uplink (.entry-uplink) — its font sizing is
+   handled there; this keeps the aria-live label neutral if unwrapped. */
+#entry-status { letter-spacing: 0.04em; }
+
+.menu-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: min(420px, 100%);
+}
+
+/* wallet plate (DESIGN 4b + SPL parameterized) — secondary shape */
+.btn-wallet {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 16px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--r-1);
+    color: var(--bone);
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+.btn-wallet:hover { border-color: var(--sol-purple); color: var(--sol-purple); background: var(--bg-2); }
+.btn-wallet.is-pending { border-color: var(--warn); color: var(--warn); }
+.wallet-tick {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--grad-sol-v);
+    box-shadow: var(--glow-purple);
+}
+.wallet-sym { color: var(--bone-dim); font-size: 12px; }
+
+/* ghost button (HOW TO PLAY) */
+.btn-ghost {
+    height: 44px;
+    padding: 0 12px;
+    background: transparent;
+    border: 0;
+    color: var(--bone-dim);
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color 120ms ease;
+}
+.btn-ghost:hover { color: var(--bone); text-decoration: underline; text-underline-offset: 4px; }
+/* BIT 11: visible keyboard focus for the ghost button (Tab nav). */
+.btn-ghost:focus-visible {
+    outline: 2px solid var(--sol-purple);
+    outline-offset: 3px;
+    color: var(--bone);
+    text-decoration: none;
+}
+
+.key-hints {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--bone-dim);
+    text-align: center;
+}
+
+/* ============================================================================
+   GHOST MODALS (z50) — HOW TO PLAY + ISSUANCE / WHITEPAPER / ROADMAP share chrome
+   ============================================================================ */
+#howto-modal, .info-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    place-items: center;
+    padding: var(--sp-5);
+    background: var(--scrim-heavy);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: opacity 160ms var(--ease-snap), visibility 160ms var(--ease-snap);
+}
+#howto-modal.howto-closed, .info-modal.info-closed { opacity: 0; visibility: hidden; pointer-events: none; }
+#howto-modal[hidden], .info-modal[hidden] { display: none; }
+.howto-panel {
+    position: relative;
+    width: min(460px, 100%);
+    max-height: min(80vh, 640px);
+    overflow-y: auto;
+    padding: var(--sp-6) var(--sp-5) var(--sp-5);
+    background: var(--bg-1);
+    box-shadow: var(--edge-hairline);
+    clip-path: var(--clip-notch);
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-3) transparent;
+}
+.howto-panel h2 {
+    margin: 6px 0 4px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-style: italic;
+    font-size: 30px;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--bone);
+}
+
+/* ---- Info-modal content (ISSUANCE / WHITEPAPER / ROADMAP) ---- */
+.token-plate {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: var(--bg-2);
+    box-shadow: var(--edge-hairline);
+    clip-path: var(--clip-notch-tl);
+}
+.token-tick {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--grad-sol-v);
+    box-shadow: var(--glow-purple);
+}
+.token-sym {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-style: italic;
+    font-size: 22px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--sol-teal);
+}
+.token-note {
+    margin-left: auto;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bone-dim);
+}
+.info-rows { list-style: none; margin: 16px 0 0; padding: 0; }
+.info-rows li {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--line);
+}
+.info-rows li span {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bone-dim);
+}
+.info-rows li b {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--warn);
+}
+.info-note {
+    margin: 18px 0 0;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--bone-dim);
+}
+.info-section { margin-top: 18px; }
+.info-section h3 {
+    margin: 0 0 4px;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--sol-teal);
+}
+.info-section p {
+    margin: 0;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--bone-dim);
+}
+/* roadmap phase list */
+.roadmap-list { list-style: none; margin: 18px 0 0; padding: 0; }
+.roadmap-list li {
+    position: relative;
+    padding: 12px 0 12px 16px;
+    border-left: 2px solid var(--line);
+    margin-left: 4px;
+}
+.roadmap-list li + li { margin-top: 2px; }
+.roadmap-list .phase-tag {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--bone-dim);
+}
+.roadmap-list .phase-name {
+    display: block;
+    margin-top: 2px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-style: italic;
+    font-size: 18px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--bone);
+}
+.roadmap-list .phase-line {
+    display: block;
+    margin-top: 3px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--bone-dim);
+}
+.roadmap-list li.is-current {
+    border-left-color: var(--sol-teal);
+    box-shadow: -2px 0 12px -4px var(--sol-teal);
+}
+.roadmap-list li.is-current .phase-tag { color: var(--sol-teal); }
+.howto-list { list-style: none; margin: 16px 0 0; padding: 0; }
+.howto-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    color: var(--bone-dim);
+}
+/* BIT 11: keycap chrome — key names read as physical keys, not bold README text. */
+.howto-list b {
+    display: inline-block;
+    padding: 2px 7px;
+    margin-right: 4px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: var(--r-1);
+    color: var(--bone);
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+.howto-touch { display: none; }
+
+.panel-close {
+    position: absolute;
+    top: 14px; right: 12px;
+    width: 44px; height: 44px;
+    background: transparent;
+    border: 0;
+    color: var(--bone-dim);
+    font-size: 18px;
+    cursor: pointer;
+    transition: color 120ms ease;
+}
+.panel-close:hover { color: var(--bone); }
+
+/* ============================================================================
+   SETTINGS panel (z50) — DESIGN 4f
+   ============================================================================ */
+#settings-menu, #dev-inspector {
+    position: fixed;
+    z-index: 50;
+    color: var(--bone);
+    background: var(--bg-1);
+    box-shadow: var(--edge-hairline);
+    transition: opacity 160ms var(--ease-snap), transform 160ms var(--ease-snap), visibility 160ms var(--ease-snap);
+}
+
+/* full-screen scrim behind the settings card while the pause menu is open
+   (DESIGN 4f: scrim-heavy + blur). Driven by body.menu-open (already toggled by
+   Simulator._openSettings/_closeSettings), so it never clips against the card's
+   clip-path. z49 = just under the z50 card. Must live INSIDE #game-shell: the
+   shell is position:fixed and forms its own stacking context, so a scrim hung
+   off body would paint over the z50 card (its z-index can't escape the shell). */
+body.menu-open #game-shell::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    background: var(--scrim-heavy);
+    pointer-events: none;
+}
+
+#settings-menu {
+    top: 50%; left: 50%;
+    width: min(480px, calc(100vw - 32px));
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: var(--sp-6) var(--sp-5) var(--sp-5);
+    clip-path: var(--clip-notch);
+    transform: translate(-50%, -50%);
+    /* BIT 12: custom thin scrollbar so the OS default gray bar doesn't ruin the
+       notch card. Card background is opaque, so no backdrop-blur needed. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-3) transparent;
+}
+#settings-menu::-webkit-scrollbar { width: 6px; }
+#settings-menu::-webkit-scrollbar-thumb { background: var(--bg-3); }
+#settings-menu.settings-closed {
+    visibility: hidden;
+    opacity: 0;
+    transform: translate(-50%, -46%);
+    pointer-events: none;
+}
+
+#settings-title {
+    margin: 6px 0 20px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-style: italic;
+    font-size: 32px;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--bone);
+}
+
+.settings-group {
+    margin: 8px 0 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--bone-dim);
+}
+
+.settings-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 48px;
+    margin-bottom: 18px;
+    padding-top: 8px;
+}
+.settings-row label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-ui);
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--bone);
+}
+.settings-row label span {
+    font-family: var(--font-hud);
+    font-size: 18px;
+    color: var(--bone);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- slider (DESIGN 4f / BIT 12): 4px track drawn on the runnable-track with a
+   --fill-driven gradient (fill tracks the value), 28px hit area, bone thumb + ink
+   outline, hover/active/focus feedback. JS sets --fill = value%. ---- */
+.settings-row input[type="range"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 28px;                 /* hit area; visual track stays 4px */
+    background: transparent;
+    outline: none;
+    cursor: pointer;
+    --fill: 50%;
+}
+.settings-row input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px;
+    background: linear-gradient(to right, var(--sol-teal), var(--sol-purple)) 0 0 / var(--fill) 100% no-repeat,
+                var(--bg-3);
+}
+.settings-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    margin-top: -8px;             /* (4 - 20) / 2 */
+    border: 2px solid var(--ink);
+    border-radius: 50%;
+    background: var(--bone);
+    cursor: pointer;
+    transition: transform 120ms var(--ease-snap), box-shadow 120ms var(--ease-snap);
+}
+.settings-row input[type="range"]:hover::-webkit-slider-thumb,
+.settings-row input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.15); }
+.settings-row input[type="range"]:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px var(--bg-1), 0 0 12px var(--sol-teal);
+}
+/* Firefox: native progress layer, no JS needed there */
+.settings-row input[type="range"]::-moz-range-track { height: 4px; background: var(--bg-3); }
+.settings-row input[type="range"]::-moz-range-progress {
+    height: 4px;
+    background: linear-gradient(to right, var(--sol-teal), var(--sol-purple));
+}
+.settings-row input[type="range"]::-moz-range-thumb {
+    box-sizing: border-box;
+    width: 20px; height: 20px;
+    border: 2px solid var(--ink);
+    border-radius: 50%;
+    background: var(--bone);
+    cursor: pointer;
+}
+
+/* BIT 12: FOV readout unit */
+#fov-val::after { content: "°"; margin-left: 1px; font-size: 13px; color: var(--bone-dim); }
+
+/* toggle checkbox (DESIGN 4f) */
+.settings-toggle-row label { justify-content: space-between; }
+.settings-row input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 52px; height: 28px;
+    border-radius: var(--r-full);
+    background: var(--bg-3);
+    position: relative;
+    cursor: pointer;
+    transition: background 120ms ease;
+}
+.settings-row input[type="checkbox"]::after {
+    content: "";
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--bone-dim);
+    transition: transform 120ms var(--ease-snap), background 120ms ease;
+}
+.settings-row input[type="checkbox"]:checked { background: var(--grad-sol); }
+.settings-row input[type="checkbox"]:checked::after { transform: translateX(24px); background: var(--bone); }
+
+/* primary DONE / RESUME button + PLAY-shaped secondary reuse */
+#resume-game {
+    width: 100%;
+    height: 56px;
+    margin-top: 4px;
+    border: 0;
+    border-radius: var(--r-1);
+    clip-path: var(--clip-notch);
+    background: var(--grad-sol);
+    color: var(--ink);
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: box-shadow 120ms var(--ease-snap), filter 120ms var(--ease-snap), transform 120ms var(--ease-snap);
+}
+#resume-game:hover { box-shadow: var(--glow-teal); filter: brightness(1.08); }
+#resume-game:active { transform: translateY(1px) scale(.985); }
+
+/* ---- Dev inspector (dev-only behavior; markup ships) ---- */
+#dev-inspector {
+    top: calc(var(--sp-5) + env(safe-area-inset-top));
+    left: calc(var(--sp-5) + env(safe-area-inset-left));
+    width: 292px;
+    padding: 20px;
+    box-shadow: var(--edge-hairline);
+    border-top: 2px solid var(--blood-bright);
+    border-radius: var(--r-1);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+#dev-inspector.dev-closed {
+    visibility: hidden;
+    opacity: 0;
+    transform: translateX(-12px);
+    pointer-events: none;
+}
+.dev-title {
+    margin: 0 0 17px;
+    color: var(--blood-bright);
+    font-family: var(--font-display);
+    font-size: 16px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.dev-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.dev-row label { color: var(--bone-dim); font-size: 12px; }
+.dev-row input, .dev-row select {
+    width: 112px;
+    min-height: 30px;
+    padding: 4px 7px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-1);
+    outline: none;
+    background: var(--bg-2);
+    color: var(--bone);
+    font-size: 12px;
+}
+
+#settings-menu, #dev-inspector { touch-action: auto; }
+
+/* ============================================================================
+   TOUCH CONTROLS (z30) — DESIGN 3.2 / 4d. Restyle only; ids preserved.
+   ============================================================================ */
+#touch-controls, #touch-controls * {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+}
+#touch-controls {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    transition: opacity 160ms ease;
+}
+body:not(.arena-entered) #touch-controls,
+body.menu-open #touch-controls,
+body.player-dead #touch-controls {
+    opacity: 0;
+    pointer-events: none;
+}
+
+#touch-move-zone, #touch-look-zone { position: absolute; top: 0; bottom: 0; width: 50%; }
+#touch-move-zone { left: 0; }
+#touch-look-zone { right: 0; }
+
+/* floating joystick */
+#touch-joy-base {
+    position: absolute;
+    z-index: 31;
+    display: none;
+    width: 120px; height: 120px;
+    margin: -60px 0 0 -60px;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 60%),
+        rgba(255, 255, 255, 0.04);
+    -webkit-backdrop-filter: blur(6px);
+            backdrop-filter: blur(6px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 4px 16px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+}
+#touch-joy-base.active { display: block; }
+#touch-joy-knob {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: rgba(19, 24, 32, 0.6);
+    border: 2px solid transparent;
+    background-image: linear-gradient(rgba(19,24,32,0.6), rgba(19,24,32,0.6)), var(--grad-sol);
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
+    box-shadow: var(--glow-teal);
+    transform: translate(-50%, -50%);
+}
+
+/* thumb buttons — circles (DESIGN 3.2). Set: fire + jump + reload + switch +
+   gear. Reload + switch live INSIDE the touch overlay (z32, above the z31 look
+   zone) so their taps register; the weapon plate is now a pure display. All
+   right-side buttons are laid out as distinct, non-overlapping ≥44px (HIG)
+   targets in the thumb arc, safe-area aware, landscape-first. */
+#touch-fire, #touch-jump, #touch-reload, #touch-switch, #touch-throw, #touch-gear {
+    position: absolute;
+    z-index: 32;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Premium glassmorphism: translucent glass plate, hairline rim, blur */
+    border: 1.5px solid rgba(255, 255, 255, 0.22);
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 50% 32%, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04) 62%),
+        rgba(255, 255, 255, 0.05);
+    -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+    color: #ffffff;
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 700;
+    /* crisp glyphs: subtle inner top-light + firm drop shadow, no blur-mush */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.18),
+        0 4px 16px rgba(0, 0, 0, 0.4);
+    opacity: 0.9;
+    transition: transform 90ms ease, background 90ms ease, border-color 90ms ease, box-shadow 90ms ease, opacity 90ms ease;
+}
+/* :active — tint to self-cyan (--hud-self) and press-in */
+#touch-jump.active, #touch-reload.active, #touch-switch.active, #touch-gear.active {
+    border-color: var(--hud-self, #7fe9ff);
+    background:
+        radial-gradient(circle at 50% 32%, rgba(127, 233, 255, 0.30), rgba(127, 233, 255, 0.10) 66%),
+        rgba(127, 233, 255, 0.10);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 0 14px rgba(127, 233, 255, 0.45),
+        0 4px 16px rgba(0, 0, 0, 0.4);
+    opacity: 1;
+    transform: scale(0.92);
+}
+
+/* FIRE — primary action, bottom-right thumb corner (96px). Carries the crit
+   identity: a bold red rim that reads as "shoot" without a heavy fill. */
+#touch-fire {
+    right: calc(28px + env(safe-area-inset-right));
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    width: 96px; height: 96px;
+    border-color: rgba(255, 51, 51, 0.55);
+    background:
+        radial-gradient(circle at 50% 32%, rgba(255, 90, 90, 0.16), rgba(255, 51, 51, 0.05) 60%),
+        rgba(255, 255, 255, 0.04);
+    color: var(--hud-crit, #ff3333);
+    font-size: 34px;
+    opacity: 0.95;
+}
+#touch-fire.active {
+    border-color: var(--hud-crit, #ff3333);
+    background:
+        radial-gradient(circle at 50% 32%, rgba(255, 80, 80, 0.34), rgba(255, 51, 51, 0.12) 66%),
+        rgba(255, 51, 51, 0.10);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 0 18px rgba(255, 51, 51, 0.5),
+        0 4px 16px rgba(0, 0, 0, 0.45);
+    opacity: 1;
+    transform: scale(0.92);
+}
+/* thumb-arc secondaries, all clear of each other and of fire (see rect map in
+   TouchControls review): no two share a rect.
+     fire   : right[28..124]  bottom[72..168]   (96px)
+     reload : right[44..104]  bottom[178..238]  (60px)  — directly above fire
+     jump   : right[140..204] bottom[168..232]  (64px)  — up-left of fire
+     switch : right[118..178] bottom[254..314]  (60px)  — above jump
+     gear   : top-right corner (top-anchored, no conflict) */
+#touch-reload {
+    right: calc(44px + env(safe-area-inset-right));
+    bottom: calc(178px + env(safe-area-inset-bottom));
+    width: 60px; height: 60px;
+    font-size: 26px;
+}
+#touch-jump {
+    right: calc(140px + env(safe-area-inset-right));
+    bottom: calc(168px + env(safe-area-inset-bottom));
+    width: 64px; height: 64px;
+}
+#touch-switch {
+    right: calc(118px + env(safe-area-inset-right));
+    bottom: calc(254px + env(safe-area-inset-bottom));
+    width: 60px; height: 60px;
+    font-size: 24px;
+}
+/* THROW — frag grenade. Right of jump (rect right[210..270] bottom[168..228]);
+   clear of fire/reload/jump/switch. Amber ordnance tint to read as "grenade". */
+#touch-throw {
+    right: calc(210px + env(safe-area-inset-right));
+    bottom: calc(168px + env(safe-area-inset-bottom));
+    width: 60px; height: 60px;
+    font-size: 24px;
+    border-color: rgba(255, 184, 77, 0.5);
+    color: var(--hud-util, #ffb84d);
+}
+#touch-throw.active {
+    border-color: var(--hud-util, #ffb84d);
+    background:
+        radial-gradient(circle at 50% 32%, rgba(255, 184, 77, 0.30), rgba(255, 140, 40, 0.10) 66%),
+        rgba(255, 184, 77, 0.10);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        0 0 14px rgba(255, 184, 77, 0.45),
+        0 4px 16px rgba(0, 0, 0, 0.4);
+    opacity: 1;
+    transform: scale(0.92);
+}
+#touch-gear {
+    top: calc(12px + env(safe-area-inset-top));
+    right: calc(12px + env(safe-area-inset-right));
+    width: 48px; height: 48px;
+    opacity: 0.8;
+}
+
+/* ============================================================================
+   RESPONSIVE — DESIGN 6. Pointer-coarse governs control scheme; width governs
+   sizing.
+   ============================================================================ */
+
+/* mobile HUD sizing: compact clusters, feed shrinks, key hints hidden */
+@media (max-width: 767px), (pointer: coarse) {
+    #top-hud {
+        top: calc(var(--sp-3) + env(safe-area-inset-top));
+        left: calc(var(--sp-4) + env(safe-area-inset-left));
+        right: calc(56px + env(safe-area-inset-right));
+    }
+    .brand-mark { width: 27px; height: 27px; }
+    .brand-name { display: none; }
+    .match-strip { min-height: 26px; padding: 0 9px; font-size: 11px; }
+
+    /* ------------------------------------------------------------------ */
+    /* SLICK-AF MOBILE LAYOUT — vital readouts live in the bottom-CENTER   */
+    /* safe corridor, flanking the crosshair. Both thumb zones (left move, */
+    /* right fire-cluster) stay unobstructed. Flat plates, data emits      */
+    /* light (chrome diet). See overlap math in the note at end of block.  */
+    /* ------------------------------------------------------------------ */
+
+    /* Neutralize A's desktop bottom-right anchor: the group's children are
+       re-homed to the center corridor below, so the wrapper must not force
+       them into the thumb corner. Kept in flow (children are absolute). */
+    #hud-right-group {
+        position: static;
+        bottom: auto;
+        right: auto;
+        display: contents;
+    }
+
+    /* HP — bottom-center-LEFT, right-aligned toward the crosshair. Flat
+       scrim plate, teal accent on the crosshair-facing (right) edge; only
+       the number + fill glow. Anchored to the RIGHT so it grows leftward,
+       keeping it out of the left move zone on wide phones and clear of the
+       right thumb cluster on narrow ones (see overlap note). */
+    #health-panel {
+        position: absolute;
+        top: auto;
+        left: auto;
+        right: calc(50% + 150px);
+        bottom: calc(18px + env(safe-area-inset-bottom));
+        min-width: 0;
+        padding: 7px 15px 8px 12px;
+        clip-path: none;
+        background: var(--hud-scrim, var(--scrim));
+        border: none;
+        border-right: 3px solid var(--hud-vitals, var(--sol-teal));
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+        pointer-events: none;
+    }
+    .health-readout { justify-content: flex-end; }
+    #health-value {
+        font-family: var(--font-numeral, var(--font-hud));
+        font-size: 42px;
+        font-variant-numeric: tabular-nums;
+    }
+    .health-unit { display: none; }
+    .health-track { width: 92px; height: 6px; margin-top: 5px; margin-left: auto; }
+    .health-track::after { display: none; } /* ticks are illegible at 6px height */
+    .hud-skull { width: 24px; height: 24px; }
+
+    /* WEAPON / AMMO — bottom-center-RIGHT, left-aligned toward the crosshair.
+       Pure DISPLAY (no pointer-events; reload/switch are touch buttons).
+       Chrome diet: kill the Halo glow box-shadow + corner brackets + icon
+       drop-shadow; keep a single self-cyan accent on the crosshair-facing
+       (left) edge. Flat scrim plate. */
+    #weapon-panel {
+        position: absolute;
+        top: auto;
+        left: auto;
+        right: calc(50% + 6px);
+        bottom: calc(18px + env(safe-area-inset-bottom));
+        min-width: 0;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 13px 8px 15px;
+        text-align: left;
+        clip-path: none;
+        background: var(--hud-scrim, var(--scrim));
+        border: none;
+        border-left: 3px solid var(--hud-self, var(--halo-cyan-deep));
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+        pointer-events: none;
+    }
+    #weapon-panel::before,
+    #weapon-panel::after { display: none; }
+    #weapon-icon {
+        width: 52px; height: 28px;
+        background-color: var(--hud-self, var(--halo-cyan));
+        filter: none;
+    }
+    .weapon-readout { align-items: flex-start; }
+    #weapon-name {
+        display: block;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        color: var(--hud-self, var(--halo-cyan-dim));
+        text-shadow: none;
+    }
+    #ammo-counter { margin-top: 0; gap: 4px; }
+    #magazine-ammo {
+        font-family: var(--font-numeral, var(--font-hud));
+        font-size: 46px;
+        color: #ffffff;
+        font-variant-numeric: tabular-nums;
+    }
+    .ammo-separator, #reserve-ammo {
+        font-family: var(--font-numeral, var(--font-hud));
+        font-size: 20px;
+        font-variant-numeric: tabular-nums;
+    }
+    /* keep the .is-reloading reveal (base #reload-state / .is-reloading rules
+       still apply); just tighten it for the compact center plate */
+    #reload-state { min-height: 11px; margin-top: 1px; font-size: 9px; }
+
+    /* colour law: when health is critical, red must OWN the peripheral read —
+       dim the calm cyan weapon accent so it can't out-shout the red. */
+    body.low-health #weapon-panel { border-left-color: rgba(127, 233, 255, 0.35); }
+    body.low-health #weapon-icon,
+    body.low-health #weapon-name { opacity: 0.6; }
+
+    /* GRENADE — floats just ABOVE the ammo plate, sharing its left edge.
+       Flat plate, amber utility accent, chrome diet (no clip/glow). */
+    #grenade-panel {
+        position: absolute;
+        top: auto;
+        left: auto;
+        right: calc(50% + 6px);
+        bottom: calc(80px + env(safe-area-inset-bottom));
+        min-width: 0;
+        padding: 5px 12px 5px 10px;
+        clip-path: none;
+        background: var(--hud-scrim, var(--scrim));
+        border: none;
+        border-left: 3px solid var(--hud-util, #ffb84d);
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+        pointer-events: none;
+    }
+    #grenade-icon { color: var(--hud-util, #ffb84d); text-shadow: none; }
+    #grenade-count {
+        font-family: var(--font-numeral, var(--font-hud));
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* OVERLAP CHECK (thumb clearance). x = px from the screen's RIGHT     */
+    /* edge; y = px from the BOTTOM edge. safe-area insets shift every     */
+    /* element equally, so they cancel and are omitted below.             */
+    /*                                                                    */
+    /* Right thumb-cluster (buttons, from right edge):                    */
+    /*   fire   x[28..124]  y[72..168]                                    */
+    /*   reload x[44..104]  y[178..238]                                   */
+    /*   jump   x[140..204] y[168..232]                                   */
+    /*   throw  x[210..270] y[168..228]                                   */
+    /*   switch x[118..178] y[254..314]                                   */
+    /*   -> whole cluster lives at x ≤ 270 (right half only), y ≥ 72.     */
+    /*                                                                    */
+    /* Readouts anchor to CENTER and grow LEFTWARD (right-anchored):      */
+    /*   ammo/grenade right edge = 50% - 4  (just left of crosshair)      */
+    /*   HP right edge          = 50% - 132                              */
+    /* Their nearest-to-cluster point is the ammo/grenade RIGHT edge at   */
+    /* abs-x = center-4, i.e. x_from_right = screen - (center-4)          */
+    /*        = center + 4  (since center = screen/2).                    */
+    /* No overlap requires center+4 > 270  ->  center > 266  ->           */
+    /* screen width > 532px. The narrowest supported landscape phone is   */
+    /* ~568px CSS px (iPhone SE landscape); there center=284, so the ammo */
+    /* right edge sits at x=288 from the right — 18px clear of the        */
+    /* cluster's x≤270. Wider phones only widen the gap (640->54px,       */
+    /* 844->156px). Verified rects (568px, W_ammo≈120, W_hp≈100):         */
+    /*   AMMO abs-x[160..280]  clusterLeft abs-x=298  -> gap 18px  OK     */
+    /*   HP   abs-x[ 52..152]  (well left of center)  -> no cluster  OK   */
+    /* Vertically the readouts sit at bottom y[16..~70] (ammo) and        */
+    /* y[62..~96] (grenade); but they never enter the cluster's x-band    */
+    /* (x≤270 is the RIGHT side; readouts are center/left), so the y      */
+    /* overlap with fire (y≥72) is moot. HP & ammo & grenade collide with */
+    /* NONE of fire/reload/switch/jump/throw on any supported width.      */
+    /*                                                                    */
+    /* Left MOVE zone = left screen half; the joystick is FLOATING        */
+    /* (spawns at the touch point, pointer-events:none when idle) — the   */
+    /* HP plate in the lower-left-of-center is the conventional mobile-   */
+    /* shooter vitals slot and does not block the move thumb.             */
+    /* ------------------------------------------------------------------ */
+
+    /* crosshair is now an inline SVG sized in user units; the spread-true parts
+       already scale with viewport height (JS), so no fixed px override here —
+       just a slight global shrink so the base ticks aren't chunky on phones */
+    #crosshair { transform: translate(-50%, -50%) scale(0.875); }
+
+    #kill-feed { top: calc(46px + env(safe-area-inset-top)); gap: 4px; max-width: 210px; }
+    .kill-feed-row { height: 24px; padding: 0 8px; font-size: 12px; }
+    .kill-feed-row .kf-weapon { display: none; }
+    #kill-feed .kill-feed-row:nth-child(n+4) { display: none; }
+
+    #frag-banner { font-size: 26px; }
+}
+
+/* menu reflow on mobile (DESIGN 4b mobile) */
+@media (max-width: 767px) {
+    #entry-overlay { padding-left: calc(var(--sp-4) + env(safe-area-inset-left)); padding-right: calc(var(--sp-4) + env(safe-area-inset-right)); }
+    .entry-wordmark { font-size: 16px; }
+    .entry-logo { width: 44px; height: 44px; }
+    .entry-content { gap: 14px; }
+    .callsign-field, .menu-plates, .menu-actions { width: 100%; }
+    .plate-label { font-size: 20px; }
+    #resume-game { height: 52px; font-size: 18px; }
+    .menu-actions { flex-wrap: wrap; }
+    #settings-title { font-size: 26px; }
+    #combat-title { font-size: clamp(26px, 8vw, 40px); }
+    .combat-skull { width: 60px; height: 60px; }
+
+    /* MENU intrusion feed: on phones the full-width centered plates + footer fill the
+       column, leaving no clear lower-left gutter — so the menu feed is HIDDEN here to
+       avoid colliding with the plates/actions/footer. The accessible status stays in
+       the header (#entry-status), and the SPLASH ticker (below) keeps the flavor on
+       the boot screen. (Desktop keeps the full panel.) */
+    .hack-feed { display: none; }
+    .splash-hack { font-size: 10px; bottom: calc(44px + env(safe-area-inset-bottom)); }
+}
+
+/* touch → show the touch how-to variant */
+@media (pointer: coarse) {
+    .howto-desktop { display: none; }
+    .howto-touch { display: block; }
+    .key-hints { display: none; } /* WASD hints are meaningless on touch */
+}
+
+/* hide player-count first on very narrow screens */
+@media (max-width: 460px) {
+    #player-count, .status-divider { display: none; }
+}
+
+/* very short landscape phones: trim vertical spacing */
+@media (max-height: 400px) {
+    .key-hints { display: none; }
+    .entry-content { gap: 8px; }
+    .lockup-word { font-size: clamp(28px, 5vh, 44px); }
+    .menu-plate { min-height: 48px; }
+    .plate-label { font-size: 17px; }
+}
+
+/* ============================================================================
+   SPLASH (z60) — DESIGN 4a / 5.4. Logo draw-in over --bg-0; auto-advances.
+   ============================================================================ */
+#splash {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 46%, #0a0d12 0%, var(--bg-0) 70%);
+    transition: opacity 220ms var(--ease-exit), transform 220ms var(--ease-exit);
+}
+#splash.splash-out { opacity: 0; transform: scale(1.04); pointer-events: none; }
+/* BIT 13: dedicated leaving state that releases input immediately during fade. */
+#splash.is-leaving { pointer-events: none; animation: splash-out 0.22s ease-out forwards; }
+@keyframes splash-out { to { opacity: 0; visibility: hidden; } }
+
+/* ---- Console-style partner boot cards (Part A). One card is `.is-active` at a time;
+   cards crossfade (~250ms). The stage holds them stacked so the fade is a true
+   cross-dissolve, not a layout jump. ---- */
+.splash-stage {
+    position: relative;
+    width: min(92vw, 560px);
+    /* fixed height so the crossfade never reflows the card around it */
+    height: 340px;
+    display: grid;
+    place-items: center;
+}
+.splash-card {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 26px;
+    text-align: center;
+    opacity: 0;
+    visibility: hidden;
+    transform: scale(0.985);
+    transition: opacity 250ms var(--ease-snap), transform 250ms var(--ease-snap), visibility 0s 250ms;
+}
+.splash-card.is-active {
+    opacity: 1;
+    visibility: visible;
+    transform: scale(1);
+    transition: opacity 250ms var(--ease-snap), transform 250ms var(--ease-snap);
+}
+.splash-kicker {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.34em;
+    text-transform: uppercase;
+    color: var(--bone-dim);
+}
+.splash-logos {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.splash-logo {
+    width: min(40vw, 320px);
+    height: auto;
+    max-height: 120px;
+    display: block;
+    object-fit: contain;
+}
+/* mark-only logos (tensor / pump pill) sit beside a styled wordmark */
+.splash-logo-mark {
+    width: auto;
+    height: clamp(48px, 9vw, 84px);
+    max-height: 84px;
+}
+.splash-pair-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+}
+.splash-wordmark-txt {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(28px, 5vw, 52px);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--bone);
+}
+/* card 4: Tensor + Magic Eden side by side; stack on narrow screens */
+.splash-logos-pair {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(28px, 6vw, 72px);
+    flex-wrap: wrap;
+}
+
+/* GATE card prompt + sub-caption */
+.splash-gate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+.splash-prompt {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--bone);
+    animation: prompt-blink 1.1s steps(2, start) infinite;
+}
+.splash-subcap {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--sol-teal);
+    opacity: 0.75;
+}
+@keyframes prompt-blink { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+/* small segment-display % echo in the splash corner (Part B). Same DSEG7 LED look
+   as the header readout, dim, bottom-right. */
+.splash-seg {
+    position: absolute;
+    right: calc(20px + env(safe-area-inset-right));
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+    font-family: 'DSEG7 Classic', ui-monospace, monospace;
+    font-weight: 700;
+    color: var(--warn);
+    opacity: 0.55;
+}
+.splash-seg-live {
+    position: relative;
+    display: inline-block;
+    width: 3.5em;               /* reserve widest "100" + ".88" (matches header) */
+    text-align: right;
+    font-size: 14px;            /* base = LARGE integer digits */
+    line-height: 1;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+/* live glyphs (glow) sit above the ghost underlay; both split large int / small frac */
+.splash-seg-live > .seg-int,
+.splash-seg-live > .seg-frac {
+    position: relative;
+    text-shadow: 0 0 5px rgba(255, 176, 32, 0.4);
+}
+.splash-seg-live .seg-ghost {
+    position: absolute;
+    inset: 0;
+    text-align: right;
+    opacity: 0.14;              /* faint hardware ghost underlay */
+    text-shadow: none;
+}
+.splash-seg-pct {
+    font-family: var(--font-display);
+    font-size: 9px;
+    letter-spacing: 0.02em;
+}
+
+.splash-foot {
+    position: absolute;
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--bone-dim);
+    opacity: 0.6;
+    white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+    .splash-stage { width: 92vw; height: 300px; }
+    .splash-logo { width: min(62vw, 280px); max-height: 96px; }
+    .splash-logos-pair { flex-direction: column; gap: 28px; }
+    .splash-logo-mark { height: clamp(40px, 12vw, 64px); }
+}
+
+/* ============================================================================
+   ACCESSIBILITY — reduced motion (DESIGN 5). Replace movement with opacity; kill
+   strobes/sheens/shake.
+   ============================================================================ */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    /* staggered reveal collapses to instant-visible */
+    [data-reveal], body.menu-reveal [data-reveal] { opacity: 1 !important; animation: none !important; }
+    .uplink-led, #enter-arena.is-ready-cta .plate-label, #enter-arena.is-arming .plate-label::after { animation: none !important; }
+    /* GATE prompt: no blink; the card still holds until tap (JS-driven) and cards
+       still cycle — only the crossfade + blink are suppressed. */
+    .splash-prompt { opacity: 1 !important; animation: none !important; }
+    #splash, #splash * { animation-duration: 0.01ms !important; animation-delay: 0s !important; }
+    .splash-card { transition: none !important; }
+    body.low-health #health-value, body.low-health .hud-skull { animation: none; }
+    #weapon-panel.is-reloading #reload-state,
+    #weapon-panel.is-empty #magazine-ammo { animation: none; }
+    body.player-hit #damage-flash { opacity: 0.2; }
+    /* keep the low-HP danger read as a steady (non-strobing) tint */
+    body.low-health #low-hp-vignette, #low-hp-vignette.active { animation: none; opacity: 0.7; }
+    #combat-state:not(.combat-state-hidden) { animation: none; }
+    #enter-arena.enter-unlock { animation: none; }
+}
+
+/* Floating overhead nametags. Subtle white callsigns above remote players;
+   positioned per-frame by CharacterModel (world head-point projected to screen).
+   #nametags fills the #game-shell (position: relative) and never eats input. */
+#nametags {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+.nametag {
+    position: absolute;
+    transform: translate(-50%, -100%) translateY(-6px);
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 11px;
+    font-family: 'Chakra Petch', monospace;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.85), 0 0 10px rgba(0,0,0,0.4);
+    white-space: nowrap;
+    display: none;
+    user-select: none;
+}
+
+/* ADS aim button (touch): mirrors the fire button glass style; sits inboard of
+   fire, slightly smaller, and doubles as a drag-look surface (see TouchControls). */
+#touch-aim {
+    position: absolute; z-index: 32;
+    display: flex; align-items: center; justify-content: center;
+    right: calc(140px + env(safe-area-inset-right));
+    bottom: calc(150px + env(safe-area-inset-bottom));
+    width: 76px; height: 76px;
+    border: 1.5px solid rgba(255,255,255,0.22); border-radius: 50%;
+    background: radial-gradient(circle at 50% 32%, rgba(255,255,255,0.14), rgba(255,255,255,0.04) 62%), rgba(255,255,255,0.05);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    color: #fff; font-family: var(--font-display); font-size: 22px; font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.55);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 4px 16px rgba(0,0,0,0.4);
+    opacity: 0.9; transition: transform 90ms ease, background 90ms ease, border-color 90ms ease, opacity 90ms ease;
+}
+#touch-aim.active {
+    transform: scale(0.92);
+    background: radial-gradient(circle at 50% 32%, rgba(120,190,255,0.35), rgba(120,190,255,0.10) 62%), rgba(120,190,255,0.12);
+    border-color: rgba(140,200,255,0.7); opacity: 1;
+}

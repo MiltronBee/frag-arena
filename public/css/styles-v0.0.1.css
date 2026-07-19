@@ -377,7 +377,9 @@ a:focus-visible {
 /* ---- Health (DESIGN 3.5): bottom-left scrim plate ---- */
 #health-panel {
     position: absolute;
-    bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));
+    /* Halo-CE vitals: shield/health reads top-LEFT, just below the brand/score
+       strip (#top-hud). --sp-8 clears the ~30px strip with a small gap. */
+    top: calc(var(--sp-8) + env(safe-area-inset-top));
     left: calc(var(--sp-5) + env(safe-area-inset-left));
     min-width: 228px;
     padding: 14px 20px;
@@ -392,7 +394,9 @@ a:focus-visible {
    66px magic offset on #grenade-panel; the children are now position:relative. ---- */
 #hud-right-group {
     position: absolute;
-    bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));
+    /* Halo-CE vitals: weapon/ammo + grenades read top-RIGHT, just below the
+       brand/score strip. Grenade plate stacks above the weapon plate. */
+    top: calc(var(--sp-8) + env(safe-area-inset-top));
     right: calc(var(--sp-5) + env(safe-area-inset-right));
     display: flex;
     flex-direction: column;
@@ -844,7 +848,9 @@ body.low-health #damage-flash {
 
 #kill-feed {
     position: absolute;
-    top: calc(var(--sp-8) + env(safe-area-inset-top));
+    /* Sits BELOW the top-right vitals stack (#hud-right-group) so the two never
+       collide now that the weapon/ammo panel owns the top-right corner. */
+    top: calc(208px + env(safe-area-inset-top));
     right: calc(var(--sp-5) + env(safe-area-inset-right));
     display: flex;
     flex-direction: column;
@@ -2220,44 +2226,47 @@ body.player-dead #touch-controls {
     /* light (chrome diet). See overlap math in the note at end of block.  */
     /* ------------------------------------------------------------------ */
 
-    /* Neutralize A's desktop bottom-right anchor: the group's children are
-       re-homed to the center corridor below, so the wrapper must not force
-       them into the thumb corner. Kept in flow (children are absolute). */
+    /* Halo-CE TOP layout on mobile too: weapon/ammo + grenades stack in a real
+       flex column anchored top-RIGHT, just below the strip and the top-right
+       gear button (#touch-gear ends ~60px down, so 64px clears it). The bottom
+       of the screen is now fully free for the thumb zones. */
     #hud-right-group {
-        position: static;
+        position: absolute;
+        top: calc(64px + env(safe-area-inset-top));
+        right: calc(var(--sp-4) + env(safe-area-inset-right));
         bottom: auto;
-        right: auto;
-        display: contents;
+        left: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
     }
 
-    /* HP — bottom-center-LEFT, right-aligned toward the crosshair. Flat
-       scrim plate, teal accent on the crosshair-facing (right) edge; only
-       the number + fill glow. Anchored to the RIGHT so it grows leftward,
-       keeping it out of the left move zone on wide phones and clear of the
-       right thumb cluster on narrow ones (see overlap note). */
+    /* HP — top-LEFT, just below the strip. Flat scrim plate, teal accent on the
+       (now outer) left edge; only the number + fill glow. */
     #health-panel {
         position: absolute;
-        top: auto;
-        left: auto;
-        right: calc(50% + 150px);
-        bottom: calc(18px + env(safe-area-inset-bottom));
+        top: calc(64px + env(safe-area-inset-top));
+        left: calc(var(--sp-4) + env(safe-area-inset-left));
+        right: auto;
+        bottom: auto;
         min-width: 0;
         padding: 7px 15px 8px 12px;
         clip-path: none;
         background: var(--hud-scrim, var(--scrim));
         border: none;
-        border-right: 3px solid var(--hud-vitals, var(--sol-teal));
+        border-left: 3px solid var(--hud-vitals, var(--sol-teal));
         box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
         pointer-events: none;
     }
-    .health-readout { justify-content: flex-end; }
+    .health-readout { justify-content: flex-start; }
     #health-value {
         font-family: var(--font-numeral, var(--font-hud));
         font-size: 42px;
         font-variant-numeric: tabular-nums;
     }
     .health-unit { display: none; }
-    .health-track { width: 92px; height: 6px; margin-top: 5px; margin-left: auto; }
+    .health-track { width: 92px; height: 6px; margin-top: 5px; margin-left: 0; }
     .health-track::after { display: none; } /* ticks are illegible at 6px height */
     .hud-skull { width: 24px; height: 24px; }
 
@@ -2267,11 +2276,11 @@ body.player-dead #touch-controls {
        drop-shadow; keep a single self-cyan accent on the crosshair-facing
        (left) edge. Flat scrim plate. */
     #weapon-panel {
-        position: absolute;
+        position: relative;
         top: auto;
         left: auto;
-        right: calc(50% + 6px);
-        bottom: calc(18px + env(safe-area-inset-bottom));
+        right: auto;
+        bottom: auto;
         min-width: 0;
         display: flex;
         flex-direction: row;
@@ -2323,14 +2332,14 @@ body.player-dead #touch-controls {
     body.low-health #weapon-icon,
     body.low-health #weapon-name { opacity: 0.6; }
 
-    /* GRENADE — floats just ABOVE the ammo plate, sharing its left edge.
+    /* GRENADE — stacks just ABOVE the ammo plate inside the top-right column.
        Flat plate, amber utility accent, chrome diet (no clip/glow). */
     #grenade-panel {
-        position: absolute;
+        position: relative;
         top: auto;
         left: auto;
-        right: calc(50% + 6px);
-        bottom: calc(80px + env(safe-area-inset-bottom));
+        right: auto;
+        bottom: auto;
         min-width: 0;
         padding: 5px 12px 5px 10px;
         clip-path: none;
@@ -2390,7 +2399,9 @@ body.player-dead #touch-controls {
        just a slight global shrink so the base ticks aren't chunky on phones */
     #crosshair { transform: translate(-50%, -50%) scale(0.875); }
 
-    #kill-feed { top: calc(46px + env(safe-area-inset-top)); gap: 4px; max-width: 210px; }
+    /* kill feed drops BELOW the top-right vitals stack (grenade+weapon) so it
+       no longer shares the corner the ammo plate now occupies. */
+    #kill-feed { top: calc(178px + env(safe-area-inset-top)); gap: 4px; max-width: 210px; }
     .kill-feed-row { height: 24px; padding: 0 8px; font-size: 12px; }
     .kill-feed-row .kf-weapon { display: none; }
     #kill-feed .kill-feed-row:nth-child(n+4) { display: none; }
@@ -2431,6 +2442,29 @@ body.player-dead #touch-controls {
 /* hide player-count first on very narrow screens */
 @media (max-width: 460px) {
     #player-count, .status-divider { display: none; }
+}
+
+/* Short landscape (phones held sideways): the vertical plate menu is taller than
+   the viewport, so its lower plates + the wallet/how-to actions were falling
+   below the fold with no way to reach them. Make the overlay SCROLL and top-align
+   its content so every control stays reachable; drop the decorative title lockup
+   to reclaim vertical space and tighten the plate rhythm. */
+@media (max-height: 560px) and (pointer: coarse) {
+    #entry-overlay {
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    .entry-content {
+        flex: 1 0 auto;
+        justify-content: flex-start;
+        gap: 10px;
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+    .entry-lockup { display: none; }
+    .menu-plates { gap: 8px; }
+    .menu-plate { min-height: 46px; }
+    .menu-actions { margin-top: 2px; }
 }
 
 /* very short landscape phones: trim vertical spacing */

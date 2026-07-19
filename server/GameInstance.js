@@ -1,5 +1,7 @@
 import nengi from 'nengi'
 import nengiConfig from '../common/nengiConfig'
+import { SPAWN_POINTS } from '../common/arenaConfig'
+import { USE_MESH_MAP, MAP_MESH, KILL_Y } from '../common/mapMesh'
 import PlayerCharacter from '../common/entity/PlayerCharacter'
 import Identity from '../common/message/Identity'
 import WeaponFired from '../common/message/WeaponFired'
@@ -26,6 +28,7 @@ import { PLAYER_NAMES } from '../common/playerNames'
 import BotController from './BotController'
 
 import * as BABYLON from 'babylonjs'
+import 'babylonjs-loaders' // registers the OBJ loader (mesh maps, server-side collision)
 //import 'babylonjs-loaders' // mutates something globally
 global.XMLHttpRequest = require('xhr2').XMLHttpRequest
 
@@ -77,7 +80,17 @@ class GameInstance {
 		niceInstanceExtension(this.instance)
 
 		// game-related state
-		this.obstacles = setupObstacles(this.instance)
+		// Mesh map: skip the box arena and load the artist OBJ as collision geometry
+		// (async — ready within ~1s of boot, before anyone connects). Box arenas keep the
+		// setupObstacles path. this.obstacles stays a Map either way (used elsewhere).
+		this.mapReady = false
+		if (USE_MESH_MAP) {
+			this.obstacles = new Map()
+			this._loadMapMesh(scene)
+		} else {
+			this.obstacles = setupObstacles(this.instance)
+			this.mapReady = true
+		}
 		this.projectiles = new Set()
 		// Phase 3: thrown frag grenades (mirrors this.projectiles). Server-only
 		// physics (gravity+bounce+fuse) + AoE detonation live in update().
@@ -123,7 +136,9 @@ class GameInstance {
 			// from inside a collider (you'd be frozen until the other player moves)
 			const spawn = this.spawnPoint()
 			rawEntity.x = spawn.x
+			rawEntity.y = spawn.y || 0
 			rawEntity.z = spawn.z
+			this._recordSpawn(rawEntity)
 
 			// make the raw entity only visible to this client
 			const channel = this.instance.createChannel()
@@ -136,6 +151,7 @@ class GameInstance {
 			const smoothEntity = new PlayerCharacter()
 			smoothEntity.mesh.checkCollisions = false
 			smoothEntity.x = rawEntity.x
+			smoothEntity.y = rawEntity.y
 			smoothEntity.z = rawEntity.z
 			this.instance.addEntity(smoothEntity)
 
@@ -556,6 +572,7 @@ class GameInstance {
 		entity.mesh.checkCollisions = true
 		const spawn = this.spawnPoint()
 		entity.x = spawn.x
+		entity.y = spawn.y || 0
 		entity.z = spawn.z
 		// spread the loadouts: rifle / smg / shotgun / pistol
 		entity.currentWeaponIndex = index % weapons.length
@@ -585,10 +602,62 @@ class GameInstance {
 	// a fresh spawn location: spread out from the origin so players never spawn
 	// inside each other's collision boxes (moveWithCollisions can't escape from
 	// inside a collider), and clear of the obstacle ring
+	// Load the artist OBJ into the scene as collision geometry (server-authoritative).
+	// Reads the file from disk and imports via a data URL (node has no static file
+	// server; xhr2 is already polyfilled at the top). Strips mtllib — collision needs
+	// geometry only. Proven headless by scripts/verify-meshmap.ts.
+	async _loadMapMesh(scene) {
+		try {
+			const fs = require('fs')
+			const obj = fs.readFileSync('public' + MAP_MESH.dir + MAP_MESH.file, 'utf8').replace(/^mtllib.*$/gm, '')
+			const res = await BABYLON.SceneLoader.ImportMeshAsync('', '', 'data:' + obj, scene, null, '.obj')
+			// upright the Z-up OBJ (rotate the whole map about X), then bake world matrices
+			// so collision uses the rotated geometry — MUST match the client (mapMesh.js).
+			const root = new BABYLON.TransformNode('mapRoot', scene)
+			res.meshes.forEach(m => { if (!m.parent) m.parent = root })
+			root.rotation.x = MAP_MESH.rotationX || 0
+			root.scaling.setAll(MAP_MESH.scale || 1)
+			root.computeWorldMatrix(true)
+			let n = 0
+			res.meshes.forEach(m => {
+				if (m.getTotalVertices && m.getTotalVertices() > 0) {
+					m.computeWorldMatrix(true)
+					if (m.refreshBoundingInfo) m.refreshBoundingInfo(true)
+					m.checkCollisions = true
+					n++
+				}
+			})
+			this.mapReady = true
+			console.log(`[map] mesh collider loaded: ${n} meshes (${MAP_MESH.file})`)
+		} catch (e) { console.error('[map] mesh load FAILED:', e) }
+	}
+
+	// diagnostic: stamp spawn pos/time on the raw entity so fall-death can report how
+	// long after spawn (and from where) a player fell.
+	_recordSpawn(raw) {
+		if (!raw) return
+		raw._spawnT = Date.now()
+		raw._spawnPos = { x: raw.x, y: raw.y, z: raw.z }
+		raw._minY = raw.y
+		raw._everGrounded = false
+		if (USE_MESH_MAP) console.log(`[spawn] nid=${raw.nid} @(${raw.x.toFixed(1)},${raw.y.toFixed(1)},${raw.z.toFixed(1)})`)
+	}
+
 	spawnPoint() {
-		const angle = Math.random() * Math.PI * 2
-		const radius = 3 + Math.random() * 5
-		return { x: Math.cos(angle) * radius, z: Math.sin(angle) * radius }
+		if (USE_MESH_MAP) {
+			// pick a floor spawn; small XZ jitter so two players don't spawn co-located.
+			// y is a hair above the floor so applyCommand gravity + mesh collision settle
+			// them cleanly.
+			const sc = MAP_MESH.scale || 1
+			const s = MAP_MESH.spawns[Math.floor(Math.random() * MAP_MESH.spawns.length)]
+			return { x: s.x * sc + (Math.random() - 0.5) * 1.2, z: s.z * sc + (Math.random() - 0.5) * 1.2, y: s.y * sc }
+		}
+		// Spawn at one of the two tower bases (Facing Worlds). Random pick among the
+		// symmetric SPAWN_POINTS with a small jitter so two players picking the same
+		// point don't spawn inside each other's collider. Server-side only (not the
+		// deterministic movement path), so Math.random is fine here.
+		const p = SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)]
+		return { x: p.x + (Math.random() - 0.5) * 2, z: p.z + (Math.random() - 0.5) * 2, y: 0 }
 	}
 
 	// Canonical damage: a player's authoritative hitpoints live on the CLIENT's
@@ -673,11 +742,12 @@ class GameInstance {
 		for (const entity of [client.rawEntity, client.smoothEntity]) {
 			if (!entity) continue
 			entity.x = spawn.x
-			entity.y = 0
+			entity.y = spawn.y || 0
 			entity.z = spawn.z
 			entity.hitpoints = 100
 			entity.isAlive = true
 			entity.velX = 0; entity.velY = 0; entity.velZ = 0
+			if (entity === client.rawEntity) this._recordSpawn(entity)
 			// Phase 4: clear any pending overheal decay so a respawn is a clean 100
 			entity.overhealDecayTimer = 0
 			// Phase 3: refresh grenades to full on respawn (mirrors the ammo reset)
@@ -712,6 +782,31 @@ class GameInstance {
 				this.respawnPlayer(client)
 			}
 		})
+
+		// Fall-death: anyone who drops below KILL_Y (walked off a ledge into the void)
+		// dies — unattributed, routed through the same death bookkeeping as a frag.
+		if (USE_MESH_MAP) {
+			const killY = KILL_Y * (MAP_MESH.scale || 1)
+			const fallKill = (raw, smooth, arm) => {
+				if (!raw) return
+				if (raw.isAlive) { raw._minY = Math.min(raw._minY ?? raw.y, raw.y); if (raw.grounded) raw._everGrounded = true }
+				if (!raw.isAlive || raw.y >= killY) return
+				const dt = raw._spawnT ? ((Date.now() - raw._spawnT) / 1000).toFixed(1) : '?'
+				const sp = raw._spawnPos ? `(${raw._spawnPos.x.toFixed(1)},${raw._spawnPos.y.toFixed(1)},${raw._spawnPos.z.toFixed(1)})` : '?'
+				console.log(`[fall] nid=${smooth.nid} died @(${raw.x.toFixed(1)},${raw.y.toFixed(1)},${raw.z.toFixed(1)}) minY=${(raw._minY ?? raw.y).toFixed(1)} everGrounded=${!!raw._everGrounded} +${dt}s after spawn ${sp}`)
+				raw.isAlive = false; smooth.isAlive = false
+				raw.velX = 0; raw.velY = 0; raw.velZ = 0
+				raw.deaths = Math.min(255, raw.deaths + 1); smooth.deaths = raw.deaths
+				arm(Date.now() + GameInstance.RESPAWN_DELAY_MS)
+				this.instance.messageAll(new Killed(smooth.nid, smooth.nid, 0, 0))
+			}
+			this.instance.clients.forEach(client => {
+				if (client.rawEntity && client.smoothEntity) fallKill(client.rawEntity, client.smoothEntity, t => { client.respawnAt = t })
+			})
+			this.bots.forEach(bot => {
+				if (bot.rawEntity) fallKill(bot.rawEntity, bot.smoothEntity, t => { bot.respawnAt = t })
+			})
+		}
 
 		// drive the bots: respawn, think, move, shoot — all through the same
 		// code paths a human's commands take

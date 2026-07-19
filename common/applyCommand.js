@@ -2,6 +2,8 @@ import { update as updateWeapon } from './weapon'
 import { Vector3, Matrix, Axis } from 'babylonjs'
 import { weapons } from './weaponsConfig'
 import nengiConfig from './nengiConfig'
+import { JUMP_PADS } from './arenaConfig'
+import { USE_MESH_MAP } from './mapMesh'
 
 /* UT99-style movement. Runs on BOTH the client (prediction) and the server
    (authoritative) — it must stay deterministic: same entity state + same
@@ -13,7 +15,8 @@ const GROUND_ACCEL = 10           // quake-style accel coefficient — snappy st
 const FRICTION = 8                // quick stops (no ice skating)
 const MAX_AIR_WISH_SPEED = 1.2    // quake-style air speed limit
 const AIR_ACCEL = 30              // quake-style air acceleration
-const JUMP_SPEED = 6.2            // JumpZ 325
+const JUMP_SPEED = 7.2            // bumped from 6.2 for a higher, floatier UT-style hop
+                                 // (apex ~1.44m vs ~1.07m; also helps clear stairs)
 const GRAVITY = 18                // 950 uu/s²
 const TERMINAL_FALL = 30
 export const DODGE_SPEED = 11.4   // dodge bursts at 1.5x GroundSpeed
@@ -120,6 +123,29 @@ export default (entity, command) => {
 		accelerate(entity, wishX, wishZ, MAX_AIR_WISH_SPEED, AIR_ACCEL, delta)
 	}
 
+	// Jump-pads (Facing Worlds tower lifts). Deterministic: static map data, fixed
+	// iteration order, reads only synced entity state (x/z/y/grounded) — never the
+	// command — so client prediction, reconciliation replay, and server authority all
+	// agree. Fires only while grounded and standing on the pad's top face; sets velY
+	// and grounded=false BEFORE gravity integrates this tick.
+	if (entity.grounded) {
+		for (let i = 0; i < JUMP_PADS.length; i++) {
+			const p = JUMP_PADS[i]
+			const topY = p.height - 0.5
+			if (
+				entity.x >= p.x - p.width * 0.5 - 0.5 && entity.x <= p.x + p.width * 0.5 + 0.5 &&
+				entity.z >= p.z - p.depth * 0.5 - 0.5 && entity.z <= p.z + p.depth * 0.5 + 0.5 &&
+				entity.y >= topY - 0.2 && entity.y <= topY + 1.2
+			) {
+				entity.velX = p.launchX
+				entity.velY = p.launchY
+				entity.velZ = p.launchZ
+				entity.grounded = false
+				break
+			}
+		}
+	}
+
 	entity.velY -= GRAVITY * delta
 	if (entity.velY < -TERMINAL_FALL) {
 		entity.velY = -TERMINAL_FALL
@@ -134,7 +160,10 @@ export default (entity, command) => {
 		entity.velY * delta,
 		entity.velZ * delta
 	))
-	if (entity.y < GROUND_Y) {
+	// Box arenas use y>=GROUND_Y as their (invisible) floor. Mesh maps have REAL floors
+	// with edges — so we DON'T clamp: players rest on the mesh via moveWithCollisions and
+	// fall off ledges into the void (the server kills them below KILL_Y). See mapMesh.js.
+	if (!USE_MESH_MAP && entity.y < GROUND_Y) {
 		entity.y = GROUND_Y
 	}
 

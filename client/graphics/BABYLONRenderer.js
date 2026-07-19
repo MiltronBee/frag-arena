@@ -1,6 +1,9 @@
 import * as BABYLON from 'babylonjs'
 import { resolveWeaponFx, classifySurface, surfaceFx, fadeAlpha } from './firingFx'
+import 'babylonjs-loaders' // OBJ loader for mesh maps
 import ArenaDressing from './arenaDressing'
+import { USE_MESH_MAP, MAP_MESH } from '../../common/mapMesh'
+import { bakeVertexColors } from './mapLights'
 
 // Blood/impact VFX — DISTINCT POOLED CLASSES (per FX consult), not one droplet
 // spray. The "dark core" rule: a bright crimson ADDITIVE mist puff sells the hot
@@ -173,14 +176,54 @@ class BABYLONRenderer {
 		// expose so character/other visuals can register themselves
 		this.scene.metadata = { shadowGenerator: this.shadowGenerator, viewmodelLight: this.viewmodelLight }
 
-		// --- equirectangular skybox (generated dusk, scripts/make-dusk-skybox.py):
-		// deep indigo zenith over a burnt-orange horizon — the arena reads dark so
-		// the shot FX carry the brightness contrast.
-		this.skydome = new BABYLON.PhotoDome('sky', '/assets/sprites/skybox_dusk.png',
-			{ resolution: 32, size: 1000 }, this.scene)
-		// PhotoDome's inner mesh is named '<name>_mesh'; keep fog off it so it isn't washed out
+		// --- SPACE VISTA (first pass): starfield dome + a day/night Earth hanging below
+		// the platform + a distant Moon. Our own composed scene from our own space
+		// textures — the Facing-Worlds "in orbit" money shot. Everything is far, fog-off,
+		// shadow-off, and inside the camera maxZ (2000) so it reads as sky, never as
+		// playfield geometry. (Kimi is tuning the proper day/night terminator + atmosphere
+		// fresnel shader; this pass is the safe blockout.)
+		this.skydome = new BABYLON.PhotoDome('sky', '/assets/space/stars.jpg',
+			{ resolution: 32, size: 3600 }, this.scene)
 		const skyMesh = this.scene.getMeshByName('sky_mesh')
 		if (skyMesh) skyMesh.applyFog = false
+
+		// EARTH — big, low, beyond the west end; its upper limb looms above the horizon.
+		// Day side lit by the sun (real terminator from the directional light); night
+		// city-lights glow via a toned emissive map (bright day diffuse keeps them subtle
+		// on the lit side — cheap-but-convincing until Kimi's terminator shader lands).
+		const earth = BABYLON.MeshBuilder.CreateSphere('earth', { diameter: 1200, segments: 64 }, this.scene)
+		earth.position.set(-360, -320, 820)
+		earth.rotation.y = 2.1
+		earth.applyFog = false
+		earth.isPickable = false
+		const earthMat = new BABYLON.StandardMaterial('earthMat', this.scene)
+		// real NASA-derived satellite day map (three.js MIT repo, public-domain imagery)
+		earthMat.diffuseTexture = new BABYLON.Texture('/assets/space/earth_day.jpg', this.scene)
+		// specular mask: oceans glint, landmasses stay matte
+		earthMat.specularTexture = new BABYLON.Texture('/assets/space/earth_spec.jpg', this.scene)
+		earthMat.specularColor = new BABYLON.Color3(0.42, 0.47, 0.58)
+		earthMat.specularPower = 96
+		// night-side city lights
+		earthMat.emissiveTexture = new BABYLON.Texture('/assets/space/earth_lights.png', this.scene)
+		earthMat.emissiveColor = new BABYLON.Color3(0.5, 0.45, 0.33)
+		earth.material = earthMat
+
+		// MOON — big and high in the black so it's caught from many sightlines, lit by
+		// the same sun as the Earth + arena.
+		const moon = BABYLON.MeshBuilder.CreateSphere('moon', { diameter: 420, segments: 32 }, this.scene)
+		moon.position.set(300, 700, -250)
+		moon.applyFog = false
+		moon.isPickable = false
+		const moonMat = new BABYLON.StandardMaterial('moonMat', this.scene)
+		moonMat.diffuseTexture = new BABYLON.Texture('/assets/space/moon.jpg', this.scene)
+		moonMat.diffuseColor = new BABYLON.Color3(1.6, 1.6, 1.65) // overbright the sunlit face
+		// self-illuminate: the raw lunar albedo map is very dark, so drive the texture
+		// through emissive too — the Moon reads as a bright disc against the black void
+		// instead of a dim smudge, while the emissive texture keeps the crater detail.
+		moonMat.emissiveTexture = new BABYLON.Texture('/assets/space/moon.jpg', this.scene)
+		moonMat.emissiveColor = new BABYLON.Color3(0.9, 0.9, 0.95)
+		moonMat.specularColor = new BABYLON.Color3(0, 0, 0)
+		moon.material = moonMat
 
 		// --- distance fog: dark slate, subtle. LINEAR fogStart 22 / fogEnd 78 was
 		// tried (2026-07-17) and reverted — in a ~60u arena it buried most of the view
@@ -231,10 +274,16 @@ class BABYLONRenderer {
 		this.scene.metadata.obstacleMaterials = this.obstacleMaterials
 		this.scene.metadata.obstacleAccentMaterials = this.obstacleAccentMaterials
 
-		// --- SciFi MegaKit arena skin (floor tiles, wall panels, columns, crates).
-		// Loads async; obstacles keep the legacy box look until attachObstacle
-		// upgrades them, and forever if the kit fails to load.
-		this.arenaDressing = new ArenaDressing(this.scene, this.shadowGenerator)
+		// --- ARENA VISUAL. Mesh maps load the artist OBJ directly as the level; box
+		// arenas use the SciFi MegaKit dressing (floor tiles, wall panels, columns).
+		if (USE_MESH_MAP) {
+			this.arenaDressing = null
+			this._loadMeshMap()
+		} else {
+			// Loads async; obstacles keep the legacy box look until attachObstacle
+			// upgrades them, and forever if the kit fails to load.
+			this.arenaDressing = new ArenaDressing(this.scene, this.shadowGenerator)
+		}
 
 		// --- shot FX are POOLED. Creating meshes/materials mid-frame races the shader
 		// + VAO compilation and crashes the GL bind on strict drivers (e.g. SwiftShader).
@@ -366,6 +415,72 @@ class BABYLONRenderer {
 		this._pool.ground[0].material.forceCompilation(this._pool.ground[0])
 
 		this.scene.executeWhenReady(() => { console.log('SCENE READY') })
+	}
+
+	// Load the artist OBJ map as the level visual (mesh maps): textured via the MTL
+	// (web-optimized WebP set in MAP_MESH.dir/textures/), lit by the original 1999
+	// light actors baked into vertex colors. Server owns collision.
+	_loadMeshMap() {
+		BABYLON.SceneLoader.ImportMeshAsync('', MAP_MESH.dir, MAP_MESH.file, this.scene)
+			.then(res => {
+				// upright the Z-up OBJ — MUST match the server's rotation (mapMesh.js) so
+				// the visual floor and the collision floor line up to the millimeter.
+				const root = new BABYLON.TransformNode('mapRoot', this.scene)
+				res.meshes.forEach(m => { if (!m.parent) m.parent = root })
+				root.rotation.x = MAP_MESH.rotationX || 0
+				root.scaling.setAll(MAP_MESH.scale || 1)
+				root.computeWorldMatrix(true)
+				const shadowList = this.shadowGenerator ? this.shadowGenerator.getShadowMap().renderList : null
+				res.meshes.forEach(m => {
+					if (!m.getTotalVertices || m.getTotalVertices() === 0) return
+					m.computeWorldMatrix(true)
+					if (m.refreshBoundingInfo) m.refreshBoundingInfo(true)
+					m.isPickable = false
+					// MUST collide: the client predicts its own movement with
+					// moveWithCollisions and needs the same floors/walls the server has,
+					// or prediction falls through the map (juddery "falling" feel).
+					m.checkCollisions = true
+					m.receiveShadows = true
+					if (shadowList) shadowList.push(m)
+				})
+				// Flat fill scoped to the map only: the sun is directional so interiors
+				// would render near-black, but the 1999 light-actor bake (vertex colors)
+				// IS the interior lighting — it needs a constant base to modulate.
+				// diffuse == groundColor makes the fill normal-independent; players keep
+				// the dramatic sun/hemi rig and still cast shadows onto sunlit floors.
+				const mapFill = new BABYLON.HemisphericLight('mapFill', new BABYLON.Vector3(0, 1, 0), this.scene)
+				mapFill.diffuse = new BABYLON.Color3(1, 1, 1)
+				mapFill.groundColor = new BABYLON.Color3(1, 1, 1)
+				mapFill.specular = new BABYLON.Color3(0, 0, 0)
+				mapFill.intensity = 0.85
+				mapFill.includedOnlyMeshes = res.meshes.filter(m => m.getTotalVertices && m.getTotalVertices() > 0)
+				console.log('[map] mesh visual loaded:', res.meshes.length)
+				this._bakeMapLights(res.meshes)
+			})
+			.catch(err => console.warn('[map] mesh visual load failed', err))
+	}
+
+	// Fetch the map's light-actor sidecar and bake it into vertex colors. Vertex
+	// buffers are LOCAL (same Z-up meter space as the JSON), so this is independent
+	// of the mapRoot rotation/scale and can run any time after import. Failure is
+	// cosmetic-only: the map just stays uniformly lit.
+	async _bakeMapLights(meshes) {
+		if (!MAP_MESH.lights) return
+		try {
+			const resp = await fetch(MAP_MESH.dir + MAP_MESH.lights)
+			if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+			const data = await resp.json()
+			let baked = 0
+			meshes.forEach(m => {
+				if (!m.getTotalVertices || m.getTotalVertices() === 0) return
+				const pos = m.getVerticesData(BABYLON.VertexBuffer.PositionKind)
+				const nor = m.getVerticesData(BABYLON.VertexBuffer.NormalKind)
+				if (!pos || !nor) return
+				m.setVerticesData(BABYLON.VertexBuffer.ColorKind, bakeVertexColors(pos, nor, data.lights))
+				baked++
+			})
+			console.log(`[map] baked ${data.lights.length} light actors into ${baked} meshes`)
+		} catch (err) { console.warn('[map] light bake failed (map stays unlit-shaded)', err) }
 	}
 
 	_loadTex(url) {

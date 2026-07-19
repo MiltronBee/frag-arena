@@ -117,9 +117,10 @@ class BotController {
 			const wanderDone = this.wander &&
 				Math.hypot(this.wander.x - me.x, this.wander.z - me.z) < 1.5
 			if (!this.wander || wanderDone || now >= this.wanderUntil) {
-				const angle = Math.random() * Math.PI * 2
-				const radius = 3 + Math.random() * 9
-				this.wander = { x: Math.cos(angle) * radius, z: Math.sin(angle) * radius }
+				// Roam the central valley of the long Facing Worlds platform: a wide X
+				// band (tower-to-tower) but clear of the tower footprints (|x|>=42) and
+				// the side walls (|z|<20). Bots don't climb towers, so keep them in play.
+				this.wander = { x: (Math.random() * 2 - 1) * 32, z: (Math.random() * 2 - 1) * 15 }
 				this.wanderUntil = now + 4000
 			}
 			wishYaw = Math.atan2(this.wander.x - me.x, this.wander.z - me.z)

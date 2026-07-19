@@ -5,7 +5,7 @@ const b = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', hea
 const p = await b.newPage()
 await p.setViewport({ width: 1280, height: 800 })
 const errs = []; p.on('pageerror', (e) => errs.push(e.message.slice(0, 160)))
-await p.goto('http://localhost:8080/', { waitUntil: 'domcontentloaded' })
+await p.goto(process.argv[2] || 'http://localhost:8080/', { waitUntil: 'domcontentloaded' })
 await new Promise((r) => setTimeout(r, 1500))
 await p.keyboard.press('Enter') // dismiss splash
 await p.waitForFunction(() => {
@@ -22,7 +22,7 @@ console.log('menu-settings:', await p.evaluate(() => JSON.stringify({
   kicker: document.getElementById('settings-kicker').textContent,
   lock: !!document.pointerLockElement,
 })))
-await p.screenshot({ path: '/tmp/probe-menu-settings.png' })
+await p.screenshot({ path: '/tmp/probe-menu-settings-live.png' })
 
 // 2) BACK, then PLAY → must enter arena
 await p.click('#resume-game')
@@ -41,6 +41,6 @@ console.log('paused:', await p.evaluate(() => JSON.stringify({
   card: document.getElementById('settings-menu').className,
   kicker: document.getElementById('settings-kicker').textContent,
 })))
-await p.screenshot({ path: '/tmp/probe-pause-settings.png' })
+await p.screenshot({ path: '/tmp/probe-pause-settings-live.png' })
 console.log('errors:', errs.length ? errs : 'none')
 await b.close()

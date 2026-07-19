@@ -1,0 +1,765 @@
+# materials for DM-W-Grove-2025
+
+newmtl Aminuxer-github
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Aminuxer-github.webp
+
+newmtl Ancient_Base_A_bsa
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Ancient_Base_A_bsa.webp
+
+newmtl Ancient_Base_BRIXGBAS
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Ancient_Base_BRIXGBAS.webp
+
+newmtl Ancient_Base_CRAGGY3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Ancient_Base_CRAGGY3.webp
+
+newmtl Ancient_Base_CRUNCHYA
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Ancient_Base_CRUNCHYA.webp
+
+newmtl Ancient_Deco_Godes-t
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Ancient_Deco_Godes-t.webp
+
+newmtl Ancient_Deco_hyro6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Ancient_Deco_hyro6.webp
+
+newmtl ChizraEFX_wfall2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/ChizraEFX_wfall2.webp
+
+newmtl Crypt_Mask_C_chnm2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Crypt_Mask_C_chnm2.webp
+
+newmtl Crypt2_Floor_C_flr13
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Crypt2_Floor_C_flr13.webp
+
+newmtl Crypt2_Panel_C_wPnl4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Crypt2_Panel_C_wPnl4.webp
+
+newmtl DecayedS_Base_Base2a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Base_Base2a.webp
+
+newmtl DecayedS_Base_Dterbas1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Base_Dterbas1.webp
+
+newmtl DecayedS_Ceiling_Hexwall2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Ceiling_Hexwall2.webp
+
+newmtl DecayedS_Deco_Wire2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Deco_Wire2.webp
+
+newmtl Detail_Rough
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Detail_Rough.webp
+
+newmtl Detail_dripple
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Detail_dripple.webp
+
+newmtl Detail_glasgrid
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Detail_glasgrid.webp
+
+newmtl Detail_hatch
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Detail_hatch.webp
+
+newmtl Detail_metalfine
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Detail_metalfine.webp
+
+newmtl Faces_Bane
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Faces_Bane.webp
+
+newmtl Faces_GORN
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Faces_GORN.webp
+
+newmtl Faces_MAKALAI
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Faces_MAKALAI.webp
+
+newmtl Faces_RAMIREZ
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Faces_RAMIREZ.webp
+
+newmtl Faces_cryss
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Faces_cryss.webp
+
+newmtl Faces_ivana
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Faces_ivana.webp
+
+newmtl Faces_nikita
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Faces_nikita.webp
+
+newmtl FractalFX_jptrimA_00
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/FractalFX_jptrimA_00.webp
+
+newmtl GenIn_Deco_Ribroof
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/GenIn_Deco_Ribroof.webp
+
+newmtl Indus1_Ulight1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus1_Ulight1.webp
+
+newmtl Indus3_ralPanl1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus3_ralPanl1.webp
+
+newmtl Indus5_Galleon_PoleWood1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus5_Galleon_PoleWood1.webp
+
+newmtl Indus5_Galleon_RufWod1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus5_Galleon_RufWod1a.webp
+
+newmtl Indus5_Galleon_ShpWood1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus5_Galleon_ShpWood1.webp
+
+newmtl Indus5_Galleon_ShpWood4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus5_Galleon_ShpWood4.webp
+
+newmtl Indus5_Galleon_ShpWood6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus5_Galleon_ShpWood6.webp
+
+newmtl Indus5_Galleon_ShpWood9
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus5_Galleon_ShpWood9.webp
+
+newmtl Indus6_Sky1_SkySetB_back
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus6_Sky1_SkySetB_back.webp
+
+newmtl Indus6_Sky1_SkySetB_front
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus6_Sky1_SkySetB_front.webp
+
+newmtl Indus6_Sky1_SkySetB_left
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus6_Sky1_SkySetB_left.webp
+
+newmtl Indus6_Sky1_SkySetB_right
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus6_Sky1_SkySetB_right.webp
+
+newmtl Indus6_Woods_DeckRf1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus6_Woods_DeckRf1.webp
+
+newmtl Indus6_Woods_ShpBanr1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus6_Woods_ShpBanr1.webp
+
+newmtl Indus6_Woods_ShpBanr2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus6_Woods_ShpBanr2.webp
+
+newmtl Indus6_Woods_ShpBeam2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus6_Woods_ShpBeam2.webp
+
+newmtl Indus6_Woods_rBedHang
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus6_Woods_rBedHang.webp
+
+newmtl Indus7_Offline_A00
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus7_Offline_A00.webp
+
+newmtl Md
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Md.webp
+
+newmtl Metalmys_MysLite5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Metalmys_MysLite5.webp
+
+newmtl Metalmys_floor4_2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Metalmys_floor4_2.webp
+
+newmtl NaliFX_ShaneFx_TORCHES2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/NaliFX_ShaneFx_TORCHES2.webp
+
+newmtl Periodic-Table-Mendeleev
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Periodic-Table-Mendeleev.webp
+
+newmtl PlayrShp_Deco_Slotted2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/PlayrShp_Deco_Slotted2.webp
+
+newmtl PlayrShp_Door_DOOR2_30
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/PlayrShp_Door_DOOR2_30.webp
+
+newmtl RainFX_Amcrat1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/RainFX_Amcrat1.webp
+
+newmtl RainFX_Amcrat2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/RainFX_Amcrat2.webp
+
+newmtl RainFX_Amcrat3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/RainFX_Amcrat3.webp
+
+newmtl RainFX_Amcrat4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/RainFX_Amcrat4.webp
+
+newmtl RainFX_AmcratEnd
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/RainFX_AmcratEnd.webp
+
+newmtl RainFX_Amcrattop
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/RainFX_Amcrattop.webp
+
+newmtl SKYBox_Effects_NCld
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/SKYBox_Effects_NCld.webp
+
+newmtl SkyCity_Window_swindoZ1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/SkyCity_Window_swindoZ1.webp
+
+newmtl SkyCity_Window_swindoZ2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/SkyCity_Window_swindoZ2.webp
+
+newmtl Slums_Brick_LitWinC1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Slums_Brick_LitWinC1.webp
+
+newmtl Soldierskins_RawS5Arkon
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Soldierskins_RawS5Arkon.webp
+
+newmtl Soldierskins_RawS5Manwell
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Soldierskins_RawS5Manwell.webp
+
+newmtl Soldierskins_Sldr5Rankin
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Soldierskins_Sldr5Rankin.webp
+
+newmtl Soldierskins_blkt5Othello
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Soldierskins_blkt5Othello.webp
+
+newmtl Soldierskins_hkil5Matrix
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Soldierskins_hkil5Matrix.webp
+
+newmtl Starship_Base_sh_bs4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Starship_Base_sh_bs4.webp
+
+newmtl UT_cementf1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UT_cementf1.webp
+
+newmtl UT_stoneb2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UT_stoneb2.webp
+
+newmtl UT_wchip1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UT_wchip1.webp
+
+newmtl UTMenu_Skins_DoorL
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTMenu_Skins_DoorL.webp
+
+newmtl UTMenu_Skins_DoorR
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTMenu_Skins_DoorR.webp
+
+newmtl UTtech1_Base_Rbase1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech1_Base_Rbase1a.webp
+
+newmtl UTtech1_Base_cbutbase_3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech1_Base_cbutbase_3.webp
+
+newmtl UTtech1_Base_drtpanelBASE
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech1_Base_drtpanelBASE.webp
+
+newmtl UTtech1_Door_doorC2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech1_Door_doorC2.webp
+
+newmtl UTtech1_Floor_rClfFlr1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech1_Floor_rClfFlr1.webp
+
+newmtl UTtech1_Panel_Mys_pan1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech1_Panel_Mys_pan1.webp
+
+newmtl UTtech1_Wall_ClifBrk1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech1_Wall_ClifBrk1.webp
+
+newmtl UTtech1_Wall_ClifCon7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech1_Wall_ClifCon7.webp
+
+newmtl UTtech1_Wall_Cliffbr5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech1_Wall_Cliffbr5.webp
+
+newmtl UTtech1_Wall_Cliffbrk7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech1_Wall_Cliffbrk7.webp
+
+newmtl UTtech2_Base_rClfBsG2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Base_rClfBsG2.webp
+
+newmtl UTtech2_Base_rClfBsG3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Base_rClfBsG3.webp
+
+newmtl UTtech2_Base_rClfBsY2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Base_rClfBsY2.webp
+
+newmtl UTtech2_Ceiling_rClfClg2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Ceiling_rClfClg2.webp
+
+newmtl UTtech2_Pillar_rClfLT4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Pillar_rClfLT4.webp
+
+newmtl UTtech2_Pillar_rClfPlr4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Pillar_rClfPlr4.webp
+
+newmtl UnrealI_Effect13_fireeffect13
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+Ke 1.000 0.450 0.100
+map_Kd textures/UnrealI_Effect13_fireeffect13.webp
+
+newmtl UnrealShare_Belt_fx_ShieldBelt_newblue
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UnrealShare_Belt_fx_ShieldBelt_newblue.webp
+
+newmtl UnrealShare_Skins_JSeaWeed1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UnrealShare_Skins_JSeaWeed1.webp
+
+newmtl Wall_01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Wall_01.webp
+
+newmtl Wall_02
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Wall_02.webp
+
+newmtl Wall_03
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Wall_03.webp
+
+newmtl Wood_PK1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Wood_PK1.webp
+
+newmtl Wood_sid
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Wood_sid.webp
+
+newmtl chem-work-1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/chem-work-1.webp
+
+newmtl city_Win-gray
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/city_Win-gray.webp
+
+newmtl door_02
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/door_02.webp
+
+newmtl eol_EMarble2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/eol_EMarble2.webp
+
+newmtl eol_EMarble3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/eol_EMarble3.webp
+
+newmtl eol_EMarble6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/eol_EMarble6.webp
+
+newmtl eol_EMarble7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/eol_EMarble7.webp
+
+newmtl floor_01_center
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/floor_01_center.webp
+
+newmtl paper-journal
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/paper-journal.webp
+
+newmtl radiaki-3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/radiaki-3.webp
