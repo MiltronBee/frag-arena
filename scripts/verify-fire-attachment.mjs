@@ -78,13 +78,18 @@ try {
   // sample hand->gun distance once per render frame for `ms` milliseconds.
   // Uses the pack's own bones: hand_l (skinned left hand) vs the weapon armature
   // root; distances are in model units (centimeters for these GLBs).
-  const trackAttachment = (ms) => page.evaluate((durationMs) => new Promise((resolve) => {
+  const trackAttachment = (ms, refName) => page.evaluate(({ durationMs, refName }) => new Promise((resolve) => {
     const simulator = window.gameClient.simulator
     const scene = simulator.renderer.scene
     const vm = simulator.viewmodel
     const find = (name) => scene.transformNodes.find(
       (n) => n.name === name && (!n.isDisposed || !n.isDisposed()))
-    const gun = find('Rifle_01_Armature') || find('Pistol_01_Armature') ||
+    // Reference node the support hand should ride. Default = the gun armature root.
+    // The pump-action Shotgun's support hand rides the sliding fore-end, so it must be
+    // measured against the pump bone ('Forearm'): relative to the receiver/root it
+    // travels the full authored pump stroke every shot, which is NOT a detachment.
+    const gun = (refName && find(refName)) ||
+      find('Rifle_01_Armature') || find('Pistol_01_Armature') ||
       scene.transformNodes.find((n) => /_?Armature$/.test(n.name) &&
         n.name !== 'Arms_Armature' && (!n.isDisposed || !n.isDisposed()))
     const hand = find('hand_l')
@@ -108,17 +113,20 @@ try {
         mean: samples.reduce((a, b) => a + b, 0) / samples.length,
       })
     }, durationMs)
-  }), ms)
+  }), { durationMs: ms, refName })
 
   // ---- A) two-handed weapons: hand tracks the gun through a burst ----
+  // The Shotgun is pump-action: its support hand rides the sliding fore-end, so it is
+  // measured against the pump bone ('Forearm') rather than the receiver root.
   for (const [index, name] of [[0, 'rifle'], [1, 'smg'], [2, 'shotgun']]) {
+    const ref = name === 'shotgun' ? 'Forearm' : null
     await switchTo(index)
-    const idle = await trackAttachment(900)
+    const idle = await trackAttachment(900, ref)
     await setInput({ mouseDown: true })
-    const firing = await trackAttachment(1400)
+    const firing = await trackAttachment(1400, ref)
     await setInput({ mouseDown: false })
     await sleep(1200)
-    const settled = await trackAttachment(900)
+    const settled = await trackAttachment(900, ref)
 
     const ok = idle && firing && settled
     // the authored clips keep the hand ON the gun: the hand->gun distance range

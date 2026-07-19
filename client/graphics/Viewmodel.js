@@ -249,6 +249,9 @@ export default class Viewmodel {
 
     // wire up animation clips if this model has them
     const anims = this.spec.anims || {}
+    // per-weapon playback speed multiplier for one-shot clips (fire/draw/aim/fire_aiming);
+    // 1.0 = authored speed. The Shotgun bumps this so its pump/aim read snappier.
+    this._animSpeed = this.spec.animSpeed || 1.0
     result.animationGroups.forEach((g) => { g.stop(); this.groups[g.name] = g })
     this.idleAnim = this.groups[anims.idle]
     // The fire clip must play UNFILTERED: the pack bakes the arms' IK at export,
@@ -368,7 +371,7 @@ export default class Viewmodel {
       this._onEndOnce(this.drawAnim, gen, () => {
         this._settleAfterClip() // enter ADS if aim is held, else hip idle
       })
-      this.drawAnim.start(false, 1.0)
+      this.drawAnim.start(false, this._animSpeed)
     } else {
       this._setState(S.IDLE)
       this._startIdleLoop()
@@ -434,7 +437,7 @@ export default class Viewmodel {
       if (this._aimWanted) this._enterAimed()
       else this._enterAimOut() // released mid-transition -> clean reversible exit
     })
-    this.aimStartAnim.start(false, 1.0)
+    this.aimStartAnim.start(false, this._animSpeed)
   }
 
   _enterAimed() {
@@ -455,7 +458,7 @@ export default class Viewmodel {
       if (this._aimWanted) this._enterAimIn() // re-pressed during exit
       else { this._setState(S.IDLE); this._startIdleLoop() }
     })
-    this.aimEndAnim.start(false, 1.0)
+    this.aimEndAnim.start(false, this._animSpeed)
   }
 
   // pick breathing (stationary) vs walk (moving) aimed loop; only swaps on change.
@@ -467,7 +470,7 @@ export default class Viewmodel {
     const on = moving ? this.walkAimingAnim : this.breathingAimingAnim
     const off = moving ? this.breathingAimingAnim : this.walkAimingAnim
     if (off) off.stop()
-    if (on) { on.stop(); on.start(true, 1.0) }
+    if (on) { on.stop(); on.start(true, this._animSpeed) }
   }
 
   get isReloading() { return this._state === S.RELOADING }
@@ -540,7 +543,7 @@ export default class Viewmodel {
     const normalDuration = this.reloadAnim.to - this.reloadAnim.from
     const reloadTime = this.spec.reloadTime || 1.5
     const speedRatio = normalDuration / reloadTime
-    this.reloadAnim.start(false, speedRatio)
+    this.reloadAnim.start(false, speedRatio * this._animSpeed)
     return true
   }
 
@@ -610,7 +613,7 @@ export default class Viewmodel {
         if (this._aimWanted) this._enterAimed()
         else this._enterAimOut()
       })
-      this.fireAimingAnim.start(false, 1.0)
+      this.fireAimingAnim.start(false, this._animSpeed)
       return
     }
 
@@ -628,7 +631,7 @@ export default class Viewmodel {
       if (this._state !== S.FIRING || !this._wantActive) return
       this._settleAfterClip() // enter ADS if aim is held (fixes zoom-but-no-aim), else idle
     })
-    this.fireAnim.start(false, 1.0)
+    this.fireAnim.start(false, this._animSpeed)
   }
 
   update(delta, moving, adsT = 0) {

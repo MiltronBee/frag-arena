@@ -3,7 +3,7 @@
 // textures + vertex-bake + coronas). World coords = native(ROTX=-90) * 0.65 scale.
 import puppeteer from 'puppeteer-core'
 import fs from 'fs'
-const URL = 'http://localhost:8080/'
+const URL = process.env.FRAG_URL || "http://localhost:8080/"
 const OUT = process.env.HOME + '/unreal/_work/map-shots'
 fs.mkdirSync(OUT, { recursive: true })
 const CHROME = process.env.CHROME_BIN || '/usr/bin/google-chrome'

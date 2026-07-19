@@ -67,6 +67,29 @@ class BABYLONRenderer {
 	constructor() {
 		this.engine = new BABYLON.Engine(document.getElementById('main-canvas'), true)
 		this.engine.enableOfflineSupport = false
+
+		// --- adaptive render-resolution cap ---------------------------------------
+		// Babylon renders the world at (canvas CSS size / hardwareScalingLevel). With
+		// adaptToDeviceRatio=false (above) that means CSS-pixel resolution — so on a
+		// 4K monitor the arena is drawn at ~8M px/frame purely as fill cost. Cap the
+		// rendered pixel count to a budget and let the browser upscale the canvas;
+		// invisible in motion, big frame-time recovery on large/weak displays. We
+		// never scale ABOVE CSS res (level >= 1) — supersampling only costs perf.
+		// NOTE: this also installs the ONLY window-resize handler the game had — the
+		// main client never called engine.resize(), so resizing the window used to
+		// distort the view. setHardwareScalingLevel() calls engine.resize() for us.
+		this._pixelBudget = /Mobi|Android/i.test((typeof navigator !== 'undefined' && navigator.userAgent) || '')
+			? 1280 * 720   // mobile: cap at 720p-equivalent
+			: 1920 * 1080  // desktop: cap at 1080p-equivalent
+		this._applyRenderScale = () => {
+			const el = document.getElementById('main-canvas')
+			const cssW = (el && el.clientWidth) || window.innerWidth || 1280
+			const cssH = (el && el.clientHeight) || window.innerHeight || 720
+			const level = Math.max(1, Math.sqrt((cssW * cssH) / this._pixelBudget))
+			this.engine.setHardwareScalingLevel(level)
+		}
+		this._applyRenderScale()
+		window.addEventListener('resize', this._applyRenderScale)
 		this.scene = new BABYLON.Scene(this.engine)
 		this.scene.collisionsEnabled = true
 		this.scene.detachControl() // we're doing our own camera!
@@ -133,6 +156,24 @@ class BABYLONRenderer {
 		this.shadowGenerator.useBlurExponentialShadowMap = true
 		this.shadowGenerator.blurKernel = 16
 		sun.shadowOrthoScale = 0.35
+		// --- freeze the static shadow map -----------------------------------------
+		// EVERYTHING that casts a shadow here is static geometry: the arena map mesh
+		// (see the map loader below) and the arena dressing instances. No player,
+		// projectile, or dynamic entity is ever added to the shadow renderList. Yet
+		// the sun is fixed and the geometry never moves — so re-rendering the shadow
+		// map AND running its blur-exponential pass every single frame is pure waste
+		// (it was a top per-frame cost and a source of the periodic jank). Switch the
+		// map to RENDER_ONCE: it bakes a single time once geometry exists and then
+		// costs nothing per frame. _refreshStaticShadows() forces one more bake and
+		// is called after each async load (map mesh + dressing) settles.
+		this.shadowGenerator.getShadowMap().refreshRate =
+			BABYLON.RenderTargetTexture.REFRESHRATE_RENDER_ONCE
+		// Fallback re-bakes covering async geometry (arena dressing / late imports) on
+		// either arena path. A handful of extra shadow renders in the first few seconds
+		// is negligible; after that the map is frozen for the rest of the match.
+		setTimeout(() => this._refreshStaticShadows(), 500)
+		setTimeout(() => this._refreshStaticShadows(), 1500)
+		setTimeout(() => this._refreshStaticShadows(), 3500)
 		// a bright light that lights ONLY the first-person viewmodel (from the camera's
 		// side), so arms/gun are always legible even when the scene key light is behind
 		// them. Viewmodels register their meshes into includedOnlyMeshes.
@@ -329,6 +370,7 @@ class BABYLONRenderer {
 		this._blood = [] // active blood particles (mist/streak/drop), simulated in update()
 		this._groundPools = [] // active floor blood pools, simulated in update()
 		this._bloodVelScratch = new BABYLON.Vector3() // reused so the sim never allocates
+		this._casingScratch = new BABYLON.Vector3() // ditto for airborne-casing integration
 		// scratch for orienting velocity-stretched streaks at spawn (no per-frame alloc)
 		this._svUp = new BABYLON.Vector3()
 		this._svFwd = new BABYLON.Vector3()
@@ -455,6 +497,8 @@ class BABYLONRenderer {
 				mapFill.intensity = 0.85
 				mapFill.includedOnlyMeshes = res.meshes.filter(m => m.getTotalVertices && m.getTotalVertices() > 0)
 				console.log('[map] mesh visual loaded:', res.meshes.length)
+				// arena geometry now exists — bake it into the frozen shadow map.
+				this._refreshStaticShadows()
 				this._bakeMapLights(res.meshes, root)
 			})
 			.catch(err => console.warn('[map] mesh visual load failed', err))
@@ -565,6 +609,16 @@ class BABYLONRenderer {
 		const tex = new BABYLON.Texture(url, this.scene)
 		tex.hasAlpha = true
 		return tex
+	}
+
+	// Force the RENDER_ONCE shadow map to bake one more frame. Called whenever static
+	// shadow-casting geometry is added asynchronously (map mesh / arena dressing), so
+	// the frozen shadow map picks up geometry that didn't exist at the first bake.
+	// resetRefreshCounter() re-arms the single render; cheap and idempotent to call.
+	_refreshStaticShadows() {
+		if (!this.shadowGenerator) return
+		const map = this.shadowGenerator.getShadowMap()
+		if (map && map.resetRefreshCounter) map.resetRefreshCounter()
 	}
 
 	// a pooled sprite quad with its OWN additive material (texture shared across the
@@ -1075,8 +1129,8 @@ class BABYLONRenderer {
 				continue
 			}
 			c.vel.y -= 9.8 * dt
-			c.mesh.position.addInPlace(c.vel.scale(dt))
-			c.mesh.rotation.addInPlace(c.spin.scale(dt))
+			c.mesh.position.addInPlace(this._casingScratch.copyFrom(c.vel).scaleInPlace(dt))
+			c.mesh.rotation.addInPlace(this._casingScratch.copyFrom(c.spin).scaleInPlace(dt))
 			if (!c.bounced && c.mesh.position.y < -0.97) {
 				c.mesh.position.y = -0.97
 				c.vel.y = Math.abs(c.vel.y) * 0.3

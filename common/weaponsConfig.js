@@ -11,8 +11,10 @@ const authoredMount = {
 // this.fov / the user FOV setting); in/out are the zoom transition seconds; the
 // sensitivity multiplier scales look speed while aimed (never mutates the stored
 // setting). These are iron sights — modest zoom, not a scope.
-// Shotgun/Flak deliberately OMIT ads (no breathing_aiming source + the documented
-// shotgun base-orientation blocker), so they stay hip-fire only.
+// The Shotgun opts in as of the 17-clip retro rebuild (breathing_aiming/fire_aiming et
+// al. are now present, built from the pack's bone-family gun actions so they orient
+// correctly and the hands follow the gun). Flak reuses the same shotgun GLB but stays
+// deliberately hip-fire ("own the doorway" burst identity).
 const adsAnims = {
   aimStart: 'aim_start', aimPose: 'aim_pose', aimEnd: 'aim_end',
   fireAiming: 'fire_aiming', breathingAiming: 'breathing_aiming', walkAiming: 'walk_aiming'
@@ -107,11 +109,21 @@ export const weapons = [
     name: 'Shotgun',
     url: '/assets/weapons/retro_shotgun_arms.glb',
     ...authoredMount,
-    // fire: null — the shipped 4-clip shotgun's fire clip moves the gun through the
-    // pump-rack without re-baked arms, detaching it ~12cm from the hands every shot
-    // (scripts/retro-blend-actions.json notes.shotgunFireGrip). Procedural recoil
-    // (recoilForce below) carries the shot feel instead; idle keeps the grip glued.
-    anims: { ...authoredMount.anims, draw: null, fire: null },
+    // Full 17-clip retro GLB built from the pack's BONE-family gun actions (shotgun01_*):
+    // correctly oriented at bind (no rig rotation needed) and the arms' hand-IK follows
+    // them, so fire pumps + reload feed with the hands ON the gun. (The object-family
+    // movement_* sway is intentionally not used — the exporter mis-bases it 90deg and the
+    // arms can't follow it; procedural bob covers locomotion sway anyway.) ADS uses the
+    // aim_* / *_aiming clips; recoilForce still adds procedural kick.
+    ...withAds(82, 0.10, 0.08),
+    // play the pump/aim one-shots a touch faster than authored so the shotgun reads
+    // snappier (both hands + gun scale together, so they stay synced).
+    animSpeed: 1.3,
+    // aimed framing: raise the two-hand grip up + forward toward the crosshair while
+    // aimed (blended from the hip mount by the aim amount). The shotgun rig ships no
+    // arms-aim pose, so ADS is a grip-hold raise + world-camera FOV zoom rather than a
+    // per-bone sight alignment. Presentation only; never touches the aim ray.
+    adsMount: { position: { x: 0.0, y: 0.06, z: 0.10 }, rotation: { x: 0, y: Math.PI / 2, z: 0 } },
     muzzle: { x: 0.08, y: -0.15, z: 1.05 },
     recoilForce: 2.2,
     drawTime: 0.40,
@@ -236,10 +248,9 @@ export const weapons = [
     name: 'Flak',
     url: '/assets/weapons/retro_shotgun_arms.glb',
     ...authoredMount,
-    // fire/draw nulled to match base Shotgun: those retro-shotgun clips rack the
-    // pump without re-baked arms and detach the gun ~12cm; procedural recoil carries
-    // the shot, idle keeps the grip glued (see slot 2 note).
-    anims: { ...authoredMount.anims, fire: null, draw: null },
+    // Shares the Shotgun's 17-clip GLB (bone-family, correctly oriented, hands follow the
+    // gun — see slot 2). Deliberately NO ads block: Flak stays hip-fire (its "own the
+    // doorway" burst identity) — a clean choice, not a half state.
     muzzle: { x: 0.08, y: -0.15, z: 1.05 },
     recoilForce: 2.2,
     drawTime: 0.40,
