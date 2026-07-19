@@ -39,6 +39,8 @@ try {
     { name: 'map-overview',  x: 4, z: -4, y: 32, yaw: 0, pitch: -1.1 },
     { name: 'map-eye',       x: -3.4, z: -3.6, y: 12.6, yaw: Math.PI/2, pitch: 0 },
     { name: 'map-eye2',      x: 4.4, z: 12.5, y: 10.6, yaw: Math.PI, pitch: 0 },
+    { name: 'grotto',        x: -8.2, z: -10.5, y: 5.2, yaw: -Math.PI/2, pitch: -0.4 },
+    { name: 'torch-hall',    x: 0.1, z: 22.3, y: -0.2, yaw: 0, pitch: -0.35 },
   ]
   for (const v of views) {
     await page.evaluate((v) => {

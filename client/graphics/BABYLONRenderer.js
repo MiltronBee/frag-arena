@@ -455,7 +455,7 @@ class BABYLONRenderer {
 				mapFill.intensity = 0.85
 				mapFill.includedOnlyMeshes = res.meshes.filter(m => m.getTotalVertices && m.getTotalVertices() > 0)
 				console.log('[map] mesh visual loaded:', res.meshes.length)
-				this._bakeMapLights(res.meshes)
+				this._bakeMapLights(res.meshes, root)
 			})
 			.catch(err => console.warn('[map] mesh visual load failed', err))
 	}
@@ -464,7 +464,7 @@ class BABYLONRenderer {
 	// buffers are LOCAL (same Z-up meter space as the JSON), so this is independent
 	// of the mapRoot rotation/scale and can run any time after import. Failure is
 	// cosmetic-only: the map just stays uniformly lit.
-	async _bakeMapLights(meshes) {
+	async _bakeMapLights(meshes, mapRoot) {
 		if (!MAP_MESH.lights) return
 		try {
 			const resp = await fetch(MAP_MESH.dir + MAP_MESH.lights)
@@ -480,7 +480,85 @@ class BABYLONRenderer {
 				baked++
 			})
 			console.log(`[map] baked ${data.lights.length} light actors into ${baked} meshes`)
+			this._addLightCoronas(data.lights, mapRoot)
 		} catch (err) { console.warn('[map] light bake failed (map stays unlit-shaded)', err) }
+	}
+
+	// Retro-style coronas: an additive billboard glow at each interesting light actor
+	// (colored or notably bright). Positions are computed straight into world space
+	// (rotX -90: (x,y,z) -> (x, z, -y), then map scale) instead of parenting to
+	// mapRoot — Babylon 4.0 billboards misbehave under rotated parents. Depth-TESTED
+	// but not depth-written: glows hide correctly behind walls and never punch holes
+	// in other transparents. Pulse/flicker types get a cheap sin/jitter scale wobble.
+	_addLightCoronas(lights, mapRoot) {
+		const colored = l => l.rgb && (l.rgb[0] !== 1 || l.rgb[1] !== 1 || l.rgb[2] !== 1)
+		// colored lights outrank white ones — they're the atmosphere; whites only
+		// make the cut when genuinely bright (fixture-style)
+		const score = l => l.brightness + (colored(l) ? 1000 : 0)
+		const ranked = lights
+			.filter(l => (colored(l) && l.brightness >= 32) || l.brightness >= 110)
+			.sort((a, b) => score(b) - score(a))
+		// greedy spatial dedupe: the sidecar has dense same-light grids (e.g. a lava
+		// pool of 160+ identical strobes) — one corona per ~2m cell reads as a glow
+		// field instead of a single blown-out blob
+		const picks = []
+		for (const l of ranked) {
+			if (picks.length >= 64) break
+			const p = l.pos_m
+			if (picks.some(k => {
+				const q = k.pos_m
+				return (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2 < 1.8 ** 2
+			})) continue
+			picks.push(l)
+		}
+		if (!picks.length) return
+		// Reuse the game's proven soft-glow PNG (the muzzle halo sprite) for the
+		// falloff instead of a DynamicTexture. On Babylon 4.0.3 a DynamicTexture-as-
+		// opacityTexture under ALPHA_ADD renders nothing, and as an emissiveTexture it
+		// reads as a flat bright square (the gradient doesn't shape the additive add).
+		// A real PNG's alpha channel works fine as opacityTexture (the whole _makeSprite
+		// FX system relies on it), so we take the same tinted-sprite recipe: the PNG's
+		// soft radial alpha shapes the glow, emissiveColor carries the per-light tint.
+		const glowTex = this._sprites.glow
+		const animated = []
+		picks.forEach((l, i) => {
+			const s = MAP_MESH.scale || 1
+			const size = (0.9 + (l.brightness / 64) * 0.9) * s
+			const plane = BABYLON.MeshBuilder.CreatePlane(`corona${i}`, { size }, this.scene)
+			plane.position.set(l.pos_m[0] * s, l.pos_m[2] * s, -l.pos_m[1] * s)
+			plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL
+			plane.isPickable = false
+			plane.applyFog = false
+			const mat = new BABYLON.StandardMaterial(`coronaMat${i}`, this.scene)
+			// tinted-sprite recipe: opacityTexture (PNG alpha) shapes the soft glow,
+			// emissiveColor is the tint. NO emissiveTexture — the white PNG luminance
+			// would wash the tint out to white (see _makeSprite's tinted-pool note).
+			mat.opacityTexture = glowTex
+			mat.disableLighting = true
+			mat.backFaceCulling = false
+			mat.alphaMode = BABYLON.Engine.ALPHA_ADD
+			mat.disableDepthWrite = true
+			const c = l.rgb || [1, 1, 1]
+			const gain = 0.55 * (l.brightness / 64)
+			mat.emissiveColor = new BABYLON.Color3(c[0] * gain, c[1] * gain, c[2] * gain)
+			plane.material = mat
+			if (l.type === 'Pulse' || l.type === 'SubtlePulse' || l.type === 'Strobe' ||
+				l.effect === 'TorchWaver' || l.effect === 'FireWaver') {
+				animated.push({ plane, size, phase: i * 1.7, flicker: l.effect === 'TorchWaver' || l.effect === 'FireWaver' })
+			}
+		})
+		if (animated.length) {
+			this.scene.registerBeforeRender(() => {
+				const t = performance.now() / 1000
+				for (const a of animated) {
+					const wob = a.flicker
+						? 0.85 + 0.15 * Math.sin(t * 9 + a.phase) + 0.08 * Math.sin(t * 23 + a.phase * 2)
+						: 0.8 + 0.2 * Math.sin(t * 2.2 + a.phase)
+					a.plane.scaling.setAll(wob)
+				}
+			})
+		}
+		console.log(`[map] coronas: ${picks.length} (${animated.length} animated)`)
 	}
 
 	_loadTex(url) {
