@@ -764,6 +764,19 @@ export default class WeaponAudio {
     osc.start(t0); osc.stop(t0 + (kill ? 0.14 : 0.08))
   }
 
+  // Headshot ANNOUNCER hook (authoritative-only; called from FragLayer.onHitConfirmed
+  // when the server flags a head hit). Reuses the sample pipeline: plays the 'headshot'
+  // voice clip IF it is loaded. NOTE: NO headshot voice asset ships yet — 'headshot' is
+  // absent from SFX_NAMES and scripts/generate-sfx.mjs authors none — so today this is
+  // a wired NO-OP (silent). We deliberately do NOT synthesize a stand-in voice (wire the
+  // hook + note the missing asset, per design). To voice it: add 'headshot' to
+  // SFX_NAMES and generate the clip offline.
+  announceHeadshot() {
+    if (!this.ctx) return
+    if (this._buf.headshot) { this.playClip('headshot', { gain: 0.7 }); return }
+    // asset missing -> hook is live but silent.
+  }
+
   // ==== Procedural UI / feedback layer (Kimi K3 SFX spec, bit 1) =============
   // SYNTHESIZED cues (no clips): high-frequency / latency-critical feedback that
   // must never wait on buffer decode and never smear when spammed. Each self-

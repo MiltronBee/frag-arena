@@ -144,11 +144,14 @@ export default class FragLayer {
   // =========================================================================
   onHitConfirmed(message) {
     const kill = !!message.wasKill
+    // AUTHORITATIVE headshot flag (server-classified pose model). The predicted flesh
+    // hitmarker already flashed instantly in Simulator; the HEADSHOT marker + announce
+    // come ONLY from here — never predicted.
+    const headshot = !!message.isHeadshot
     // reuse Simulator's marker helper: kill => the rotating red-X kill treatment,
-    // otherwise the red confirm pop. Deliberately NOT time-matched to a specific
-    // shot — it just flashes on each confirmation.
+    // headshot => the distinct heavy/headshot marker, otherwise the red confirm pop.
     if (typeof this.sim._showHitMarker === 'function') {
-      this.sim._showHitMarker(kill)
+      this.sim._showHitMarker(kill, false, headshot)
     }
     // brief screen-space red vignette so a landed hit registers viscerally; a kill
     // gets the doubled-weight pulse (spec §5.2).
@@ -157,6 +160,12 @@ export default class FragLayer {
     if (kill && this.sim.audio && typeof this.sim.audio.hitMarker === 'function') {
       this.sim.audio.hitMarker(true)
     }
+    // Headshot announcer: reuse the audio system. announceHeadshot() plays the
+    // 'headshot' voice clip IF that asset exists (it does NOT ship yet — see
+    // WeaponAudio.announceHeadshot); until then it is a wired no-op.
+    if (headshot && this.sim.audio && typeof this.sim.audio.announceHeadshot === 'function') {
+      this.sim.audio.announceHeadshot()
+    }
   }
 
   // =========================================================================
@@ -164,12 +173,13 @@ export default class FragLayer {
   // =========================================================================
   onKilled(message) {
     const { killerNid, victimNid, weaponIndex, overkill } = message
+    const headshot = !!message.isHeadshot
     const myNid = this._mySmoothNid()
     const suicide = killerNid === victimNid
     const iKilled = !suicide && killerNid === myNid
     const iDied = victimNid === myNid
 
-    this._pushKillFeed({ killerNid, victimNid, weaponIndex, suicide, iKilled, iDied })
+    this._pushKillFeed({ killerNid, victimNid, weaponIndex, suicide, iKilled, iDied, headshot })
 
     if (iKilled) this._showFragBanner(victimNid)
 
@@ -188,10 +198,12 @@ export default class FragLayer {
     if (iDied) this._startDeathCam(killerNid)
   }
 
-  _pushKillFeed({ killerNid, victimNid, weaponIndex, suicide, iKilled, iDied }) {
+  _pushKillFeed({ killerNid, victimNid, weaponIndex, suicide, iKilled, iDied, headshot }) {
     const row = document.createElement('div')
     row.className = 'kill-feed-row'
     if (iKilled || iDied) row.classList.add('kill-feed-mine')
+    // headshot kill-feed flavour (authoritative). A suicide/fall is never a headshot.
+    if (headshot && !suicide) row.classList.add('kill-feed-headshot')
 
     if (suicide) {
       row.innerHTML =
@@ -199,9 +211,12 @@ export default class FragLayer {
         `<span class="kf-weapon">[${this._weaponName(weaponIndex)}]</span>`
       row.classList.add('kill-feed-suicide')
     } else {
+      // headshot -> insert a HEADSHOT badge between weapon and victim (kf-headshot CSS
+      // hook; degrades to plain text if unstyled).
+      const hs = headshot ? `<span class="kf-headshot">HEADSHOT</span>` : ''
       row.innerHTML =
         `<span class="kf-killer">${iKilled ? 'You' : this._label(killerNid)}</span>` +
-        `<span class="kf-weapon">[${this._weaponName(weaponIndex)}]</span>` +
+        `<span class="kf-weapon">[${this._weaponName(weaponIndex)}]</span>` + hs +
         `<span class="kf-victim">${iDied ? 'You' : this._label(victimNid)}</span>`
     }
 

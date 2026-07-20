@@ -35,6 +35,32 @@ const withAds = (fov, inTime, outTime, extra = {}) => ({
   ads: { fov, inTime, outTime, ...extra }
 })
 
+// ── Body-zone damage multipliers (server-authoritative body-part hit detection) ──
+// The server classifies each CONFIRMED hitscan hit into head / torso / legs with a
+// lightweight 3-sphere pose model (server/lagCompensatedHitscanCheck.js) and applies
+// these multipliers in GameInstance.damagePlayer — authoritative, OUTSIDE the
+// reconciled applyCommand path, and NEVER on the predicted client path. Pure DATA (no
+// wall-clock, no randomness), so it is safe to live in this shared module.
+//
+// Per weapon: a weapon may carry its own `zoneMultipliers`; anything without one falls
+// back to DEFAULT_ZONE_MULTIPLIERS (the "global default"). v1 hitscan roster: Rifle /
+// SMG / Shotgun-pellet use the default (head 2.0); the Pistol overrides head to 2.5
+// (its precision/ADS finisher — 34 * 2.5 = 85, a UT-sniper-like near-instakill that
+// also triggers the headshot announcer). Projectiles (Plasma/Flak) are unchanged: they
+// never carry a zone, so no multiplier is applied (v1 is hitscan-only).
+//
+// LEG_DAMAGE_MULT is the ONE tunable knob. legs < 1.0 is THE USER'S ADDITION, not
+// vanilla UT (UT had no limb reduction) — set this to 1.0 for "true UT" behaviour.
+export const LEG_DAMAGE_MULT = 0.7
+// 'arms' are FOLDED INTO torso (1.0): a vertical-band pose model with no skeleton
+// cannot isolate an arm, so there is no 'arms' zone — a shoulder/arm ray classifies as
+// torso and takes the torso multiplier. Documented here as the intended arm value.
+export const DEFAULT_ZONE_MULTIPLIERS = {
+  head: 2.0,
+  torso: 1.0,   // arms fold into torso (see above)
+  legs: LEG_DAMAGE_MULT
+}
+
 export const weapons = [
   {
     index: 0,
@@ -191,6 +217,10 @@ export const weapons = [
     magazineCapacity: 6, // was 12 — small mag reinforces "finisher, not primary"
     maxReserveAmmo: 36,
     damage: 34, // was 20 → 3-shot kill @ 100 HP
+    // Body-zone override: the Pistol is the precision finisher, so its HEAD hit is
+    // 2.5x (34 -> 85, near-instakill) vs the roster default of 2.0. torso/legs inherit
+    // the default. See DEFAULT_ZONE_MULTIPLIERS / LEG_DAMAGE_MULT above.
+    zoneMultipliers: { ...DEFAULT_ZONE_MULTIPLIERS, head: 2.5 },
     range: 50,
     // Damage falloff (common/damageFalloff.js): full 34 dmg (3-shot @ 100 HP) inside
     // 20m, LINEAR down to 0.5x (17 dmg -> 6-shot) by 40m, floored beyond. Hip-fire is

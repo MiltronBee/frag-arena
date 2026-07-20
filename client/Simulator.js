@@ -579,20 +579,28 @@ class Simulator {
 	// (≥20 predicted dmg — pistol/shotgun) gets a slightly bigger pop. Durations here
 	// MUST match the CSS keyframes (hit-pop 160ms, kill-pop 450ms) so the class is
 	// removed exactly when the grow-in/out animation ends.
-	_showHitMarker(kill, heavy) {
+	_showHitMarker(kill, heavy, headshot) {
 		const el = document.getElementById('hit-marker')
 		if (!el) return
-		el.classList.remove('hit-active', 'kill-active', 'hit-active-heavy')
+		el.classList.remove('hit-active', 'kill-active', 'hit-active-heavy', 'headshot-active')
 		void el.offsetWidth // restart the CSS animation (SMG-rate re-triggers must not drop the marker)
 		if (kill) {
 			el.classList.add('kill-active')
+			// a HEADSHOT kill keeps the kill marker; headshot-active rides along as a CSS
+			// hook and FragLayer fires the "Headshot!" announcer separately.
+			if (headshot) el.classList.add('headshot-active')
+		} else if (headshot) {
+			// distinct HEADSHOT marker (authoritative-only, never predicted). Degrades to
+			// the existing heavy treatment so it reads stronger than a flesh hit even
+			// before a bespoke .headshot-active CSS rule is authored.
+			el.classList.add('hit-active', 'hit-active-heavy', 'headshot-active')
 		} else {
 			el.classList.add('hit-active')
 			if (heavy) el.classList.add('hit-active-heavy')
 		}
 		clearTimeout(this._hitMarkerTimer)
 		this._hitMarkerTimer = setTimeout(() => {
-			el.classList.remove('hit-active', 'kill-active', 'hit-active-heavy')
+			el.classList.remove('hit-active', 'kill-active', 'hit-active-heavy', 'headshot-active')
 		}, kill ? 450 : 160)
 	}
 

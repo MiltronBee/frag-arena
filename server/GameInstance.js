@@ -23,7 +23,7 @@ import lagCompensatedHitscanCheck, { nearestWorldHit } from './lagCompensatedHit
 import Projectile from '../common/entity/Projectile'
 import Grenade from '../common/entity/Grenade'
 import MegaHealthPickup, { MEGA_STATE } from '../common/entity/MegaHealthPickup'
-import { weapons } from '../common/weaponsConfig'
+import { weapons, DEFAULT_ZONE_MULTIPLIERS } from '../common/weaponsConfig'
 import { PLAYER_NAMES } from '../common/playerNames'
 import BotController from './BotController'
 
@@ -430,7 +430,10 @@ class GameInstance {
 				// lag-compensated spots) — dedupe per pellet so one pellet is
 				// one hit, applied once to the player's canonical state
 				const damagedThisPellet = new Set()
-				hits.forEach(victim => {
+				hits.forEach(hit => {
+					// lagCompensatedHitscanCheck now returns { entity, zone, distance } so the
+					// authoritative body-zone rides each confirmed hit (v1: hitscan only).
+					const victim = hit.entity
 					if (victim.nid !== entity.nid && victim.nid !== smoothEntity.nid) {
 						if (victim instanceof PlayerCharacter && victim.isAlive &&
 							victim.client && !damagedThisPellet.has(victim.client)) {
@@ -441,7 +444,9 @@ class GameInstance {
 							// ramp this shot fired with) extends the pistol's full-damage range.
 							const dist = BABYLON.Vector3.Distance(ray.origin, victim.mesh.position)
 							const dmg = Math.round(config.damage * damageFalloffMult(config, dist, ray.aimFactor))
-							this.damagePlayer(victim.client, shooter, dmg, config.name, config.index)
+							// hit.zone (head/torso/legs) -> the per-zone multiplier is applied
+							// authoritatively in damagePlayer, NOT here (outside applyCommand).
+							this.damagePlayer(victim.client, shooter, dmg, config.name, config.index, hit.zone)
 						}
 					}
 				})
@@ -988,12 +993,37 @@ class GameInstance {
 	// pair of entities and must move in lockstep — the victim reads their own
 	// rawEntity (private channel), everyone else reads the smoothEntity. Applying
 	// damage to whichever entity a ray happened to hit desyncs the two views.
-	damagePlayer(victimClient, attackerClient, damage, sourceName, weaponIndex) {
+	damagePlayer(victimClient, attackerClient, damage, sourceName, weaponIndex, zone = null) {
 		const raw = victimClient.rawEntity
 		const smooth = victimClient.smoothEntity
 		if (!raw || !raw.isAlive) return
 		// GODMODE: real players take no damage (bots still do — go frag them)
 		if (this._godmode && !victimClient.bot) return
+
+		// BODY-ZONE multiplier — AUTHORITATIVE, applied HERE (outside the reconciled
+		// applyCommand path), never on the predicted client path. `zone` is the server-
+		// classified head/torso/legs from lagCompensatedHitscanCheck; it is null for
+		// non-hitscan damage (projectiles, grenades, fall deaths) which take NO zone
+		// scaling (v1 is hitscan-only). The client NEVER asserts a zone — the whole path
+		// is rebuilt server-side from movement/aim input. Per-weapon zoneMultipliers with
+		// a global default (common/weaponsConfig.js). Rounded after scaling so the wire
+		// damage (UInt8) matches the hitpoints actually deducted.
+		const wcfg = weapons[weaponIndex]
+		const zmults = (wcfg && wcfg.zoneMultipliers) ? wcfg.zoneMultipliers : DEFAULT_ZONE_MULTIPLIERS
+		const zmult = zone ? (zmults[zone] != null ? zmults[zone] : 1) : 1
+		const isHeadshot = zone === 'head'
+		if (zmult !== 1) damage = Math.round(damage * zmult)
+		// Headshot COUNTER — a server-side hook for future token issuance (damage is
+		// authoritative and will later gate tokens). Counted at the authoritative branch,
+		// never trusting the client. (timeAgo = latency+100 in performShot is the one
+		// client-influenced lever — a client inflating its reported latency widens its
+		// rewind window; NOT fixed here, flagged for a later hardening pass.)
+		if (isHeadshot) {
+			this._headshots = (this._headshots || 0) + 1
+			if (attackerClient && attackerClient.rawEntity) {
+				attackerClient._headshots = (attackerClient._headshots || 0) + 1
+			}
+		}
 
 		// hp BEFORE this hit — overkill is damage beyond what the kill needed
 		const hpBefore = raw.hitpoints
@@ -1023,7 +1053,7 @@ class GameInstance {
 
 		// HitConfirmed → the attacker only (real clients; bots have no socket)
 		if (isRealAttacker) {
-			this.instance.message(new HitConfirmed(victimNid, Math.min(255, damage), wasKill), attackerClient)
+			this.instance.message(new HitConfirmed(victimNid, Math.min(255, damage), wasKill, isHeadshot), attackerClient)
 		}
 
 		if (wasKill) {
@@ -1050,7 +1080,7 @@ class GameInstance {
 			// every connected socket.) overkill = damage past what the kill needed. If
 			// there's no attacker, killerNid = victimNid (suicide-style, unattributed).
 			const overkill = Math.min(255, Math.max(0, damage - hpBefore))
-			this.instance.messageAll(new Killed(attackerNid, victimNid, weaponIndex || 0, overkill))
+			this.instance.messageAll(new Killed(attackerNid, victimNid, weaponIndex || 0, overkill, isHeadshot))
 
 			console.log(`Player ${raw.nid} died from ${sourceName}!`)
 		}
@@ -1124,7 +1154,7 @@ class GameInstance {
 				raw.velX = 0; raw.velY = 0; raw.velZ = 0
 				raw.deaths = Math.min(255, raw.deaths + 1); smooth.deaths = raw.deaths
 				arm(Date.now() + GameInstance.RESPAWN_DELAY_MS)
-				this.instance.messageAll(new Killed(smooth.nid, smooth.nid, 0, 0))
+				this.instance.messageAll(new Killed(smooth.nid, smooth.nid, 0, 0, false))
 			}
 			this.instance.clients.forEach(client => {
 				if (client.rawEntity && client.smoothEntity) fallKill(client.rawEntity, client.smoothEntity, t => { client.respawnAt = t })

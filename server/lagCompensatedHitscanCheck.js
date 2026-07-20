@@ -30,9 +30,70 @@ export const nearestWorldHit = (meshes, ray, maxDist) => {
 	return best
 }
 
-// Lag-compensated hitscan resolution. Returns the entities this ray legitimately hit:
-// rewound to the shooter's view of the world, inside the weapon's reach, and with an
-// unobstructed line from the muzzle.
+// ── Body-zone POSE MODEL (v1: hitscan) ──────────────────────────────────────────
+// The server has NO skeleton: a player is ONE CreateBox(size 1) spanning y-0.5..+0.5
+// (common/entity/PlayerCharacter.js). Body zones are therefore three ON-AXIS spheres
+// in ENTITY-LOCAL units, matched to the VISIBLE model (feet at y-0.5, head top at
+// y+0.60). Because they sit on the vertical axis they are radially symmetric — pitch/
+// yaw-invariant — so they need NO rotation rewind, only the POSITION the historian
+// already rewinds. Placed at (past.x, past.y + cy, past.z). Kept server-side only
+// (never networked; the client never asserts a zone).
+//
+// head reaches y+0.60, ABOVE the collision box (+0.5) — so the hittable VOLUME here is
+// the box UNION these spheres (see classifyZone). That closes the "top of the visible
+// head misses the box" gap WITHOUT touching the box mesh / its ellipsoid, so movement
+// collision is provably unaffected (the box geometry and ellipsoid are untouched).
+const ZONES = [
+	{ name: 'head',  cy: 0.47, r: 0.13 },   // covers y+0.34..+0.60 (visible head, incl. top)
+	{ name: 'torso', cy: 0.15, r: 0.28 },   // chest/abdomen (arms fold in here — no skeleton)
+	{ name: 'legs',  cy: -0.28, r: 0.26 },  // hips down to feet
+]
+
+// Analytic ray/sphere ENTRY distance (world metres, since `d` is unit-length — see the
+// probe below and common/firePattern.applyPattern, which returns a normalized dir).
+// Returns Infinity on a miss / sphere fully behind the muzzle; 0 if the muzzle is
+// inside the sphere. No Babylon mesh is created — this is a handful of flops per zone.
+const raySphereEntry = (ox, oy, oz, dx, dy, dz, cx, cy, cz, r) => {
+	const lx = cx - ox, ly = cy - oy, lz = cz - oz
+	const tca = lx * dx + ly * dy + lz * dz
+	const d2 = (lx * lx + ly * ly + lz * lz) - tca * tca
+	const r2 = r * r
+	if (d2 > r2) return Infinity            // ray misses the sphere entirely
+	const thc = Math.sqrt(r2 - d2)
+	const t1 = tca + thc
+	if (t1 < 0) return Infinity             // whole sphere is behind the muzzle
+	const t0 = tca - thc
+	return t0 >= 0 ? t0 : 0                  // origin inside sphere -> entry at 0
+}
+
+// Classify a rewound hit into a body zone. `boxHit`/`boxDist` come from the existing
+// box raycast; (px,py,pz) is the ALREADY-REWOUND entity position. Returns null when
+// the ray touches neither the box nor any zone sphere (no hit), otherwise
+// { zone, distance } where `distance` is the nearest surface of the hit volume (metres
+// along the ray) and `zone` is the NEAREST zone entered — defaulting to 'torso' when
+// only the box is clipped (e.g. a shoulder outside every sphere).
+const classifyZone = (o, d, boxHit, boxDist, px, py, pz) => {
+	let bestZoneDist = Infinity
+	let zone = null
+	for (let i = 0; i < ZONES.length; i++) {
+		const z = ZONES[i]
+		const t = raySphereEntry(o.x, o.y, o.z, d.x, d.y, d.z, px, py + z.cy, pz, z.r)
+		if (t < bestZoneDist) { bestZoneDist = t; zone = z.name }
+	}
+	if (!boxHit && zone === null) return null          // no hit at all
+	// entry = first contact with the hit volume (box OR any sphere).
+	const entry = Math.min(boxHit ? boxDist : Infinity, bestZoneDist)
+	// box clipped but no sphere -> baseline torso (shoulder/arm; arms fold into torso).
+	return { zone: zone !== null ? zone : 'torso', distance: entry }
+}
+
+// Lag-compensated hitscan resolution. Returns the HITS this ray legitimately landed:
+// rewound to the shooter's view of the world, inside the weapon's reach, unobstructed
+// from the muzzle, and CLASSIFIED into a body zone. Shape:
+//   [ { entity, zone, distance }, ... ]   (was: [ entity, ... ] before body zones)
+// `zone` is 'head' | 'torso' | 'legs'; `distance` is metres along the ray. Callers
+// (GameInstance.performShot) read hit.entity for the victim and hit.zone for the
+// damage multiplier + headshot feedback.
 //
 // `world` (optional) is supplied by GameInstance.performShot:
 //   { meshes: <static collider meshes>, maxDistance: <weapon reach in metres> }
@@ -49,7 +110,8 @@ export default (instance, ray, timeAgo, world = null) => {
 	// (common/weapon.js builds the ray straight off entity.mesh.position), and the
 	// rewind below mutates that very vector whenever the shooter is itself in the
 	// historian sample. Cloning once means every distance measured here — players and
-	// world alike — comes from one stable origin.
+	// world alike — comes from one stable origin. ray.direction is unit-length, so the
+	// analytic zone-sphere entries below are in the same metres as the box/world hits.
 	const probe = new BABYLON.Ray(ray.origin.clone(), ray.direction)
 
 	const candidates = []
@@ -71,16 +133,28 @@ export default (instance, ray, timeAgo, world = null) => {
 			realEntity.z = pastEntity.z
 			realEntity.mesh.computeWorldMatrix(true)
 
-			// see if the ray collides with an entity at the lag compensated position
+			// see if the ray collides with the box at the lag compensated position
 			const raycheck = probe.intersectsMesh(realEntity.mesh)
+
+			// BODY-ZONE classification rides this same rewound block: the three on-axis
+			// zone spheres are built at the ALREADY-REWOUND position (pastEntity x/y/z,
+			// no rotation — they are yaw/pitch-invariant), ray-tested analytically, and
+			// the NEAREST zone is returned. The hittable VOLUME is the box UNION the
+			// spheres, so a shot at the top of the visible head (above the box) still
+			// registers. Default 'torso' when the box is clipped but no sphere is.
+			const zoned = classifyZone(
+				probe.origin, probe.direction,
+				raycheck.hit, raycheck.distance,
+				pastEntity.x, pastEntity.y, pastEntity.z
+			)
 
 			// restore the entity back to its current position (undo the lag compensated translation)
 			Object.assign(realEntity.mesh.position, temp)
 
 			// RANGE: keep the hit distance so the weapon's reach and the world-geometry
 			// occlusion below can both be judged by distance ALONG THE RAY.
-			if (raycheck.hit && raycheck.distance <= maxDist) {
-				candidates.push({ entity: realEntity, distance: raycheck.distance })
+			if (zoned && zoned.distance <= maxDist) {
+				candidates.push({ entity: realEntity, distance: zoned.distance, zone: zoned.zone })
 			}
 		}
 
@@ -105,7 +179,9 @@ export default (instance, ray, timeAgo, world = null) => {
 
 	const hits = []
 	for (let i = 0; i < candidates.length; i++) {
-		if (candidates[i].distance < wallDist) hits.push(candidates[i].entity)
+		// preserve the return CONTRACT: carry entity + zone + distance so performShot
+		// can apply the per-zone damage multiplier and the headshot feedback.
+		if (candidates[i].distance < wallDist) hits.push(candidates[i])
 	}
 	return hits
 }
