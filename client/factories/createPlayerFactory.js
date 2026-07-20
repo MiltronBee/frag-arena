@@ -19,6 +19,7 @@ export default ({ simulator }) => {
 				// entity are ignored — we predict them — so this is the only handoff)
 				if (simulator.spawnPos) {
 					entity.x = simulator.spawnPos.x
+					entity.y = simulator.spawnPos.y
 					entity.z = simulator.spawnPos.z
 				}
 				simulator.myRawEntity = entity

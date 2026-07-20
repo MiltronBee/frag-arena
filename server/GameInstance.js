@@ -1143,7 +1143,7 @@ class GameInstance {
 			}
 			const entity = bot.rawEntity
 			if (!entity.isAlive) return
-			const command = bot.controller.think(delta, wallNow, this.combatants(entity), this.obstacles)
+			const command = bot.controller.think(delta, wallNow, this.combatants(entity), this.occluderMeshes)
 			applyCommand(entity, command, this.obstacles)
 			// only attempt the shot when the weapon can actually fire — fire()
 			// would reject it anyway, but noisily (WEAPON_FIRE_FAIL log per tick)

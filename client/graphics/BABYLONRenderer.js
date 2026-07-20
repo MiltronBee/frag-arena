@@ -845,7 +845,15 @@ class BABYLONRenderer {
 		// wall behind. (The shooter's nid isn't available at this call site, so the 0.5m
 		// fall-through — not a per-nid exclusion — is the fix; the 0.6m offset and 120m
 		// fallback are unchanged tuned presentation values.)
-		const ray = new BABYLON.Ray(origin, dir, 500)
+		// FAR BOUND: a shot must not paint an impact mark past the weapon's server-side
+		// reach. server/GameInstance.js performShot clamps its hitscan to
+		// max(range, ADS-extended falloffEnd) via common/damageFalloff.js falloffRange; the
+		// caller (Simulator fire-prediction) computes the SAME value with the SAME helper and
+		// passes it as opts.reach, so the client mark and the server hit cannot drift. The ray
+		// starts 0.6m ahead of the true fire point, so subtract that to measure reach from the
+		// shooter. Absent (remote/observer path), keep the old unbounded 500m probe.
+		const maxDist = opts.reach != null ? Math.max(0, opts.reach - 0.6) : 500
+		const ray = new BABYLON.Ray(origin, dir, maxDist)
 		const picks = this.scene.multiPickWithRay(ray, this._hitscanPredicate)
 		let hit = null
 		if (picks) {
@@ -855,7 +863,9 @@ class BABYLONRenderer {
 			}
 		}
 		const hitValid = !!hit
-		const end = hitValid ? hit.pickedPoint : origin.add(dir.scale(120))
+		// tracer fallback (no hit): the tuned 120m streak, but never past reach so a
+		// short-reach weapon (Shotgun 30m) does not streak into space the server ignored.
+		const end = hitValid ? hit.pickedPoint : origin.add(dir.scale(Math.min(120, maxDist)))
 
 		// tracer: thin, hot, brief. Multi-pellet weapons call drawHitscan once per
 		// REAL pattern ray (common/firePattern.js) with opts.tracer gating a subset,

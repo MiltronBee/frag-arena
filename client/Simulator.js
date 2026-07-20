@@ -12,6 +12,7 @@ import applyCommand, { DODGE_DIRS } from '../common/applyCommand'
 import TouchControls, { isTouchDevice } from './TouchControls'
 import { fire } from '../common/weapon'
 import { shotPattern, applyPattern } from '../common/firePattern'
+import { falloffRange } from '../common/damageFalloff'
 import Viewmodel from './graphics/Viewmodel'
 import WeaponAudio from './graphics/WeaponAudio'
 import MusicManager from './graphics/MusicManager'
@@ -1063,13 +1064,22 @@ class Simulator {
 					if (ray.config.type === 'hitscan') {
 						const offsets = shotPattern(ray.config, ray.seed, ray.heat, ray.aimFactor)
 						const maxTracers = (fx.tracer && fx.tracer.pelletTracers) || offsets.length
+						// Match the server's hitscan cutoff EXACTLY so a predicted wall mark only
+						// appears where the server would score a hit: server/GameInstance.js performShot
+						// uses reach = max(range, ADS-extended falloffEnd) via the SAME
+						// common/damageFalloff.js falloffRange helper imported here (no duplicated math,
+						// so client and server cannot drift). ray.aimFactor is the live ADS ramp this
+						// shot fired with (extends the Pistol's reach past its range) — the same value
+						// the server derives.
+						const reach = Math.max(ray.config.range || 0,
+							falloffRange(ray.config, ray.aimFactor).end) || Number.MAX_VALUE
 						let hitFlesh = false
 						offsets.forEach((off, i) => {
 							const d = applyPattern(
 								{ x: ray.direction.x, y: ray.direction.y, z: ray.direction.z }, off)
 							const info = this.renderer.drawHitscan(
 								{ x: ox, y: oy, z: oz, tx: d.x, ty: d.y, tz: d.z },
-								{ fx, muzzle: false, tracer: i < maxTracers }
+								{ fx, muzzle: false, tracer: i < maxTracers, reach }
 							)
 							if (info && info.hit && info.surface === 'flesh') hitFlesh = true
 						})

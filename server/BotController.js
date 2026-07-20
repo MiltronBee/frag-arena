@@ -8,18 +8,32 @@
 //   * per-burst aim error (it misses like a mid-skill UT bot)
 //   * trigger discipline (bursts with pauses, only fires roughly on target)
 //   * line-of-sight checks against the REAL map geometry (it can't wallhack)
-//   * wander targets on real walkable floor (it can't walk into the void)
+//   * A* pathfinding over the map's OWN UT99 nav graph (it crosses the map like a
+//     player, not by diffusing across probed floor)
 //   * strafe-orbiting at its weapon's preferred range, occasional jumps
 import * as BABYLON from '../common/babylon.node.js'
 import { weapons } from '../common/weaponsConfig'
 import { USE_MESH_MAP, MAP_MESH } from '../common/mapMesh'
 import { nearestWorldHit } from './lagCompensatedHitscanCheck'
+import { getNavGraph, nearestNode, aStar } from './navGraph'
 
-const TURN_RATE = 3.4          // rad/s — swings onto a target in ~0.3-0.9s
+const TURN_RATE = 3.4          // rad/s — swings onto a target in ~0.3-0.9s (aim: human-ish)
+const NAV_TURN_RATE = 12       // rad/s — steering (no visible target). The aim rate is
+// deliberately slow so the bot doesn't snap onto YOU; but movement follows the heading,
+// and at 3.4 rad/s the heading crawls while momentum carries the bot wide — it arcs off
+// narrow floor into the void. When there is nothing to aim at, the bot may whip its view
+// around to face the next waypoint, so velocity stays glued to the path.
 const RETARGET_MS = 900        // how often it reconsiders who to fight
 const AIM_ERR_YAW = 0.055      // rad, re-rolled each burst (~±1.6°)
 const AIM_ERR_PITCH = 0.03
 const FIRE_CONE = 0.13         // rad — only pulls the trigger this close to on-target
+// Combat orbit (strafe/advance/fire) is a CLOSE-range behaviour. Its strafing walks the
+// bot sideways with no floor awareness, which is fatal on a catwalk like Visage's central
+// bridge — a bot that sees an enemy across the span would strafe straight off it. So the
+// bot only orbits within COMBAT_RANGE; visible-but-farther, it keeps A*-pathfinding toward
+// the enemy (staying on real floor) and closes the distance before it fights.
+const COMBAT_RANGE = 22        // world units
+const LEDGE_LOOK = 1.8         // world units — how far ahead combat ledge-sense probes
 
 // LoS re-evaluation interval. A cross-map ray on CTF-Visage costs ~100-300us (it is
 // up to 105m long, so the bounding-sphere pre-reject in nearestWorldHit prunes far
@@ -31,44 +45,55 @@ const FIRE_CONE = 0.13         // rad — only pulls the trigger this close to o
 const LOS_INTERVAL_MS = 120
 const LOS_JITTER_MS = 60
 
+// A* pathfinding over the map's own UT99 nav graph (server/navGraph.js). Re-planning is
+// THROTTLED: a bot re-runs A* at most once per PATH_REPLAN_MS, or immediately when its
+// destination snaps to a different graph node or it runs out of waypoints — a fresh path
+// every tick is pure waste, the graph does not change under a moving target inside a
+// second. A waypoint is retired once the bot is within WAYPOINT_REACH of it.
+const PATH_REPLAN_MS = 1000
+const WAYPOINT_REACH = 3.0     // world units — advance to the next waypoint this close
+const JUMP_LEAD = 5.0          // press jump this far out when the leg is a 'jump' edge
+const PICKUP_HOLD_MS = 8000    // how long a bot roams toward one pickup before repicking
+// Movement is along the CURRENT heading (aimYaw), which turns at only TURN_RATE. Holding
+// W while the heading is still swinging onto a waypoint carves a wide arc — fine in the
+// open, fatal near a ledge (the bot arcs off into the void). So on a path we only drive
+// forward once the heading is within MOVE_CONE of the waypoint; outside it the bot pivots
+// in place. It costs a fraction of a second per sharp turn and keeps the bot on the floor.
+const MOVE_CONE = 0.6          // rad (~34°)
+// Cornering: the bot has real momentum (applyCommand friction bleeds ~7.6 m/s over ~0.3s),
+// so arriving at a waypoint at full tilt and then turning hard carries it past the node —
+// off a ledge if the node sits near one. Slow-in/fast-out: within SLOWDOWN_DIST of a
+// waypoint whose OUTGOING leg turns more than BRAKE_ANGLE, drive forward only every other
+// tick (half speed) so the bot reaches the corner slow and the overshoot stays small.
+const SLOWDOWN_DIST = 5.0      // world units
+const BRAKE_ANGLE = 0.6        // rad — corner sharper than this triggers the brake
+const LOOKAHEAD = 4.0          // pure-pursuit carrot distance ahead along the polyline
+
 // ---------------------------------------------------------------------------
 // World geometry access
 // ---------------------------------------------------------------------------
 // Bot LoS and server shot resolution MUST agree, so both consult the SAME meshes:
-// GameInstance.occluderMeshes (subdivided, disabled clones of the map collider on a
-// mesh map; the Obstacle boxes on a box arena). think() is only handed `this.obstacles`,
-// which is an EMPTY Map on a mesh map — that emptiness is the wallhack bug: the old
-// loop simply never ran and every LoS query returned true.
-//
-// GameInstance is owned by another change right now, so rather than widen think()'s
-// signature we recover the occluders from the scene the bot's own mesh lives in
-// (server/GameInstance.js builds them there, named `occluder_<i>`). That naming is the
-// one piece of coupling here and it is worth removing: see the note at the bottom of
-// this file — passing this.occluderMeshes into think() is strictly better.
+// GameInstance.occluderMeshes (subdivided, disabled clones of the map collider on a mesh
+// map; the Obstacle boxes on a box arena). GameInstance now hands that array straight
+// into think() (it maintains occluderMeshes on both paths), so worldMeshes just returns
+// it — the old `occluder_<i>` scene-name matching is gone. The obstacles-Map branch is
+// kept only so an older caller still works.
 const EMPTY = []
 const boxCache = new WeakMap()
-const sceneCache = new WeakMap()
 
-const worldMeshes = (me, obstacles) => {
-	// box arena: the obstacles Map is populated and is itself the occluder set
-	if (obstacles && obstacles.size > 0) {
-		let c = boxCache.get(obstacles)
-		if (!c || c.size !== obstacles.size) {
-			c = { size: obstacles.size, meshes: [...obstacles.values()].map(o => o.mesh).filter(Boolean) }
-			boxCache.set(obstacles, c)
+const worldMeshes = (me, arg) => {
+	// GameInstance passes its occluderMeshes array directly
+	if (Array.isArray(arg)) return arg
+	// legacy caller: an obstacles Map (box arena) is itself the occluder set
+	if (arg && arg.size > 0) {
+		let c = boxCache.get(arg)
+		if (!c || c.size !== arg.size) {
+			c = { size: arg.size, meshes: [...arg.values()].map(o => o.mesh).filter(Boolean) }
+			boxCache.set(arg, c)
 		}
 		return c.meshes
 	}
-	const scene = me.mesh && me.mesh.getScene && me.mesh.getScene()
-	if (!scene) return EMPTY
-	let c = sceneCache.get(scene)
-	// re-scan while empty: the map mesh loads async, so the first few bot ticks after
-	// boot legitimately find nothing. Once populated the list is static and cached.
-	if (!c || c.meshes.length === 0) {
-		c = { meshes: scene.meshes.filter(m => m.name && m.name.indexOf('occluder_') === 0) }
-		sceneCache.set(scene, c)
-	}
-	return c.meshes
+	return EMPTY
 }
 
 // LoS: a ray from the bot's chest to the target's, blocked by any world geometry
@@ -98,7 +123,9 @@ const hasLineOfSight = (me, target, meshes) => {
 // x=32, so a bot could never reach the east base at x 60-79. Instead of a new magic
 // rectangle (there are 9 maps coming), derive the walkable set from the MAP ITSELF:
 //
-//   1. probe a grid of downward rays over the map's own spawn bounding box + margin
+//   1. probe a grid of downward rays over the map's own `walkable` AABB (the floor
+//      extent mapMesh.js publishes; a spawn-bbox+margin box would clip any map whose
+//      play area reaches past where players start — e.g. Visage's far east deck)
 //   2. keep cells whose topmost surface is walkable (|normal.y| >= MIN_WALK_NORMAL,
 //      the same 0.7 common/applyCommand.js uses) and above killY
 //   3. flood-fill from the cells under the map's real spawn points, so the kept set is
@@ -148,21 +175,48 @@ const floorProbe = (meshes, x, z, fromY, len) => {
 	return { y: fromY - best.distance, ny: n ? Math.abs(n.y) : 1 }
 }
 
+// Floor-probe extents for combat ledge-sense, derived once from the active map's data
+// (topmost start above the walkable ceiling, run down past killY).
+let combatProbe = null
+const combatProbeParams = () => {
+	if (!combatProbe) {
+		const sc = MAP_MESH.scale || 1
+		const w = MAP_MESH.walkable
+		const topY = (w ? w.maxY * sc : 100) + 60
+		const killY = (MAP_MESH.killY != null ? MAP_MESH.killY : (w ? w.minY : -1e6)) * sc
+		combatProbe = { topY, len: topY - killY + 5, floorMin: killY + 3 }
+	}
+	return combatProbe
+}
+
 const navCache = new WeakMap()
 
 const newNav = () => {
 	const sc = MAP_MESH.scale || 1
 	const spawns = (MAP_MESH.spawns || []).map(s => ({ x: s.x * sc, y: s.y * sc, z: s.z * sc }))
 	if (spawns.length === 0) return null
-	const m = NAV.margin
-	const minX = Math.min(...spawns.map(s => s.x)) - m
-	const maxX = Math.max(...spawns.map(s => s.x)) + m
-	const minZ = Math.min(...spawns.map(s => s.z)) - m
-	const maxZ = Math.max(...spawns.map(s => s.z)) + m
-	const killY = (MAP_MESH.killY || -1e9) * sc
-	// start every probe above the tallest thing a spawn could sit under, and run it
-	// down past killY so the ray cannot stop short of the floor
-	const topY = Math.max(...spawns.map(s => s.y)) + 60
+	// Bounds = the map's `walkable` AABB (native units -> world). It is the true floor
+	// extent, so nothing reachable is clipped; a spawn-bbox+margin box was tighter than
+	// the real play area on any map that extends past its spawns. Fall back to the old
+	// spawn-bbox+margin only if a map has no `walkable` block.
+	const w = MAP_MESH.walkable
+	let minX, maxX, minZ, maxZ, killY, topY
+	if (w) {
+		minX = w.minX * sc; maxX = w.maxX * sc; minZ = w.minZ * sc; maxZ = w.maxZ * sc
+		killY = (MAP_MESH.killY != null ? MAP_MESH.killY : w.minY) * sc
+		// probe from just above the walkable ceiling, down past killY
+		topY = w.maxY * sc + 60
+	} else {
+		const m = NAV.margin
+		minX = Math.min(...spawns.map(s => s.x)) - m
+		maxX = Math.max(...spawns.map(s => s.x)) + m
+		minZ = Math.min(...spawns.map(s => s.z)) - m
+		maxZ = Math.max(...spawns.map(s => s.z)) + m
+		killY = (MAP_MESH.killY || -1e9) * sc
+		// start every probe above the tallest thing a spawn could sit under, and run it
+		// down past killY so the ray cannot stop short of the floor
+		topY = Math.max(...spawns.map(s => s.y)) + 60
+	}
 	const nx = Math.ceil((maxX - minX) / NAV.step) + 1
 	const nz = Math.ceil((maxZ - minZ) / NAV.step) + 1
 	return {
@@ -298,13 +352,30 @@ class BotController {
 		this.losTarget = null
 		this.losAt = 0
 		this.losResult = false
+		// A* path state (server/navGraph.js). Replanned on a throttle (PATH_REPLAN_MS) and
+		// followed by PURE PURSUIT — the bot steers at a carrot point that slides along the
+		// walkable polyline, so it tracks the path instead of cutting corners off ledges.
+		this.path = null        // array of graph node indices, current route
+		this.pathX = null       // its node world x's (the polyline)
+		this.pathZ = null       // its node world z's
+		this.segJump = null     // segJump[i]: is segment (i-1 -> i) a jump edge?
+		this.pathProg = 0       // index of the polyline segment the bot is currently on
+		this.pathDone = false   // reached the last node -> head straight at the destination
+		this.pathGoal = -1      // goal node the current path targets (detect goal moves)
+		this.pathAt = 0         // next time replanning is allowed
+		this.pickupGoal = -1    // roam-destination pickup node when there is no enemy
+		this.pickupUntil = 0
+		this.wantJump = false   // set by navigate() when the current segment is a jump edge
+		this.brake = false      // set by navigate() when braking into a sharp corner
+		this.tick = 0           // think-tick counter (drives the half-speed brake duty)
 	}
 
 	// One AI tick: returns a MoveCommand-shaped plain object for applyCommand.
 	// `combatants` = alive entities it may fight (never includes itself).
-	think(delta, now, combatants, obstacles) {
+	think(delta, now, combatants, occluderMeshes) {
 		const me = this.entity
-		const meshes = worldMeshes(me, obstacles)
+		this.tick++
+		const meshes = worldMeshes(me, occluderMeshes)
 		// Advance the navigable-point build EVERY tick, not just when a wander target is
 		// wanted. Picks happen at most once per 4s per bot, which is nowhere near enough
 		// ticks to finish a ~2350-ray grid — left to the pick path the set never became
@@ -330,6 +401,7 @@ class BotController {
 		let wishPitch = 0
 		let forwards = false, backwards = false, left = false, right = false, jump = false
 		let wantsFire = false
+		let turnRate = TURN_RATE   // bumped to NAV_TURN_RATE while steering (no visible target)
 
 		const target = this.target
 		const alive = target && target.isAlive !== false
@@ -344,8 +416,10 @@ class BotController {
 			this.losResult = hasLineOfSight(me, target, meshes)
 		}
 		const seesTarget = alive && this.losResult
+		// close enough to fight? beyond COMBAT_RANGE the bot pathfinds in instead of orbiting
+		const engage = seesTarget && Math.hypot(target.x - me.x, target.z - me.z) <= COMBAT_RANGE
 
-		if (seesTarget) {
+		if (engage) {
 			const dx = target.x - me.x
 			const dy = target.y - me.y
 			const dz = target.z - me.z
@@ -377,24 +451,70 @@ class BotController {
 			wantsFire = dist < (spec.range || 50) * 0.9 && now < this.burstUntil
 			// a new wander target is chosen fresh next time it loses sight
 			this.wander = null
-		} else {
-			// no target in sight: wander to a point on real walkable floor
-			const wanderDone = this.wander &&
-				Math.hypot(this.wander.x - me.x, this.wander.z - me.z) < 1.5
-			if (!this.wander || wanderDone || now >= this.wanderUntil) {
-				this.wander = this.pickWanderTarget(nav, meshes)
-				// no target available yet (nav still probing, or the bot is somewhere with
-				// nothing straight-line reachable) -> retry soon instead of idling 4s
-				this.wanderUntil = now + (this.wander ? 4000 : 250)
+
+			// LEDGE SENSE. Orbit strafing has no floor awareness, so a fight on a catwalk or
+			// tower top would walk the bot off the edge (Visage is all edges). Probe the floor
+			// a step ahead in the move direction; if it's void, first try flipping the strafe,
+			// and if that is void too, stand and shoot rather than step off. Only runs while
+			// engaged (close, few bots), so the extra probe is cheap.
+			if (meshes.length && (forwards || backwards || left || right)) {
+				const safe = (lr, fb) => this.moveSafe(meshes, me, wishYaw, lr, fb)
+				const lr = (left ? -1 : 0) + (right ? 1 : 0)
+				const fb = (forwards ? 1 : 0) - (backwards ? 1 : 0)
+				if (!safe(lr, fb)) {
+					if (lr !== 0 && safe(-lr, fb)) {            // flip strafe onto solid ground
+						this.strafeDir = -this.strafeDir; left = lr > 0; right = lr < 0
+					} else if (fb !== 0 && safe(0, fb)) {       // keep advancing/retreating, no strafe
+						left = right = false
+					} else {                                     // nowhere safe -> hold position
+						forwards = backwards = left = right = false
+					}
+				}
 			}
-			if (this.wander) {
-				wishYaw = Math.atan2(this.wander.x - me.x, this.wander.z - me.z)
-				forwards = true
+		} else {
+			// No target in sight: A* the map's real nav graph toward a destination — the
+			// enemy (chase it to re-establish LoS) if one is alive, otherwise an item-pickup
+			// node to roam — and steer along the waypoints. This replaces the slow-diffusion
+			// wander: a bot crosses the map on the graph's edges at walking speed instead of
+			// random-hopping across it over minutes.
+			turnRate = NAV_TURN_RATE   // steer the heading fast so velocity hugs the path
+			const wp = this.navigate(now, alive ? target : null)
+			if (wp) {
+				wishYaw = Math.atan2(wp.x - me.x, wp.z - me.z)
+				// drive forward only once roughly facing the waypoint (see MOVE_CONE)
+				let he = wishYaw - this.aimYaw
+				while (he > Math.PI) he -= Math.PI * 2
+				while (he < -Math.PI) he += Math.PI * 2
+				// forward when facing the waypoint; half-speed (every other tick) when
+				// braking into a sharp corner so momentum can't carry the bot off a ledge
+				forwards = Math.abs(he) < MOVE_CONE && (!this.brake || (this.tick & 1) === 0)
+				if (this.wantJump && forwards) jump = true
+				this.wander = null
+			} else {
+				// Graph unavailable, or the destination is in a disconnected component
+				// (A* found no path): fall back to the probed straight-line wander so the
+				// bot keeps moving on real floor rather than freezing.
+				const wanderDone = this.wander &&
+					Math.hypot(this.wander.x - me.x, this.wander.z - me.z) < 1.5
+				if (!this.wander || wanderDone || now >= this.wanderUntil) {
+					this.wander = this.pickWanderTarget(nav, meshes)
+					// no target available yet (nav still probing, or the bot is somewhere with
+					// nothing straight-line reachable) -> retry soon instead of idling 4s
+					this.wanderUntil = now + (this.wander ? 4000 : 250)
+				}
+				if (this.wander) {
+					wishYaw = Math.atan2(this.wander.x - me.x, this.wander.z - me.z)
+					let he = wishYaw - this.aimYaw
+					while (he > Math.PI) he -= Math.PI * 2
+					while (he < -Math.PI) he += Math.PI * 2
+					forwards = Math.abs(he) < MOVE_CONE
+				}
 			}
 		}
 
-		// swing the aim toward the wish direction at a bounded, human-ish rate
-		const maxTurn = TURN_RATE * delta
+		// swing the aim toward the wish direction at a bounded rate — human-ish when
+		// aiming at a target, fast when merely steering toward a waypoint (see NAV_TURN_RATE)
+		const maxTurn = turnRate * delta
 		let dYaw = (wishYaw + this.aimErrYaw) - this.aimYaw
 		while (dYaw > Math.PI) dYaw -= Math.PI * 2
 		while (dYaw < -Math.PI) dYaw += Math.PI * 2
@@ -415,6 +535,129 @@ class BotController {
 			fireInput: wantsFire && onTarget, // also drives applyCommand's auto-reload
 			delta,
 		}
+	}
+
+	// A* NAVIGATION with pure pursuit. Return the world {x,z} the bot should steer toward
+	// THIS tick, or null if there is no graph / no path (the caller then uses the probed
+	// fallback). `target` is a live enemy to chase, or null to roam toward an item pickup.
+	// A* is throttled to once per PATH_REPLAN_MS (plus on a goal-node change or route
+	// completion); every other tick just slides a carrot along the cached polyline, which
+	// is a handful of distance checks. The carrot tracks the WALKABLE polyline, so the bot
+	// follows the path's shape instead of aiming at a far node and cutting the corner off a
+	// ledge — the failure mode of one-waypoint-at-a-time steering on this geometry.
+	navigate(now, target) {
+		this.wantJump = false
+		this.brake = false
+		if (!USE_MESH_MAP) return null   // box arena has no nav graph -> caller's box wander
+		const g = getNavGraph()
+		if (!g || g.N === 0) return null
+		const me = this.entity
+
+		// Destination world point + its goal node.
+		let goalNode, destX, destZ
+		if (target) {
+			destX = target.x; destZ = target.z
+			goalNode = nearestNode(g, target.x, target.y, target.z)
+		} else {
+			// roam: hold one reachable pickup for a while, then pick another (also when the
+			// current route completes, so the bot doesn't stall on a reached pickup)
+			if (this.pickupGoal < 0 || now >= this.pickupUntil || this.pathDone) {
+				this.pickupGoal = g.pickups.length
+					? g.pickups[(Math.random() * g.pickups.length) | 0] : -1
+				this.pickupUntil = now + PICKUP_HOLD_MS
+				this.path = null
+			}
+			if (this.pickupGoal < 0) return null
+			goalNode = this.pickupGoal
+			destX = g.nodes[goalNode].x; destZ = g.nodes[goalNode].z
+		}
+		if (goalNode < 0) return null
+
+		// (Re)plan on a throttle, on a goal-node change, or when the route is complete.
+		if (!this.path || goalNode !== this.pathGoal || now >= this.pathAt || this.pathDone) {
+			this.pathAt = now + PATH_REPLAN_MS
+			this.pathGoal = goalNode
+			const startNode = nearestNode(g, me.x, me.y, me.z)
+			const p = aStar(g, startNode, goalNode)
+			if (!p) { this.path = null; return null }  // disconnected -> fallback
+			this.path = p
+			this.pathDone = false
+			this.pathProg = 0
+			// cache the polyline (world) + per-segment jump flags
+			this.pathX = new Float64Array(p.length)
+			this.pathZ = new Float64Array(p.length)
+			this.segJump = new Uint8Array(p.length)
+			for (let i = 0; i < p.length; i++) { this.pathX[i] = g.nodes[p[i]].x; this.pathZ[i] = g.nodes[p[i]].z }
+			for (let i = 1; i < p.length; i++) {
+				const es = g.adj[p[i - 1]]
+				for (let k = 0; k < es.length; k++) if (es[k].to === p[i]) { this.segJump[i] = es[k].jump ? 1 : 0; break }
+			}
+		}
+
+		const X = this.pathX, Z = this.pathZ, N = X.length
+		if (N === 1) { this.pathDone = true; return { x: destX, z: destZ } }
+
+		// closest point on the polyline, searched from current progress forward (monotonic,
+		// so the bot never snaps back to an earlier segment that happens to pass nearby)
+		let bestSeg = this.pathProg, bestT = 0, bestD = Infinity
+		const windowEnd = Math.min(N - 1, this.pathProg + 8)
+		for (let s = this.pathProg; s < windowEnd; s++) {
+			const ax = X[s], az = Z[s], dx = X[s + 1] - ax, dz = Z[s + 1] - az
+			const L2 = dx * dx + dz * dz || 1e-6
+			let t = ((me.x - ax) * dx + (me.z - az) * dz) / L2
+			t = t < 0 ? 0 : t > 1 ? 1 : t
+			const cx = ax + dx * t, cz = az + dz * t
+			const d = (me.x - cx) ** 2 + (me.z - cz) ** 2
+			if (d < bestD) { bestD = d; bestSeg = s; bestT = t }
+		}
+		this.pathProg = bestSeg
+
+		// done: within reach of the final node -> steer straight at the real destination
+		if (bestSeg >= N - 2 && Math.hypot(me.x - X[N - 1], me.z - Z[N - 1]) < WAYPOINT_REACH) {
+			this.pathDone = true
+			return { x: destX, z: destZ }
+		}
+
+		// brake into a sharp bend at the NEXT vertex (slow-in/fast-out)
+		if (bestSeg + 2 < N) {
+			const v0x = X[bestSeg + 1] - X[bestSeg], v0z = Z[bestSeg + 1] - Z[bestSeg]
+			const v1x = X[bestSeg + 2] - X[bestSeg + 1], v1z = Z[bestSeg + 2] - Z[bestSeg + 1]
+			const l0 = Math.hypot(v0x, v0z) || 1, l1 = Math.hypot(v1x, v1z) || 1
+			const bend = Math.acos(Math.max(-1, Math.min(1, (v0x * v1x + v0z * v1z) / (l0 * l1))))
+			if (bend > BRAKE_ANGLE &&
+				Math.hypot(X[bestSeg + 1] - me.x, Z[bestSeg + 1] - me.z) < SLOWDOWN_DIST) this.brake = true
+		}
+
+		// carrot: walk LOOKAHEAD metres forward along the polyline from (bestSeg, bestT)
+		let seg = bestSeg, t = bestT, remain = LOOKAHEAD, cx = X[N - 1], cz = Z[N - 1]
+		while (seg < N - 1) {
+			const ax = X[seg], az = Z[seg], dx = X[seg + 1] - ax, dz = Z[seg + 1] - az
+			const segLen = Math.hypot(dx, dz)
+			const toEnd = segLen * (1 - t)
+			if (this.segJump[seg + 1]) this.wantJump = true  // jump if the carrot spans a jump edge
+			if (remain <= toEnd || seg === N - 2) {
+				const tt = Math.min(1, t + (segLen > 0 ? remain / segLen : 0))
+				cx = ax + dx * tt; cz = az + dz * tt
+				break
+			}
+			remain -= toEnd; seg++; t = 0
+		}
+		return { x: cx, z: cz }
+	}
+
+	// Combat ledge-sense: would stepping in the (lr strafe, fb forward/back) direction —
+	// relative to heading `yaw` — land on walkable floor LEDGE_LOOK ahead? Mirrors the
+	// world-space move basis applyCommand uses (forward = (sin,cos)yaw, right = (cos,-sin)yaw).
+	moveSafe(meshes, me, yaw, lr, fb) {
+		const cos = Math.cos(yaw), sin = Math.sin(yaw)
+		let dx = lr * cos + fb * sin
+		let dz = -lr * sin + fb * cos
+		const l = Math.hypot(dx, dz)
+		if (l < 1e-6) return true
+		dx /= l; dz /= l
+		const p = combatProbeParams()
+		const f = floorProbe(meshes, me.x + dx * LEDGE_LOOK, me.z + dz * LEDGE_LOOK, p.topY, p.len)
+		return !!f && f.ny >= MIN_WALK_NORMAL && f.y > p.floorMin
 	}
 
 	// Get-or-create this scene's navigable point set and push its incremental build
@@ -445,12 +688,7 @@ class BotController {
 	}
 }
 
-// NOTE for whoever next owns server/GameInstance.js: think() should be handed
-// `this.occluderMeshes` instead of (or alongside) `this.obstacles`. GameInstance already
-// maintains that array on BOTH the mesh-map and box-arena paths, and passing it would
-// delete the `occluder_<i>` name-matching in worldMeshes() above — the only fragile part
-// of this file. The call site is GameInstance.update:
-//     bot.controller.think(delta, wallNow, this.combatants(entity), this.obstacles)
-// -> bot.controller.think(delta, wallNow, this.combatants(entity), this.occluderMeshes)
-// with worldMeshes() reduced to `Array.isArray(arg) ? arg : <derive from Map>`.
+// think() is handed GameInstance.this.occluderMeshes directly (the call site is
+// GameInstance.update). That array is maintained on BOTH the mesh-map and box-arena paths,
+// so worldMeshes() just returns it — the old `occluder_<i>` scene-name matching is gone.
 export default BotController
