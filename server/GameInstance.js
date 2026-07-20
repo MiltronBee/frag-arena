@@ -1,7 +1,8 @@
 import nengi from 'nengi'
 import nengiConfig from '../common/nengiConfig'
 import { SPAWN_POINTS } from '../common/arenaConfig'
-import { USE_MESH_MAP, MAP_MESH, KILL_Y } from '../common/mapMesh'
+import { setActiveMap } from '../common/mapMesh'
+import { getMapRecord, DEFAULT_MAP_ID } from '../common/mapRegistry'
 import PlayerCharacter from '../common/entity/PlayerCharacter'
 import Identity from '../common/message/Identity'
 import WeaponFired from '../common/message/WeaponFired'
@@ -123,10 +124,10 @@ const MEGA = {
 	// pickup sat 18.4m above it and ~25m above the walkable deck, so with RADIUS 2.2
 	// the proximity test could never pass and the entire mechanic was dead while
 	// clients rendered a glowing amber box floating in the sky. Mesh maps take their
-	// position from MAP_MESH.mega (common/mapMesh.js) instead.
+	// position from this.map.mega (common/mapMesh.js) instead.
 	X: 0,
 	Y: 1.0,                // bob height ABOVE THE FLOOR — the box arena's floor is the
-	                       // plane y=0, a mesh map's is MAP_MESH.mega.y; both add this.
+	                       // plane y=0, a mesh map's is this.map.mega.y; both add this.
 	Z: 6,
 	HEAL: 100,             // added on pickup
 	MAX: 150,              // overheal cap: min(150, hp+HEAL)
@@ -144,12 +145,23 @@ const VIEW_MARGIN = 16
 class GameInstance {
 	static RESPAWN_DELAY_MS = 2500
 
-	constructor() {
+	constructor(mapArg) {
 		const engine = new BABYLON.NullEngine()
 		engine.enableOfflineSupport = false
 		const scene = new BABYLON.Scene(engine)
 		scene.collisionsEnabled = true
 		//const camera = new BABYLON.ArcRotateCamera("Camera", 0, 0.8, 100, BABYLON.Vector3.Zero(), scene)
+
+		// Runtime map selection. Resolve the constructor arg (map id | record) to a
+		// canonical registry record; with no arg the default is CTF-Visage, so this
+		// instance is byte-identical to the live game. setActiveMap() syncs the module-
+		// level active-map bindings (USE_MESH_MAP / MAP_MESH / KILL_Y in mapMesh.js) that the pure
+		// applyCommand and server/navGraph read — keeping map selection a RUNTIME value
+		// without changing applyCommand's (entity, command) signature.
+		this.map = mapArg ? getMapRecord(mapArg) : getMapRecord(DEFAULT_MAP_ID)
+		setActiveMap(this.map)
+		this.useMeshMap = this.map.useMeshMap
+		this.killY = this.map.killY
 
 		this.instance = new nengi.Instance(nengiConfig, { port: 8079 })
 		niceInstanceExtension(this.instance)
@@ -172,7 +184,7 @@ class GameInstance {
 		// _loadMapMesh so there is no window where it is undefined; the mesh-derived box
 		// replaces it once the OBJ resolves, which is well before anyone can connect.
 		this.viewBox = this.defaultViewBox()
-		if (USE_MESH_MAP) {
+		if (this.useMeshMap) {
 			this.obstacles = new Map()
 			this._loadMapMesh(scene)
 		} else {
@@ -738,7 +750,7 @@ class GameInstance {
 			// orientation, so keep legacy on BOTH sides (client sets it too). NOTE: the
 			// class lives on the loaders module, NOT the BABYLON namespace, under tsx.
 			OBJFileLoader.USE_LEGACY_BEHAVIOR = true
-			const obj = fs.readFileSync('public' + MAP_MESH.dir + MAP_MESH.file, 'utf8').replace(/^mtllib.*$/gm, '')
+			const obj = fs.readFileSync('public' + this.map.dir + this.map.file, 'utf8').replace(/^mtllib.*$/gm, '')
 			// PERF: the OBJ is handed to babylon as a data URL. Babylon tests the string
 			// against /^data:([^,]+\/[^,]+)?;base64,/ to detect base64. CTF-Visage's OBJ has
 			// NO comma in 431KB, so [^,]+ spans the whole file and the regex backtracks over
@@ -750,8 +762,8 @@ class GameInstance {
 			// so collision uses the rotated geometry — MUST match the client (mapMesh.js).
 			const root = new BABYLON.TransformNode('mapRoot', scene)
 			res.meshes.forEach(m => { if (!m.parent) m.parent = root })
-			root.rotation.x = MAP_MESH.rotationX || 0
-			root.scaling.setAll(MAP_MESH.scale || 1)
+			root.rotation.x = this.map.rotationX || 0
+			root.scaling.setAll(this.map.scale || 1)
 			root.computeWorldMatrix(true)
 			let n = 0
 			const colliders = []
@@ -818,7 +830,7 @@ class GameInstance {
 			console.log(`[view] box centre(${vb.x.toFixed(2)}, ${vb.y.toFixed(2)}, ${vb.z.toFixed(2)}) `
 				+ `half(${vb.halfWidth.toFixed(2)}, ${vb.halfHeight.toFixed(2)}, ${vb.halfDepth.toFixed(2)})`)
 			this.mapReady = true
-			console.log(`[map] mesh collider loaded: ${n} meshes (${MAP_MESH.file})`)
+			console.log(`[map] mesh collider loaded: ${n} meshes (${this.map.file})`)
 		} catch (e) { console.error('[map] mesh load FAILED:', e) }
 	}
 
@@ -830,16 +842,16 @@ class GameInstance {
 		raw._spawnPos = { x: raw.x, y: raw.y, z: raw.z }
 		raw._minY = raw.y
 		raw._everGrounded = false
-		if (USE_MESH_MAP) console.log(`[spawn] nid=${raw.nid} @(${raw.x.toFixed(1)},${raw.y.toFixed(1)},${raw.z.toFixed(1)})`)
+		if (this.useMeshMap) console.log(`[spawn] nid=${raw.nid} @(${raw.x.toFixed(1)},${raw.y.toFixed(1)},${raw.z.toFixed(1)})`)
 	}
 
 	spawnPoint() {
-		if (USE_MESH_MAP) {
+		if (this.useMeshMap) {
 			// pick a floor spawn; small XZ jitter so two players don't spawn co-located.
 			// y is a hair above the floor so applyCommand gravity + mesh collision settle
 			// them cleanly.
-			const sc = MAP_MESH.scale || 1
-			const s = MAP_MESH.spawns[Math.floor(Math.random() * MAP_MESH.spawns.length)]
+			const sc = this.map.scale || 1
+			const s = this.map.spawns[Math.floor(Math.random() * this.map.spawns.length)]
 			return { x: s.x * sc + (Math.random() - 0.5) * 1.2, z: s.z * sc + (Math.random() - 0.5) * 1.2, y: s.y * sc }
 		}
 		// Spawn at one of the two tower bases (Facing Worlds). Random pick among the
@@ -850,23 +862,23 @@ class GameInstance {
 		return { x: p.x + (Math.random() - 0.5) * 2, z: p.z + (Math.random() - 0.5) * 2, y: 0 }
 	}
 
-	// WORLD position of the mega-health pickup. Mesh maps read MAP_MESH.mega (native
+	// WORLD position of the mega-health pickup. Mesh maps read this.map.mega (native
 	// units, like spawns/killY) and add MEGA.Y as the bob height above that floor
 	// point; box arenas keep their MEGA.X/Y/Z placement over the y=0 floor plane. A
 	// mesh map with no `mega` entry falls back to the box position and warns rather
 	// than silently parking the pickup somewhere unreachable — which is the bug this
 	// whole method exists to kill.
 	megaSpawnPos() {
-		if (USE_MESH_MAP) {
-			if (MAP_MESH.mega) {
-				const sc = MAP_MESH.scale || 1
+		if (this.useMeshMap) {
+			if (this.map.mega) {
+				const sc = this.map.scale || 1
 				return {
-					x: MAP_MESH.mega.x * sc,
-					y: MAP_MESH.mega.y * sc + MEGA.Y,
-					z: MAP_MESH.mega.z * sc
+					x: this.map.mega.x * sc,
+					y: this.map.mega.y * sc + MEGA.Y,
+					z: this.map.mega.z * sc
 				}
 			}
-			console.warn(`[mega] ${MAP_MESH.file} has no 'mega' entry in common/mapMesh.js — `
+			console.warn(`[mega] ${this.map.file} has no 'mega' entry in common/mapMesh.js — `
 				+ `falling back to the box-arena position (${MEGA.X}, ${MEGA.Y}, ${MEGA.Z}), `
 				+ `which is almost certainly not on this map's floor.`)
 		}
@@ -901,9 +913,9 @@ class GameInstance {
 	// yet). Mesh maps declare `walkable` in common/mapMesh.js; _loadMapMesh replaces
 	// this with the real thing derived from the mesh as soon as the OBJ is in.
 	defaultViewBox() {
-		if (USE_MESH_MAP && MAP_MESH.walkable) {
-			const sc = MAP_MESH.scale || 1
-			const w = MAP_MESH.walkable
+		if (this.useMeshMap && this.map.walkable) {
+			const sc = this.map.scale || 1
+			const w = this.map.walkable
 			return this.viewBoxFrom(
 				{ x: w.minX * sc, y: w.minY * sc, z: w.minZ * sc },
 				{ x: w.maxX * sc, y: w.maxY * sc, z: w.maxZ * sc }
@@ -917,16 +929,16 @@ class GameInstance {
 	// Turn a world-space min/max into a nengi aabb, union'd with everything else that
 	// must be replicated: the spawn points (authoritative positions — if one ever sat
 	// outside the floor AABB the box must still cover it) and the kill plane (players
-	// falling to their death stay visible until the server kills them at KILL_Y).
+	// falling to their death stay visible until the server kills them at this.killY).
 	viewBoxFrom(min, max) {
-		const sc = MAP_MESH.scale || 1
-		if (USE_MESH_MAP) {
-			for (const s of MAP_MESH.spawns) {
+		const sc = this.map.scale || 1
+		if (this.useMeshMap) {
+			for (const s of this.map.spawns) {
 				min.x = Math.min(min.x, s.x * sc); max.x = Math.max(max.x, s.x * sc)
 				min.y = Math.min(min.y, s.y * sc); max.y = Math.max(max.y, s.y * sc)
 				min.z = Math.min(min.z, s.z * sc); max.z = Math.max(max.z, s.z * sc)
 			}
-			min.y = Math.min(min.y, KILL_Y * sc)
+			min.y = Math.min(min.y, this.killY * sc)
 		}
 		const m = VIEW_MARGIN
 		return {
@@ -1128,6 +1140,11 @@ class GameInstance {
 	}
 
 	update(delta, tick, now) {
+		// Pin the module-level active map to THIS instance's map before ticking. A tick is
+		// synchronous, so every applyCommand call below (and any reconciliation replay of
+		// these commands) sees a constant active map — deterministic, and multi-instance
+		// safe even when one process hosts instances with different maps.
+		setActiveMap(this.map)
 		this.instance.emitCommands()
 
 		// respawn any players whose death timer has run out
@@ -1139,10 +1156,10 @@ class GameInstance {
 			}
 		})
 
-		// Fall-death: anyone who drops below KILL_Y (walked off a ledge into the void)
+		// Fall-death: anyone who drops below this.killY (walked off a ledge into the void)
 		// dies — unattributed, routed through the same death bookkeeping as a frag.
-		if (USE_MESH_MAP) {
-			const killY = KILL_Y * (MAP_MESH.scale || 1)
+		if (this.useMeshMap) {
+			const killY = this.killY * (this.map.scale || 1)
 			const fallKill = (raw, smooth, arm) => {
 				if (!raw) return
 				if (raw.isAlive) { raw._minY = Math.min(raw._minY ?? raw.y, raw.y); if (raw.grounded) raw._everGrounded = true }
@@ -1218,7 +1235,7 @@ class GameInstance {
 			// shrapnel bounce. Running both would double-resolve the same boxes and the
 			// (earlier) world sweep would pre-empt every bounce.
 			let worldT = Infinity
-			if (USE_MESH_MAP && segLen > 0) {
+			if (this.useMeshMap && segLen > 0) {
 				const d = sweepWorld(this.occluderMeshes, p0x, p0y, p0z,
 					sx / segLen, sy / segLen, sz / segLen, segLen)
 				if (d < segLen) worldT = d / segLen
@@ -1356,7 +1373,7 @@ class GameInstance {
 
 			// FLOOR BOUNCE. Reflect Y with restitution + damp horizontal a touch so it
 			// settles instead of skating forever. Only WHERE the floor is differs by map.
-			if (USE_MESH_MAP) {
+			if (this.useMeshMap) {
 				// A mesh map has no floor plane — CTF-Visage's deck is at world y ~-25.35,
 				// so the old unconditional clamp to GROUND_Y=0 shoved every grenade ~24m
 				// into the sky on tick 1 and detonated it in the void: grenades did zero

@@ -23,9 +23,12 @@ const PLAYER_HALF_HEIGHT = 0.5
 // map filename convention: the OBJ's basename with .nav.json (CTF-Visage.obj -> CTF-Visage.nav.json)
 const navPathFor = (map) => 'public' + map.dir + map.file.replace(/\.obj$/i, '.nav.json')
 
-// One graph per active map. Built lazily on first request, cached forever (the active map
-// never changes at runtime — USE_MESH_MAP / MAP_MESH are fixed).
-let cache // undefined = not tried, null = tried & unavailable, object = ready
+// One graph PER MAP, keyed by the map's OBJ basename, built lazily on first request and
+// cached (a map's baked ReachSpec graph never changes at runtime). Keyed rather than a
+// single slot so a future multi-instance server hosting several maps in one process gets
+// the right graph for each — a map is now a runtime value (common/mapMesh.js), not a
+// compile-time constant.
+const cache = new Map() // map.file -> (null = tried & unavailable | graph object)
 
 const build = (map) => {
 	const file = navPathFor(map)
@@ -59,10 +62,12 @@ const build = (map) => {
 	return { nodes, adj, pickups, N }
 }
 
-export const getNavGraph = () => {
-	if (cache !== undefined) return cache
-	cache = build(MAP_MESH)
-	return cache
+export const getNavGraph = (map = MAP_MESH) => {
+	const key = map.file
+	if (cache.has(key)) return cache.get(key)
+	const g = build(map)
+	cache.set(key, g)
+	return g
 }
 
 // Nearest graph node to a world point, restricted to nodes that HAVE traversable edges

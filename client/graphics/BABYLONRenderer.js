@@ -3,7 +3,7 @@ import { resolveWeaponFx, classifySurface, surfaceFx, fadeAlpha } from './firing
 import { OBJFileLoader } from '../babylon.js' // OBJ loader (mesh maps) via curated barrel
 
 import ArenaDressing from './arenaDressing'
-import { USE_MESH_MAP, MAP_MESH } from '../../common/mapMesh'
+import { getActiveMap } from '../../common/mapMesh'
 import { bakeVertexColors } from './mapLights'
 
 // Layer the first-person viewmodel lives on: vmCamera renders ONLY this, the world
@@ -50,7 +50,7 @@ const DROP_SIZE_MUL = 0.55, DROP_SIZE_JITTER = 0.4
 // A drop/streak that reaches the floor leaves one: grow, hold, fade, recycle.
 // BOX ARENAS ONLY. This is the arenaDressing floor height — valid when the level is
 // the SciFi-kit box arena (invisible collision plane + tiles drawn at y -1). MESH MAPS
-// (USE_MESH_MAP, common/mapMesh.js) have no such global floor: the artist OBJ is both
+// (this.useMeshMap, common/mapMesh.js) have no such global floor: the artist OBJ is both
 // visual and collision, its deck sits at an arbitrary world height (CTF-Visage ~ -25),
 // and that height VARIES across the map. So never test/place FX against this constant
 // unconditionally — go through _floorYBelow(), which falls back to it only on box
@@ -68,7 +68,12 @@ const GROUND_SIZE = 0.5, GROUND_SIZE_JITTER = 0.4 // × base impact scale
 // so the string-replace was a dead no-op. Precision is handled in-source. (upgrade.md R10)
 
 class BABYLONRenderer {
-	constructor() {
+	constructor(map) {
+		// Which map to load, as a RUNTIME value: the caller (client/Simulator) tells us,
+		// defaulting to the active map (CTF-Visage) so nothing changes for the live game.
+		this.map = map || getActiveMap()
+		this.useMeshMap = this.map.useMeshMap
+
 		this.engine = new BABYLON.Engine(document.getElementById('main-canvas'), true)
 		this.engine.enableOfflineSupport = false
 
@@ -299,7 +304,7 @@ class BABYLONRenderer {
 		// Nothing else holds a reference: the handle is local, and the only other mention
 		// of the name is drawHitscan's pick filter (m.name !== 'ground'), which is simply
 		// a no-op when the mesh doesn't exist.
-		if (!USE_MESH_MAP) {
+		if (!this.useMeshMap) {
 			const plane = BABYLON.MeshBuilder.CreatePlane('ground', { size: 60 }, this.scene)
 			plane.rotation.x = Math.PI * 0.5
 			plane.position.y = -1.03
@@ -342,7 +347,7 @@ class BABYLONRenderer {
 
 		// --- ARENA VISUAL. Mesh maps load the artist OBJ directly as the level; box
 		// arenas use the SciFi MegaKit dressing (floor tiles, wall panels, columns).
-		if (USE_MESH_MAP) {
+		if (this.useMeshMap) {
 			this.arenaDressing = null
 			this._loadMeshMap()
 		} else {
@@ -485,7 +490,7 @@ class BABYLONRenderer {
 	}
 
 	// Load the artist OBJ map as the level visual (mesh maps): textured via the MTL
-	// (web-optimized WebP set in MAP_MESH.dir/textures/), lit by the original 1999
+	// (web-optimized WebP set in this.map.dir/textures/), lit by the original 1999
 	// light actors baked into vertex colors. Server owns collision.
 	_loadMeshMap() {
 		// Babylon 9's OBJ loader default-mirrors X vs 4.0.3 (USE_LEGACY_BEHAVIOR now
@@ -493,14 +498,14 @@ class BABYLONRenderer {
 		// and the server collider sets the same flag — visual and collision must match.
 		// (Named import: the class lives on the loaders module, not the BABYLON namespace.)
 		OBJFileLoader.USE_LEGACY_BEHAVIOR = true
-		BABYLON.SceneLoader.ImportMeshAsync('', MAP_MESH.dir, MAP_MESH.file, this.scene)
+		BABYLON.SceneLoader.ImportMeshAsync('', this.map.dir, this.map.file, this.scene)
 			.then(res => {
 				// upright the Z-up OBJ — MUST match the server's rotation (mapMesh.js) so
 				// the visual floor and the collision floor line up to the millimeter.
 				const root = new BABYLON.TransformNode('mapRoot', this.scene)
 				res.meshes.forEach(m => { if (!m.parent) m.parent = root })
-				root.rotation.x = MAP_MESH.rotationX || 0
-				root.scaling.setAll(MAP_MESH.scale || 1)
+				root.rotation.x = this.map.rotationX || 0
+				root.scaling.setAll(this.map.scale || 1)
 				root.computeWorldMatrix(true)
 				const shadowList = this.shadowGenerator ? this.shadowGenerator.getShadowMap().renderList : null
 				res.meshes.forEach(m => {
@@ -539,9 +544,9 @@ class BABYLONRenderer {
 	// of the mapRoot rotation/scale and can run any time after import. Failure is
 	// cosmetic-only: the map just stays uniformly lit.
 	async _bakeMapLights(meshes, mapRoot) {
-		if (!MAP_MESH.lights) return
+		if (!this.map.lights) return
 		try {
-			const resp = await fetch(MAP_MESH.dir + MAP_MESH.lights)
+			const resp = await fetch(this.map.dir + this.map.lights)
 			if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
 			const data = await resp.json()
 			let baked = 0
@@ -596,7 +601,7 @@ class BABYLONRenderer {
 		const glowTex = this._sprites.glow
 		const animated = []
 		picks.forEach((l, i) => {
-			const s = MAP_MESH.scale || 1
+			const s = this.map.scale || 1
 			const size = (0.9 + (l.brightness / 64) * 0.9) * s
 			const plane = BABYLON.MeshBuilder.CreatePlane(`corona${i}`, { size }, this.scene)
 			plane.position.set(l.pos_m[0] * s, l.pos_m[2] * s, -l.pos_m[1] * s)
@@ -1077,7 +1082,7 @@ class BABYLONRenderer {
 	// null as "never lands" — the particle expires mid-air rather than snapping to a
 	// phantom floor, which is the correct read over Visage's open edges.
 	_floorYBelow(point) {
-		if (!USE_MESH_MAP) return GROUND_Y
+		if (!this.useMeshMap) return GROUND_Y
 		const from = new BABYLON.Vector3(point.x, point.y + 0.25, point.z)
 		const ray = new BABYLON.Ray(from, new BABYLON.Vector3(0, -1, 0), 400)
 		const hit = this.scene.pickWithRay(ray, (m) => this._isSolidWorld(m))

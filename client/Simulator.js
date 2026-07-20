@@ -9,6 +9,8 @@ import { decodeName, sanitizeName } from '../common/playerNames'
 import createFactories from './factories/createFactories'
 import reconcilePlayer from './reconcilePlayer'
 import applyCommand, { DODGE_DIRS } from '../common/applyCommand'
+import { setActiveMap } from '../common/mapMesh'
+import { getMapRecord, DEFAULT_MAP_ID } from '../common/mapRegistry'
 import TouchControls, { isTouchDevice } from './TouchControls'
 import { fire } from '../common/weapon'
 import { shotPattern, applyPattern } from '../common/firePattern'
@@ -50,7 +52,14 @@ const shouldIgnore = (myId, update) => {
 class Simulator {
 	constructor(client) {
 		this.client = client
-		this.renderer = new BABYLONRenderer()
+		// Map selection is a RUNTIME value on the client too. For now the client plays
+		// the default (CTF-Visage) — later a server handshake will name the instance's
+		// map. setActiveMap pins the module-level active-map bindings that the client's
+		// own applyCommand PREDICTION and reconciliation read, so prediction and the
+		// server agree on USE_MESH_MAP; the renderer is told the same record explicitly.
+		this.map = getMapRecord(DEFAULT_MAP_ID)
+		setActiveMap(this.map)
+		this.renderer = new BABYLONRenderer(this.map)
 		this.input = new InputSystem()
 		this.obstacles = new Map()
 		this.characterModels = new Map() // nid -> CharacterModel (other players' visuals)
