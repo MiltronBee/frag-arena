@@ -19,7 +19,7 @@ import setupObstacles from './setupObstacles'
 import { fire } from '../common/weapon'
 import { shotPattern, applyPattern } from '../common/firePattern'
 import { damageFalloffMult, falloffRange } from '../common/damageFalloff'
-import lagCompensatedHitscanCheck from './lagCompensatedHitscanCheck'
+import lagCompensatedHitscanCheck, { nearestWorldHit } from './lagCompensatedHitscanCheck'
 import Projectile from '../common/entity/Projectile'
 import Grenade from '../common/entity/Grenade'
 import MegaHealthPickup, { MEGA_STATE } from '../common/entity/MegaHealthPickup'
@@ -46,7 +46,69 @@ const GRENADE = {
 	RADIUS: 5.0,           // AoE radius (m)
 	DMG_CENTER: 120,       // damage at the center
 	DMG_EDGE: 20,          // damage at RADIUS (linear falloff to 0 beyond)
-	GROUND_Y: 0            // floor plane (matches applyCommand GROUND_Y)
+	// BOX ARENAS ONLY. The box arena's floor really is the plane y=0 (matches
+	// applyCommand GROUND_Y). A mesh map has no such plane: CTF-Visage's deck sits at
+	// world y ~-25.35, i.e. BELOW zero, so clamping to 0 teleported every grenade ~24m
+	// into the sky on its first tick and detonated it in the void. Mesh maps take their
+	// floor from the geometry instead (the down-probe in update()), so this constant is
+	// now read only on the box-arena branch.
+	GROUND_Y: 0,
+	// Clearance kept between a resting grenade and the surface under it. Also the lift
+	// applied to the splash line-of-sight origin, so a grenade sitting ON the deck does
+	// not have that same deck count as the wall that blocks its own blast.
+	SKIN: 0.12
+}
+
+// ---------------------------------------------------------------------------
+// Swept world-geometry query
+// ---------------------------------------------------------------------------
+// "Does static map geometry lie on the segment origin -> origin + dir*len?" Returns the
+// distance along the segment, or Infinity when the segment is clear.
+//
+// This is deliberately NOT a new geometry query: it forwards to
+// server/lagCompensatedHitscanCheck.js's nearestWorldHit — the same function hitscan
+// occlusion and BotController's line-of-sight already use, against the same
+// this.occluderMeshes (subdivided OBJ submeshes on a mesh map, Obstacle boxes on a box
+// arena). One implementation decides every "is this blocked" question on the server.
+//
+// The Ray is module-scoped and mutated in place: this runs per projectile per tick and
+// Flak fires 5 pellets, so allocating a Ray + two Vector3s per query would be pure
+// garbage. The server is single-threaded and nearestWorldHit never retains the ray.
+//
+// `dir` MUST be unit length — nearestWorldHit's bounding-sphere pre-reject projects
+// onto it and would mis-cull otherwise.
+const _sweepRay = new BABYLON.Ray(new BABYLON.Vector3(0, 0, 0), new BABYLON.Vector3(0, 0, 1), 1)
+const sweepWorld = (meshes, ox, oy, oz, dx, dy, dz, len) => {
+	if (!meshes || meshes.length === 0 || !(len > 0)) return Infinity
+	_sweepRay.origin.set(ox, oy, oz)
+	_sweepRay.direction.set(dx, dy, dz)
+	// bound the ray itself, not just the pre-reject: an unbounded ray would report the
+	// far side of the map as a "hit" and cost triangle tests all the way there.
+	_sweepRay.length = len
+	return nearestWorldHit(meshes, _sweepRay, len)
+}
+
+// Earliest fraction t in [0,1] at which the segment p -> p+s enters the sphere of
+// radius r about c, or -1 if it never does. Smaller root of |p + t*s - c|^2 = r^2.
+//
+// This replaces a POINT test at the tick position. A point test samples ONE point of
+// this segment, so it only lands a hit when a tick boundary happens to fall inside the
+// target sphere. At full-ADS Plasma the segment is 2.19m long and the sphere is 0.90m
+// across, so most geometrically real hits fell between two ticks and were silently
+// dropped — the weapon advertised as the precise dart was the least reliable in the
+// game. Sweeping the segment makes the hit independent of tick phase.
+const segmentSphereT = (px, py, pz, sx, sy, sz, cx, cy, cz, r) => {
+	const mx = px - cx, my = py - cy, mz = pz - cz
+	const cc = mx * mx + my * my + mz * mz - r * r
+	if (cc <= 0) return 0                      // started inside the sphere
+	const a = sx * sx + sy * sy + sz * sz
+	if (a <= 0) return -1                      // not moving, and outside
+	const b = mx * sx + my * sy + mz * sz
+	if (b >= 0) return -1                      // outside and moving away
+	const disc = b * b - a * cc
+	if (disc < 0) return -1                    // misses the sphere entirely
+	const t = (-b - Math.sqrt(disc)) / a
+	return (t >= 0 && t <= 1) ? t : -1
 }
 
 // Phase 4 MEGA-HEALTH pickup tuning (locked design numbers). Server-only.
@@ -519,6 +581,26 @@ class GameInstance {
 			const dx = v.x - gx, dy = v.y - gy, dz = v.z - gz
 			const dist = Math.hypot(dx, dy, dz)
 			if (dist >= GRENADE.RADIUS) return
+
+			// LINE OF SIGHT. The radius test on its own is a pure Math.hypot with no
+			// occlusion, so a blast damages straight THROUGH a wall. That was harmless
+			// only because grenades never survived to detonate anywhere useful on a mesh
+			// map; fixing the floor above would have turned zero damage into 5m
+			// through-wall damage, which is strictly worse. So both ship together.
+			//
+			// Same query and same rule as hitscan occlusion: geometry strictly BETWEEN
+			// the blast and the victim blocks it, geometry behind the victim does not.
+			// Only paid for players already inside the 5m radius, over a <=5m ray.
+			if (this.occluderMeshes.length > 0) {
+				// lift the origin off whatever the grenade is resting on, or the deck
+				// under it counts as the wall that blocks its own blast
+				const oy = gy + GRENADE.SKIN
+				const lx = v.x - gx, ly = v.y - oy, lz = v.z - gz
+				const lLen = Math.hypot(lx, ly, lz)
+				if (lLen > 0.001 &&
+					sweepWorld(this.occluderMeshes, gx, oy, gz, lx / lLen, ly / lLen, lz / lLen, lLen) < lLen) return
+			}
+
 			// linear falloff: t=0 at center → DMG_CENTER, t=1 at edge → DMG_EDGE
 			const t = dist / GRENADE.RADIUS
 			const dmg = Math.round(GRENADE.DMG_CENTER + (GRENADE.DMG_EDGE - GRENADE.DMG_CENTER) * t)
@@ -1053,9 +1135,18 @@ class GameInstance {
 
 		// Update all active projectiles
 		this.projectiles.forEach(proj => {
-			proj.x += proj.velocity.x * delta
-			proj.y += proj.velocity.y * delta
-			proj.z += proj.velocity.z * delta
+			// SWEPT step. Everything below resolves against the SEGMENT the bolt covers
+			// this tick, [p0 -> p0 + v*delta], not against the end point alone. Keep the
+			// start and the step vector; `segLen` is the distance travelled this tick.
+			const p0x = proj.x, p0y = proj.y, p0z = proj.z
+			const sx = proj.velocity.x * delta
+			const sy = proj.velocity.y * delta
+			const sz = proj.velocity.z * delta
+			const segLen = Math.hypot(sx, sy, sz)
+
+			proj.x = p0x + sx
+			proj.y = p0y + sy
+			proj.z = p0z + sz
 			proj.lifeTime -= delta
 
 			// Check if out of lifetime
@@ -1066,52 +1157,91 @@ class GameInstance {
 				return
 			}
 
-			let hitOccurred = false
+			// WORLD GEOMETRY. On a mesh map this.obstacles is EMPTY by construction (see
+			// the constructor), so the obstacle loop further down can never stop a bolt:
+			// before this, every Plasma bolt and Flak pellet flew through both towers and
+			// the bridge for its full 3s life (195m / 135m) and Flak's bounceCount was
+			// dead code. The map mesh is the world here, so sweep the step against it.
+			//
+			// Box arenas keep the obstacle loop below: there the Obstacle boxes ARE the
+			// world geometry, that loop already handles them, and it is what carries the
+			// shrapnel bounce. Running both would double-resolve the same boxes and the
+			// (earlier) world sweep would pre-empt every bounce.
+			let worldT = Infinity
+			if (USE_MESH_MAP && segLen > 0) {
+				const d = sweepWorld(this.occluderMeshes, p0x, p0y, p0z,
+					sx / segLen, sy / segLen, sz / segLen, segLen)
+				if (d < segLen) worldT = d / segLen
+			}
 
-			// Check collisions with players (humans and bots alike)
+			// Check collisions with players (humans and bots alike). Take the EARLIEST
+			// entry along the segment, so a bolt that would cross two players hits the
+			// near one — the old loop took whoever came first in iteration order.
 			const projectileTargets = []
 			this.instance.clients.forEach(c => projectileTargets.push(c))
 			projectileTargets.push(...this.bots)
+			let bestT = Infinity
+			let bestClient = null
 			projectileTargets.forEach(c => {
-				if (hitOccurred) return
 				const target = c.rawEntity
-				if (target && target.isAlive && target.nid !== proj.ownerNid) {
-					const dx = target.x - proj.x
-					const dy = target.y - proj.y
-					const dz = target.z - proj.z
-					const dist = Math.hypot(dx, dy, dz)
-
-					// Collision cylinder check (height 1m, radius = proj.radius, default
-					// 0.75m; aimed Plasma bolts spawn with a smaller radius — see spawn).
-					if (dist < proj.radius && Math.abs(dy) < 1.0) {
-						let attacker = null
-						this.instance.clients.forEach(ac => {
-							if (ac.rawEntity && ac.rawEntity.nid === proj.ownerNid) attacker = ac
-						})
-						if (!attacker) attacker = this.bots.find(b => b.rawEntity.nid === proj.ownerNid) || null
-						this.damagePlayer(c, attacker, proj.damage, 'projectile', proj.weaponIndex)
-
-						// Plasma slow-on-hit: refresh (don't stack) the debuff on the
-						// victim. Set on BOTH raw+smooth in lockstep — same rule as
-						// damagePlayer's hp sync (the victim reads raw, everyone smooth).
-						if (proj.slowFactor > 0 && c.rawEntity && c.rawEntity.isAlive) {
-							c.rawEntity.slowTimer = proj.slowDuration
-							c.rawEntity.slowFactor = proj.slowFactor
-							if (c.smoothEntity) {
-								c.smoothEntity.slowTimer = proj.slowDuration
-								c.smoothEntity.slowFactor = proj.slowFactor
-							}
-						}
-
-						this.instance.removeEntity(proj)
-						if (proj.mesh && proj.mesh.dispose) proj.mesh.dispose()
-						this.projectiles.delete(proj)
-						hitOccurred = true
-					}
-				}
+				if (!target || !target.isAlive || target.nid === proj.ownerNid) return
+				// Swept sphere check (radius = proj.radius, default 0.75m; aimed Plasma
+				// bolts spawn with a smaller radius — see spawn).
+				const t = segmentSphereT(p0x, p0y, p0z, sx, sy, sz, target.x, target.y, target.z, proj.radius)
+				if (t < 0 || t >= bestT) return
+				// Vertical band, kept from the old test but now evaluated AT THE CROSSING
+				// rather than at the tick position. Non-binding while proj.radius <= 1
+				// (the crossing point is ON the sphere, so |dy| <= radius there); it only
+				// starts to matter if a future weapon spawns a fatter bolt.
+				if (Math.abs(target.y - (p0y + sy * t)) >= 1.0) return
+				bestT = t
+				bestClient = c
 			})
 
-			if (hitOccurred) return
+			// A wall crossed BEFORE the victim blocks the bolt; a wall behind them does
+			// not (same distance-along-the-ray rule the hitscan occlusion uses).
+			if (bestClient && bestT <= worldT) {
+				const c = bestClient
+				// place the bolt at the crossing so the removal FX lands on the victim
+				proj.x = p0x + sx * bestT
+				proj.y = p0y + sy * bestT
+				proj.z = p0z + sz * bestT
+				let attacker = null
+				this.instance.clients.forEach(ac => {
+					if (ac.rawEntity && ac.rawEntity.nid === proj.ownerNid) attacker = ac
+				})
+				if (!attacker) attacker = this.bots.find(b => b.rawEntity.nid === proj.ownerNid) || null
+				this.damagePlayer(c, attacker, proj.damage, 'projectile', proj.weaponIndex)
+
+				// Plasma slow-on-hit: refresh (don't stack) the debuff on the
+				// victim. Set on BOTH raw+smooth in lockstep — same rule as
+				// damagePlayer's hp sync (the victim reads raw, everyone smooth).
+				if (proj.slowFactor > 0 && c.rawEntity && c.rawEntity.isAlive) {
+					c.rawEntity.slowTimer = proj.slowDuration
+					c.rawEntity.slowFactor = proj.slowFactor
+					if (c.smoothEntity) {
+						c.smoothEntity.slowTimer = proj.slowDuration
+						c.smoothEntity.slowFactor = proj.slowFactor
+					}
+				}
+
+				this.instance.removeEntity(proj)
+				if (proj.mesh && proj.mesh.dispose) proj.mesh.dispose()
+				this.projectiles.delete(proj)
+				return
+			}
+
+			// Struck the map. Park the bolt exactly on the surface so the client's impact
+			// FX fires at the wall, then kill it.
+			if (worldT < Infinity) {
+				proj.x = p0x + sx * worldT
+				proj.y = p0y + sy * worldT
+				proj.z = p0z + sz * worldT
+				this.instance.removeEntity(proj)
+				if (proj.mesh && proj.mesh.dispose) proj.mesh.dispose()
+				this.projectiles.delete(proj)
+				return
+			}
 
 			// Check collisions with obstacles
 			for (const obstacle of this.obstacles.values()) {
@@ -1168,14 +1298,62 @@ class GameInstance {
 		// so detonateGrenade can safely mutate this.grenades mid-iteration.
 		this.grenades.forEach(g => {
 			// gravity + integrate
+			const gp0x = g.x, gp0y = g.y, gp0z = g.z
 			g.velocity.y -= GRENADE.GRAVITY * delta
 			g.x += g.velocity.x * delta
 			g.y += g.velocity.y * delta
 			g.z += g.velocity.z * delta
 
-			// floor bounce: reflect Y with restitution + damp horizontal a touch so it
-			// settles instead of skating forever
-			if (g.y <= GRENADE.GROUND_Y) {
+			// FLOOR BOUNCE. Reflect Y with restitution + damp horizontal a touch so it
+			// settles instead of skating forever. Only WHERE the floor is differs by map.
+			if (USE_MESH_MAP) {
+				// A mesh map has no floor plane — CTF-Visage's deck is at world y ~-25.35,
+				// so the old unconditional clamp to GROUND_Y=0 shoved every grenade ~24m
+				// into the sky on tick 1 and detonated it in the void: grenades did zero
+				// damage on this map, always. Ask the geometry instead.
+				//
+				// Probe straight DOWN from the height the grenade started this tick, at the
+				// x/z it is landing on, over exactly the distance it fell (+SKIN). That is a
+				// swept floor test — a fast grenade cannot fall through a thin deck between
+				// ticks — and it costs one short ray only while descending.
+				const fall = gp0y - g.y
+				if (fall > 0) {
+					const reach = fall + GRENADE.SKIN
+					const d = sweepWorld(this.occluderMeshes, g.x, gp0y, g.z, 0, -1, 0, reach)
+					if (d < reach) {
+						g.y = gp0y - d + GRENADE.SKIN
+						if (g.velocity.y < 0) {
+							g.velocity.y = -g.velocity.y * g.restitution
+							g.velocity.x *= 0.8
+							g.velocity.z *= 0.8
+							// kill tiny residual bounces so it comes to rest-ish
+							if (g.velocity.y < 0.6) g.velocity.y = 0
+						}
+					}
+				}
+
+				// WALL STOP. The down-probe only knows about surfaces underneath, so sweep
+				// the HORIZONTAL part of the step too: a purely horizontal ray that hits
+				// something is unambiguously a wall (no surface normal needed, which is why
+				// the floor case is a separate query — at a shallow landing the dominant
+				// travel axis is horizontal and reflecting on that would bounce a grenade
+				// backwards off the deck). Reflect the dominant horizontal axis with
+				// restitution, mirroring the box-arena obstacle fallback below.
+				const hx = g.x - gp0x, hz = g.z - gp0z
+				const hLen = Math.hypot(hx, hz)
+				if (hLen > 0) {
+					const reach = hLen + GRENADE.SKIN
+					const d = sweepWorld(this.occluderMeshes, gp0x, g.y, gp0z, hx / hLen, 0, hz / hLen, reach)
+					if (d < reach) {
+						const back = Math.max(0, d - GRENADE.SKIN) / hLen
+						g.x = gp0x + hx * back
+						g.z = gp0z + hz * back
+						if (Math.abs(g.velocity.x) >= Math.abs(g.velocity.z)) g.velocity.x = -g.velocity.x * g.restitution
+						else g.velocity.z = -g.velocity.z * g.restitution
+					}
+				}
+			} else if (g.y <= GRENADE.GROUND_Y) {
+				// Box arena: the floor really is the plane y=0. Unchanged.
 				g.y = GRENADE.GROUND_Y
 				if (g.velocity.y < 0) {
 					g.velocity.y = -g.velocity.y * g.restitution

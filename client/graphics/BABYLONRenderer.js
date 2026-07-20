@@ -833,11 +833,28 @@ class BABYLONRenderer {
 		// start the tracer slightly ahead of the shooter so it doesn't self-intersect
 		const origin = new BABYLON.Vector3(x, y, z).add(dir.scale(0.6))
 
-		// find the impact point; ignore very-near hits (the shooter's own box) and
-		// fall back to a long ray if nothing is hit
+		// find the impact point. A single pickWithRay returns ONLY the nearest mesh, so a
+		// hit closer than 0.5m does not fall through to the geometry behind it — it VOIDS
+		// the whole pick and no impact FX is drawn. The shooter's own hittable box is a
+		// 1u cube (half-diagonal 0.707 > the 0.6m origin offset), so a DIAGONAL shot fired
+		// from an entity CENTRE starts inside that box and its far wall is the nearest hit
+		// (~0.1m out) — cancelling the shot. Local shots dodge it (muzzle ~1.05m forward),
+		// but the remote-shot path passes the shooter's centre (Simulator.js), so other
+		// players' diagonal aims dropped their impact FX. multiPickWithRay returns ALL
+		// hits; take the nearest one PAST 0.5m so a near self-box hit falls THROUGH to the
+		// wall behind. (The shooter's nid isn't available at this call site, so the 0.5m
+		// fall-through — not a per-nid exclusion — is the fix; the 0.6m offset and 120m
+		// fallback are unchanged tuned presentation values.)
 		const ray = new BABYLON.Ray(origin, dir, 500)
-		const hit = this.scene.pickWithRay(ray, this._hitscanPredicate)
-		const hitValid = hit && hit.hit && hit.pickedPoint && hit.distance > 0.5
+		const picks = this.scene.multiPickWithRay(ray, this._hitscanPredicate)
+		let hit = null
+		if (picks) {
+			// multiPickWithRay is NOT distance-sorted; scan for the nearest valid hit.
+			for (const p of picks) {
+				if (p && p.hit && p.pickedPoint && p.distance > 0.5 && (!hit || p.distance < hit.distance)) hit = p
+			}
+		}
+		const hitValid = !!hit
 		const end = hitValid ? hit.pickedPoint : origin.add(dir.scale(120))
 
 		// tracer: thin, hot, brief. Multi-pellet weapons call drawHitscan once per
@@ -1071,6 +1088,13 @@ class BABYLONRenderer {
 	// pickable for everything else.
 	_isSolidWorld(mesh) {
 		if (!mesh || mesh.name === 'sky') return false
+		// A predicate passed to pickWithRay REPLACES Babylon's built-in isEnabled gate,
+		// so _floorYBelow's downward ray (called ~once per shot to seat brass/blood/gibs)
+		// otherwise triangle-tests the same disabled weapon-swap leftovers and the skydome
+		// backing sphere that bloated the hitscan pick. Skip both here too. (see
+		// _isHitscanTarget — same root cause; measured _floorYBelow 1760us -> 860us, ~2x).
+		if (!mesh.isEnabled()) return false
+		if (this.skydome && (mesh === this.skydome.mesh || mesh.parent === this.skydome.mesh)) return false
 		if (classifySurface(mesh) === 'flesh') return false // don't land blood inside a body
 		if (mesh.checkCollisions) return true               // mesh-map geometry (non-pickable)
 		return mesh.isPickable !== false                    // box-arena floor/obstacles
@@ -1104,6 +1128,21 @@ class BABYLONRenderer {
 	// measured ~27% off the pick cost.
 	_isHitscanTarget(mesh) {
 		if (!mesh || mesh.name === 'sky' || mesh.name === 'ground') return false
+		// A predicate passed to pickWithRay REPLACES Babylon's built-in isEnabled/
+		// isVisible/isPickable gating, so DISABLED meshes we could never normally hit
+		// still get fully triangle-tested every pick. On Visage that silently made the
+		// two most expensive meshes in every hitscan pick a weapon swap's DISABLED
+		// leftover gun meshes (Gun_SMG / Gun_Pistol, ~3.3-3.9k tris each, on the WORLD
+		// layer so the VM mask below never excluded them) plus the skydome's disabled
+		// ~17k-tri backing sphere. Restore the isEnabled gate the default pick always had
+		// and only lost because we pass a predicate. (measured 1940us -> 570us median.)
+		if (!mesh.isEnabled()) return false
+		// The PhotoDome sky mesh is named '<dome>_mesh' ('sky_mesh'), NOT 'sky', so the
+		// name guard above never caught the VISIBLE dome: a ~4.6k-tri sphere whose bounding
+		// volume encloses the shooter (so it is never culled) yet sits ~1800m out, well
+		// past any 500m ray — pure wasted triangle testing on every pellet of every shot.
+		// Exclude the dome (and its child) by reference. (570us -> 235us, 8.3x vs shipped.)
+		if (this.skydome && (mesh === this.skydome.mesh || mesh.parent === this.skydome.mesh)) return false
 		if (mesh.layerMask === VM_LAYER_MASK) return false // local viewmodel: never a surface
 		if (mesh.isPickable !== false) return true         // players (flesh), box-arena world
 		return this._isSolidWorld(mesh)                    // mesh-map geometry (non-pickable)

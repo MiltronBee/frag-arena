@@ -86,6 +86,20 @@ For each spawn, probe straight down and confirm:
 > Do a normal-filtered probe, not a min/max-y column probe. A column probe
 > cannot tell an up-facing walkable surface from a down-facing hull.
 
+> **Gate on the nav graph, not raw floor.** Some up-facing geometry is not
+> reachable — tower undersides and roof panels face up but nobody stands on
+> them. CTF-Visage's raw walkable geometry reaches native **-78.42**, but its
+> *reachable* floor stops at **-39.01**. Deriving `killY` from raw floor puts the
+> kill plane ~40 m too low; gating on nav reproduces the shipped `killY = -65`
+> exactly. A working rule:
+> `killY = floor((lowest_reachable_floor - 15) / 5) * 5`, which yields ~10-17 m
+> of margin across the map set.
+
+Also check **headroom at every spawn**. A spawn with under ~1 m of clearance
+puts the player's head in geometry. Four spawns on CTF-Dismal (0.74-0.94 m) and
+one on CTF-Torix (0.25 m) had to be dropped for this — measure it rather than
+trusting the original author.
+
 ---
 
 ## 4. Network view bounds — BLOCKER
@@ -241,14 +255,20 @@ glance.
   sweep was plainly blocked. Detect contact by travel shortfall instead. On the
   horizontal walking move it reads `false` *always*. Working substitute:
   `slidePlaneNormal` is zero before the move and non-zero after.
-- **Triangle winding is per-map, and DM-W-Grove's is inverted** — its floors
-  report `normal.y = -1.000`. Any probe written as `normal.y >= 0.7` returns an
-  **empty set** on that map and looks like "no walkable floor" rather than an
-  error. Test `Math.abs(n.y) >= 0.7` whenever you only need walkability.
-  You still need the true sign to tell a floor from a ceiling — calibrate it per
-  map (vote from known-good spawn positions, compare against the OBJ's own
-  vertex normals, or check the signed mesh volume). Note the x/z *extents* of
-  walkable floor are sign-independent, so bounds work either way.
+- **Winding: keep the defensive test, but the "Grove is inverted" warning is
+  retired.** An earlier probe reported DM-W-Grove's floors as `normal.y = -1.000`.
+  Re-measured through the exact `_loadMapMesh` path (Babylon 9,
+  `USE_LEGACY_BEHAVIOR = true`, `rotationX = -PI/2`), Grove reads **+1.000** under
+  all 16 spawns, by face *and* vertex normals, and **all 84 maps read +1**. The
+  earlier result came from a different load path. Still test
+  `Math.abs(n.y) >= 0.7` when you only need walkability — it costs nothing and
+  survives a pipeline change — but do not expect per-map winding variation.
+  Note walkable x/z *extents* are sign-independent either way.
+- **Two exporters exist and their conventions differ.** The raw exporter under
+  `/mnt/echostore` emits **z negated** relative to the live assets. The live
+  convention is the one in `maps/improved/`. Mixing them **mirrors the map** —
+  spawns, pickups and objectives will land on the wrong side and nothing will
+  look obviously broken. Always take geometry from `maps/improved/`.
 - **The player collider is a 1 m sphere** (`ellipsoid = 0.5, 0.5, 0.5`), roughly
   half human height, in a metric world. It lands *tangent* to a step's top edge,
   so the contact normal there depends on approach speed — which makes stair

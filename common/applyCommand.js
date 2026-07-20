@@ -54,11 +54,69 @@ const MIN_WALK_NORMAL = 0.7
 // friction/jump/dodge/jump-pads (all gated on grounded) die. Past |moveY| > radius the
 // vector flips sign; taking |.| is correct here because this is only ever consulted
 // while velY <= 0, where the contacted surface must be a floor rather than a ceiling.
-const groundNormalY = (n) => {
-	const len = Math.sqrt(n.x * n.x + n.y * n.y + n.z * n.z)
-	return len > 1e-9 ? Math.abs(n.y) / len : 1
+//
+// SCALED SPACE (Stage 3 fix — a no-op today, a landmine tomorrow). Babylon's collider
+// does all of its work in a space where the ellipsoid is a UNIT SPHERE, i.e. world
+// coordinates divided componentwise by the ellipsoid radii. `slidePlaneNormal` is never
+// converted back, so what it hands us is the plane normal IN THAT SCALED SPACE. The
+// mapping for a normal is the inverse-transpose of the point mapping, so recovering the
+// true world normal is a componentwise DIVISION by the radii followed by a renormalize:
+//     N_world  ∝  (n.x / rx, n.y / ry, n.z / rz)
+// With our uniform 0.5/0.5/0.5 sphere every component is divided by the SAME number,
+// which cancels in the renormalize — so this is exactly an identity today, and
+// _work/depen/normal-noop.ts proves it bit-for-bit over a sweep of slopes.
+//
+// It is not an identity for any non-uniform collider, and the error is not small. An
+// uncorrected reading satisfies tan(theta_reported) = (rx/ry) * tan(theta_true), so on a
+// true 45-degree ramp (n.y = 0.7071) a 0.35/0.90 capsule reports n.y = 0.9320 and a
+// 0.65/0.35 one reports 0.4741. Against MIN_WALK_NORMAL = 0.7 the tall capsule would
+// call a 69-degree WALL walkable. If PlayerCharacter's ellipsoid ever stops being a
+// sphere, this conversion is what keeps the walkability test honest — which is why it is
+// applied now, while it is provably free, rather than left as a comment for later.
+const slidePlaneUnit = (entity) => {
+	const c = entity.mesh.collider
+	const raw = c ? c.slidePlaneNormal : null
+	if (!raw) { return null }
+	const r = entity.mesh.ellipsoid
+	const nx = raw.x / r.x, ny = raw.y / r.y, nz = raw.z / r.z
+	const len = Math.sqrt(nx * nx + ny * ny + nz * nz)
+	if (!(len > 1e-9)) { return null }
+	return { x: nx / len, y: ny / len, z: nz / len }
 }
+// Walkability from an already-unscaled UNIT normal. |.y| for the same reason as before:
+// this is only ever consulted while velY <= 0, where the contacted surface must be a
+// floor rather than a ceiling, and the residual vector's sign can flip.
+const isWalkable = (n) => !n || Math.abs(n.y) >= MIN_WALK_NORMAL
 const STEP_DOWN = 0.35
+
+// ---------------------------------------------------------------------------
+// LATERAL CONTACT GAP — the depenetration guard. See the long block at
+// resolveLateralContact() below for the measurements this is derived from. Same
+// derivation as FLOOR_GAP_TARGET (6.3% of the collider radius); it has to exceed the
+// worst measured single-tick inward creep at the absorption boundary, which is 0.0042.
+const CONTACT_GAP = 0.0316
+// A move is treated as BLOCKED when it falls this far short of what was requested.
+// Open ground and a floor-parallel walking move both read a shortfall of 0 to within
+// float noise (measured: |shortfall| < 1e-9 over a full Visage traverse), while the
+// smallest real blocked tick measured on a 0.396 step is 0.0791 — four orders of
+// magnitude of separation, so the exact value here is not load-bearing.
+const BLOCKED_SHORTFALL = 1e-4
+// Smallest upward tilt of a contact plane that can be RIDDEN OVER, and therefore
+// absorbed. Swept across step heights (_work/depen/char5.ts), the reported contact
+// normal is exactly n.y = 1 - 2H for a step of height H against our 0.5 sphere, and
+// free pass-through exists for EVERY H < 0.5 and for NO H >= 0.5:
+//        H  0.200 0.300 0.396 0.450 0.480 0.490 0.495 | 0.500 0.520 0.610 0.700
+//      n.y  0.600 0.400 0.208 0.100 0.040 0.020 0.010 | 0.000 0.000 0.000 0.000
+//  absorbs?  yes   yes   yes   yes   yes   yes   yes  |  no    no    no    no
+// The boundary is exactly n.y > 0: a lip below the collider's equator can be climbed
+// over, so the centre eventually crosses the riser plane and the triangle is discarded;
+// a vertical face or an overhang never lets the centre past, and the solver resists it
+// at every depth we could reach. So the guard is gated on a STRICTLY UPWARD tilt, which
+// is what keeps it off plain walls — including the 45-degree angled wall, whose normal
+// reads n.y = 0.0000 and which slides correctly without any help from us. The threshold
+// sits below the shallowest absorbing case measured (0.010) and above the exact zero a
+// vertical face reports.
+const CONTACT_NY_MIN = 1e-3
 
 // ---------------------------------------------------------------------------
 // FLOOR-GAP CONSTANTS — UE CharacterMovementComponent's MIN_FLOOR_DIST /
@@ -142,25 +200,25 @@ const sweepFloor = (entity, dist) => {
 	// Travelled the whole way => open air below us.
 	if (sy - py >= dist - 1e-4) { return null }
 
-	const c = entity.mesh.collider
-	const raw = c ? c.slidePlaneNormal : null
-	const len = raw ? Math.sqrt(raw.x * raw.x + raw.y * raw.y + raw.z * raw.z) : 0
-	if (!raw || len <= 1e-9) {
+	const unit = slidePlaneUnit(entity)
+	if (!unit) {
 		// Blocked but no usable plane. Treat as flat floor and fall back to the drop —
 		// the same `!n => walkable` convention the vertical phase has always used for
 		// box-arena floors and solver paths that report no slide plane.
 		return { floorDist: sy - py, nx: 0, ny: 1, nz: 0, walkable: true }
 	}
-	let nx = raw.x / len, ny = raw.y / len, nz = raw.z / len
-	// Orient UP. groundNormalY compares |n.y| so a sign-flipped residual still
+	// Walkability is decided on |.y| BEFORE the orientation flip below, so the answer is
+	// independent of which way the residual vector happened to point.
+	const walkable = isWalkable(unit)
+	let nx = unit.x, ny = unit.y, nz = unit.z
+	// Orient UP. The walkability test compares |n.y| so a sign-flipped residual still
 	// classifies correctly, but the ramp-parallel delta below needs the genuinely
 	// upward normal or it would synthesize the move INTO the ramp instead of along it.
 	if (ny < 0) { nx = -nx; ny = -ny; nz = -nz }
 	return {
 		floorDist: ((sx - px) * nx + (sy - py) * ny + (sz - pz) * nz) / ny,
 		nx, ny, nz,
-		// keep using the validated helper for the walkability test itself
-		walkable: groundNormalY(raw) >= MIN_WALK_NORMAL,
+		walkable,
 	}
 }
 
@@ -302,18 +360,117 @@ const adjustFloorHeight = (entity, fl) => {
 const clipVelocityToSlidePlane = (entity) => {
 	const collider = entity.mesh.collider
 	if (collider && collider.collisionFound) {
-		const rawN = collider.slidePlaneNormal
-		const len = Math.sqrt(rawN.x * rawN.x + rawN.y * rawN.y + rawN.z * rawN.z)
-		if (len > 1e-9) {
-			const nx = rawN.x / len
-			const nz = rawN.z / len
-			const dot = entity.velX * nx + entity.velZ * nz
+		const n = slidePlaneUnit(entity)
+		if (n) {
+			const dot = entity.velX * n.x + entity.velZ * n.z
 			if (dot < 0) {
-				entity.velX -= nx * dot
-				entity.velZ -= nz * dot
+				entity.velX -= n.x * dot
+				entity.velZ -= n.z * dot
 			}
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// THE DEPENETRATION GUARD.
+//
+// WHAT GOES WRONG, measured rather than assumed (_work/depen/char1..char4.ts).
+// Babylon's collide-and-slide discards any triangle whose plane the ellipsoid CENTRE has
+// already passed — the classic `t1 < 0 => no collision` early-out in Collider._testTriangle.
+// For a WALL that never happens: the face is tall, the centre stays in front of it, and the
+// sweep resists at every depth (measured: a wall and a 0.610 ledge both refuse to be entered
+// at ANY tested penetration, reporting collisionFound = true and pushing back 0.005).
+//
+// For a STEP whose top face lies BELOW the collider's equator it happens almost immediately,
+// and that is the entire bug. With our 0.5 sphere standing at y = 0.5 on a 0.396 riser, the
+// only geometry that can block is the LIP EDGE, and the sphere's widest point clears it by
+// just 0.0109. The approach is resisted correctly — the sweep stops the player dead at
+// tangency, z = -0.4905 — but each blocked tick still creeps 0.004 to 0.014 forward while
+// being deflected 0.017 to 0.040 UPWARD. After a few ticks that creep carries the equator
+// past the riser plane, the lip triangle is discarded, and the move goes FULLY free:
+//
+//     gap to lip | achieved of 0.190 | collisionFound | |slidePlaneNormal|
+//        0.02094 |          0.023359 |          false |             0.6593
+//        0.01094 |          0.013792 |          false |             0.6397
+//        0.00094 |          0.004225 |          false |             0.6201
+//       -0.00006 |          0.190000 |          false |             0.0000   <- absorbed
+//
+// So the tolerated interpenetration is not ~0.03; it is ZERO. There is no soft band. The
+// solver resists right up to contact and then stops seeing the surface at all.
+//
+// WHY NOTHING COULD DETECT IT AFTERWARDS. Once absorbed, the embedded state is genuinely
+// INDISTINGUISHABLE from open air by every signal available to a pure function: a zero-length
+// moveWithCollisions displaces exactly 0.000000 (the 0.0057 push-out seen previously is a
+// SLOPE effect and does not occur here), collisionFound is false, |slidePlaneNormal| is 0,
+// and a full-length move is realised in full. That is why a "restore the pre-move position
+// when we end up inside" guard cannot be written: there is no test for "inside". The guard
+// therefore has to be PREVENTIVE, and prevention is strictly better anyway — we never enter
+// the state that cannot be measured.
+//
+// WHY AdjustFloorHeight DOES NOT ALREADY COVER IT. It is the right idea applied to one axis.
+// It servos the capsule to hover above the FLOOR, using a DOWNWARD probe, and it is why a
+// player resting on a surface no longer starts the next move interpenetrating. But a step
+// riser is not underneath you, it is in front of you: findFloor's downward sweep never sees
+// it, and no mechanism in this file maintained any clearance in the horizontal plane. So the
+// collider was free to grind straight into the lip. This guard is the missing half — the same
+// hover discipline, applied to lateral contacts.
+//
+// WHAT IT DOES. After a horizontal move, compare achieved travel against requested. A
+// shortfall means something stopped us. If the plane that stopped us is one we could not
+// stand on (|n.y| < MIN_WALK_NORMAL — a wall, a step riser, a ledge face), back off along its
+// HORIZONTAL outward normal by CONTACT_GAP, so the next tick starts clear of the discard
+// threshold instead of 0.0014 from it.
+//
+// THREE THINGS MAKE THIS SAFE:
+//   * The walkability gate means it can NEVER fire on the surface you are standing on. A
+//     floor, a walkable ramp and the ramp-parallel walking move (which by construction does
+//     not contact the ramp at all) are all excluded structurally, not by tuning. That is what
+//     keeps the downhill/uphill/flat numbers untouched.
+//   * `slidePlaneNormal` is STALE, not cleared — after a free move it still holds the last
+//     collision's value (measured: |N| stays 0.8100 across a move made in open air). So the
+//     normal is only ever consulted once the SHORTFALL has independently established that
+//     this move really was blocked. Reading |N| alone would fire constantly.
+//   * The back-off is a SWEPT move, exactly as adjustFloorHeight's is. In a tight gap, or a
+//     corner where backing off would push us into the opposite face, the sweep simply refuses
+//     and we stay put — a direct position write could not make that promise.
+//
+// It also publishes the BLOCKED SIGNAL that a future step-up needs. entity.blocked* is
+// derived fresh from (entity, command) every tick and is not in PlayerCharacter.protocol, so
+// it never goes on the wire and reconciliation replay recomputes it identically — the same
+// contract aimFactor and equipTimer already run under.
+const resolveLateralContact = (entity, reqX, reqY, reqZ, preX, preY, preZ) => {
+	const req = Math.sqrt(reqX * reqX + reqY * reqY + reqZ * reqZ)
+	const gotX = entity.x - preX, gotY = entity.y - preY, gotZ = entity.z - preZ
+	if (req - Math.sqrt(gotX * gotX + gotY * gotY + gotZ * gotZ) <= BLOCKED_SHORTFALL) { return }
+
+	const n = slidePlaneUnit(entity)
+	if (!n || Math.abs(n.y) >= MIN_WALK_NORMAL) { return }
+
+	// Outward horizontal direction. |n.y| < 0.7 guarantees |n_h| > 0.7, never degenerate.
+	const hLen = Math.sqrt(n.x * n.x + n.z * n.z)
+	if (!(hLen > 1e-9)) { return }
+	const hx = n.x / hLen, hz = n.z / hLen
+
+	// THE SIGNAL. Published for every non-walkable contact — wall, step riser, ledge
+	// face — because that is what a caller asking "did something stop me, and which way
+	// is it facing" wants. It is reported whether or not we then back off.
+	entity.blocked = true
+	entity.blockedNX = hx
+	entity.blockedNY = n.y
+	entity.blockedNZ = hz
+
+	// THE BACK-OFF, applied only to contacts that can actually be absorbed. A vertical
+	// wall reports n.y = 0.0000 and is left completely alone — it already blocks
+	// correctly at every depth, and pushing off it each tick would fight the solver's
+	// own slide (measured: it cost 15% of the travel along a 45-degree wall).
+	if (n.y <= CONTACT_NY_MIN) { return }
+
+	const sy = entity.y
+	entity.mesh.computeWorldMatrix(true)
+	entity.mesh.moveWithCollisions(new Vector3(hx * CONTACT_GAP, 0, hz * CONTACT_GAP))
+	// The back-off is horizontal by construction; hold y exactly so it can never
+	// contribute to the vertical bookkeeping the floor logic owns.
+	entity.y = sy
 }
 
 // clamp hitches so one lagged frame can't teleport. Derived from the sim tick so
@@ -539,6 +696,14 @@ export default (entity, command) => {
 	// ---------------------------------------------------------------------------
 	const wasGrounded = entity.grounded
 
+	// Cleared unconditionally so the signal always describes THIS tick. A stale `blocked`
+	// surviving into a tick that never ran a horizontal move is exactly the class of bug
+	// slidePlaneNormal's own staleness caused.
+	entity.blocked = false
+	entity.blockedNX = 0
+	entity.blockedNY = 0
+	entity.blockedNZ = 0
+
 	if (entity.grounded) {
 		// =======================================================================
 		// B. WALKING MOVE — UE's ComputeGroundMovementDelta(). THE ACTUAL FIX.
@@ -574,9 +739,11 @@ export default (entity, command) => {
 		if (haveFloor && floorNY > 1e-4) {
 			dy = -(floorNX * dx + floorNZ * dz) / floorNY
 		}
+		const preWX = entity.x, preWY = entity.y, preWZ = entity.z
 		entity.mesh.computeWorldMatrix(true)
 		entity.mesh.moveWithCollisions(new Vector3(dx, dy, dz))
 		clipVelocityToSlidePlane(entity)
+		resolveLateralContact(entity, dx, dy, dz, preWX, preWY, preWZ)
 	} else {
 		// =======================================================================
 		// AIRBORNE PATH — the horizontal-then-vertical split, unchanged. A player who
@@ -590,9 +757,15 @@ export default (entity, command) => {
 		// (that is how you walk UP a ramp or a step). Note there is deliberately no
 		// pre-move x/z snapshot here any more: nothing downstream is allowed to look at
 		// how far this move actually got (see the clipping block below for why).
+		const preAX = entity.x, preAY = entity.y, preAZ = entity.z
+		// Snapshot the REQUESTED delta before the move: clipVelocityToSlidePlane below
+		// rewrites velX/velZ, so re-deriving it afterwards would compare the achieved
+		// travel against a request that was never made.
+		const reqAX = entity.velX * delta, reqAZ = entity.velZ * delta
 		entity.mesh.computeWorldMatrix(true)
-		entity.mesh.moveWithCollisions(new Vector3(entity.velX * delta, 0, entity.velZ * delta))
+		entity.mesh.moveWithCollisions(new Vector3(reqAX, 0, reqAZ))
 		clipVelocityToSlidePlane(entity)
+		resolveLateralContact(entity, reqAX, 0, reqAZ, preAX, preAY, preAZ)
 
 		// PHASE 2 — vertical (gravity fall / jump arc).
 		const preY = entity.y
@@ -609,10 +782,10 @@ export default (entity, command) => {
 		let walkable = false
 		if (blocked) {
 			const collider = entity.mesh.collider
-			const n = collider && collider.collisionFound ? collider.slidePlaneNormal : null
+			const n = collider && collider.collisionFound ? slidePlaneUnit(entity) : null
 			// No collider normal (box-arena floor plane, or a solver path that reports no
 			// slide plane) => treat as flat floor, which is what those surfaces are.
-			walkable = !n || groundNormalY(n) >= MIN_WALK_NORMAL
+			walkable = isWalkable(n)
 		}
 
 		if (blocked && walkable) {
@@ -649,8 +822,8 @@ export default (entity, command) => {
 			entity.mesh.moveWithCollisions(new Vector3(0, -STEP_DOWN, 0))
 			const snapped = entity.y - sy
 			const collider = entity.mesh.collider
-			const n = collider && collider.collisionFound ? collider.slidePlaneNormal : null
-			const snapWalkable = !n || groundNormalY(n) >= MIN_WALK_NORMAL
+			const n = collider && collider.collisionFound ? slidePlaneUnit(entity) : null
+			const snapWalkable = isWalkable(n)
 			if (snapped > -STEP_DOWN + 0.001 && snapWalkable) {
 				// found floor within a step — glue to it (keep the probe's y, drop its
 				// sideways deflection for the same reason phase 2 does)
