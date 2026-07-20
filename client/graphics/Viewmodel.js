@@ -399,21 +399,29 @@ export default class Viewmodel {
   }
   get aimState() { return this._state }
 
-  // Held-aim input edge from the Simulator (RMB / touch). Only meaningful once the
-  // rig is the equipped, ready, ADS-capable weapon; otherwise a hard no-op.
   setAim(down) {
     if (this._disposed || !this.ready || !this._wantActive || !this.hasAds) return
     down = !!down
     if (down === this._aimWanted) return
     this._aimWanted = down
     if (down) {
-      // engage only from a settled hip idle, or reverse a live exit back in.
-      // From DRAWING/FIRING/RELOADING/ADS_FIRING we defer: those clips' end
-      // callbacks re-check _aimWanted and settle into aim.
-      if (this._state === S.IDLE || this._state === S.AIMING_OUT) this._enterAimIn()
+      // engage from settled hip idle, exit reversal, or interrupt active hip fire or draw
+      if (this._state === S.IDLE || this._state === S.AIMING_OUT || this._state === S.FIRING || this._state === S.DRAWING) {
+        if (this._state === S.FIRING) {
+          this._rewindStop(this.fireAnim)
+        } else if (this._state === S.DRAWING) {
+          this._rewindStop(this.drawAnim)
+        }
+        this._enterAimIn()
+      }
     } else {
-      if (this._state === S.AIMING_IN || this._state === S.AIMED) this._enterAimOut()
-      // from ADS_FIRING the fire_aiming end callback settles via _aimWanted
+      // exit from transition, settled ADS, or interrupt active ADS fire
+      if (this._state === S.AIMING_IN || this._state === S.AIMED || this._state === S.ADS_FIRING) {
+        if (this._state === S.ADS_FIRING) {
+          this._rewindStop(this.fireAimingAnim)
+        }
+        this._enterAimOut()
+      }
     }
   }
 
@@ -436,7 +444,12 @@ export default class Viewmodel {
         if (this._aimWanted) this._enterAimed()
         else this._enterAimOut() // released mid-transition -> clean reversible exit
       })
-      this.aimStartAnim.start(false, this._animSpeed)
+      const inTime = (this.spec.ads && this.spec.ads.inTime) || 0.18
+      const fps = (this.aimStartAnim.targetedAnimations[0] &&
+        this.aimStartAnim.targetedAnimations[0].animation.framePerSecond) || 60
+      const normalDuration = (this.aimStartAnim.to - this.aimStartAnim.from) / fps
+      const speedRatio = normalDuration / inTime
+      this.aimStartAnim.start(false, speedRatio * this._animSpeed)
     } else {
       this._enterAimed()
     }
@@ -461,7 +474,12 @@ export default class Viewmodel {
         if (this._aimWanted) this._enterAimIn() // re-pressed during exit
         else { this._setState(S.IDLE); this._startIdleLoop() }
       })
-      this.aimEndAnim.start(false, this._animSpeed)
+      const outTime = (this.spec.ads && this.spec.ads.outTime) || 0.15
+      const fps = (this.aimEndAnim.targetedAnimations[0] &&
+        this.aimEndAnim.targetedAnimations[0].animation.framePerSecond) || 60
+      const normalDuration = (this.aimEndAnim.to - this.aimEndAnim.from) / fps
+      const speedRatio = normalDuration / outTime
+      this.aimEndAnim.start(false, speedRatio * this._animSpeed)
     } else {
       this._setState(S.IDLE)
       this._startIdleLoop()
@@ -609,7 +627,11 @@ export default class Viewmodel {
   // recoilForce-scaled kick.
   kick(profile) {
     if (this._disposed || !this.ready || !this._wantActive) return
-    if (this._state === S.RELOADING || this._state === S.DRAWING) return
+    if (this._state === S.RELOADING) return
+
+    if (this._state === S.DRAWING) {
+      if (this.drawAnim) this.drawAnim.stop()
+    }
 
     // aimed shots play fire_aiming and hold the sight picture; the recoil is also
     // damped below so it doesn't fight the authored aimed-fire motion.
