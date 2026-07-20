@@ -734,7 +734,13 @@ class GameInstance {
 			// class lives on the loaders module, NOT the BABYLON namespace, under tsx.
 			OBJFileLoader.USE_LEGACY_BEHAVIOR = true
 			const obj = fs.readFileSync('public' + MAP_MESH.dir + MAP_MESH.file, 'utf8').replace(/^mtllib.*$/gm, '')
-			const res = await BABYLON.SceneLoader.ImportMeshAsync('', '', 'data:' + obj, scene, null, '.obj')
+			// PERF: the OBJ is handed to babylon as a data URL. Babylon tests the string
+			// against /^data:([^,]+\/[^,]+)?;base64,/ to detect base64. CTF-Visage's OBJ has
+			// NO comma in 431KB, so [^,]+ spans the whole file and the regex backtracks over
+			// all ~24k '/' in the face lines — 93% of load time, 7.4s. An empty media type
+			// followed by a comma ('data:,') is a valid data URL that caps the backtrack at
+			// byte 5: Visage load 7433ms -> 45ms (165x), geometry BIT-IDENTICAL (verified).
+			const res = await BABYLON.SceneLoader.ImportMeshAsync('', '', 'data:,' + obj, scene, null, '.obj')
 			// upright the Z-up OBJ (rotate the whole map about X), then bake world matrices
 			// so collision uses the rotated geometry — MUST match the client (mapMesh.js).
 			const root = new BABYLON.TransformNode('mapRoot', scene)
@@ -747,6 +753,20 @@ class GameInstance {
 			res.meshes.forEach(m => {
 				if (m.getTotalVertices && m.getTotalVertices() > 0) {
 					m.computeWorldMatrix(true)
+					// PERF: subdivide the MOVEMENT colliders into ~12-triangle submeshes, exactly
+					// like the hitscan occluders below. The OBJ groups faces by MATERIAL, so one
+					// "mesh" (e.g. the whole floor) can span the entire map — its single bounding
+					// volume culls nothing, so moveWithCollisions tests every player against all of
+					// its triangles EVERY tick (~1ms+/player). babylon's per-submesh AABB cull
+					// (SubMesh.canIntersects) then bites: measured 16-player tick collision from
+					// ~79% to ~7.6% of the 25ms budget. Subdivided IN PLACE: the server is headless
+					// (no shadow/light bake here — that is client-side, HTTP-loaded), so only the
+					// collision path reads these meshes, and in-place shares the VertexBuffers (no
+					// geometry clone, ~2.5MB of SubMesh objects for the whole map). Bit-identical to
+					// the whole mesh on trajectories (same triangles, nearest hit wins) — verified
+					// 8 players x 300 ticks @ 0.000000mm and golden-collision clean.
+					const parts = Math.max(1, Math.ceil((m.getTotalIndices() / 3) / 12))
+					if (parts > 1) m.subdivide(parts)
 					if (m.refreshBoundingInfo) m.refreshBoundingInfo(true)
 					m.checkCollisions = true
 					colliders.push(m)
