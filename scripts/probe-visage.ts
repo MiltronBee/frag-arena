@@ -4,8 +4,8 @@
 // height histogram. The right orientation = lots of probes landing on a FEW
 // consistent floor levels (a real multi-level building), not scattered wall hits.
 //   ROTX=-90 npx tsx scripts/verify-meshmap.ts
-import * as BABYLON from 'babylonjs'
-import 'babylonjs-loaders'
+import * as BABYLON from '../common/babylon.node.js'
+import '@babylonjs/loaders/glTF/index.js' // register glTF/GLB loader (node barrel already covers OBJ)
 import http from 'http'; import fs from 'fs'; import path from 'path'
 import XHR from 'xhr2'
 ;(global as any).XMLHttpRequest = XHR

@@ -1,5 +1,4 @@
-import * as BABYLON from 'babylonjs'
-import 'babylonjs-loaders' // registers the glTF/GLB loader with SceneLoader
+import * as BABYLON from '../babylon.js'
 
 // First-person viewmodel locked to the camera. Parented to the camera node so it
 // renders in view space. If the model ships animation clips (per the manifest

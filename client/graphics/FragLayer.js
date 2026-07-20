@@ -1,4 +1,4 @@
-import * as BABYLON from 'babylonjs'
+import * as BABYLON from '../babylon.js'
 import { weapons } from '../../common/weaponsConfig'
 
 // ============================================================================

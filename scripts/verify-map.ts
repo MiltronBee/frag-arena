@@ -10,7 +10,7 @@
 // Per map it checks: spawns are on open floor; every jump-pad deposits a player ON
 // the nearest tower deck (ballistic AND with air-control); and all geometry fits the
 // ±64 network view box (GameInstance client.view). Exit 0 = all maps pass.
-import * as BABYLON from 'babylonjs'
+import * as BABYLON from '../common/babylon.node.js'
 import applyCommand from '../common/applyCommand'
 import { obstacleY } from '../common/arenaConfig'
 import { mapList, getMap } from '../common/maps'

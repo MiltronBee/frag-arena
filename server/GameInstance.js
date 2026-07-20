@@ -27,8 +27,9 @@ import { weapons } from '../common/weaponsConfig'
 import { PLAYER_NAMES } from '../common/playerNames'
 import BotController from './BotController'
 
-import * as BABYLON from 'babylonjs'
-import { OBJFileLoader } from 'babylonjs-loaders' // registers the OBJ loader (mesh maps, server-side collision)
+import * as BABYLON from '../common/babylon.node.js'
+import { OBJFileLoader } from '../common/babylon.node.js' // OBJ loader (server-side collision) via node barrel
+
 //import 'babylonjs-loaders' // mutates something globally
 global.XMLHttpRequest = require('xhr2').XMLHttpRequest
 

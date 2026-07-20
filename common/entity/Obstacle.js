@@ -1,5 +1,5 @@
 import nengi from 'nengi'
-import * as BABYLON from 'babylonjs'
+import * as BABYLON from '../babylon.node.js'
 
 class Obstacle {
 	constructor() {

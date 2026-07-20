@@ -1,4 +1,4 @@
-import * as BABYLON from 'babylonjs'
+import * as BABYLON from '../babylon.js'
 import createPlayerFactory from './createPlayerFactory'
 import createObstacleFactory from './createObstacleFactory'
 import { loadPropTemplate } from '../graphics/CharacterModel'

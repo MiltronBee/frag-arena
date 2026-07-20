@@ -9,7 +9,7 @@
 //   * trigger discipline (bursts with pauses, only fires roughly on target)
 //   * line-of-sight checks against the arena obstacles (it can't wallhack)
 //   * strafe-orbiting at its weapon's preferred range, occasional jumps
-import * as BABYLON from 'babylonjs'
+import * as BABYLON from '../common/babylon.node.js'
 import { weapons } from '../common/weaponsConfig'
 
 const TURN_RATE = 3.4          // rad/s — swings onto a target in ~0.3-0.9s

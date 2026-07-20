@@ -2,8 +2,8 @@
 // moveWithCollisions collide against it? Also maps floor heights so we can pick scale
 // + spawn heights. Loads via xhr2 (XMLHttpRequest polyfill) from a tiny http server.
 //   node scripts/verify-meshmap.mjs
-import * as BABYLON from 'babylonjs'
-import 'babylonjs-loaders'
+import * as BABYLON from '../common/babylon.node.js'
+import '@babylonjs/loaders/glTF/index.js' // register glTF/GLB loader (node barrel already covers OBJ)
 import http from 'http'; import fs from 'fs'; import path from 'path'
 import XHR from 'xhr2'
 // XHR polyfill so Babylon's file loader works in node. Do NOT stub window/document:

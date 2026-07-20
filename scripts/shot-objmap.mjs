@@ -14,8 +14,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
 const MIME = { '.js':'text/javascript','.obj':'text/plain','.mtl':'text/plain','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.html':'text/html' }
 
 const PAGE = `<!doctype html><html><head><meta charset=utf8><style>html,body,#c{margin:0;width:100%;height:100%;overflow:hidden;background:#0b0b12}</style>
-<script src="/node_modules/babylonjs/babylon.js"></script>
-<script src="/node_modules/babylonjs-loaders/babylonjs.loaders.js"></script></head>
+<script src='/js/app-v0.0.1.js'></script></head>
 <body><canvas id=c></canvas><script>
 const rotx = ${ROTX} * Math.PI/180;
 const engine = new BABYLON.Engine(document.getElementById('c'), true);

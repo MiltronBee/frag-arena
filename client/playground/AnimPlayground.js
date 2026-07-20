@@ -1,5 +1,4 @@
-import * as BABYLON from 'babylonjs'
-import 'babylonjs-loaders' // registers the glTF/GLB loader with SceneLoader
+import * as BABYLON from '../babylon.js'
 import { assets, tpWeapons } from '../assets/assetManifest'
 
 // ---------------------------------------------------------------------------

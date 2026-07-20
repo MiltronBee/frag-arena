@@ -18,8 +18,8 @@
 import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
 global.XMLHttpRequest = require('xhr2')
-const BABYLON = require('babylonjs')
-require('babylonjs-loaders')
+import * as BABYLON from '../common/babylon.node.js'
+import '@babylonjs/loaders/glTF/index.js' // register glTF/GLB loader (GLB weapon models)
 
 const BASE = (process.env.FRAG_URL || 'http://localhost:8080/').replace(/\/$/, '') + '/assets/weapons/'
 

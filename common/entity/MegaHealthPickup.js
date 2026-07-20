@@ -1,5 +1,5 @@
 import nengi from 'nengi'
-import * as BABYLON from 'babylonjs'
+import { Engine, MeshBuilder, StandardMaterial, Color3, Vector3 } from '../babylon.node.js'
 
 // Phase 4 MEGA-HEALTH PICKUP — the arena's "heartbeat". ONE contested power item
 // near the center that heals big (min(150, hp+100), can overheal past 100) on a
@@ -18,29 +18,29 @@ export const MEGA_STATE = { HIDDEN: 0, CHARGING: 1, AVAILABLE: 2 }
 
 class MegaHealthPickup {
 	constructor(startX = 0, startY = 0, startZ = 0) {
-		const scene = BABYLON.Engine.LastCreatedScene
+		const scene = Engine.LastCreatedScene
 		if (scene) {
 			// a small placeholder box — the position holder the real GLB model parents
 			// onto (like the grenade's pebble). Kept tiny + non-pickable so it never
 			// intercepts a shot's raycast.
-			this.mesh = BABYLON.MeshBuilder.CreateBox('megaHealth', { size: 0.5 }, scene)
+			this.mesh = MeshBuilder.CreateBox('megaHealth', { size: 0.5 }, scene)
 			this.mesh.position.set(startX, startY, startZ)
 			this.mesh.isPickable = false
 
 			// only build a visual material on client/visual engines; the headless
 			// server (NullEngine) stays bare so it allocates nothing.
 			if (scene.getEngine().name !== 'NullEngine') {
-				const mat = new BABYLON.StandardMaterial('megaHealthMat', scene)
-				mat.emissiveColor = new BABYLON.Color3(1.0, 0.75, 0.2) // amber
-				mat.diffuseColor = new BABYLON.Color3(0.2, 0.12, 0.0)
-				mat.specularColor = new BABYLON.Color3(0.3, 0.25, 0.15)
+				const mat = new StandardMaterial('megaHealthMat', scene)
+				mat.emissiveColor = new Color3(1.0, 0.75, 0.2) // amber
+				mat.diffuseColor = new Color3(0.2, 0.12, 0.0)
+				mat.specularColor = new Color3(0.3, 0.25, 0.15)
 				this.mesh.material = mat
 				this.mat = mat
 			}
 		} else {
 			// headless fallback placeholder (matches Grenade.js / Projectile.js)
 			this.mesh = {
-				position: new BABYLON.Vector3(startX, startY, startZ),
+				position: new Vector3(startX, startY, startZ),
 				dispose() {}
 			}
 		}

@@ -1,6 +1,7 @@
-import * as BABYLON from 'babylonjs'
+import * as BABYLON from '../babylon.js'
 import { resolveWeaponFx, classifySurface, surfaceFx, fadeAlpha } from './firingFx'
-import { OBJFileLoader } from 'babylonjs-loaders' // OBJ loader for mesh maps
+import { OBJFileLoader } from '../babylon.js' // OBJ loader (mesh maps) via curated barrel
+
 import ArenaDressing from './arenaDressing'
 import { USE_MESH_MAP, MAP_MESH } from '../../common/mapMesh'
 import { bakeVertexColors } from './mapLights'

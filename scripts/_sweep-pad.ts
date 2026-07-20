@@ -1,7 +1,7 @@
 // Sweep candidate jump-pad launches against the REAL tower collision to find the
 // snappiest arc that reliably deposits a player ON the west tower deck. Symmetric,
 // so the east pad is the mirror. Run: npx tsx scripts/_sweep-pad.ts
-import * as BABYLON from 'babylonjs'
+import * as BABYLON from '../common/babylon.node.js'
 import applyCommand from '../common/applyCommand'
 import { OBSTACLE_SPECS, obstacleY } from '../common/arenaConfig'
 import PlayerCharacter from '../common/entity/PlayerCharacter'

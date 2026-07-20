@@ -1,6 +1,6 @@
 /* weapon system */
 
-import { Vector3, Ray } from 'babylonjs'
+import { Vector3, Ray } from './babylon.node.js'
 import { weapons } from './weaponsConfig'
 import { shotSeed } from './firePattern'
 

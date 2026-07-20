@@ -1,5 +1,5 @@
 import { update as updateWeapon } from './weapon'
-import { Vector3, Matrix, Axis } from 'babylonjs'
+import { Vector3, Matrix, Axis } from './babylon.node.js'
 import { weapons } from './weaponsConfig'
 import nengiConfig from './nengiConfig'
 import { JUMP_PADS } from './arenaConfig'

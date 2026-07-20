@@ -9,7 +9,7 @@
 //
 //   npx tsx scripts/golden-collision.ts            # write the golden JSON
 //   npx tsx scripts/golden-collision.ts /tmp/x.json  # write to a chosen path
-import * as BABYLON from 'babylonjs'
+import * as BABYLON from '../common/babylon.node.js'
 import { writeFileSync } from 'fs'
 import applyCommand from '../common/applyCommand'
 import { obstacleY } from '../common/arenaConfig'

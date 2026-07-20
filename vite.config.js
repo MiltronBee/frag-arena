@@ -24,9 +24,8 @@ export default defineConfig(({ command }) => {
         events: path.resolve(ROOT, 'node_modules/events/events.js'),
       },
     },
-    optimizeDeps: {
-      include: ['babylonjs', 'babylonjs-loaders'], // UMD/CJS — pre-bundle for dev
-    },
+    // optimizeDeps: scoped @babylonjs/core deep imports are ESM; Vite auto-discovers.
+    // (Phase 3: removed the old babylonjs/babylonjs-loaders UMD pre-bundle include.)
     server: {
       port: 8080,
       strictPort: true,

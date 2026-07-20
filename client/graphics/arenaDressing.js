@@ -1,5 +1,4 @@
-import * as BABYLON from 'babylonjs'
-import 'babylonjs-loaders' // registers the glTF loader with SceneLoader
+import * as BABYLON from '../babylon.js'
 import { ARENA_SIZE, SPAWN_POINTS } from '../../common/arenaConfig'
 
 // Cosmetic arena skin built from the Quaternius Modular SciFi MegaKit (CC0,
