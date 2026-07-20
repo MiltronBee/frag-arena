@@ -539,8 +539,15 @@ export default class Viewmodel {
       if (this._wantActive) this._startIdleLoop()
     })
 
-    // stretch/squash the clip so its wall-clock matches the gameplay reloadTime
-    const normalDuration = this.reloadAnim.to - this.reloadAnim.from
+    // stretch/squash the clip so its wall-clock matches the gameplay reloadTime.
+    // Babylon 9's glTF loader tags imported animations with framePerSecond=60
+    // (4.0.3 effectively authored them at 1), so the clip's native length is
+    // (to-from)/fps SECONDS, not (to-from) seconds. Dividing by fps keeps the
+    // speedRatio a true seconds/seconds ratio; omitting it played the reload ~60x
+    // too fast (the whole clip in a single frame) under 9.x.
+    const fps = (this.reloadAnim.targetedAnimations[0] &&
+      this.reloadAnim.targetedAnimations[0].animation.framePerSecond) || 60
+    const normalDuration = (this.reloadAnim.to - this.reloadAnim.from) / fps
     const reloadTime = this.spec.reloadTime || 1.5
     const speedRatio = normalDuration / reloadTime
     this.reloadAnim.start(false, speedRatio * this._animSpeed)

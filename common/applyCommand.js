@@ -155,6 +155,13 @@ export default (entity, command) => {
 	const oldX = entity.x
 	const oldY = entity.y
 	const oldZ = entity.z
+	// Babylon 9 headless fix: getRenderId() never advances under NullEngine (server)
+	// or during client prediction-replay, so getAbsolutePosition() returns a stale world
+	// matrix and moveWithCollisions tunnels through walls / never rests on the ground.
+	// force=true recomputes it, bypassing the frozen-renderId world-matrix cache guard
+	// (transformNode: _currentRenderId===currentRenderId short-circuit added in 9.x).
+	// Validated bit-for-bit vs 4.0.3; a harmless no-op there.
+	entity.mesh.computeWorldMatrix(true)
 	entity.mesh.moveWithCollisions(new Vector3(
 		entity.velX * delta,
 		entity.velY * delta,

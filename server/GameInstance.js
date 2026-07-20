@@ -28,7 +28,7 @@ import { PLAYER_NAMES } from '../common/playerNames'
 import BotController from './BotController'
 
 import * as BABYLON from 'babylonjs'
-import 'babylonjs-loaders' // registers the OBJ loader (mesh maps, server-side collision)
+import { OBJFileLoader } from 'babylonjs-loaders' // registers the OBJ loader (mesh maps, server-side collision)
 //import 'babylonjs-loaders' // mutates something globally
 global.XMLHttpRequest = require('xhr2').XMLHttpRequest
 
@@ -609,6 +609,11 @@ class GameInstance {
 	async _loadMapMesh(scene) {
 		try {
 			const fs = require('fs')
+			// Babylon 9's OBJ loader default-mirrors X vs 4.0.3 (USE_LEGACY_BEHAVIOR now
+			// defaults false); all spawn/killY/light data is calibrated on the legacy
+			// orientation, so keep legacy on BOTH sides (client sets it too). NOTE: the
+			// class lives on the loaders module, NOT the BABYLON namespace, under tsx.
+			OBJFileLoader.USE_LEGACY_BEHAVIOR = true
 			const obj = fs.readFileSync('public' + MAP_MESH.dir + MAP_MESH.file, 'utf8').replace(/^mtllib.*$/gm, '')
 			const res = await BABYLON.SceneLoader.ImportMeshAsync('', '', 'data:' + obj, scene, null, '.obj')
 			// upright the Z-up OBJ (rotate the whole map about X), then bake world matrices

@@ -1,6 +1,6 @@
 import * as BABYLON from 'babylonjs'
 import { resolveWeaponFx, classifySurface, surfaceFx, fadeAlpha } from './firingFx'
-import 'babylonjs-loaders' // OBJ loader for mesh maps
+import { OBJFileLoader } from 'babylonjs-loaders' // OBJ loader for mesh maps
 import ArenaDressing from './arenaDressing'
 import { USE_MESH_MAP, MAP_MESH } from '../../common/mapMesh'
 import { bakeVertexColors } from './mapLights'
@@ -46,22 +46,11 @@ const GROUND_COLOR = [0.4, 0.01, 0.01]
 const GROUND_GROW = 100, GROUND_HOLD = 3000, GROUND_FADE = 1000 // ms phases
 const GROUND_SIZE = 0.5, GROUND_SIZE_JITTER = 0.4 // × base impact scale
 
-// Babylon 4.0.3 declares the WebGL2 PCF shadow helpers (sampler2DShadow params)
-// without a precision default. Lenient desktop drivers accept it, but strict
-// GLES compilers (SwiftShader, some mobile GPUs) reject the effect, so every
-// shadow-receiving material silently falls back to a no-shadow shader — and the
-// fallback churn can crash the instanced-mesh VAO bind. Inject the missing
-// precision statement into the shader include before any effect compiles.
-{
-	const store = BABYLON.Effect.IncludesShadersStore
-	const inc = store && store.shadowsFragmentFunctions
-	if (inc && inc.indexOf('precision highp sampler2DShadow') === -1) {
-		store.shadowsFragmentFunctions = inc.replace(
-			'#ifdef WEBGL2',
-			'#ifdef WEBGL2\nprecision highp sampler2DShadow;'
-		)
-	}
-}
+// Babylon 9 note: the old 4.0.3 shadowsFragmentFunctions precision patch was REMOVED
+// here. 9.17.0's shadowsFragmentFunctions include already declares every sampler2DShadow
+// as `highp sampler2DShadow` upstream, and the `#ifdef WEBGL2` anchor the patch searched
+// for no longer exists (guards are now `#if defined(WEBGL2)||defined(WEBGPU)||defined(NATIVE)`),
+// so the string-replace was a dead no-op. Precision is handled in-source. (upgrade.md R10)
 
 class BABYLONRenderer {
 	constructor() {
@@ -225,7 +214,9 @@ class BABYLONRenderer {
 		// fresnel shader; this pass is the safe blockout.)
 		this.skydome = new BABYLON.PhotoDome('sky', '/assets/space/stars.jpg',
 			{ resolution: 32, size: 3600 }, this.scene)
-		const skyMesh = this.scene.getMeshByName('sky_mesh')
+		// Babylon 9: use the PhotoDome's public mesh handle instead of the fragile
+		// internal '<domeName>_mesh' name lookup (TextureDome refactor risk). (upgrade.md R-Med)
+		const skyMesh = this.skydome && this.skydome.mesh
 		if (skyMesh) skyMesh.applyFog = false
 
 		// EARTH — big, low, beyond the west end; its upper limb looms above the horizon.
@@ -463,6 +454,11 @@ class BABYLONRenderer {
 	// (web-optimized WebP set in MAP_MESH.dir/textures/), lit by the original 1999
 	// light actors baked into vertex colors. Server owns collision.
 	_loadMeshMap() {
+		// Babylon 9's OBJ loader default-mirrors X vs 4.0.3 (USE_LEGACY_BEHAVIOR now
+		// defaults false); spawns/killY/lights are calibrated on the legacy orientation,
+		// and the server collider sets the same flag — visual and collision must match.
+		// (Named import: the class lives on the loaders module, not the BABYLON namespace.)
+		OBJFileLoader.USE_LEGACY_BEHAVIOR = true
 		BABYLON.SceneLoader.ImportMeshAsync('', MAP_MESH.dir, MAP_MESH.file, this.scene)
 			.then(res => {
 				// upright the Z-up OBJ — MUST match the server's rotation (mapMesh.js) so
@@ -1067,6 +1063,14 @@ class BABYLONRenderer {
 	// render. Finished effects are hidden and reclaimed — the pool never grows.
 	update() {
 		const now = performance.now()
+		// Babylon 9 steps animations by engine.getDeltaTime(), which is only
+		// refreshed inside beginFrame()/_measureFps(). This game drives rendering
+		// from a manual requestAnimationFrame loop (clientMain.js) rather than
+		// engine.runRenderLoop(), so without an explicit beginFrame()/endFrame()
+		// bracket the delta stays 0 and every AnimationGroup crawls at ~1ms/frame
+		// (~16x too slow). Babylon 4.0.3 stepped animations off absolute wall-clock
+		// time so the manual loop needed no bracket; 9.x is delta-based, hence this.
+		this.engine.beginFrame()
 
 		// decay the muzzle light pulse back to its idle intensity 0 over the weapon's
 		// light.life. decayPow>1 front-loads the energy: peak*(1-t)^2 reads as a FLASH,
@@ -1201,6 +1205,7 @@ class BABYLONRenderer {
 		}
 
 		this.scene.render()
+		this.engine.endFrame()
 	}
 }
 
