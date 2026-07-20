@@ -60,6 +60,14 @@ export const fire = (entity) => {
 		return false
 	}
 
+	// UT-STYLE OWNERSHIP GATE (v1): refuse to fire a weapon the player does not own.
+	// ownedWeapons is a server-authoritative bitmask networked to the client, so this
+	// gates client prediction AND server authority in lockstep (like the equipTimer
+	// gate below). Undefined ownedWeapons (legacy/test entities) = own everything.
+	if (entity.ownedWeapons !== undefined && !(entity.ownedWeapons & (1 << index))) {
+		return false
+	}
+
 	// swap-commitment: cannot fire mid-draw. Gates BOTH client prediction and server
 	// authority through this shared function, so they stay in lockstep (like reload).
 	if (entity.equipTimer > 0) {

@@ -2,6 +2,13 @@ import * as BABYLON from '../babylon.js'
 import createPlayerFactory from './createPlayerFactory'
 import createObstacleFactory from './createObstacleFactory'
 import { loadPropTemplate } from '../graphics/CharacterModel'
+import {
+	PICKUP_TYPE,
+	WEAPON_MODEL_URL,
+	PEDESTAL_MODEL_URL,
+	AMMO_MODEL_URL,
+	HEALTH_MODEL_URL as PICKUP_HEALTH_MODEL_URL,
+} from '../../common/pickupConfig'
 
 // Real thrown-grenade model (Quaternius sci-fi prop). Loaded lazily from the
 // warm cache the preloader primes, cloned per grenade, parented to the entity's
@@ -119,6 +126,78 @@ async function attachHealthModel(entity) {
 	entity._healthModel = clone
 }
 
+// ── UT-STYLE PICKUP models ───────────────────────────────────────────────────────
+// Per-type model spec for a Pickup entity (common/pickupConfig.js PICKUP_TYPE). Weapon
+// pickups pick a third-person weapon silhouette by roster index and get a metal pedestal
+// beneath them. Armor/powerup are v1-DEFERRED (no bespoke asset) — they keep the entity
+// constructor's cyan placeholder box so the item is still visible on the map.
+function pickupModelSpec(type, weaponIndex) {
+	switch (type) {
+		case PICKUP_TYPE.WEAPON: return { url: WEAPON_MODEL_URL[weaponIndex] || WEAPON_MODEL_URL[3], size: 0.9, pedestal: true }
+		case PICKUP_TYPE.HEALTH: return { url: PICKUP_HEALTH_MODEL_URL, size: 0.7, pedestal: false }
+		case PICKUP_TYPE.AMMO:   return { url: AMMO_MODEL_URL, size: 0.5, pedestal: false }
+		default:                 return null // ARMOR / POWERUP — leave the placeholder box
+	}
+}
+
+// Shared auto-scale-from-bbox + center-on-origin (the same math attachGrenade/HealthModel
+// use): scale the clone so its largest dimension ≈ targetSize, then offset so its bbox
+// centre sits on the entity origin (the tracked position).
+function fitClone(clone, srcRoot, targetSize) {
+	let min = null, max = null
+	const srcMeshes = [srcRoot, ...srcRoot.getChildMeshes()].filter((m) => m.getBoundingInfo)
+	srcMeshes.forEach((m) => {
+		const bb = m.getBoundingInfo().boundingBox
+		if (!min) { min = bb.minimum.clone(); max = bb.maximum.clone() }
+		min = BABYLON.Vector3.Minimize(min, bb.minimum)
+		max = BABYLON.Vector3.Maximize(max, bb.maximum)
+	})
+	if (min && max) {
+		const size = max.subtract(min)
+		const maxDim = Math.max(size.x, size.y, size.z) || 1
+		const scale = targetSize / maxDim
+		clone.scaling.setAll(scale)
+		const center = min.add(max).scaleInPlace(0.5)
+		clone.rotationQuaternion = null
+		clone.position.set(-center.x * scale, -center.y * scale, -center.z * scale)
+	}
+}
+
+// Attach a Pickup's real model (+ optional pedestal) to entity.mesh (the positioned
+// placeholder box). MIRRORS attachHealthModel: async warm-cache clone, async-delete
+// guard, auto-scale + center, hide the placeholder box. Stores the spinnable item model
+// as entity._pickupModel so Simulator._updatePickups can spin it (the holder bobs).
+async function attachPickupModel(entity, spec) {
+	const scene = BABYLON.Engine.LastCreatedScene
+	if (!scene || scene.getEngine().name === 'NullEngine') return
+
+	// pedestal first (a static base under the floating item)
+	if (spec.pedestal) {
+		try {
+			const { root: pRoot } = await loadPropTemplate(scene, PEDESTAL_MODEL_URL)
+			if (!entity || entity._disposed || !entity.mesh || entity.mesh.isDisposed()) return
+			const ped = pRoot.clone('pickupPedestal', entity.mesh)
+			ped.setEnabled(true)
+			ped.getChildMeshes().forEach((m) => { m.setEnabled(true); m.isPickable = false })
+			ped.isPickable = false
+			fitClone(ped, pRoot, 1.1)
+			ped.position.y -= 0.55 // drop it beneath the floating weapon
+			entity._pedestal = ped
+		} catch (e) { /* pedestal is decorative — a load miss must not break the pickup */ }
+	}
+
+	const { root } = await loadPropTemplate(scene, spec.url)
+	if (!entity || entity._disposed || !entity.mesh || entity.mesh.isDisposed()) return
+	const clone = root.clone('pickupModel', entity.mesh)
+	clone.setEnabled(true)
+	clone.getChildMeshes().forEach((m) => { m.setEnabled(true); m.isPickable = false })
+	clone.isPickable = false
+	fitClone(clone, root, spec.size)
+	if (entity._disposed || entity.mesh.isDisposed()) { clone.dispose(false, true); return }
+	if (entity.mesh.material) entity.mesh.material.alpha = 0 // hide the placeholder box
+	entity._pickupModel = clone
+}
+
 export default ({ simulator /* inject depenencies here */ }) => {
 	return {
 		'PlayerCharacter': createPlayerFactory({ simulator, /* inject depenencies here */ }),
@@ -188,6 +267,28 @@ export default ({ simulator /* inject depenencies here */ }) => {
 			},
 			delete({ nid, entity }) {
 				simulator.unregisterMegaHealth(nid)
+				if (entity) entity._disposed = true
+				if (entity && entity.mesh && typeof entity.mesh.dispose === 'function') {
+					entity.mesh.dispose(false, true)
+				}
+			}
+		},
+		// UT-STYLE PICKUP (v1). The placeholder box is built in the entity constructor;
+		// create() registers it for the per-frame bob/spin drive (Simulator._updatePickups,
+		// which reacts to the networked `state`) and swaps in the real model by type.
+		// Pickups are never removed server-side (they hide via `state`), so delete() only
+		// fires on shutdown/disconnect — same as the mega.
+		'Pickup': {
+			create({ data, entity }) {
+				simulator.registerPickup(entity)
+				const type = entity.type !== undefined ? entity.type : (data && data.type)
+				const weaponIndex = entity.weaponIndex !== undefined ? entity.weaponIndex : (data && data.weaponIndex)
+				const spec = pickupModelSpec(type, weaponIndex)
+				if (spec) attachPickupModel(entity, spec)
+				// else ARMOR / POWERUP: keep the constructor's cyan placeholder box (v1-deferred asset)
+			},
+			delete({ nid, entity }) {
+				simulator.unregisterPickup(nid)
 				if (entity) entity._disposed = true
 				if (entity && entity.mesh && typeof entity.mesh.dispose === 'function') {
 					entity.mesh.dispose(false, true)

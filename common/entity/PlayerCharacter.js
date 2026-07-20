@@ -6,6 +6,10 @@ const red = new BABYLON.Color4(1, 0, 0)
 const blue = new BABYLON.Color4(0, 0, 1)
 const faceColors = [red, blue, blue, blue, blue, blue]
 
+// Spawn loadout: pistol only (roster index 3). One place the "start with the pistol"
+// rule lives — GameInstance.respawnPlayer resets to this too.
+const PISTOL_ONLY = 1 << 3
+
 class PlayerCharacter {
 	constructor() {
 		this.mesh = BABYLON.MeshBuilder.CreateBox('player', { size: 1, faceColors })
@@ -62,15 +66,29 @@ class PlayerCharacter {
 		this.throwCooldown = 0        // seconds until the next throw is allowed
 		this.rechargeAccum = 0        // seconds accrued toward the next +1 charge
 
-		// Modular weapons state
+		// UT-STYLE OWNERSHIP (v1). A player spawns owning ONLY the pistol (roster index
+		// 3) and finds the rest on the map. `ownedWeapons` is a bitmask (bit i = owns
+		// weapon i) and IS networked (UInt8) so the HUD greys unowned slots and the
+		// client can predict its own refill on a grant. weapon.fire() and the switch
+		// gate (applyCommand + the GameInstance switch handler) refuse an unowned index.
+		// Server-authoritative: the client never asserts an ownership bit (down-only; a
+		// mismatch just snaps). Bots are granted the full arsenal in GameInstance.addBot.
+		this.ownedWeapons = PISTOL_ONLY
+
+		// Modular weapons state. Non-owned weapons start with ZERO ammo (magazine +
+		// reserve) so an ownership bug can never leak firepower; a weapon pickup refills
+		// its own weapon on grant (GameInstance.updatePickups).
 		this.currentWeaponIndex = 0
-		this.weaponsState = weapons.map(w => ({
-			magazineAmmo: w.magazineCapacity,
-			reserveAmmo: w.maxReserveAmmo,
-			cooldownTimer: 0,
-			onCooldown: false,
-			heat: 0 // sustained-fire spread bloom (common/firePattern.js)
-		}))
+		this.weaponsState = weapons.map((w, i) => {
+			const owned = (this.ownedWeapons & (1 << i)) !== 0
+			return {
+				magazineAmmo: owned ? w.magazineCapacity : 0,
+				reserveAmmo: owned ? w.maxReserveAmmo : 0,
+				cooldownTimer: 0,
+				onCooldown: false,
+				heat: 0 // sustained-fire spread bloom (common/firePattern.js)
+			}
+		})
 
 		// Keep legacy weapon object for backward compatibility with template checks
 		this.weapon = {
@@ -113,10 +131,15 @@ PlayerCharacter.protocol = {
 	hitpoints: nengi.UInt8,
 	slowTimer: nengi.Float32,
 	currentWeaponIndex: nengi.UInt8,
+	ownedWeapons: nengi.UInt8,
 	grenadeCharges: nengi.UInt8,
 	kills: nengi.UInt8,
 	deaths: nengi.UInt8,
 	nameIndex: nengi.UInt8
 }
+
+// Exposed so server code (GameInstance.respawnPlayer) resets to the same spawn loadout.
+PlayerCharacter.PISTOL_ONLY = PISTOL_ONLY
+PlayerCharacter.ALL_WEAPONS = (1 << weapons.length) - 1
 
 export default PlayerCharacter

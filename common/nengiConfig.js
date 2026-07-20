@@ -16,6 +16,7 @@ import Obstacle from './entity/Obstacle'
 import Projectile from './entity/Projectile'
 import Grenade from './entity/Grenade'
 import MegaHealthPickup from './entity/MegaHealthPickup'
+import Pickup from './entity/Pickup'
 
 const config = {
     UPDATE_RATE: 40, // raised 20->40 (2026-07-16): halves per-tick dodge jump (0.57m->0.285m)
@@ -42,7 +43,8 @@ const config = {
             ['Obstacle', Obstacle],
             ['Projectile', Projectile],
             ['Grenade', Grenade],
-            ['MegaHealthPickup', MegaHealthPickup]
+            ['MegaHealthPickup', MegaHealthPickup],
+            ['Pickup', Pickup]
         ],
         localMessages: [],
         messages: [

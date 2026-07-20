@@ -26,6 +26,7 @@ import { resolveWeaponFx } from './graphics/firingFx'
 import { assets, weapons } from './assets/assetManifest'
 import preloadAssets from './graphics/assetPreloader'
 import { MEGA_STATE } from '../common/entity/MegaHealthPickup'
+import { PICKUP_TYPE, PICKUP_RADIUS } from '../common/pickupConfig'
 
 // Aim-safe positional camera pulse on a confirmed LOCAL flesh hit (world units of
 // velocity impulse fed to the existing recoil spring; never rotates aim). Kept small
@@ -68,6 +69,8 @@ class Simulator {
 		this._grenades = new Map()       // nid -> {entity, t0} for the Phase 3 fuse blink
 		this._megaHealth = null          // the Phase 4 mega-health pickup entity (bob/spin/hum tell)
 		this._megaState = -1             // last-seen networked pickup state (drives transitions)
+		this._pickups = new Map()        // nid -> Pickup entity (UT-style map items; bob/spin off state)
+		this._lastOwned = undefined      // last-seen ownedWeapons bitmask (drives the local ammo-refill mirror)
 
 		// procedural weapon audio (WebAudio). Silent until resume() runs from a user
 		// gesture (enter-arena / pointer-lock / touch).
@@ -256,6 +259,21 @@ class Simulator {
 			this.myRawEntity.velX = 0
 			this.myRawEntity.velY = 0
 			this.myRawEntity.velZ = 0
+
+			// UT-STYLE LOADOUT RESET: a respawn returns us to pistol-only (the server does
+			// the same authoritatively). Reset our predicted inventory + re-equip the pistol
+			// so the HUD/viewmodel match and fire()/switch gate on the right ownership.
+			this.myRawEntity.ownedWeapons = 1 << 3
+			this._lastOwned = 1 << 3
+			if (this.myRawEntity.weaponsState) {
+				this.myRawEntity.weaponsState.forEach((st, i) => {
+					const owned = i === 3
+					st.magazineAmmo = owned ? weapons[i].magazineCapacity : 0
+					st.reserveAmmo = owned ? weapons[i].maxReserveAmmo : 0
+					st.onCooldown = false; st.cooldownTimer = 0; st.reloading = false; st.reloadTimer = 0; st.heat = 0
+				})
+			}
+			if (this.weaponIndex !== 3) this.switchWeapon(3) // force-equip the pistol
 
 			// local respawn cue (this message is our own re-entry — see guard above)
 			this.audio.respawn()
@@ -786,11 +804,106 @@ class Simulator {
 		return this._megaModelScale || 1
 	}
 
+	// UT-STYLE PICKUP bookkeeping (called from the Pickup factory). We track every live
+	// pickup so _updatePickups can drive its bob/spin/visibility off the networked state
+	// and mirror our OWN ammo/weapon refill when we grab one — all off server-authored
+	// state; the client never asserts a pickup.
+	registerPickup(entity) { if (entity) { entity._lastState = -1; this._pickups.set(entity.nid, entity) } }
+	unregisterPickup(nid) { this._pickups.delete(nid) }
+
+	// Presentation + local-refill mirror for every live pickup. Reacts to the networked
+	// `state` (AVAILABLE→visible+bob+spin, HIDDEN→off). On the AVAILABLE→HIDDEN grab
+	// transition, if WE were the one in range, mirror the server's grant into our
+	// predicted inventory so client prediction (HUD + weapon.fire gating) stays aligned:
+	//   • WEAPON grabs are handled by _syncOwnershipRefill (ownedWeapons is networked).
+	//   • AMMO grabs top up the mapped weapon's reserve here (ammo is NOT networked, so
+	//     the pickup's own state transition + our proximity is the signal).
+	// Health needs nothing (hitpoints is networked). Server-authoritative throughout.
+	_updatePickups() {
+		if (!this._pickups.size) return
+		const now = performance.now()
+		const me = this.myRawEntity
+		const R2 = PICKUP_RADIUS * PICKUP_RADIUS
+		this._pickups.forEach((e) => {
+			const mesh = e.mesh
+			if (!mesh || (mesh.isDisposed && mesh.isDisposed())) return
+			const state = e.state
+			if (state !== e._lastState) {
+				const prev = e._lastState
+				e._lastState = state
+				// grab: AVAILABLE → HIDDEN. Mirror an AMMO top-up if we were in range.
+				if (prev === MEGA_STATE.AVAILABLE && state === MEGA_STATE.HIDDEN &&
+					e.type === PICKUP_TYPE.AMMO && me) {
+					const dx = me.x - e.x, dy = me.y - e.y, dz = me.z - e.z
+					if (dx * dx + dy * dy + dz * dz <= R2) {
+						const wi = e.weaponIndex
+						const owns = me.ownedWeapons === undefined || (me.ownedWeapons & (1 << wi))
+						if (owns && me.weaponsState && me.weaponsState[wi]) {
+							me.weaponsState[wi].reserveAmmo = weapons[wi].maxReserveAmmo
+						}
+					}
+				}
+			}
+			const shown = state !== MEGA_STATE.HIDDEN
+			mesh.setEnabled(shown)
+			const model = e._pickupModel
+			if (model && model.setEnabled) model.setEnabled(shown)
+			if (e._pedestal && e._pedestal.setEnabled) e._pedestal.setEnabled(shown)
+			if (!shown) return
+			if (model) model.rotation.y = (now * 0.0011) % (Math.PI * 2)
+			// gentle bob of the whole holder (item + pedestal) around the networked base
+			const bob = Math.sin(now * 0.0025 + (e.nid || 0)) * 0.1
+			mesh.position.y = e.y + bob
+		})
+	}
+
+	// Mirror a WEAPON grant into our predicted inventory: ownedWeapons is networked, so
+	// when the server sets a new bit we see it here and refill THAT weapon locally (mag +
+	// reserve) — matching what the server did on grant — so client fire()/switch gating
+	// and the HUD immediately treat the new weapon as usable. Idempotent; the diff fires
+	// only on the tick a bit newly appears.
+	_syncOwnershipRefill() {
+		const e = this.myRawEntity
+		if (!e || e.ownedWeapons === undefined) return
+		if (this._lastOwned === undefined) { this._lastOwned = e.ownedWeapons; return }
+		const gained = e.ownedWeapons & ~this._lastOwned
+		if (gained && e.weaponsState) {
+			for (let i = 0; i < weapons.length; i++) {
+				if ((gained & (1 << i)) && e.weaponsState[i]) {
+					e.weaponsState[i].magazineAmmo = weapons[i].magazineCapacity
+					e.weaponsState[i].reserveAmmo = weapons[i].maxReserveAmmo
+				}
+			}
+		}
+		this._lastOwned = e.ownedWeapons
+	}
+
+	// Does the local player own weapon `i`? Undefined mask (pre-Identity) = own all, so
+	// nothing is falsely locked before the first snapshot arrives.
+	_ownsWeapon(i) {
+		const ow = this.myRawEntity ? this.myRawEntity.ownedWeapons : undefined
+		return ow === undefined || (ow & (1 << i)) !== 0
+	}
+
+	// Cycle to the next OWNED weapon in `dir` (+1 / -1), skipping unowned slots. Used by
+	// Q / mouse-wheel so an unowned weapon is simply passed over (its "greyed" state).
+	_cycleWeapon(dir) {
+		const n = weapons.length
+		for (let step = 1; step <= n; step++) {
+			const idx = (((this.weaponIndex + dir * step) % n) + n) % n
+			if (this._ownsWeapon(idx)) { this.switchWeapon(idx); return }
+		}
+	}
+
 	// equip weapon by index (wraps around); updates the on-screen weapon name
 	switchWeapon(index) {
 		const n = weapons.length
 		index = ((index % n) + n) % n
 		if (index === this.weaponIndex) return
+		// UT-STYLE OWNERSHIP: refuse selecting a weapon we don't own (the server's switch
+		// gate rejects it anyway; refusing locally keeps the HUD/viewmodel honest). Unowned
+		// weapons thus read as "greyed" — unselectable until picked up.
+		if (!this._ownsWeapon(index)) return
 		// swap accepted (past the same-weapon / normalized-index guards): play the
 		// swap clack. weaponSwap() self-throttles so scroll-cycling can't spam it.
 		this.audio.weaponSwap()
@@ -921,14 +1034,14 @@ class Simulator {
 			if (!this.input.pointerLocked) return
 			if (e.code >= 'Digit1' && e.code <= 'Digit9') {
 				const slot = parseInt(e.code.slice(5), 10) - 1
-				if (slot < weapons.length) this.switchWeapon(slot)
+				if (slot < weapons.length) this.switchWeapon(slot) // direct-select: refused if unowned
 			} else if (e.key === 'q' || e.key === 'Q') {
-				this.switchWeapon(this.weaponIndex + 1)
+				this._cycleWeapon(1) // cycle to the next OWNED weapon (skips unowned)
 			}
 		})
 		document.addEventListener('wheel', (e) => {
 			if (!this.input.pointerLocked) return
-			this.switchWeapon(this.weaponIndex + (e.deltaY > 0 ? 1 : -1))
+			this._cycleWeapon(e.deltaY > 0 ? 1 : -1) // cycle over OWNED weapons only
 		})
 		const el = document.getElementById('weapon-name')
 		if (el) el.textContent = weapons[0].name.toUpperCase()
@@ -1210,6 +1323,11 @@ class Simulator {
 
 		// Phase 4: mega-health pickup bob/spin/glow + hum tell (off networked state)
 		this._updateMegaHealth()
+
+		// UT-STYLE PICKUPS: mirror our own weapon/ammo refill off networked state
+		// (ownedWeapons + pickup transitions), then bob/spin the visible items.
+		this._syncOwnershipRefill()
+		this._updatePickups()
 
 		// advance kill-feedback FX (corpses, gibs, damage arc). Runs after the
 		// character models are driven so a corpse's frozen pose isn't re-overridden.
@@ -1725,6 +1843,15 @@ class Simulator {
 		if (reserve) reserve.textContent = state.reserveAmmo
 		if (weaponPanel) {
 			weaponPanel.classList.toggle('is-reloading', !!state.reloading)
+			// UT-STYLE OWNERSHIP: publish the owned-weapons bitmask + current-weapon
+			// ownership so the HUD/CSS can grey unowned slots (a weapon wheel reads this).
+			// The current weapon is always owned (the switch gate guarantees it), so
+			// is-unowned is a belt-and-braces cue rather than an expected state.
+			const owned = this.myRawEntity.ownedWeapons
+			if (owned !== undefined) {
+				weaponPanel.dataset.owned = owned
+				weaponPanel.classList.toggle('is-unowned', !(owned & (1 << this.weaponIndex)))
+			}
 			// bit 4: 3-tier ammo state (contract names is-low-ammo / is-empty).
 			// LOW MAG (<=25%, still loaded): steady amber warning so the player can
 			// top off before running dry. EMPTY (0, not reloading): red panic owns it.

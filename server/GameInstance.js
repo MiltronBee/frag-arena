@@ -24,6 +24,8 @@ import lagCompensatedHitscanCheck, { nearestWorldHit } from './lagCompensatedHit
 import Projectile from '../common/entity/Projectile'
 import Grenade from '../common/entity/Grenade'
 import MegaHealthPickup, { MEGA_STATE } from '../common/entity/MegaHealthPickup'
+import setupPickups from './setupPickups'
+import { PICKUP_TYPE, PICKUP_RADIUS, CHARGE_LEAD_SECONDS, HEALTH_HEAL, HEALTH_CAP } from '../common/pickupConfig'
 import { weapons, DEFAULT_ZONE_MULTIPLIERS } from '../common/weaponsConfig'
 import { PLAYER_NAMES } from '../common/playerNames'
 import BotController from './BotController'
@@ -142,6 +144,17 @@ const MEGA = {
 // for jump/rocket arcs, grenades and FX that briefly leave the floor's footprint.
 const VIEW_MARGIN = 16
 
+// UT-STYLE SPAWN tuning (v1). SPAWN_POINTS below SPAWN_MIN_HEADROOM metres of clearance
+// are dropped (Visage's 20 are all headroom 15, so none drop). Each surviving point is
+// drop-probed to the real floor and the player is placed SPAWN_REST above it so
+// applyCommand gravity settles them cleanly (same intent as the legacy "y a hair above
+// the floor" note) — this is what makes the re-extracted UT y-values (~1m off the old
+// hand-tuned spawns) land on the deck instead of inside/below it.
+const SPAWN_MIN_HEADROOM = 4
+const SPAWN_REST = 0.5
+const SPAWN_PROBE_UP = 2.0
+const SPAWN_PROBE_DOWN = 6.0
+
 class GameInstance {
 	static RESPAWN_DELAY_MS = 2500
 
@@ -196,6 +209,12 @@ class GameInstance {
 		// Phase 3: thrown frag grenades (mirrors this.projectiles). Server-only
 		// physics (gravity+bounce+fuse) + AoE detonation live in update().
 		this.grenades = new Set()
+
+		// UT-STYLE PICKUPS (v1): live Pickup entities on the map (weapon/ammo/health/
+		// armor/powerup). Filled by setupPickups() once the collision mesh is ready (mesh
+		// maps load async — see _loadMapMesh), so the drop-probe runs against real
+		// geometry. Box arenas carry no PICKUPS block, so this stays empty for them.
+		this.pickups = []
 
 		// Phase 4: the ONE mega-health pickup, on contested ground at bob height.
 		// Present (AVAILABLE) from boot; update() runs the proximity heal + 60s respawn
@@ -338,7 +357,10 @@ class GameInstance {
 
 		this.instance.on('command::SwitchWeaponCommand', ({ command, client, tick }) => {
 			const entity = client.rawEntity
-			if (entity && command.index !== undefined && command.index >= 0 && command.index < weapons.length) {
+			// UT-STYLE OWNERSHIP GATE (v1): refuse a switch to an unowned weapon (mirrors
+			// the applyCommand gate + weapon.fire()). Server-authoritative.
+			if (entity && command.index !== undefined && command.index >= 0 && command.index < weapons.length
+				&& (entity.ownedWeapons === undefined || (entity.ownedWeapons & (1 << command.index)))) {
 				// swap commitment: start the equip lock when the index actually changes,
 				// matching the client's switchWeapon() + applyCommand so fire() gates in
 				// lockstep. (This handler sets currentWeaponIndex directly, so the next
@@ -680,6 +702,93 @@ class GameInstance {
 		}
 	}
 
+	// UT-STYLE PICKUPS (v1): the generalized sibling of updateMegaHealth. Each tick, for
+	// every AVAILABLE pickup, proximity-check every living player (humans + bots) against
+	// its OWN authoritative mesh position (idempotent — the AVAILABLE guard means a taken
+	// pickup can't be granted twice). On a grab, apply the type-specific effect
+	// (grantPickup), flip state→HIDDEN and start the per-type respawn clock; while taken,
+	// flip to CHARGING in the final CHARGE_LEAD seconds, then back to AVAILABLE. FULLY
+	// SERVER-AUTHORITATIVE — the client never asserts a pickup; it only mirrors its own
+	// refill off the networked ownedWeapons / state (see Simulator). `now` is wall-clock ms.
+	//
+	// COST: O(pickups × players) cheap squared-distance tests, no allocation in the hot
+	// loop, no raycast (positions are static). On Visage (~50 pickups) with a couple of
+	// players this is a few hundred float ops per tick — negligible against the collision
+	// budget the mesh-map notes measure in whole percent.
+	updatePickups(now) {
+		const list = this.pickups
+		if (!list || list.length === 0) return
+
+		const targets = []
+		this.instance.clients.forEach(c => targets.push(c))
+		for (const b of this.bots) targets.push(b)
+
+		const R2 = PICKUP_RADIUS * PICKUP_RADIUS
+		for (const pk of list) {
+			if (pk.state === MEGA_STATE.AVAILABLE) {
+				for (const c of targets) {
+					const raw = c.rawEntity
+					if (!raw || !raw.isAlive) continue
+					const dx = raw.x - pk.x, dy = raw.y - pk.y, dz = raw.z - pk.z
+					if (dx * dx + dy * dy + dz * dz > R2) continue
+					// grantPickup returns false when there is nothing to gain (ammo for an
+					// unowned weapon, health at cap, an already-full weapon, or a deferred
+					// armor/powerup) — in that case the pickup is LEFT available.
+					if (!this.grantPickup(c, pk)) continue
+					pk.state = MEGA_STATE.HIDDEN
+					pk.respawnAt = now + (pk.respawnMs || 30000)
+					break
+				}
+			} else if (now >= pk.respawnAt) {
+				pk.state = MEGA_STATE.AVAILABLE
+			} else if (now >= pk.respawnAt - CHARGE_LEAD_SECONDS * 1000) {
+				if (pk.state !== MEGA_STATE.CHARGING) pk.state = MEGA_STATE.CHARGING
+			}
+		}
+	}
+
+	// Apply a pickup's effect to a grabber. Returns true if the pickup was consumed (so
+	// it should hide + start its respawn clock) or false if there was nothing to gain
+	// (leave it available). Server-authoritative; heal is applied to raw+smooth in
+	// lockstep (like damagePlayer). Ammo/ownership live only on the raw entity (ammo is
+	// not networked; the client mirrors its OWN refill off the networked ownedWeapons +
+	// pickup state — see Simulator._updatePickups).
+	grantPickup(c, pk) {
+		const raw = c.rawEntity
+		const smooth = c.smoothEntity
+		if (pk.type === PICKUP_TYPE.WEAPON) {
+			const wi = pk.weaponIndex
+			const cfg = weapons[wi]
+			const st = raw.weaponsState && raw.weaponsState[wi]
+			const owned = (raw.ownedWeapons & (1 << wi)) !== 0
+			const full = st && st.magazineAmmo >= cfg.magazineCapacity && st.reserveAmmo >= cfg.maxReserveAmmo
+			if (owned && full) return false // nothing to gain — leave it
+			raw.ownedWeapons |= (1 << wi)
+			if (smooth) smooth.ownedWeapons = raw.ownedWeapons
+			if (st) { st.magazineAmmo = cfg.magazineCapacity; st.reserveAmmo = cfg.maxReserveAmmo }
+			return true
+		}
+		if (pk.type === PICKUP_TYPE.AMMO) {
+			const wi = pk.weaponIndex
+			if (!(raw.ownedWeapons & (1 << wi))) return false // unowned weapon — ignore
+			const cfg = weapons[wi]
+			const st = raw.weaponsState && raw.weaponsState[wi]
+			if (!st || st.reserveAmmo >= cfg.maxReserveAmmo) return false // already full
+			st.reserveAmmo = cfg.maxReserveAmmo
+			return true
+		}
+		if (pk.type === PICKUP_TYPE.HEALTH) {
+			if (raw.hitpoints >= HEALTH_CAP) return false // full — leave it
+			const hp = Math.min(HEALTH_CAP, raw.hitpoints + HEALTH_HEAL)
+			raw.hitpoints = hp
+			if (smooth) smooth.hitpoints = hp
+			return true
+		}
+		// ARMOR + POWERUP: v1-DEFERRED grant (no stat/mechanic yet). Placed + rendered
+		// but NOT consumable — leave them available so nothing looks broken.
+		return false
+	}
+
 	// Phase 4: decay each player's overheal (hitpoints > 100) at OVERHEAL_RATE/sec,
 	// but only after the per-player grace timer expires. Never touches base health
 	// (floors at 100). Server-authoritative + applied to raw+smooth in lockstep like
@@ -712,6 +821,14 @@ class GameInstance {
 		entity.z = spawn.z
 		// spread the loadouts: rifle / smg / shotgun / pistol
 		entity.currentWeaponIndex = index % weapons.length
+		// UT-STYLE OWNERSHIP (v1): bots own the FULL arsenal (they never pick weapons up)
+		// so they behave exactly as before this feature. Refill the ammo the constructor
+		// zeroed for the non-pistol slots.
+		entity.ownedWeapons = PlayerCharacter.ALL_WEAPONS
+		entity.weaponsState.forEach((state, i) => {
+			state.magazineAmmo = weapons[i].magazineCapacity
+			state.reserveAmmo = weapons[i].maxReserveAmmo
+		})
 		entity.nameIndex = this._nameCounter++ % PLAYER_NAMES.length
 		this.instance.addEntity(entity)
 
@@ -831,6 +948,11 @@ class GameInstance {
 				+ `half(${vb.halfWidth.toFixed(2)}, ${vb.halfHeight.toFixed(2)}, ${vb.halfDepth.toFixed(2)})`)
 			this.mapReady = true
 			console.log(`[map] mesh collider loaded: ${n} meshes (${this.map.file})`)
+
+			// UT-STYLE PICKUPS: now that occluderMeshes is published, drop-probe the
+			// registry PICKUPS onto the floor and spawn a Pickup entity per surviving item.
+			// Runs AFTER the mesh is ready so every probe tests real geometry.
+			this.pickups = setupPickups(this).created
 		} catch (e) { console.error('[map] mesh load FAILED:', e) }
 	}
 
@@ -845,12 +967,38 @@ class GameInstance {
 		if (this.useMeshMap) console.log(`[spawn] nid=${raw.nid} @(${raw.x.toFixed(1)},${raw.y.toFixed(1)},${raw.z.toFixed(1)})`)
 	}
 
+	// Cast a ray straight DOWN through the collision mesh from `worldY`+up and return the
+	// floor's world y under (x,z), or null if there is no floor in the probe window.
+	// Reuses the hitscan occluder meshes — the same query setupPickups uses.
+	_dropProbeY(x, worldY, z, up = SPAWN_PROBE_UP, down = SPAWN_PROBE_DOWN) {
+		const meshes = this.occluderMeshes
+		if (!meshes || meshes.length === 0) return null
+		const origin = new BABYLON.Vector3(x, worldY + up, z)
+		const ray = new BABYLON.Ray(origin, new BABYLON.Vector3(0, -1, 0), up + down)
+		const dist = nearestWorldHit(meshes, ray, up + down)
+		return Number.isFinite(dist) ? origin.y - dist : null
+	}
+
 	spawnPoint() {
 		if (this.useMeshMap) {
-			// pick a floor spawn; small XZ jitter so two players don't spawn co-located.
-			// y is a hair above the floor so applyCommand gravity + mesh collision settle
-			// them cleanly.
 			const sc = this.map.scale || 1
+			// Prefer the UT-extracted SPAWN_POINTS (20, team-tagged, yaw, headroom) on the
+			// enriched record; drop low-headroom entries and drop-probe each to the floor.
+			// Fall back to the legacy `spawns` list for any map without SPAWN_POINTS.
+			const pts = this.map.SPAWN_POINTS
+			if (Array.isArray(pts) && pts.length) {
+				const usable = pts.filter(p => p.headroom === undefined || p.headroom >= SPAWN_MIN_HEADROOM)
+				const pool = usable.length ? usable : pts
+				const p = pool[Math.floor(Math.random() * pool.length)]
+				const wx = p.x * sc + (Math.random() - 0.5) * 1.2
+				const wz = p.z * sc + (Math.random() - 0.5) * 1.2
+				const floorY = this._dropProbeY(wx, p.y * sc, wz)
+				// on a probe miss, fall back to the native y (never worse than the legacy
+				// behaviour, which used the native y verbatim)
+				const wy = floorY != null ? floorY + SPAWN_REST : p.y * sc
+				return { x: wx, y: wy, z: wz, yaw: p.yaw }
+			}
+			// legacy fallback: pick a floor spawn; small XZ jitter; y a hair above the floor.
 			const s = this.map.spawns[Math.floor(Math.random() * this.map.spawns.length)]
 			return { x: s.x * sc + (Math.random() - 0.5) * 1.2, z: s.z * sc + (Math.random() - 0.5) * 1.2, y: s.y * sc }
 		}
@@ -1120,15 +1268,24 @@ class GameInstance {
 			entity.grenadeCharges = GRENADE.MAX_CHARGES
 			entity.throwCooldown = 0
 			entity.rechargeAccum = 0
+			// UT-STYLE OWNERSHIP RESET (v1): a respawn returns the player to pistol-only
+			// (+ pistol ammo); every other weapon reverts to unowned with ZERO ammo. Bots
+			// keep the full arsenal so they still fight (they never pick weapons up).
+			const spawnOwned = client.bot ? PlayerCharacter.ALL_WEAPONS : PlayerCharacter.PISTOL_ONLY
+			entity.ownedWeapons = spawnOwned
 			entity.weaponsState.forEach((state, i) => {
-				state.magazineAmmo = weapons[i].magazineCapacity
-				state.reserveAmmo = weapons[i].maxReserveAmmo
+				const owned = (spawnOwned & (1 << i)) !== 0
+				state.magazineAmmo = owned ? weapons[i].magazineCapacity : 0
+				state.reserveAmmo = owned ? weapons[i].maxReserveAmmo : 0
 				state.cooldownTimer = 0
 				state.onCooldown = false
 				state.reloading = false
 				state.reloadTimer = 0
 				state.heat = 0
 			})
+			// a respawn always re-equips the pistol so a human never spawns holding a
+			// weapon they no longer own (which fire()/switch would then refuse).
+			if (!client.bot) entity.currentWeaponIndex = 3
 		}
 		// the client ignores server x/y/z for its own entity (it predicts them),
 		// so hand the teleport over explicitly — same contract as Identity's spawn.
@@ -1494,6 +1651,7 @@ class GameInstance {
 		// Phase 4: mega-health pickup (proximity heal + 60s respawn clock) and the
 		// per-player overheal decay. Server-authoritative, outside client prediction.
 		this.updateMegaHealth(wallNow)
+		this.updatePickups(wallNow)
 		this.updateOverhealDecay(delta)
 
 		// for each player ...

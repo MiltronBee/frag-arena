@@ -891,11 +891,21 @@ export default (entity, command) => {
 	// Apply weapon switching. When the equipped index actually changes, start the
 	// equip lock (drawTime) — weapon.fire() refuses to fire while equipTimer > 0.
 	if (command.weaponIndex !== undefined) {
-		if (command.weaponIndex !== entity.currentWeaponIndex) {
-			const w = weapons[command.weaponIndex]
-			entity.equipTimer = (w && w.drawTime) || 0
+		const wi = command.weaponIndex
+		// UT-STYLE OWNERSHIP GATE (v1): refuse switching to an unowned weapon. Reads the
+		// server-authoritative ownedWeapons bitmask (undefined = own everything, for
+		// legacy/golden entities). DETERMINISM: ownedWeapons is set only by the server
+		// (down-only) and never mutated by a command, so a reconciliation replay of the
+		// same command window sees a constant mask; and currentWeaponIndex does NOT feed
+		// the movement math, so the golden trajectory is provably untouched by this gate.
+		const owns = entity.ownedWeapons === undefined || (entity.ownedWeapons & (1 << wi))
+		if (owns) {
+			if (wi !== entity.currentWeaponIndex) {
+				const w = weapons[wi]
+				entity.equipTimer = (w && w.drawTime) || 0
+			}
+			entity.currentWeaponIndex = wi
 		}
-		entity.currentWeaponIndex = command.weaponIndex
 	}
 
 	// Modular weapons reload logic
