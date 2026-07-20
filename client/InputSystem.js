@@ -109,10 +109,7 @@ class InputSystem {
 			}
 		})
 
-		document.addEventListener('pointerdown', event => {
-			// touches are handled by TouchControls — never pointer-lock or fire
-			if (event.pointerType === 'touch') { return }
-
+		document.addEventListener('mousedown', event => {
 			if (event.target.closest('#settings-menu') || event.target.closest('#dev-inspector')) {
 				return // Let user click sliders and dev inspector inputs
 			}

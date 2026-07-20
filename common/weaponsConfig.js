@@ -83,9 +83,11 @@ export const weapons = [
     name: 'SMG',
     url: '/assets/weapons/retro_smg_arms.glb',
     ...authoredMount,
-    // SMG stays hip-only for now: the full-set ADS rebuild rendered badly in live
-    // testing (its vendor rig has known quirks). Reverted to the original shipped GLB.
-    // Revisit with re-authored SMG arm clips before re-enabling ADS here.
+    // ADS enabled via procedural viewmodel centering fallback.
+    // ADS gameplay: tighter base cone (-40%), -30% sustained bloom, -20% heat/shot
+    ...withAds(80, 0.20, 0.15, { spreadBaseMult: 0.6, spreadHeatMult: 0.7, heatMult: 0.8 }),
+    // ADS: sink the receiver down + forward so the sights align with the crosshair
+    adsMount: { position: { x: 0.0, y: -0.03, z: 0.06 }, rotation: { x: 0, y: Math.PI / 2, z: 0 } },
     muzzle: { x: 0.08, y: -0.13, z: 0.90 },
     recoilForce: 0.6,
     drawTime: 0.25,
@@ -119,11 +121,10 @@ export const weapons = [
     // play the pump/aim one-shots a touch faster than authored so the shotgun reads
     // snappier (both hands + gun scale together, so they stay synced).
     animSpeed: 1.3,
-    // aimed framing: raise the two-hand grip up + forward toward the crosshair while
-    // aimed (blended from the hip mount by the aim amount). The shotgun rig ships no
-    // arms-aim pose, so ADS is a grip-hold raise + world-camera FOV zoom rather than a
-    // per-bone sight alignment. Presentation only; never touches the aim ray.
-    adsMount: { position: { x: 0.0, y: 0.06, z: 0.10 }, rotation: { x: 0, y: Math.PI / 2, z: 0 } },
+    // aimed framing: now that the shotgun has custom aim animations, we just need
+    // a slight downward and forward offset to drop the receiver out of the sights
+    // and prevent arm clipping.
+    adsMount: { position: { x: 0.0, y: -0.03, z: 0.05 }, rotation: { x: 0, y: Math.PI / 2, z: 0 } },
     muzzle: { x: 0.08, y: -0.15, z: 1.05 },
     recoilForce: 2.2,
     drawTime: 0.40,

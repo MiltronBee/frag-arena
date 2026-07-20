@@ -270,16 +270,15 @@ export default class Viewmodel {
     this.drawAnim = this.groups[anims.draw]
 
     // ADS clips (optional). Present only on ads-enabled weapons whose GLB carries the
-    // full baked aim group (scripts/retro-blend-actions.json "aim"). If ANY is missing
-    // we treat the weapon as non-ADS, so setAim() is a hard no-op — never half-aimed.
+    // full baked aim group. If the animations are missing, we still support aiming
+    // by falling back to a procedural holder-mount alignment.
     this.aimStartAnim = this.groups[anims.aimStart]
     this.aimPoseAnim = this.groups[anims.aimPose]
     this.aimEndAnim = this.groups[anims.aimEnd]
     this.fireAimingAnim = this.groups[anims.fireAiming]
     this.breathingAimingAnim = this.groups[anims.breathingAiming]
     this.walkAimingAnim = this.groups[anims.walkAiming]
-    this.hasAds = !!(this.spec.ads && this.aimStartAnim && this.aimPoseAnim &&
-      this.aimEndAnim && this.fireAimingAnim && this.breathingAimingAnim && this.walkAimingAnim)
+    this.hasAds = !!this.spec.ads
     // blend the aimed loops in from the transition's end pose so the handoff
     // aim_start -> breathing/walk_aiming doesn't snap the arms.
     ;[this.breathingAimingAnim, this.walkAimingAnim].forEach((g) => {
@@ -427,21 +426,25 @@ export default class Viewmodel {
   _enterAimIn() {
     const gen = ++this._gen
     this._setState(S.AIMING_IN)
-    if (this.idleAnim) this.idleAnim.stop()
-    this._stopAimLoops()
-    this.aimEndAnim.stop()
-    this.aimStartAnim.stop()
-    this._onEndOnce(this.aimStartAnim, gen, () => {
-      if (!this._wantActive) return
-      if (this._aimWanted) this._enterAimed()
-      else this._enterAimOut() // released mid-transition -> clean reversible exit
-    })
-    this.aimStartAnim.start(false, this._animSpeed)
+    if (this.aimStartAnim) {
+      if (this.idleAnim) this.idleAnim.stop()
+      this._stopAimLoops()
+      if (this.aimEndAnim) this.aimEndAnim.stop()
+      this.aimStartAnim.stop()
+      this._onEndOnce(this.aimStartAnim, gen, () => {
+        if (!this._wantActive) return
+        if (this._aimWanted) this._enterAimed()
+        else this._enterAimOut() // released mid-transition -> clean reversible exit
+      })
+      this.aimStartAnim.start(false, this._animSpeed)
+    } else {
+      this._enterAimed()
+    }
   }
 
   _enterAimed() {
     this._setState(S.AIMED)
-    this.aimStartAnim.stop()
+    if (this.aimStartAnim) this.aimStartAnim.stop()
     this._aimLoop = null
     this._updateAimedLocomotion(this._lastMoving) // start the correct aimed loop now
   }
@@ -449,15 +452,20 @@ export default class Viewmodel {
   _enterAimOut() {
     const gen = ++this._gen
     this._setState(S.AIMING_OUT)
-    this._stopAimLoops()
-    this.aimStartAnim.stop()
-    this.aimEndAnim.stop()
-    this._onEndOnce(this.aimEndAnim, gen, () => {
-      if (!this._wantActive) return
-      if (this._aimWanted) this._enterAimIn() // re-pressed during exit
-      else { this._setState(S.IDLE); this._startIdleLoop() }
-    })
-    this.aimEndAnim.start(false, this._animSpeed)
+    if (this.aimEndAnim) {
+      this._stopAimLoops()
+      if (this.aimStartAnim) this.aimStartAnim.stop()
+      this.aimEndAnim.stop()
+      this._onEndOnce(this.aimEndAnim, gen, () => {
+        if (!this._wantActive) return
+        if (this._aimWanted) this._enterAimIn() // re-pressed during exit
+        else { this._setState(S.IDLE); this._startIdleLoop() }
+      })
+      this.aimEndAnim.start(false, this._animSpeed)
+    } else {
+      this._setState(S.IDLE)
+      this._startIdleLoop()
+    }
   }
 
   // pick breathing (stationary) vs walk (moving) aimed loop; only swaps on change.
@@ -474,9 +482,6 @@ export default class Viewmodel {
 
   get isReloading() { return this._state === S.RELOADING }
 
-  // re-express a camera-local point in holder-local space using the holder's
-  // BASE transform (so sockets land where the manifest authored them, then
-  // follow every live holder motion: bob, spring recoil, pump rack)
   _cameraLocalToHolder(camLocal) {
     const r = this.spec.rotation || {}
     const q = BABYLON.Quaternion.FromEulerAngles(r.x || 0, r.y || 0, r.z || 0)
@@ -484,6 +489,49 @@ export default class Viewmodel {
     const base = BABYLON.Matrix.Compose(
       new BABYLON.Vector3(s, s, s), q, this._basePos)
     return BABYLON.Vector3.TransformCoordinates(camLocal, base.invert())
+  }
+
+  _cameraMuzzlePos(adsT) {
+    const mz = this.spec.muzzle || { x: 0.08, y: -0.14, z: 0.9 }
+    const a = this._hasAimMount ? Math.max(0, Math.min(1, adsT)) : 0
+
+    // Aimed muzzle Y estimate: sights are aligned at Y=0, barrel is slightly below
+    // (typically around -0.05 to -0.08 depending on weapon receiver height).
+    let aimedY = mz.y
+    if (this.spec.name === 'Rifle' || this.spec.name === 'Plasma' || this.spec.name === 'SMG') {
+      aimedY = -0.06
+    } else if (this.spec.name === 'Shotgun') {
+      aimedY = -0.07
+    } else if (this.spec.name === 'Pistol') {
+      aimedY = -0.03
+    }
+
+    const mx = mz.x * (1 - a)
+    const my = mz.y + (aimedY - mz.y) * a
+    const mz_val = mz.z
+
+    return new BABYLON.Vector3(mx, my, mz_val)
+  }
+
+  _cameraLocalToHolderClean(camLocal, adsT) {
+    const a = this._hasAimMount ? Math.max(0, Math.min(1, adsT)) : 0
+    const baseRotY = (this.spec.rotation && this.spec.rotation.y) || 0
+    const baseRotZ = (this.spec.rotation && this.spec.rotation.z) || 0
+    const rX = this._baseRotX + (this._adsRot.x - this._baseRotX) * a
+    const rY = baseRotY + (this._adsRot.y - baseRotY) * a
+    const rZ = baseRotZ + (this._adsRot.z - baseRotZ) * a
+    const q = BABYLON.Quaternion.FromEulerAngles(rX, rY, rZ)
+
+    const s = this.spec.scale || 1
+    const mx = this._basePos.x + (this._adsPos.x - this._basePos.x) * a
+    const my = this._basePos.y + (this._adsPos.y - this._basePos.y) * a
+    const mz = this._basePos.z + (this._adsPos.z - this._basePos.z) * a
+    const cleanPos = new BABYLON.Vector3(mx, my, mz)
+
+    const cleanMatrix = BABYLON.Matrix.Compose(
+      new BABYLON.Vector3(s, s, s), q, cleanPos)
+
+    return BABYLON.Vector3.TransformCoordinates(camLocal, cleanMatrix.invert())
   }
 
   // world-space barrel tip (for muzzle flash / tracer origin)
@@ -686,6 +734,11 @@ export default class Viewmodel {
     const rZ = baseRotZ + (this._adsRot.z - baseRotZ) * a
     this.holder.position.set(mx + bobX + this.recoilPos.x, my + bobY + this.recoilPos.y, mz + this.recoilPos.z)
     this.holder.rotation.set(rX + this.recoilRot.x, rY + this.recoilRot.y, rZ + this.recoilRot.z)
+
+    if (this.muzzle) {
+      const localMuzzle = this._cameraMuzzlePos(adsT)
+      this.muzzle.position.copyFrom(this._cameraLocalToHolderClean(localMuzzle, adsT))
+    }
   }
 
   _disposeLoadedResources() {
