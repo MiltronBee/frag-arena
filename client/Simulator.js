@@ -208,7 +208,10 @@ class Simulator {
 			this.mySmoothId = message.smoothId
 			// our own x/y/z updates are ignored (we predict them), so the server hands
 			// us the spawn point here; applied when the raw entity arrives
-			this.spawnPos = { x: message.x, z: message.z }
+			// y is carried too (see Identity.js). createPlayerFactory currently applies
+			// only x/z — the entity's y already arrives correct on the create-snapshot —
+			// but keeping y here means the two sources can't disagree.
+			this.spawnPos = { x: message.x, y: message.y, z: message.z }
 			console.log('identified as', message)
 
 			// tell the server our chosen callsign (typed at the menu, saved by
@@ -232,7 +235,13 @@ class Simulator {
 			// snapshots are ignored, so this message is the only way we move)
 			if (!this.myRawEntity) return
 			this.myRawEntity.x = message.x
-			this.myRawEntity.y = 0
+			// y comes from the server now. It used to be hardcoded to 0 — correct only
+			// on a box arena, whose floor WAS the plane y=0. On a mesh map the server
+			// respawns you on the artist's floor (CTF-Visage: world y ~-24.2), so the
+			// old `= 0` teleported the client ~24m into the air and it fell back down
+			// every single respawn, mispredicting its own position (and every shot
+			// origin / muzzle FX) for the whole ~1.6s fall.
+			this.myRawEntity.y = message.y
 			this.myRawEntity.z = message.z
 			this.myRawEntity.velX = 0
 			this.myRawEntity.velY = 0

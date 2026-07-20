@@ -6,6 +6,13 @@ import ArenaDressing from './arenaDressing'
 import { USE_MESH_MAP, MAP_MESH } from '../../common/mapMesh'
 import { bakeVertexColors } from './mapLights'
 
+// Layer the first-person viewmodel lives on: vmCamera renders ONLY this, the world
+// camera renders everything EXCEPT it (see the camera setup below). Viewmodel.js
+// stamps the same mask on every gun/arms mesh, which makes it the reliable way to
+// recognise "this is the local player's own gun" — used by _isHitscanTarget to keep
+// impact FX off it.
+const VM_LAYER_MASK = 0x10000000
+
 // Blood/impact VFX — DISTINCT POOLED CLASSES (per FX consult), not one droplet
 // spray. The "dark core" rule: a bright crimson ADDITIVE mist puff sells the hot
 // atomized flash; dark-burgundy ALPHA streaks + drops carry the weight; floor
@@ -41,7 +48,14 @@ const DROP_SIZE_MUL = 0.55, DROP_SIZE_JITTER = 0.4
 
 // GROUND POOLS — a separate capped pool of flat floor quads (no mesh decals).
 // A drop/streak that reaches the floor leaves one: grow, hold, fade, recycle.
-const GROUND_Y = -1           // arenaDressing floor height
+// BOX ARENAS ONLY. This is the arenaDressing floor height — valid when the level is
+// the SciFi-kit box arena (invisible collision plane + tiles drawn at y -1). MESH MAPS
+// (USE_MESH_MAP, common/mapMesh.js) have no such global floor: the artist OBJ is both
+// visual and collision, its deck sits at an arbitrary world height (CTF-Visage ~ -25),
+// and that height VARIES across the map. So never test/place FX against this constant
+// unconditionally — go through _floorYBelow(), which falls back to it only on box
+// arenas. (Using it unconditionally put blood pools ~24m above the Visage deck.)
+const GROUND_Y = -1           // arenaDressing floor height (box arenas only)
 const GROUND_POOL = 24        // max simultaneous floor pools (round-robin recycle)
 const GROUND_COLOR = [0.4, 0.01, 0.01]
 const GROUND_GROW = 100, GROUND_HOLD = 3000, GROUND_FADE = 1000 // ms phases
@@ -112,7 +126,11 @@ class BABYLONRenderer {
 		this.vmCamera.fov = 1.0 // Fixed viewmodel FOV
 		this.vmCamera.minZ = 0.01 // Prevent close clipping
 		this.vmCamera.maxZ = 10
-		this.vmCamera.layerMask = 0x10000000 // Renders only viewmodel meshes
+		this.vmCamera.layerMask = VM_LAYER_MASK // Renders only viewmodel meshes
+
+		// Bound once: drawHitscan picks once PER PELLET (the shotgun fires 8), so the
+		// predicate must not allocate a fresh closure on every one.
+		this._hitscanPredicate = (m) => this._isHitscanTarget(m)
 
 		// Clear depth buffer before rendering viewmodel so it doesn't clip through world geometry
 		this.scene.onBeforeCameraRenderObservable.add((cam) => {
@@ -267,15 +285,30 @@ class BABYLONRenderer {
 		this.scene.fogDensity = 0.008
 
 		// --- ground: dark asphalt catch-all under the kit floor tiles (sits a hair
-		// lower so the tiles don't z-fight it); still the shadow receiver of record
-		const plane = BABYLON.MeshBuilder.CreatePlane('ground', { size: 60 }, this.scene)
-		plane.rotation.x = Math.PI * 0.5
-		plane.position.y = -1.03
-		const groundMat = new BABYLON.StandardMaterial('groundMat', this.scene)
-		groundMat.diffuseColor = new BABYLON.Color3(0.11, 0.11, 0.13)
-		groundMat.specularColor = new BABYLON.Color3(0.08, 0.07, 0.06)
-		plane.material = groundMat
-		plane.receiveShadows = true
+		// lower so the tiles don't z-fight it); still the shadow receiver of record.
+		// BOX ARENAS ONLY. On a MESH MAP the artist OBJ is the floor, at its own height
+		// (CTF-Visage's deck is ~ -25), so this 60x60 y=-1.03 slab is not "under" anything
+		// — it floats ~24m above the west/central deck, spanning world x/z [-30,30].
+		// Measured, so the next reader doesn't have to re-derive it: it is NOT the black
+		// ceiling it looks like on paper. The plane is single-sided with a +Y world normal
+		// and backFaceCulling on, so from the deck below it is culled and invisible; it
+		// only draws when viewed from ABOVE y -1.03. It is dead weight rather than a
+		// visible artifact — a wasted draw call, a member of the frozen shadow-map render
+		// list, and something that WOULD pop into view for any camera that ever rises
+		// above it. It has no checkCollisions, so it never blocked movement.
+		// Nothing else holds a reference: the handle is local, and the only other mention
+		// of the name is drawHitscan's pick filter (m.name !== 'ground'), which is simply
+		// a no-op when the mesh doesn't exist.
+		if (!USE_MESH_MAP) {
+			const plane = BABYLON.MeshBuilder.CreatePlane('ground', { size: 60 }, this.scene)
+			plane.rotation.x = Math.PI * 0.5
+			plane.position.y = -1.03
+			const groundMat = new BABYLON.StandardMaterial('groundMat', this.scene)
+			groundMat.diffuseColor = new BABYLON.Color3(0.11, 0.11, 0.13)
+			groundMat.specularColor = new BABYLON.Color3(0.08, 0.07, 0.06)
+			plane.material = groundMat
+			plane.receiveShadows = true
+		}
 
 		// --- arena obstacle materials (consumed by createObstacleFactory via
 		// scene.metadata, keyed by entity.style). Dark industrial concrete/metal
@@ -778,6 +811,11 @@ class BABYLONRenderer {
 			t0: 0,
 			life: 1100,
 			bounced: false,
+			// floor to bounce off, resolved from the geometry under the muzzle rather than
+			// a box-arena constant (the old -0.97 is ~24m ABOVE the Visage deck, so brass
+			// ejected at y ~ -23.5 was already "below" it and got snapped up into the sky
+			// on the next tick). null over the void = falls forever until its life ends.
+			floorY: this._floorYBelow(pos),
 		})
 	}
 
@@ -798,7 +836,7 @@ class BABYLONRenderer {
 		// find the impact point; ignore very-near hits (the shooter's own box) and
 		// fall back to a long ray if nothing is hit
 		const ray = new BABYLON.Ray(origin, dir, 500)
-		const hit = this.scene.pickWithRay(ray, (m) => m.isPickable !== false && m.name !== 'ground' && m.name !== 'sky')
+		const hit = this.scene.pickWithRay(ray, this._hitscanPredicate)
 		const hitValid = hit && hit.hit && hit.pickedPoint && hit.distance > 0.5
 		const end = hitValid ? hit.pickedPoint : origin.add(dir.scale(120))
 
@@ -902,6 +940,12 @@ class BABYLONRenderer {
 		const ny = normal ? normal.y : 0
 		const nz = normal ? normal.z : 0
 		const now = performance.now()
+		// Resolve the floor ONCE per burst (not per droplet): all ~12 particles of a hit
+		// start from the same point, so they share a landing surface, and one ray per
+		// flesh hit is far cheaper than one per particle. null = nothing underneath (a hit
+		// out over the void), in which case no droplet pools — see _floorYBelow.
+		const floorY = this._floorYBelow(point)
+		const canPool = floorY !== null
 
 		// --- MIST: bright additive puff(s) that expand + fade fast ---
 		const mistN = low ? MIST_COUNT_LO : MIST_COUNT_HI
@@ -941,7 +985,7 @@ class BABYLONRenderer {
 			this._orientStreak(st, vel)
 			st.isVisible = true
 			st.visibility = 1
-			this._blood.push({ mesh: st, kind: 'streak', vel, t0: now, life: STREAK_LIFE, grav: STREAK_GRAVITY, drag: STREAK_DRAG, ground: true })
+			this._blood.push({ mesh: st, kind: 'streak', vel, t0: now, life: STREAK_LIFE, grav: STREAK_GRAVITY, drag: STREAK_DRAG, ground: canPool, floorY })
 		}
 
 		// --- DROPS: heavier gravity-bound droplets (thinned, not removed, on low) ---
@@ -961,7 +1005,7 @@ class BABYLONRenderer {
 			const vx = nx * DROP_SPEED + (Math.random() - 0.5) * DROP_SPREAD
 			const vy = ny * DROP_SPEED + DROP_UP + Math.random() * DROP_UP
 			const vz = nz * DROP_SPEED + (Math.random() - 0.5) * DROP_SPREAD
-			this._blood.push({ mesh: d, kind: 'drop', vel: new BABYLON.Vector3(vx, vy, vz), t0: now, life: DROP_LIFE, grav: DROP_GRAVITY, ground: !low })
+			this._blood.push({ mesh: d, kind: 'drop', vel: new BABYLON.Vector3(vx, vy, vz), t0: now, life: DROP_LIFE, grav: DROP_GRAVITY, ground: !low && canPool, floorY })
 		}
 	}
 
@@ -984,9 +1028,92 @@ class BABYLONRenderer {
 		mesh.rotationQuaternion = this._streakQuat.clone()
 	}
 
+	// World-y of the real floor beneath `point` — the surface a ballistic FX particle
+	// (blood drop, brass, gib) should come to rest on.
+	//
+	// BOX ARENAS have exactly one flat floor, so the legacy constant is both correct and
+	// cheaper; we keep it verbatim there. A ray would instead hit the dressing tiles or
+	// the -1.03 catch-all slab at subtly different heights and re-introduce the z-fight
+	// the hand-picked constant was chosen to avoid, so box arenas take the early out.
+	//
+	// MESH MAPS have no global floor at all: the artist OBJ is one mesh serving as both
+	// visual and collision, its deck sits at an arbitrary world height, and that height
+	// VARIES per location (Visage's towers, bridge and deck are all different). So the
+	// height is derived from the geometry actually under the effect, which is what makes
+	// this correct on any future mesh map at any height rather than only on Visage.
+	//
+	// FLESH is excluded from the pick: a blood burst originates ON a body, and picking
+	// that body would "floor" the blood at chest height inside the corpse. Every pooled
+	// FX mesh already sets isPickable=false, so no effect can be its own floor.
+	//
+	// Returns null when there is nothing below (shot out over the void). Callers treat
+	// null as "never lands" — the particle expires mid-air rather than snapping to a
+	// phantom floor, which is the correct read over Visage's open edges.
+	_floorYBelow(point) {
+		if (!USE_MESH_MAP) return GROUND_Y
+		const from = new BABYLON.Vector3(point.x, point.y + 0.25, point.z)
+		const ray = new BABYLON.Ray(from, new BABYLON.Vector3(0, -1, 0), 400)
+		const hit = this.scene.pickWithRay(ray, (m) => this._isSolidWorld(m))
+		return (hit && hit.hit && hit.pickedPoint) ? hit.pickedPoint.y : null
+	}
+
+	// Is this mesh solid world geometry an FX particle can land on?
+	//
+	// SOLIDITY IS DECIDED BY checkCollisions, NOT isPickable. That is the whole trick
+	// here: _loadMeshMap sets isPickable=false on every map submesh on purpose (the
+	// server owns collision, and pick-testing ~450 submeshes is not free) while setting
+	// checkCollisions=true, because the client still predicts its own movement against
+	// the map. So on a mesh map the floor is invisible to any isPickable-based filter —
+	// which is exactly why an isPickable predicate here returned "no floor anywhere"
+	// and why drawHitscan's own pick filter (isPickable !== false) never registers a
+	// hit on Visage geometry. A predicate passed to pickWithRay overrides isPickable,
+	// so testing checkCollisions lets FX see the real floor without making the map
+	// pickable for everything else.
+	_isSolidWorld(mesh) {
+		if (!mesh || mesh.name === 'sky') return false
+		if (classifySurface(mesh) === 'flesh') return false // don't land blood inside a body
+		if (mesh.checkCollisions) return true               // mesh-map geometry (non-pickable)
+		return mesh.isPickable !== false                    // box-arena floor/obstacles
+	}
+
+	// Can a hitscan PRESENTATION ray land an impact (spark/scorch/decal) on this mesh?
+	//
+	// This is a strict SUPERSET of the filter drawHitscan used to inline
+	// (isPickable !== false && name !== 'ground' && name !== 'sky'), composed with
+	// _isSolidWorld rather than replaced by it, because the two want opposite things
+	// about bodies. Everything the old filter accepted is still accepted:
+	//   - PLAYERS: the hittable body is the entity's collision BOX (common/entity/
+	//     PlayerCharacter.js names it 'player'), which is pickable, so it comes in via
+	//     the isPickable branch. That branch is deliberately tested BEFORE
+	//     _isSolidWorld, which REJECTS flesh — right for landing blood on a floor,
+	//     fatal here, since Simulator's hitmarker is exactly `surface === 'flesh'`.
+	//   - BOX-ARENA floor + obstacles: same isPickable branch (they are pickable and
+	//     have no checkCollisions), so non-mesh maps behave exactly as before.
+	//   - 'ground' (the box-arena catch-all slab) and 'sky' stay excluded.
+	//   - Pooled FX meshes stay excluded: isPickable=false and no checkCollisions, so
+	//     neither branch takes them and a spark can't be another spark's impact.
+	// What is NEW is the last line: mesh-map submeshes are isPickable=false on purpose
+	// (see _loadMeshMap — server owns collision) and so were invisible to the old
+	// filter, which is why NO shot ever marked a wall or floor on Visage.
+	//
+	// The VIEWMODEL exclusion is also new. Viewmodel.js tags its meshes with this
+	// layerMask so vmCamera renders them; they are pickable and sit centimetres from
+	// the muzzle, so they were both a false impact surface for steeply-angled shots
+	// (a scorch decal on your own gun) and — at 7.3k + 9.2k verts for Main_Mesh and
+	// ChargeHandle_Mesh — the two most expensive meshes in every pick. Dropping them
+	// measured ~27% off the pick cost.
+	_isHitscanTarget(mesh) {
+		if (!mesh || mesh.name === 'sky' || mesh.name === 'ground') return false
+		if (mesh.layerMask === VM_LAYER_MASK) return false // local viewmodel: never a surface
+		if (mesh.isPickable !== false) return true         // players (flesh), box-arena world
+		return this._isSolidWorld(mesh)                    // mesh-map geometry (non-pickable)
+	}
+
 	// Leave a flat blood pool on the floor where a droplet landed. Separate pool so a
 	// lingering pool isn't recycled by fresh airborne droplets. No mesh decals.
-	_spawnGroundPool(x, z) {
+	// `y` is the floor height the droplet actually landed on (_floorYBelow), NOT a
+	// global constant — on a mesh map it differs per hit location.
+	_spawnGroundPool(x, y, z) {
 		const gp = this._next('ground')
 		// drop any stale sim entry for this recycled mesh
 		for (let i = this._groundPools.length - 1; i >= 0; i--) {
@@ -994,7 +1121,7 @@ class BABYLONRenderer {
 		}
 		this._setColor(gp, GROUND_COLOR)
 		const idx = this._idx.ground % GROUND_POOL
-		gp.position.set(x, GROUND_Y + 0.002 + idx * 0.0002, z) // tiny per-index epsilon vs z-fight
+		gp.position.set(x, y + 0.002 + idx * 0.0002, z) // tiny per-index epsilon vs z-fight
 		gp.rotation.x = Math.PI / 2
 		gp.rotation.y = Math.random() * Math.PI * 2
 		const size = GROUND_SIZE + Math.random() * GROUND_SIZE_JITTER
@@ -1136,8 +1263,10 @@ class BABYLONRenderer {
 			c.vel.y -= 9.8 * dt
 			c.mesh.position.addInPlace(this._casingScratch.copyFrom(c.vel).scaleInPlace(dt))
 			c.mesh.rotation.addInPlace(this._casingScratch.copyFrom(c.spin).scaleInPlace(dt))
-			if (!c.bounced && c.mesh.position.y < -0.97) {
-				c.mesh.position.y = -0.97
+			// rest a hair above the floor so the brass sits ON it rather than z-fighting
+			// into it (0.03 preserves the old box-arena look: floor -1.00, brass -0.97).
+			if (!c.bounced && c.floorY != null && c.mesh.position.y < c.floorY + 0.03) {
+				c.mesh.position.y = c.floorY + 0.03
 				c.vel.y = Math.abs(c.vel.y) * 0.3
 				c.vel.x *= 0.5
 				c.vel.z *= 0.5
@@ -1177,8 +1306,11 @@ class BABYLONRenderer {
 			this._bloodVelScratch.copyFrom(b.vel).scaleInPlace(dt)
 			b.mesh.position.addInPlace(this._bloodVelScratch)
 			b.mesh.visibility = fadeAlpha(f, 1)
-			if (b.ground && b.mesh.position.y <= GROUND_Y) {
-				if (this._fxTier !== 'low') this._spawnGroundPool(b.mesh.position.x, b.mesh.position.z)
+			// landed? Test against the floor resolved AT SPAWN for this burst, not a global
+			// constant: on a mesh map GROUND_Y (-1) is above the deck, so this test was
+			// already true on frame 1 and every droplet was retired before it moved.
+			if (b.ground && b.mesh.position.y <= b.floorY) {
+				if (this._fxTier !== 'low') this._spawnGroundPool(b.mesh.position.x, b.floorY, b.mesh.position.z)
 				b.mesh.isVisible = false
 				b.mesh.visibility = 1
 				if (b.kind === 'streak') b.mesh.rotationQuaternion = null

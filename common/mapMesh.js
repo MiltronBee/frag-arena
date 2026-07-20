@@ -10,6 +10,20 @@
 // ONE scale (0.65) so the player is the same size relative to geometry everywhere;
 // a bigger native map (Facing Worlds) simply plays bigger. spawns/killY are in the
 // map's native (ROTX=-90) units — the server multiplies them by scale at runtime.
+//
+// Per-map `walkable` and `mega` (also native units) exist because two subsystems used
+// to hardcode the OLD BOX ARENA's world — a ±64 network view box at the origin, and a
+// mega-health pickup at (0, 1, 6). Both are meaningless on an artist mesh that sits at
+// an arbitrary height and extent, so both are now map data:
+//   walkable — AABB of the near-horizontal (|normal.y| >= 0.7) floor triangles. Only a
+//              BOOT FALLBACK: GameInstance._loadMapMesh re-derives it from the real
+//              mesh once the OBJ is in, so a new map needs no hand-measured numbers.
+//              Numbers below were measured with _work/netfix/probe8.ts and ROUNDED
+//              OUTWARD — the fallback must never be tighter than the derived box, or
+//              the boot window would cull something the real box keeps.
+//   mega     — the WALKABLE SURFACE point under the mega-health pickup (the server adds
+//              the MEGA.Y bob height in world units, exactly as it does over the box
+//              arena's y=0 floor). Verified on real floor + reachable, see probe9.ts.
 export const USE_MESH_MAP = true
 
 const MAPS = {
@@ -29,7 +43,13 @@ const MAPS = {
 			{ x: -5.3, z: 19.2, y: 15.7 }, { x: 6.7, z: 19.2, y: 15.7 },
 			{ x: 18.7, z: 6.8, y: 15.7 }, { x: -29.3, z: -5.5, y: 16.3 },
 			{ x: -5.3, z: -5.5, y: 18.8 }, { x: 6.7, z: -5.5, y: 18.8 }
-		]
+		],
+		// 10528 near-horizontal tris. Grove's OBJ winding is INVERTED (its floors read
+		// normal.y = -1.000), which is why the extraction tests |normal.y|, not normal.y.
+		walkable: { minX: -35.4, minY: -4.9, minZ: -48.8, maxX: 48.8, maxY: 35.1, maxZ: 37.7 },
+		// mid-arena floor 7.0m clear of every spawn (world (-3.45, 11.10, 3.43); a player
+		// dropped there settles at world y 11.545, i.e. 0.55 under the pickup).
+		mega: { x: -5.300, y: 17.069, z: 5.269 }
 	},
 	visage: {
 		// CTF-Visage = the classic CTF-Face (Facing Worlds), renamed to dodge Epic
@@ -53,7 +73,16 @@ const MAPS = {
 			{ x: -10.9, z: -22.1, y: -37.3 }, { x: 3.8, z: -8.7, y: -37.3 },
 			{ x: 3.8, z: 17.9, y: -37.1 }, { x: 91.9, z: -8.7, y: -36.7 },
 			{ x: 106.5, z: -22.1, y: -36.7 }, { x: 121.2, z: 17.9, y: -36.7 }
-		]
+		],
+		// 2126 near-horizontal tris => world x[-35.39..102.18] y[-57.08..16.15]
+		// z[-27.33..24.34]. The east deck reaching world x=+102 is what the old ±64
+		// origin-centred view box was cutting in half (~39% of the walkable floor).
+		walkable: { minX: -54.5, minY: -87.9, minZ: -42.1, maxX: 157.3, maxY: 24.9, maxZ: 37.5 },
+		// APEX of the central bridge — the Facing-Worlds power position: the highest,
+		// most exposed point on the only route between the two towers, and the widest
+		// part of the span (solid walkable world-z -11..+7 at world x=34). World
+		// (34.0, -17.84, -2.0); a player there settles at world y -17.285.
+		mega: { x: 52.308, y: -27.446, z: -3.077 }
 	}
 }
 

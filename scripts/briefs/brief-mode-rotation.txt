@@ -1,0 +1,332 @@
+FRAG ARENA — GAME MODE ROTATION DESIGN BRIEF
+Prepared for an external design consult. Everything below is a real, verified survey of
+the shipping codebase as of 2026-07-20, with file:line citations. Trust it over
+assumptions; where it contradicts the ambition, the codebase is the truth.
+
+================================================================================
+1. THE PROJECT
+================================================================================
+
+Frag Arena is a browser-based arena FPS.
+- Client: Babylon.js 9.
+- Netcode: nengi over WebSocket. UPDATE_RATE = 40 Hz (common/nengiConfig.js:21).
+  USE_HISTORIAN true, HISTORIAN_TICKS 80 = a 2000 ms lag-compensation rewind window
+  (common/nengiConfig.js:30-35). DIMENSIONALITY 3.
+- Client-side prediction + server reconciliation. Movement is ONE shared pure function,
+  common/applyCommand.js, run on the client for prediction, on the server for authority,
+  and replayed on the client for reconciliation. It must stay a pure function of
+  (entity state, command).
+- Movement values are UT99-derived; accel/friction are Quake-style.
+- Maps are artist-authored OBJ meshes loaded at boot into a Babylon scene on the client
+  (visual + client-prediction collision) and into a NullEngine scene on the server
+  (authoritative collision + hitscan occlusion).
+
+STANDING CONSTRAINT FROM THE PROJECT OWNER: always optimize for SPEED AND LOW LATENCY.
+This is a competitive 40 Hz predicted shooter. Any design that adds reconnects, long
+loads, or per-tick bandwidth has to justify itself against that.
+
+================================================================================
+2. THE GOAL BEING PROPOSED
+================================================================================
+
+Build an Overwatch-Quick-Play-style experience:
+
+  - 9 maps, split 3 / 3 / 3 across three modes:
+      * 3 Capture the Flag
+      * 3 Domination
+      * 3 Team Deathmatch
+  - Matches made of SEVERAL ROUNDS, where the ROUND CAN VARY THE GAME MODE — jumping
+    between CTF, Domination and TDM within a single match, "like Overwatch Quick Play".
+
+That is the plan as stated. It is offered for honest critique, not for validation.
+
+================================================================================
+3. STAGE 1 SURVEY — WHAT ACTUALLY EXISTS TODAY (verified, with file:line)
+================================================================================
+
+--- 3.1 MAP SELECTION: COMPILE-TIME CONSTANT, ONE MAP LIVE ---
+
+Map choice is a HARD-CODED MODULE CONSTANT. There is no runtime map selection of any
+kind — not per-match, not per-server, not by config, not by env var.
+
+  common/mapMesh.js:13   export const USE_MESH_MAP = true
+  common/mapMesh.js:15   const MAPS = { grove: {...}, visage: {...} }   // exactly 2 entries
+  common/mapMesh.js:61   export const MAP_MESH = MAPS.visage
+                         // literal comment in the file: "Swap this one line to change maps"
+  common/mapMesh.js:63   export const KILL_Y = MAP_MESH.killY
+
+MAP_MESH is imported as a module-level binding and read directly by:
+  server/GameInstance.js:4        import { USE_MESH_MAP, MAP_MESH, KILL_Y }
+  client/graphics/BABYLONRenderer.js:6   import { USE_MESH_MAP, MAP_MESH }
+  client/graphics/CharacterModel.js:3    import { USE_MESH_MAP }
+  common/applyCommand.js:6              import { USE_MESH_MAP }
+  plus several scripts/probe-*.ts harnesses
+
+Consequence: changing maps today requires editing a source file and RESTARTING BOTH
+SIDES. The server cannot change map without a restart, and the client cannot change map
+without a page reload — because the map is loaded exactly once, at construction, and
+nothing ever disposes it.
+
+SERVER LOAD PATH: GameInstance._loadMapMesh(scene), server/GameInstance.js:634-696.
+  - Called once from the constructor, server/GameInstance.js:97-99, fire-and-forget.
+  - Reads the OBJ off disk (server/GameInstance.js:642), strips mtllib, imports via a
+    data: URL through BABYLON.SceneLoader.ImportMeshAsync (:643).
+  - Parents everything to a fresh TransformNode 'mapRoot', applies rotationX and scale,
+    bakes world matrices (:645-651).
+  - Marks every mesh checkCollisions = true (:657).
+  - Then CLONES every collider and subdivides it into ~12-triangle submeshes to build
+    the hitscan occluder set (:679-691). The comment at :665-673 records the measurement:
+    227 us/pellet unsubdivided vs ~34 us/pellet subdivided on CTF-Visage, ~6.7x.
+  - Sets this.occluderMeshes and this.mapReady = true (:692-694).
+  - Guarded by this.mapReady, initialised false at server/GameInstance.js:87. The
+    comment at :88-95 states the load is "ready within ~1s of boot, before anyone
+    connects", and that occluderMeshes stays EMPTY during the load — i.e. for that
+    window the server fails OPEN and no shot is occluded by world geometry.
+  - There is NO unload, NO dispose, NO reload. Loading a second map into the same scene
+    would stack it on top of the first.
+
+CLIENT LOAD PATH: BABYLONRenderer._loadMeshMap(), client/graphics/BABYLONRenderer.js:473-517.
+  - Called once from the renderer constructor at client/graphics/BABYLONRenderer.js:330.
+  - ImportMeshAsync from MAP_MESH.dir + MAP_MESH.file (:479).
+  - Same mapRoot / rotationX / scale contract, explicitly commented as needing to match
+    the server "to the millimeter" (:483-487).
+  - checkCollisions = true on every map mesh, with the comment at :493-495 stating this
+    is REQUIRED because the client predicts its own movement with moveWithCollisions and
+    needs identical floors/walls or prediction falls through the map.
+  - receiveShadows + pushed into the shadow generator render list (:498-499).
+  - Then _refreshStaticShadows() re-bakes the frozen shadow map (:514) and
+    _bakeMapLights(res.meshes, root) (:515) fetches a per-map .lights.json sidecar and
+    bakes light actors into VERTEX COLORS (client/graphics/BABYLONRenderer.js:524-545),
+    plus _addLightCoronas (:550).
+  - Again: no dispose, no reload path.
+
+LOAD COST TODAY (measured by asset size, not instrumented):
+  CTF-Visage: 431 KB OBJ + 28 KB lights.json + a textures/ dir (1.2 MB total).
+  DM-W-Grove: 3.5 MB total.
+  Server-side the load also pays the occluder clone+subdivide pass over ~6900 triangles.
+  Client-side it additionally pays a shadow-map re-bake and a full vertex-color light bake.
+  Server comment claims ~1s; the client's cost is unmeasured but includes texture decode.
+
+NOTHING RECONNECTS TODAY because nothing ever switches. There is no code path that
+attempts it, so the reconnect cost is currently unknown and untested.
+
+--- 3.2 GAME MODES: NONE. AT ALL. ---
+
+There is NO mode system. Not a stub, not an interface, not an enum.
+
+Exhaustively searched server/, common/, client/, bot/ for: gamemode, game_mode, ctf,
+domination, deathmatch, flag, round, warmup, intermission, matchState, winCondition.
+Every hit was a false positive — Math.round(), a boolean "flag" variable, or the string
+"CTF-Visage" appearing as a MAP FILENAME (the map is a Facing Worlds remake, so "CTF" is
+in its name only; the map ships with zero flag functionality).
+
+Specifically confirmed ABSENT:
+  - No flag entity. common/entity/ contains exactly: Grenade.js, MegaHealthPickup.js,
+    Obstacle.js, PlayerCharacter.js, Projectile.js. No Flag, no ControlPoint, no
+    CaptureZone.
+  - No carrier state, no pickup/drop/return/capture logic anywhere.
+  - No control-point capture logic.
+  - No win condition of any kind. A search for gameover|matchEnd|endMatch|winner|victory|
+    scorelimit|fraglimit|timelimit across server/, common/, client/ and public/index.html
+    returned ZERO results. The match never ends. The server runs forever.
+  - Scoring is FFA frags only: PlayerCharacter.kills / .deaths, incremented in
+    GameInstance's damage/death path (server/GameInstance.js:774-781), networked as
+    UInt8 (common/entity/PlayerCharacter.js:117-118).
+  - HUD "scoreboard" is a single text span. public/index.html:55
+    <span id="frag-count">0 FRAGS · 0 DEATHS</span>, written from the local player's own
+    entity at client/Simulator.js:1654-1659. There is no player list, no team score, no
+    objective UI, no round timer, no end-of-match screen.
+  - client/graphics/FragLayer.js is purely kill-FEEDBACK FX (hitmarkers, gib triggers,
+    death cam). Its header comment at :14 explicitly says it "NEVER predicts kills" and
+    is driven only by server messages. It is not a scoreboard.
+
+--- 3.3 TEAMS: NONE. ---
+
+  - PlayerCharacter has NO team field. Full protocol, common/entity/PlayerCharacter.js:102-120:
+      x, y, z, rotationX, rotationY, rotationZ, velX, velY, velZ, isAlive, hitpoints,
+      slowTimer, currentWeaponIndex, grenadeCharges, kills, deaths, nameIndex.
+    That is the complete networked surface. No teamId.
+  - No team assignment logic on join. server/GameInstance.js:145-151 just picks a random
+    spawn from the global pool.
+  - No friendly fire rules — damage is applied to whatever the ray hit, unconditionally.
+  - No team colours. The player mesh is a box built with a hardcoded faceColors array
+    (common/entity/PlayerCharacter.js:5-7: one red face, five blue) — decorative, identical
+    for every player, unrelated to teams.
+  - No team nametags. Identity is nameIndex -> common/playerNames.js, assigned round-robin.
+  - Bots are pure FFA. server/BotController.js:1 header: "UT99-style deathmatch bot brain."
+    Targeting at :62-71 picks the NEAREST LIVING PLAYER with no team filter.
+
+CTF, Domination AND TDM all require team infrastructure. None of it exists.
+
+--- 3.4 ROUNDS / MATCH LIFECYCLE: NONE. ---
+
+There is no match, no round, no warmup, no intermission, no reset, no score limit, no
+time limit. The server boots, loads a map, and runs one infinite FFA session.
+
+The ONLY lifecycle primitive that exists is individual respawn:
+  server/GameInstance.js:71   static RESPAWN_DELAY_MS = 2500
+  server/GameInstance.js:776  victimClient.respawnAt = Date.now() + RESPAWN_DELAY_MS
+  server/GameInstance.js:803  respawnPlayer(client) -> new spawn point, full HP, full ammo
+  server/GameInstance.js:709  spawnPoint() -> random pick from MAP_MESH.spawns with jitter
+
+When someone "wins", nothing happens, because winning is not a concept in this codebase.
+
+--- 3.5 MAPS AVAILABLE: TWO. THE PLAN NEEDS NINE. ---
+
+On disk, public/assets/maps/ contains exactly two directories:
+  CTF-Visage/  (CTF-Visage.obj 431 KB, .mtl, .lights.json 28 KB, textures/) — 1.2 MB
+  DM-W-Grove/  (DM-W-Grove-2025.obj, .lights.json, textures/)              — 3.5 MB
+
+MAPS registry, common/mapMesh.js:15-59, has exactly the same two: grove, visage.
+Only ONE is live: MAP_MESH = MAPS.visage.
+
+Neither is authored for an objective mode. CTF-Visage is a Facing Worlds remake (twin
+towers + central bridge floating in void) whose spawns are 8 FFA points on the main deck
+(common/mapMesh.js:51-58) — it has "CTF" in the name and no flags, no team spawns.
+
+THERE IS A SECOND, DORMANT MAP REGISTRY — and it is DEAD CODE in production:
+  common/maps/index.js:1-20 — exports maps{}, mapList[], DEFAULT_MAP='facingWorlds',
+  getMap(id). Its own header comment (common/maps/index.js:3-4) admits: "The live game
+  still reads common/arenaConfig.js directly (Facing Worlds); this registry is what the
+  map harness verifies and what map selection / the mode layer will consume."
+
+It contains four BOX-ARENA (not mesh) maps: facingWorlds, curse, sesmar, rook. These
+carry aspirational mode metadata that is wired to NOTHING:
+  common/maps/facingWorlds.js:11      mode: 'CTF'
+  common/maps/facingWorlds.js:18-23   mode_data.flags = [{team:0,x:-48,y:8,z:0},
+                                       {team:1,x:48,y:8,z:0}]
+                                      with the comment at :16-17 "Wired when the CTF mode
+                                      lands; harmless data until then."
+  common/maps/sesmar.js:41            mode: 'DOM'
+  common/maps/sesmar.js:53-60         mode_data.controlPoints = [A,B,C],
+                                       scorePerTickPerPoint: 1
+  common/maps/sesmar.js:45-50         SPAWN_POINTS carrying team: 0 / team: 1
+  common/maps/rook.js:45-50           team 0 = attackers, team 1 = defenders spawns
+
+VERIFIED: nothing in server/, common/ (outside the registry itself), client/ or bot/
+imports common/maps. The ONLY consumers are offline harnesses — scripts/verify-map.ts:16,
+scripts/golden-collision.ts:16, scripts/golden-PRESTRUCT.ts:16.
+
+So there are two parallel, unreconciled map concepts: the LIVE mesh-map constant
+(common/mapMesh.js, 2 maps, no mode data) and a DEAD box-arena registry (common/maps/,
+4 maps, rich mode data). The mode metadata exists only on the maps that are not playable.
+
+REAL PLAYABLE MAP COUNT TODAY: 1 live, 2 on disk. The plan asks for 9.
+
+--- 3.6 NETCODE SHAPE AND THE PROTOCOL CHANGE SURFACE ---
+
+common/nengiConfig.js:20-65 is the complete protocol.
+
+  UPDATE_RATE: 40  (:21 — raised 20->40 on 2026-07-16 to halve per-tick dodge jump)
+  USE_HISTORIAN: true, HISTORIAN_TICKS: 80  (:30-35 — 2000 ms rewind, sized in TICKS so
+    it must scale with UPDATE_RATE)
+  ID_BINARY_TYPE UInt16, TYPE_BINARY_TYPE UInt8, DIMENSIONALITY 3
+
+  entities (5):  PlayerCharacter, Obstacle, Projectile, Grenade, MegaHealthPickup
+  messages (7):  Identity, WeaponFired, Respawned, HitConfirmed, Killed, DamageTaken,
+                 PlayerName
+  commands (5):  MoveCommand, FireCommand, SwitchWeaponCommand,
+                 DevUpdateWeaponConfigCommand, SetNameCommand
+  localMessages: [] (empty)
+  basics:        [] (empty)
+
+Notable protocol facts a mode layer collides with:
+  - Identity (common/message/Identity.js) carries rawId, smoothId, x, z — NO Y. Its
+    comment explains the client permanently ignores server x/y/z for its own entity, so
+    spawn position must be handed over explicitly.
+  - Respawned (common/message/Respawned.js) likewise carries only x, z — NO Y. This is
+    exactly the source of the "respawn drops players out of the sky" bug on mesh maps: the
+    spawn Y is simply never transmitted.
+  - Killed (common/message/Killed.js) carries killerNid, victimNid, weaponIndex, overkill.
+    Its comment notes it is broadcast to ALL clients and that this is "safe to reach
+    everyone because the network view deliberately covers the whole arena."
+  - THE NETWORK VIEW IS A FIXED BOX AT THE ORIGIN: server/GameInstance.js:192-198 sets
+    client.view = { ..., halfWidth: 64, halfHeight: 64, halfDepth: 64 }, with the comment
+    at :187-191 stating it is "a FIXED box at the origin sized to cover the ENTIRE arena"
+    and is "not re-centered on the player (there is no 3D view culler in nengi yet)."
+    On CTF-Visage, whose play space spans roughly x = -40 to +121 in native units, a
+    64-unit half-extent box at the origin DOES NOT COVER THE MAP. This is confirmed broken.
+
+Protocol change surface a mode/round system implies (all NEW, none exist):
+  - a teamId field somewhere (adding it to PlayerCharacter's protocol costs bytes on
+    EVERY player entity on EVERY one of 40 ticks/second)
+  - objective entities (Flag, ControlPoint) and their state
+  - match/round state: mode id, round number, per-team score, phase, timer
+  - events: RoundStart, RoundEnd, MatchEnd, FlagTaken/Dropped/Returned/Captured,
+    PointCaptured, MapChange
+  - possibly a command for team/mode selection
+Also note commands are client->server and are REPLAYED for reconciliation, so nothing
+objective-related should ride in MoveCommand.
+
+================================================================================
+4. THE THING THAT MATTERS MOST: THE MIGRATION IS INCOMPLETE
+================================================================================
+
+This must be weighed heavily in any recommendation.
+
+An audit completed TODAY found that the BOX-ARENA -> MESH-MAP migration is FUNDAMENTALLY
+INCOMPLETE. Roughly 9 of ~11 world-aware subsystems still assume the OLD world model: a
+box arena with a flat floor at y = 0 and a ~60-unit extent. The live map (CTF-Visage) is
+a mesh map whose deck sits at world y ~ -25 and which spans far more than 60 units.
+
+CONFIRMED BROKEN ON THE CURRENT, ONLY, LIVE MAP:
+  - Network view box CULLS PART OF THE MAP (fixed 64-unit half-extent box at the origin,
+    server/GameInstance.js:192-198). Entities outside it are not replicated.
+  - RESPAWN DROPS PLAYERS ~24 M OUT OF THE SKY (Respawned/Identity carry x,z but no y —
+    common/message/Respawned.js, common/message/Identity.js).
+  - MEGA-HEALTH PICKUP FLOATS UNREACHABLE — hardcoded at MEGA X:0, Y:1.0, Z:6
+    (server/GameInstance.js:53-60, X/Y/Z at :58-60), i.e. positioned for a y=0 floor that no longer exists.
+  - GRENADES DETONATE IN THE SKY — grenade physics still uses GROUND_Y: 0
+    (server/GameInstance.js:49).
+  - PROJECTILES PASS THROUGH ALL WORLD GEOMETRY.
+  - BOTS WALLHACK AND WALK INTO THE VOID — server/BotController.js line-of-sight is a ray
+    tested against OBSTACLE BOXES (:22-25), and there are no obstacle boxes on a mesh map
+    (server/GameInstance.js:97-98 leaves this.obstacles an empty Map). So LoS always
+    returns true, and pathing has no world model at all.
+  - MULTIPLE FX SYSTEMS DROP DEBRIS ~23 M ABOVE THE DECK. See the explicit note at
+    client/graphics/FragLayer.js:277-279 and client/graphics/BABYLONRenderer.js:47 and
+    :279, all describing the same class of hardcoded-y=0 assumption.
+
+Some of these are being fixed right now by other work in flight.
+
+WHY THIS MATTERS FOR A 9-MAP PLAN, STATED PLAINLY:
+Every unmigrated world assumption MULTIPLIES BY 9. Each new map is another opportunity to
+trip an assumption that has only ever been tested against one geometry. Worse, the current
+architecture carries HAND-CALIBRATED PER-MAP DATA — common/mapMesh.js entries hold
+per-map scale, rotationX, yOffset, killY and a hand-probed spawn list (the visage spawns
+were generated by scripts/probe-visage.ts and the grove numbers were "calibrated against
+this geometry"). That is a per-map manual calibration burden that scales linearly with
+map count while nothing automates it. Nine maps means nine hand-probed spawn sets, nine
+killY values, nine light bakes, and nine chances for every one of the bugs above to
+resurface in a new form.
+
+================================================================================
+5. QUESTIONS FOR THE CONSULT
+================================================================================
+
+Answer all seven, directly, in order. Answer honestly even where the answer contradicts
+the plan as stated — that is what this consult is for.
+
+1. Is "rounds that vary the game mode within one match" actually good design, or is
+   Overwatch's model (one mode per match, rotate between matches) better — and why?
+
+2. For 9 maps split 3/3/3 across CTF, Domination and TDM — how should rotation and
+   map/mode pairing work? Should a map ever serve more than one mode?
+
+3. What is the minimum viable mode-system architecture: what must be SHARED between modes,
+   and what must be PER-MODE? Given the codebase currently has effectively no mode system,
+   what is the right seam?
+
+4. Round/match lifecycle: warmup, round start, scoring, intermission, map switch — what
+   does each need to feel good, and what can be CUT for a v1?
+
+5. What does Overwatch do about map loading and mode transitions that keeps it feeling
+   instant? How do we switch map+mode WITHOUT a reconnect or a long stall, given a
+   persistent WebSocket, a 40 Hz predicted sim, and OBJ mesh maps loaded once at boot into
+   scenes that currently have no dispose path?
+
+6. Given the engineering reality — incomplete migration, one live map, no team system, no
+   objective system, no match lifecycle — what is the CORRECT ORDER to build this in?
+   What is the SMALLEST FIRST SLICE that is actually fun?
+
+7. What will we get wrong that you have seen teams get wrong before?

@@ -24,8 +24,17 @@ export const assets = {
   playerBody: {
     url: '/assets/characters/hero_male.glb',
     scale: 0.577, // raw ~1.82 units * 0.577 ≈ 1.05 in-game (matches old body height)
-    yOffset: -1.0, // feet sit on the VISUAL floor (arenaDressing GROUND_Y = -1),
-                   // NOT the collision box bottom (-0.5) — else bodies hover ~0.5 up
+    // Feet-to-origin alignment. The sim anchors a player at the CENTRE of the
+    // 1-unit collision box (ellipsoid r=0.5), so the collision bottom is at
+    // entity.y - 0.5 and the GLB (origin at the feet) needs -0.5 to stand on it.
+    // Box arenas draw their visual floor 0.5 BELOW the collision bottom
+    // (arenaDressing GROUND_Y = -1), so there the body must drop a further -0.5
+    // or it hovers. Mesh maps (CTF-Visage, DM-W-Grove) use ONE mesh as both the
+    // visual and the collision floor — applying the box-arena -1.0 there buried
+    // the body half a metre (knee/waist deep in the deck). CharacterModel picks
+    // between these by USE_MESH_MAP; keep both in sync with the floors above.
+    yOffset: -1.0,        // box arenas: visual floor sits at -1
+    yOffsetMeshMap: -0.5, // mesh maps: visual floor IS the collision floor
     yawOffset: 0, // GLB faces +Z and the loader's __root__ fix preserves forward, so no offset (Math.PI flipped bodies 180deg opposite their aim + inverted locomotion)
     anims: {
       idle: 'Idle_Loop',

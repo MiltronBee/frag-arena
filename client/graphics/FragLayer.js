@@ -272,6 +272,15 @@ export default class FragLayer {
     const y = atEntity ? atEntity.y : 0
     const z = atEntity ? atEntity.z : 0
     const count = 5 + Math.floor(Math.random() * 4) // 5..8
+    // Floor for the chunks to land on, resolved ONCE from the geometry under the victim
+    // rather than a hardcoded -0.95. Box arenas have a single floor at a known height,
+    // but on a MESH MAP (common/mapMesh.js) the deck sits at an arbitrary world height
+    // (CTF-Visage ~ -25) that varies across the map, so the old constant was ~24m ABOVE
+    // the spawn point — gibs spawned already "below" the floor and the next tick snapped
+    // them up into the sky. Delegated to the renderer so the floor rule lives in one
+    // place (FragLayer already reaches into simulator.renderer for the scene).
+    // null = nothing underneath (gibbed over the void): chunks just fall until they fade.
+    const floorY = this.sim.renderer._floorYBelow(new BABYLON.Vector3(x, y, z))
     for (let i = 0; i < count; i++) {
       const size = 0.08 + Math.random() * 0.10
       const mesh = BABYLON.MeshBuilder.CreateBox('gib', { size: 1 }, this.scene)
@@ -295,7 +304,7 @@ export default class FragLayer {
       const spin = new BABYLON.Vector3(
         (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20
       )
-      this._gibs.push({ mesh, mat, vel, spin, t0: performance.now(), life: GIB_LIFE })
+      this._gibs.push({ mesh, mat, vel, spin, t0: performance.now(), life: GIB_LIFE, floorY })
     }
   }
 
@@ -436,8 +445,10 @@ export default class FragLayer {
         g.vel.y -= 9.8 * dt
         g.mesh.position.addInPlace(g.vel.scale(dt))
         g.mesh.rotation.addInPlace(g.spin.scale(dt))
-        if (g.mesh.position.y < -0.95) {
-          g.mesh.position.y = -0.95
+        // rest a hair above the floor so a chunk sits ON the deck instead of z-fighting
+        // into it (0.05 preserves the old box-arena look: floor -1.00, gib -0.95).
+        if (g.floorY != null && g.mesh.position.y < g.floorY + 0.05) {
+          g.mesh.position.y = g.floorY + 0.05
           g.vel.y = Math.abs(g.vel.y) * 0.35
           g.vel.x *= 0.6; g.vel.z *= 0.6
         }

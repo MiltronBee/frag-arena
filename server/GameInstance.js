@@ -18,7 +18,7 @@ import applyCommand, { MAX_SPEED } from '../common/applyCommand'
 import setupObstacles from './setupObstacles'
 import { fire } from '../common/weapon'
 import { shotPattern, applyPattern } from '../common/firePattern'
-import { damageFalloffMult } from '../common/damageFalloff'
+import { damageFalloffMult, falloffRange } from '../common/damageFalloff'
 import lagCompensatedHitscanCheck from './lagCompensatedHitscanCheck'
 import Projectile from '../common/entity/Projectile'
 import Grenade from '../common/entity/Grenade'
@@ -51,12 +51,20 @@ const GRENADE = {
 
 // Phase 4 MEGA-HEALTH pickup tuning (locked design numbers). Server-only.
 const MEGA = {
-	// arena CENTER is occupied by the reactor landmark (OBSTACLE_SPECS: x0 z0, 4x4),
-	// so the pickup sits 6m north of it — open floor, still the visual "heart" of the
-	// arena, verified clear of every obstacle + wall (reactor z-max=2; nearest cover
-	// (-5,9)/(5,-9) both clear x=0,z=6). Tune here after a live playtest.
+	// X/Z are the BOX-ARENA placement only. The arena CENTER is occupied by the reactor
+	// landmark (OBSTACLE_SPECS: x0 z0, 4x4), so the pickup sits 6m north of it — open
+	// floor, still the visual "heart" of the arena, verified clear of every obstacle +
+	// wall (reactor z-max=2; nearest cover (-5,9)/(5,-9) both clear x=0,z=6).
+	//
+	// MESH MAPS IGNORE X/Z (see megaSpawnPos): OBSTACLE_SPECS does not exist there, and
+	// world (0, 6) on CTF-Visage is a tower column whose top is world y -17.43 — the
+	// pickup sat 18.4m above it and ~25m above the walkable deck, so with RADIUS 2.2
+	// the proximity test could never pass and the entire mechanic was dead while
+	// clients rendered a glowing amber box floating in the sky. Mesh maps take their
+	// position from MAP_MESH.mega (common/mapMesh.js) instead.
 	X: 0,
-	Y: 1.0,                // bob height — reachable/centered on a standing player's torso
+	Y: 1.0,                // bob height ABOVE THE FLOOR — the box arena's floor is the
+	                       // plane y=0, a mesh map's is MAP_MESH.mega.y; both add this.
 	Z: 6,
 	HEAL: 100,             // added on pickup
 	MAX: 150,              // overheal cap: min(150, hp+HEAL)
@@ -66,6 +74,10 @@ const MEGA = {
 	OVERHEAL_GRACE: 3.0,   // seconds after pickup before overheal starts decaying
 	OVERHEAL_RATE: 2.0     // HP/sec decay while hitpoints > 100 (after the grace)
 }
+
+// Slack added to every side of the derived network view box (world units): headroom
+// for jump/rocket arcs, grenades and FX that briefly leave the floor's footprint.
+const VIEW_MARGIN = 16
 
 class GameInstance {
 	static RESPAWN_DELAY_MS = 2500
@@ -85,11 +97,25 @@ class GameInstance {
 		// (async — ready within ~1s of boot, before anyone connects). Box arenas keep the
 		// setupObstacles path. this.obstacles stays a Map either way (used elsewhere).
 		this.mapReady = false
+		// Static world geometry the server's hitscan resolution occludes against
+		// (server/lagCompensatedHitscanCheck.js). Mesh maps fill this from the artist
+		// OBJ once _loadMapMesh resolves; box arenas fill it from the Obstacle boxes
+		// immediately. Plain babylon meshes either way, so one occlusion path serves both.
+		// It stays EMPTY during the async mesh load at boot -> no occlusion for that
+		// window, i.e. exactly the old behaviour. Deliberate: failing open for the ~1s
+		// before anyone can connect is far safer than a server that silently eats every
+		// shot, and mapReady gates nothing else about damage.
+		this.occluderMeshes = []
+		// The nengi AABB every client's view is cut from (see deriveViewBox). Set BEFORE
+		// _loadMapMesh so there is no window where it is undefined; the mesh-derived box
+		// replaces it once the OBJ resolves, which is well before anyone can connect.
+		this.viewBox = this.defaultViewBox()
 		if (USE_MESH_MAP) {
 			this.obstacles = new Map()
 			this._loadMapMesh(scene)
 		} else {
 			this.obstacles = setupObstacles(this.instance)
+			this.occluderMeshes = [...this.obstacles.values()].map(o => o.mesh).filter(Boolean)
 			this.mapReady = true
 		}
 		this.projectiles = new Set()
@@ -97,10 +123,11 @@ class GameInstance {
 		// physics (gravity+bounce+fuse) + AoE detonation live in update().
 		this.grenades = new Set()
 
-		// Phase 4: the ONE mega-health pickup, near the arena center at bob height.
+		// Phase 4: the ONE mega-health pickup, on contested ground at bob height.
 		// Present (AVAILABLE) from boot; update() runs the proximity heal + 60s respawn
 		// clock and drives its networked `state` (which the client renders the tell off).
-		this.megaHealth = new MegaHealthPickup(MEGA.X, MEGA.Y, MEGA.Z)
+		const megaPos = this.megaSpawnPos()
+		this.megaHealth = new MegaHealthPickup(megaPos.x, megaPos.y, megaPos.z)
 		this.megaHealth.state = MEGA_STATE.AVAILABLE
 		this.instance.addEntity(this.megaHealth)
 		// (the rest is just attached to client objects when they connect)
@@ -165,7 +192,7 @@ class GameInstance {
 			smoothEntity.nameIndex = HUMAN_NAME_SENTINEL
 
 			// tell the client which entities it controls + where it spawned
-			this.instance.message(new Identity(rawEntity.nid, smoothEntity.nid, rawEntity.x, rawEntity.z), client)
+			this.instance.message(new Identity(rawEntity.nid, smoothEntity.nid, rawEntity.x, rawEntity.y, rawEntity.z), client)
 
 			// establish a relation between this entity and the client
 			rawEntity.client = client
@@ -174,19 +201,14 @@ class GameInstance {
 			client.smoothEntity = smoothEntity
 			client.positions = []
 
-			// The network view is a FIXED box at the origin sized to cover the ENTIRE
-			// arena (ARENA_SIZE 44) with generous margin, so nothing is ever
-			// network-culled at this scale — walls, players and projectiles all stay
-			// visible and their meshes never get disposed. It is deliberately NOT
-			// re-centered on the player (there is no 3D view culler in nengi yet).
-			client.view = {
-				x: 0,
-				y: 0,
-				z: 0,
-				halfWidth: 64,
-				halfHeight: 64,
-				halfDepth: 64
-			}
+			// The network view is a FIXED box sized to the MAP's walkable floor, so
+			// nothing in the playable world is ever network-culled — players,
+			// projectiles and pickups all stay visible and their meshes never get
+			// disposed. Still deliberately NOT re-centered on the player (there is no
+			// 3D view culler in nengi yet). See deriveViewBox for how it is measured
+			// and why it is per-axis and off-origin. Copied per client because nengi
+			// mutates the view object.
+			client.view = { ...this.viewBox }
 
 			// accept the connection
 			callback({ accepted: true, text: 'Welcome!' })
@@ -323,10 +345,24 @@ class GameInstance {
 			// are the rays that judged damage. One entry for single-bullet
 			// weapons, a rosette for the shotgun.
 			const offsets = shotPattern(config, ray.seed, ray.heat, ray.aimFactor)
+			// RANGE + OCCLUSION budget for every pellet of this shot.
+			//
+			// `range` is a HARD CUTOFF on hitscan reach, not a damage curve: nothing in
+			// common/damageFalloff.js reads it (falloff is driven purely by falloffStart/
+			// falloffEnd/falloffMinMult), so it has no damage semantics to regress —
+			// today it is simply never enforced, which is how a Shotgun (range 30) can
+			// kill across the whole map. But the cutoff must never truncate the weapon's
+			// effective falloff window: the ADS pistol's ads.rangeMult 1.75 pushes
+			// falloffEnd 40 -> 70, past its range of 50, and clipping at 50 would delete
+			// the designed "aimed pistol keeps the 3-shot kill at range". So the reach is
+			// max(range, ADS-extended falloffEnd) — a real cutoff for every weapon, and
+			// still the full authored falloff curve for the pistol.
+			const reach = Math.max(config.range || 0, falloffRange(config, ray.aimFactor).end) || Number.MAX_VALUE
+			const world = { meshes: this.occluderMeshes, maxDistance: reach }
 			offsets.forEach(off => {
 				const d = applyPattern(ray.direction, off)
 				const pelletRay = new BABYLON.Ray(ray.origin, new BABYLON.Vector3(d.x, d.y, d.z))
-				const hits = lagCompensatedHitscanCheck(this.instance, pelletRay, timeAgo)
+				const hits = lagCompensatedHitscanCheck(this.instance, pelletRay, timeAgo, world)
 				// a single pellet ray can intersect BOTH of a victim's entities
 				// (raw + smooth are the same player at slightly different
 				// lag-compensated spots) — dedupe per pellet so one pellet is
@@ -625,14 +661,55 @@ class GameInstance {
 			root.scaling.setAll(MAP_MESH.scale || 1)
 			root.computeWorldMatrix(true)
 			let n = 0
+			const colliders = []
 			res.meshes.forEach(m => {
 				if (m.getTotalVertices && m.getTotalVertices() > 0) {
 					m.computeWorldMatrix(true)
 					if (m.refreshBoundingInfo) m.refreshBoundingInfo(true)
 					m.checkCollisions = true
+					colliders.push(m)
 					n++
 				}
 			})
+			// Hitscan OCCLUDERS (server/lagCompensatedHitscanCheck.js). The raw OBJ groups
+			// faces by MATERIAL, so one "mesh" can span the entire map — its bounding volume
+			// tells a ray nothing, half of them enclose the shooter, and every pellet ends up
+			// testing all ~6900 triangles (measured 227us/pellet on CTF-Visage). Subdividing
+			// into ~12-triangle submeshes gives babylon's per-submesh bounding-box cull
+			// (AbstractMesh.intersects -> subMesh.canIntersects) something to bite on and takes
+			// that to ~34us/pellet — 6.7x, ~270us for a worst-case 8-pellet shotgun blast.
+			// MEASURED, not assumed: a per-mesh submesh octree (createOrUpdateSubmeshesOctree,
+			// available via @babylonjs/core/Culling/Octrees) on top of this is worth only ~4%
+			// here — too few submeshes per mesh to pay for itself — so we do not build one.
+			//
+			// These are CLONES: babylon clones SHARE the source geometry (no vertex data is
+			// duplicated) but carry their own submesh list, and they are left disabled with
+			// checkCollisions off. So the movement collision path still runs against the
+			// un-subdivided meshes above, exactly as it did before this change.
+			const occluders = []
+			colliders.forEach((m, i) => {
+				const c = m.clone('occluder_' + i, null)
+				c.parent = m.parent
+				c.computeWorldMatrix(true)
+				const parts = Math.max(1, Math.ceil((c.getTotalIndices() / 3) / 12))
+				if (parts > 1) c.subdivide(parts)
+				if (c.refreshBoundingInfo) c.refreshBoundingInfo(true)
+				c.checkCollisions = false
+				c.isPickable = false
+				c.setEnabled(false)
+				occluders.push(c)
+			})
+			// publish only once every world matrix / bounding volume above is baked, so a
+			// concurrent shot never sees a half-built collider
+			this.occluderMeshes = occluders
+			// Size the network view box to the real geometry now that it is loaded. This
+			// runs off the un-subdivided COLLIDERS (not the occluder clones) and only
+			// reads vertex data, so it disturbs nothing above.
+			const derived = this.deriveViewBox(colliders)
+			if (derived) this.viewBox = derived
+			const vb = this.viewBox
+			console.log(`[view] box centre(${vb.x.toFixed(2)}, ${vb.y.toFixed(2)}, ${vb.z.toFixed(2)}) `
+				+ `half(${vb.halfWidth.toFixed(2)}, ${vb.halfHeight.toFixed(2)}, ${vb.halfDepth.toFixed(2)})`)
 			this.mapReady = true
 			console.log(`[map] mesh collider loaded: ${n} meshes (${MAP_MESH.file})`)
 		} catch (e) { console.error('[map] mesh load FAILED:', e) }
@@ -664,6 +741,145 @@ class GameInstance {
 		// deterministic movement path), so Math.random is fine here.
 		const p = SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)]
 		return { x: p.x + (Math.random() - 0.5) * 2, z: p.z + (Math.random() - 0.5) * 2, y: 0 }
+	}
+
+	// WORLD position of the mega-health pickup. Mesh maps read MAP_MESH.mega (native
+	// units, like spawns/killY) and add MEGA.Y as the bob height above that floor
+	// point; box arenas keep their MEGA.X/Y/Z placement over the y=0 floor plane. A
+	// mesh map with no `mega` entry falls back to the box position and warns rather
+	// than silently parking the pickup somewhere unreachable — which is the bug this
+	// whole method exists to kill.
+	megaSpawnPos() {
+		if (USE_MESH_MAP) {
+			if (MAP_MESH.mega) {
+				const sc = MAP_MESH.scale || 1
+				return {
+					x: MAP_MESH.mega.x * sc,
+					y: MAP_MESH.mega.y * sc + MEGA.Y,
+					z: MAP_MESH.mega.z * sc
+				}
+			}
+			console.warn(`[mega] ${MAP_MESH.file} has no 'mega' entry in common/mapMesh.js — `
+				+ `falling back to the box-arena position (${MEGA.X}, ${MEGA.Y}, ${MEGA.Z}), `
+				+ `which is almost certainly not on this map's floor.`)
+		}
+		return { x: MEGA.X, y: MEGA.Y, z: MEGA.Z }
+	}
+
+	// ---- network view box -------------------------------------------------------
+	// nengi culls entities against a per-client AABB (node_modules/nengi/core/instance/
+	// BasicSpace.js, queryAreaEMap3D — a strict min/max test on all three axes with
+	// DIMENSIONALITY 3). An entity outside a client's box is simply never inserted into
+	// that client's view: no model, no nametag, no corpse. It is deliberately NOT
+	// re-centred on the player (nengi has no 3D view culler yet), so it must be a fixed
+	// box that covers the whole playable world.
+	//
+	// It used to be a symmetric ±64 cube AT THE ORIGIN, sized for a 44-unit box arena.
+	// On CTF-Visage that hard-culls real play space: the walkable floor runs to world
+	// x = +102.18, so ~39% of it — and 2 of the 8 spawn points (x 69.23 and 78.78) —
+	// sat outside the box. A player there was invisible to everyone else while still
+	// able to shoot them (hitscan uses its own ±999999 area), which reads as a ghost.
+	//
+	// The box is now sized to the MAP: per-axis half-extents around the map's own
+	// centre, not the origin. nengi's aabb carries its own x/y/z centre and separate
+	// halfWidth/halfHeight/halfDepth, so an asymmetric off-origin box costs nothing —
+	// and it matters here, because Visage's walkable z spans only ~52m against ~138m
+	// of x. MEASURED on CTF-Visage: the derived box is centre(33.39, -20.47, -1.49)
+	// half(84.79, 52.61, 41.84) = 1.49e6 m3, and it holds 2126/2126 walkable-floor
+	// sample points vs 1190/2126 (56.0%) for the old ±64 cube. A symmetric
+	// origin-centred cube covering the same world would need ±118 = 13.20e6 m3, i.e.
+	// 8.8x the volume for no gain.
+	//
+	// Fallback used only for the ~1s async mesh load at boot (nobody has connected
+	// yet). Mesh maps declare `walkable` in common/mapMesh.js; _loadMapMesh replaces
+	// this with the real thing derived from the mesh as soon as the OBJ is in.
+	defaultViewBox() {
+		if (USE_MESH_MAP && MAP_MESH.walkable) {
+			const sc = MAP_MESH.scale || 1
+			const w = MAP_MESH.walkable
+			return this.viewBoxFrom(
+				{ x: w.minX * sc, y: w.minY * sc, z: w.minZ * sc },
+				{ x: w.maxX * sc, y: w.maxY * sc, z: w.maxZ * sc }
+			)
+		}
+		// box arena: the old ±64 origin cube, which scripts/verify-map.ts asserts every
+		// box map fits inside. Unchanged on purpose.
+		return { x: 0, y: 0, z: 0, halfWidth: 64, halfHeight: 64, halfDepth: 64 }
+	}
+
+	// Turn a world-space min/max into a nengi aabb, union'd with everything else that
+	// must be replicated: the spawn points (authoritative positions — if one ever sat
+	// outside the floor AABB the box must still cover it) and the kill plane (players
+	// falling to their death stay visible until the server kills them at KILL_Y).
+	viewBoxFrom(min, max) {
+		const sc = MAP_MESH.scale || 1
+		if (USE_MESH_MAP) {
+			for (const s of MAP_MESH.spawns) {
+				min.x = Math.min(min.x, s.x * sc); max.x = Math.max(max.x, s.x * sc)
+				min.y = Math.min(min.y, s.y * sc); max.y = Math.max(max.y, s.y * sc)
+				min.z = Math.min(min.z, s.z * sc); max.z = Math.max(max.z, s.z * sc)
+			}
+			min.y = Math.min(min.y, KILL_Y * sc)
+		}
+		const m = VIEW_MARGIN
+		return {
+			x: (min.x + max.x) / 2,
+			y: (min.y + max.y) / 2,
+			z: (min.z + max.z) / 2,
+			halfWidth: (max.x - min.x) / 2 + m,
+			halfHeight: (max.y - min.y) / 2 + m,
+			halfDepth: (max.z - min.z) / 2 + m
+		}
+	}
+
+	// Walkable-floor AABB straight off the loaded mesh: sweep every collider triangle
+	// in WORLD space and keep the near-horizontal ones. Deriving this (rather than
+	// hardcoding another number) is what makes the view box correct for the next map
+	// without anyone having to remember to measure it.
+	//
+	// The test is on |n.y|, NOT n.y, on purpose: OBJ winding is not consistent across
+	// our maps — DM-W-Grove's floors come out with n.y = -1.000 while CTF-Visage's
+	// come out +1 — and the horizontal extent is IDENTICAL under either convention
+	// (measured on both maps), so being sign-agnostic buys correctness on inverted
+	// maps for free and avoids having to guess a per-map winding.
+	deriveViewBox(colliders) {
+		const min = { x: Infinity, y: Infinity, z: Infinity }
+		const max = { x: -Infinity, y: -Infinity, z: -Infinity }
+		const a = new BABYLON.Vector3(), b = new BABYLON.Vector3(), c = new BABYLON.Vector3()
+		const v = new BABYLON.Vector3()
+		let tris = 0
+		for (const m of colliders) {
+			const pos = m.getVerticesData(BABYLON.VertexBuffer.PositionKind)
+			const idx = m.getIndices()
+			if (!pos || !idx) continue
+			const wm = m.getWorldMatrix()
+			const get = (i, out) => {
+				v.set(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2])
+				BABYLON.Vector3.TransformCoordinatesToRef(v, wm, out)
+			}
+			for (let i = 0; i < idx.length; i += 3) {
+				get(idx[i], a); get(idx[i + 1], b); get(idx[i + 2], c)
+				const ux = b.x - a.x, uy = b.y - a.y, uz = b.z - a.z
+				const vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z
+				const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx
+				const len = Math.hypot(nx, ny, nz)
+				if (len < 1e-9 || Math.abs(ny / len) < 0.7) continue
+				tris++
+				for (const p of [a, b, c]) {
+					if (p.x < min.x) min.x = p.x; if (p.x > max.x) max.x = p.x
+					if (p.y < min.y) min.y = p.y; if (p.y > max.y) max.y = p.y
+					if (p.z < min.z) min.z = p.z; if (p.z > max.z) max.z = p.z
+				}
+			}
+		}
+		if (!tris) {
+			console.warn('[view] no walkable triangles found in the map mesh — keeping the declared view box')
+			return null
+		}
+		console.log(`[view] walkable floor from ${tris} tris: `
+			+ `x[${min.x.toFixed(2)}..${max.x.toFixed(2)}] y[${min.y.toFixed(2)}..${max.y.toFixed(2)}] `
+			+ `z[${min.z.toFixed(2)}..${max.z.toFixed(2)}]`)
+		return this.viewBoxFrom(min, max)
 	}
 
 	// Canonical damage: a player's authoritative hitpoints live on the CLIENT's
@@ -773,7 +989,9 @@ class GameInstance {
 		// the client ignores server x/y/z for its own entity (it predicts them),
 		// so hand the teleport over explicitly — same contract as Identity's spawn.
 		// Bots have no socket to message; the server-side teleport IS their move.
-		if (!client.bot) this.instance.message(new Respawned(spawn.x, spawn.z), client)
+		// spawn.y goes on the wire now — the client used to assume 0 (box-arena floor)
+		// and fell ~24m out of the sky on every respawn on a mesh map.
+		if (!client.bot) this.instance.message(new Respawned(spawn.x, spawn.y || 0, spawn.z), client)
 		console.log(`${client.bot ? 'Bot' : 'Player'} ${client.rawEntity.nid} respawned at (${spawn.x.toFixed(1)}, ${spawn.z.toFixed(1)})`)
 	}
 

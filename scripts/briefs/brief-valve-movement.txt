@@ -1,0 +1,457 @@
+FRAG ARENA — SLOPE MOVEMENT CONSULT
+Downhill walking collapses to 0.85 m/s. We need Source-lineage guidance that fits
+inside a hard determinism constraint. Everything below is measured fact, not guess.
+
+================================================================================
+THE SYSTEM
+================================================================================
+
+Browser arena FPS. Babylon.js 9.17 client, custom WebSocket netcode.
+Fixed sim tick: 40 Hz, delta = 0.025 exactly.
+Architecture: authoritative server + client-side prediction + reconciliation replay.
+One shared movement function, common/applyCommand.js, runs in all three roles.
+
+THE ONLY COLLISION PRIMITIVE WE HAVE is Babylon's
+
+    mesh.moveWithCollisions(displacement: Vector3)
+
+an ellipsoid collide-and-slide (ellipsoid radius 0.5) swept against the map's
+triangle mesh. It does its OWN internal iteration and sliding. It does NOT report
+the set of planes it hit. After the call we can read exactly two things:
+
+    mesh.collider.collisionFound      (boolean)
+    mesh.collider.slidePlaneNormal    (Vector3 — see FINDING 1, it is not a unit normal)
+
+That is the entire API surface. There is no trace/sweep/raycast function available
+to us inside applyCommand (see the determinism constraint below).
+
+Constants in play:
+    GRAVITY          18      (m/s^2)
+    GROUND_SPEED     7.6     (m/s)
+    GROUND_ACCEL     10
+    FRICTION         8
+    JUMP_SPEED       7.2
+    TERMINAL_FALL    30
+    MIN_WALK_NORMAL  0.7
+    STEP_DOWN        0.35
+    ellipsoid radius 0.5
+    delta            0.025
+
+GEOMETRY NOTE: the player entity is anchored at the CENTRE of a 1-unit box, so the
+collision bottom is at entity.y - 0.5. Any y arithmetic you prescribe must account
+for that; entity.y is NOT the feet.
+
+================================================================================
+HARD DETERMINISM CONSTRAINT — READ THIS BEFORE PRESCRIBING ANYTHING
+================================================================================
+
+    applyCommand(entity, command)
+
+MUST keep exactly that signature, and MUST stay a pure function of
+(entity state, command). It is replayed during client reconciliation, potentially
+dozens of times per frame, with NO scene handle available.
+
+Therefore, categorically forbidden in any fix:
+  - NO raycasts. NO scene.pickWithRay. NO scene.pickWithBoundingInfo. No scene access at all.
+  - NO added parameters to applyCommand. The signature is frozen.
+  - NO wall-clock time, no Date.now, no performance.now.
+  - NO randomness.
+  - NO render-frame data, no getRenderId-dependent behaviour beyond the existing
+    computeWorldMatrix(true) calls.
+
+A PREVIOUS CONSULT PRESCRIBED A SCENE RAYCAST FOR THE GROUND TRACE. The entire
+prescription had to be thrown away for exactly this reason. Please do not repeat
+that mistake — if your instinct is "do a downward trace here", express it as a
+moveWithCollisions probe (which we can do, and already do in phase 3) plus a
+restore of the pre-probe position, not as a raycast.
+
+Any fix must work using ONLY:
+  - moveWithCollisions(...) calls (including zero-length and probe moves)
+  - the resulting entity.x / entity.y / entity.z
+  - collider.collisionFound and collider.slidePlaneNormal
+  - entity state and the command
+
+================================================================================
+THE ACTUAL CURRENT CODE — common/applyCommand.js
+================================================================================
+
+Constants, the groundNormalY helper, and the accelerate helper (lines 12-90):
+
+```js
+// UT99 values converted at ~52.5 unreal-units per meter
+export const GROUND_SPEED = 7.6   // GroundSpeed 400
+const GROUND_ACCEL = 10           // quake-style accel coefficient — snappy starts
+const FRICTION = 8                // quick stops (no ice skating)
+const MAX_AIR_WISH_SPEED = 1.2    // quake-style air speed limit
+const AIR_ACCEL = 30              // quake-style air acceleration
+const JUMP_SPEED = 7.2            // bumped from 6.2 for a higher, floatier UT-style hop
+                                 // (apex ~1.44m vs ~1.07m; also helps clear stairs)
+const GRAVITY = 18                // 950 uu/s²
+const TERMINAL_FALL = 30
+export const DODGE_SPEED = 11.4   // dodge bursts at 1.5x GroundSpeed
+const DODGE_UP = 3.4              // small hop so the dodge clears the floor
+const DODGE_COOLDOWN = 0.35       // after landing, before the next dodge
+// NOTE: an earlier post-dodge "landing speed clamp" was removed — DYOR found it has
+// no prior art in shipped arena shooters (they use a re-dodge cooldown, which we
+// already have). Raising the sim tick to 40Hz halves the per-tick dodge jump
+// (0.57m -> 0.285m), which fixes the target-trackability problem the clamp was
+// invented for. If dodges still feel spammy in playtest, bump DODGE_COOLDOWN to
+// ~0.45 (UT4's shipped `dodgedelay`) rather than reintroducing a clamp.
+const GROUND_Y = 0
+// Walkable-surface limit: the minimum ground-plane normal.y a player can stand on.
+// 0.7 == Quake III's MIN_WALK_NORMAL (~45.6 degrees). At or above it the surface is
+// FLOOR (gravity is clipped out, you stand still); below it the surface is a WALL/RAMP
+// you slide down. The normal comes from the collider's slide plane after the vertical
+// move — no raycast, so this stays a pure function of (entity, command).
+const MIN_WALK_NORMAL = 0.7
+// Snap-to-ground probe distance. Walking DOWNHILL at 40Hz, one tick of horizontal
+// travel (7.6 m/s * 0.025 = 0.19m) drops the floor away by more than gravity can pull
+// the capsule in the same tick (18 * 0.025^2 = 0.011m) on any slope steeper than ~3.4
+// degrees — so without an active snap the player goes ballistic, loses ground contact,
+// and friction switches off (the "ice" feel). After the vertical move we probe down by
+// this much and stay glued if we find walkable floor. 0.35 covers a 40Hz downhill run
+// on slopes past 60 degrees while staying under the ~0.5 step height, so it can't glue
+// a player to a floor they genuinely jumped or walked off.
+// `collider.slidePlaneNormal` is NOT a unit surface normal in Babylon 9 — it is the
+// residual-penetration vector, whose LENGTH scales with the unconsumed part of the
+// requested move (on a flat floor |n| == 1 - |moveY|/radius). Its DIRECTION is the true
+// surface normal, so normalizing recovers it exactly — verified to 4dp against ground
+// truth on 0/15/30/44/50/60-degree slopes. Comparing the RAW .y to a cosine threshold
+// measures IMPACT SPEED, not slope: a player landing at JUMP_SPEED (7.2 m/s) moves
+// 0.18 in a tick and reads n.y ~ 0.64 on DEAD FLAT GROUND, so it is misclassified as a
+// wall and never re-grounds — grounded latches false, velY runs to terminal, and
+// friction/jump/dodge/jump-pads (all gated on grounded) die. Past |moveY| > radius the
+// vector flips sign; taking |.| is correct here because this is only ever consulted
+// while velY <= 0, where the contacted surface must be a floor rather than a ceiling.
+const groundNormalY = (n) => {
+	const len = Math.sqrt(n.x * n.x + n.y * n.y + n.z * n.z)
+	return len > 1e-9 ? Math.abs(n.y) / len : 1
+}
+const STEP_DOWN = 0.35
+// clamp hitches so one lagged frame can't teleport. Derived from the sim tick so
+// a tick-rate raise (nengiConfig.UPDATE_RATE) keeps the per-command clamp equal to
+// exactly one server tick automatically — do NOT hardcode this to 1/20.
+const MAX_DELTA = 1 / nengiConfig.UPDATE_RATE
+
+// the fastest a player legitimately moves horizontally (used for the smooth
+// entity's path-following budget on the server)
+export const MAX_SPEED = DODGE_SPEED
+
+// dodge direction wire codes (0 = no dodge this command)
+export const DODGE_DIRS = { forwards: 1, backwards: 2, left: 3, right: 4 }
+const DODGE_VECTORS = {
+	1: new Vector3(0, 0, 1),
+	2: new Vector3(0, 0, -1),
+	3: new Vector3(-1, 0, 0),
+	4: new Vector3(1, 0, 0),
+}
+
+// quake-style acceleration: only adds speed while the velocity component along
+// wishDir is below wishSpeed — never bleeds speed above it, so dodge momentum
+// survives holding forward
+const accelerate = (entity, wishX, wishZ, wishSpeed, accel, delta) => {
+	const current = entity.velX * wishX + entity.velZ * wishZ
+	const add = wishSpeed - current
+	if (add <= 0) { return }
+	const speed = Math.min(accel * wishSpeed * delta, add)
+	entity.velX += wishX * speed
+	entity.velZ += wishZ * speed
+}
+```
+
+The grounded friction / accel / jump-dodge block (lines 115-154):
+
+```js
+	if (entity.grounded) {
+		// ground friction, applied even while accelerating — the interplay of the
+		// two is what makes starts/stops feel 1999-snappy instead of floaty
+		const speed = Math.hypot(entity.velX, entity.velZ)
+		if (speed > 0) {
+			const drop = speed * FRICTION * delta
+			const scale = Math.max(speed - drop, 0) / speed
+			entity.velX *= scale
+			entity.velZ *= scale
+		}
+		if (wishLen > 0) {
+			// Plasma slow debuff: scale ground max-speed AND accel by (1-slowFactor)
+			// for this frame. Deterministic (slowTimer/slowFactor are entity state,
+			// synced + predicted), so it reconciles exactly. Does NOT touch the dodge
+			// burst below (escape stays viable at full DODGE_SPEED).
+			const slow = entity.slowTimer > 0 ? (1 - (entity.slowFactor || 0)) : 1
+			accelerate(entity, wishX, wishZ, GROUND_SPEED * slow, GROUND_ACCEL * slow, delta)
+		}
+
+		// the cooldown only ticks while grounded: dodging launches you airborne,
+		// so you can't dodge again until you land AND the timer runs out (UT rule)
+		if (entity.dodgeTimer > 0) {
+			entity.dodgeTimer -= delta
+		}
+
+		if (command.dodge && entity.dodgeTimer <= 0 && DODGE_VECTORS[command.dodge]) {
+			const dir = Vector3.TransformCoordinates(DODGE_VECTORS[command.dodge], yawMatrix)
+			entity.velX = dir.x * DODGE_SPEED
+			entity.velZ = dir.z * DODGE_SPEED
+			entity.velY = DODGE_UP
+			entity.grounded = false
+			entity.dodgeTimer = DODGE_COOLDOWN
+		} else if (command.jump) {
+			entity.velY = JUMP_SPEED
+			entity.grounded = false
+		}
+	} else if (wishLen > 0) {
+		// Quake-style air acceleration / strafe jumping
+		accelerate(entity, wishX, wishZ, MAX_AIR_WISH_SPEED, AIR_ACCEL, delta)
+	}
+```
+
+The full three-phase integrate section, gravity through the ground clamp (lines 179-311):
+
+```js
+	entity.velY -= GRAVITY * delta
+	if (entity.velY < -TERMINAL_FALL) {
+		entity.velY = -TERMINAL_FALL
+	}
+
+	// ---------------------------------------------------------------------------
+	// INTEGRATE, IN TWO SEPARATE PHASES (horizontal, then vertical).
+	//
+	// This used to be ONE combined moveWithCollisions of (velX, velY, velZ) * delta,
+	// which is what made sloped mesh maps (CTF-Visage) feel like they had "strong
+	// gravity": you slid downhill while standing still. The mechanism was a feedback
+	// loop between the solver and the velocity re-derivation below —
+	//
+	//   1. gravity puts -0.45 m/s into velY every tick even while grounded,
+	//   2. collide-and-slide projects that downward move along the slope, turning it
+	//      into DOWNHILL HORIZONTAL displacement,
+	//   3. `velX = (x - oldX) / delta` promoted that displacement into real, persistent
+	//      horizontal momentum, which fed step 2 harder on the next tick,
+	//   4. and once the downhill creep passed ~1.13 m/s the old grounded test (which
+	//      measured TOTAL y movement, so horizontal speed on a slope contaminated it)
+	//      started reporting airborne — switching ground friction OFF entirely, so
+	//      nothing was left to oppose the slide.
+	//
+	// Splitting the move fixes the whole chain: the horizontal phase alone feeds the
+	// velocity re-derivation (walls still absorb speed exactly as before), and the
+	// vertical phase's sideways deflection is DISCARDED on walkable ground instead of
+	// becoming momentum. Quake solves this with PM_ClipVelocity against the ground
+	// normal; discarding the deflection is the same idea expressed through Babylon's
+	// solver, which we keep as the only collision primitive.
+	//
+	// Babylon 9 headless note (applies to every moveWithCollisions below): getRenderId()
+	// never advances under NullEngine (server) or during client prediction-replay, so
+	// getAbsolutePosition() returns a stale world matrix and the move tunnels through
+	// walls / never rests on the ground. computeWorldMatrix(true) recomputes it,
+	// bypassing the frozen-renderId cache guard (transformNode:
+	// _currentRenderId===currentRenderId short-circuit added in 9.x). Validated
+	// bit-for-bit vs 4.0.3; a harmless no-op there.
+	// ---------------------------------------------------------------------------
+	const wasGrounded = entity.grounded
+
+	// PHASE 1 — horizontal. Collide-and-slide along walls; this phase may also raise y
+	// (that is how you walk UP a ramp or a step).
+	const oldX = entity.x
+	const oldZ = entity.z
+	entity.mesh.computeWorldMatrix(true)
+	entity.mesh.moveWithCollisions(new Vector3(entity.velX * delta, 0, entity.velZ * delta))
+
+	// horizontal velocity becomes what actually happened, so walls absorb speed
+	// instead of storing a slingshot for when you strafe off them. Only the HORIZONTAL
+	// phase feeds this — gravity's slope deflection is no longer promoted here.
+	entity.velX = (entity.x - oldX) / delta
+	entity.velZ = (entity.z - oldZ) / delta
+
+	// PHASE 2 — vertical (gravity fall / jump arc).
+	const preY = entity.y
+	const preX = entity.x
+	const preZ = entity.z
+	entity.mesh.computeWorldMatrix(true)
+	entity.mesh.moveWithCollisions(new Vector3(0, entity.velY * delta, 0))
+	const movedY = entity.y - preY
+
+	// The vertical move was cut short => we landed on something. Ask the collider what
+	// we landed ON: normal.y >= MIN_WALK_NORMAL is walkable floor, anything less is a
+	// steep face we should slide down.
+	const blocked = entity.velY <= 0 && movedY - entity.velY * delta > 0.001
+	let walkable = false
+	if (blocked) {
+		const collider = entity.mesh.collider
+		const n = collider && collider.collisionFound ? collider.slidePlaneNormal : null
+		// No collider normal (box-arena floor plane, or a solver path that reports no
+		// slide plane) => treat as flat floor, which is what those surfaces are.
+		walkable = !n || groundNormalY(n) >= MIN_WALK_NORMAL
+	}
+
+	if (blocked && walkable) {
+		// Standing on real floor. Discard the sideways deflection this vertical move
+		// produced — that deflection IS the phantom downhill slide — and kill the
+		// downward velocity so gravity stops pumping into the slope next tick.
+		entity.x = preX
+		entity.z = preZ
+		entity.grounded = true
+		entity.velY = 0
+	} else if (blocked) {
+		// Too steep to stand on. This is a genuine slide: KEEP the deflection and let
+		// it become horizontal momentum, so steep faces shed you with real speed
+		// instead of sticking. Gravity keeps accumulating (we stay airborne).
+		entity.velX = (entity.x - preX) / delta
+		entity.velZ = (entity.z - preZ) / delta
+		entity.grounded = false
+	} else {
+		entity.grounded = false
+	}
+
+	// PHASE 3 — snap-to-ground. If we came into this tick standing and are not jumping,
+	// but the vertical phase left us airborne, we most likely just walked over the crest
+	// of a downhill slope and out-ran gravity (see STEP_DOWN). Probe down; if walkable
+	// floor is within reach, stay glued to it so friction and ground accel keep running.
+	// If nothing is there we really did walk off an edge — restore and fall (Visage is a
+	// floating map: walking off MUST drop you into the void).
+	if (wasGrounded && !entity.grounded && entity.velY <= 0 && !command.jump && !command.dodge) {
+		const sx = entity.x
+		const sy = entity.y
+		const sz = entity.z
+		entity.mesh.computeWorldMatrix(true)
+		entity.mesh.moveWithCollisions(new Vector3(0, -STEP_DOWN, 0))
+		const snapped = entity.y - sy
+		const collider = entity.mesh.collider
+		const n = collider && collider.collisionFound ? collider.slidePlaneNormal : null
+		const snapWalkable = !n || groundNormalY(n) >= MIN_WALK_NORMAL
+		if (snapped > -STEP_DOWN + 0.001 && snapWalkable) {
+			// found floor within a step — glue to it (keep the probe's y, drop its
+			// sideways deflection for the same reason phase 2 does)
+			entity.x = sx
+			entity.z = sz
+			entity.grounded = true
+			entity.velY = 0
+		} else {
+			entity.x = sx
+			entity.y = sy
+			entity.z = sz
+		}
+	}
+
+	// Box arenas use y>=GROUND_Y as their (invisible) floor. Mesh maps have REAL floors
+	// with edges — so we DON'T clamp: players rest on the mesh via moveWithCollisions and
+	// fall off ledges into the void (the server kills them below KILL_Y). See mapMesh.js.
+	if (!USE_MESH_MAP && entity.y < GROUND_Y) {
+		entity.y = GROUND_Y
+		if (entity.velY < 0) {
+			entity.grounded = true
+			entity.velY = 0
+		}
+	}
+```
+
+================================================================================
+FINDINGS ESTABLISHED SO FAR (measured, not hypothesised)
+================================================================================
+
+FINDING 1 — slidePlaneNormal is a residual-penetration vector. FIXED.
+
+collider.slidePlaneNormal is NOT a unit surface normal in Babylon 9. It is a
+RESIDUAL-PENETRATION vector: its LENGTH scales with the unconsumed portion of the
+requested move. On a flat floor, |n| == 1 - |moveY|/radius. Its DIRECTION, however,
+is the true surface normal, so normalizing recovers ground truth. Verified to 4
+decimal places against analytic ground truth on 0 / 15 / 30 / 44 / 50 / 60 degree
+slopes.
+
+Consequence of the old (raw .y vs cosine) test: it measured IMPACT SPEED, not slope.
+A player landing at JUMP_SPEED (7.2 m/s) moves 0.18 in a tick and reads raw n.y ~ 0.64
+on DEAD FLAT GROUND — misclassified as a wall, never re-grounded, grounded latched
+false, velY ran to terminal, and friction/jump/dodge/jump-pads (all gated on grounded)
+died.
+
+This is FIXED via the groundNormalY helper (normalize, take |y|). Results after fix:
+  - landing sweep: 28/28 pass, up to terminal velocity
+  - jumpArc grounded-ticks: recovered 0 -> 90 on all 4 maps
+
+FINDING 2 — THE OPEN DEFECT: downhill walking collapses.
+
+Test: 20 degree walkable ramp, hold W for 3 seconds (120 ticks).
+
+                distance      avg speed      % ticks grounded
+  downhill  OLD 20.914 m      6.971 m/s      10%
+  downhill  NEW  2.544 m      0.848 m/s      100%     <-- THE DEFECT
+  uphill    OLD 15.352 m                              fine
+  uphill    NEW 16.715 m                              fine
+  flat      OLD 22.382 m                              identical
+  flat      NEW 22.382 m                              identical
+
+GROUND_SPEED is 7.6 m/s. Downhill should be at or above 7.6. It is 0.85.
+So the ground-contact fix (FINDING 1) traded "ice" for "tar": we now hold ground
+contact 100% of ticks and go nowhere.
+
+MEASURED MECHANISM — a 3-tick limit cycle:
+
+  tick A: a real downhill step happens.
+          dx = -0.0516, dy = -0.0583, NO collision reported.
+  tick B: the solver pushes the player back UP out of the surface, dy = +0.0188,
+          while phase 1's horizontal move is almost entirely blocked, dx = -0.0051.
+  tick C: same again, dy = +0.0170, dx = -0.0051.
+
+  Net displacement per 3 ticks: 0.0206 m.
+
+  And then the line
+
+      entity.velX = (entity.x - oldX) / delta
+
+  re-derives velX from that blocked/pushed-out delta as -0.2052 m/s. The speed is
+  destroyed by the re-derivation, every cycle, forever. Ground accel then has to
+  climb back from ~0.2 m/s every 3 ticks and never gets anywhere.
+
+CORROBORATING EVIDENCE THAT THIS IS DEPENETRATION, NOT SLIDE DEFLECTION:
+At tick 0, with velocity EXACTLY ZERO, phase 1 passes a ZERO-LENGTH vector to
+moveWithCollisions — and the entity STILL MOVES 0.0057 m. The direction of that
+promoted movement, normalized, is exactly the contact face's horizontal normal.
+So the solver is pushing us out of the surface, and (x - oldX)/delta is faithfully
+converting that push-out into "velocity".
+
+FINDING 3 — secondary defect: the phase 3 gate is wrong.
+
+Phase 3 (snap-to-ground) is gated on
+
+    && !command.jump && !command.dodge
+
+but a dodge only ACTUALLY fires when entity.dodgeTimer <= 0. So tapping dodge during
+its 0.35 s cooldown suppresses snap-to-ground while no dodge occurs at all. Measured:
+grounded drops from 100% to 13% on a 20 degree ramp, reintroducing the ice feel.
+The gate is testing the INPUT, not whether the action happened.
+
+================================================================================
+QUESTIONS — please answer all five explicitly, code-level
+================================================================================
+
+1. The velocity re-derivation `velX = (entity.x - oldX) / delta` was introduced
+   deliberately, so that walls ABSORB speed instead of storing a slingshot for when
+   you strafe off them. Source solves that same problem with ClipVelocity against
+   each contact plane, subtractively, without ever touching position.
+   Given we only have moveWithCollisions — which does its own internal sliding and
+   does NOT report the full plane set — how would we get Source-style ClipVelocity
+   behaviour here? SPECIFICALLY: how do we distinguish REAL BLOCKED MOTION from
+   DEPENETRATION PUSH-OUT, using only the collider state Babylon leaves behind
+   (collisionFound, slidePlaneNormal) plus whatever extra moveWithCollisions probes
+   we are willing to pay for?
+
+2. Should the ground move be HORIZONTAL-ONLY with an explicit StayOnGround step-down
+   (i.e. Source's WalkMove shape), which is close to what phases 1 + 3 already do —
+   or is the three-phase split (horizontal / vertical / snap) itself the wrong shape
+   for this problem? If it is wrong, what is the right shape given our primitive?
+
+3. How should a GROUNDED player's velocity be handled on a slope so that:
+     - walking downhill reaches proper speed (>= 7.6 m/s),
+     - walking uphill is correctly slowed,
+     - standing still does not drift?
+   Give the CONCRETE OPERATION SEQUENCE PER TICK, in order, with the exact
+   arithmetic and the exact moveWithCollisions calls.
+
+4. Is MIN_WALK_NORMAL = 0.7 the right limit for this sim, and WHERE EXACTLY in the
+   tick should the walkability test be evaluated? (Currently it is evaluated after
+   the vertical phase and again after the snap probe.)
+
+5. What does Source do that this sim is missing ENTIRELY and will regret later?
+   Name the top 2-3, concretely.
+
+Please give concrete, code-level answers that respect the determinism constraint in
+full. Exact replacement snippets preferred over prose. If any recommendation cannot
+be done without a raycast or an extra parameter, say so explicitly and give the
+constraint-respecting alternative instead.

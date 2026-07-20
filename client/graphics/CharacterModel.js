@@ -1,5 +1,6 @@
 import * as BABYLON from '../babylon.js'
 import { tpWeapons } from '../assets/assetManifest'
+import { USE_MESH_MAP } from '../../common/mapMesh'
 
 // A visual character bound to (but not parented to) a host transform — typically
 // another player's replicated collision box. Each frame it copies the host's
@@ -22,6 +23,13 @@ import { tpWeapons } from '../assets/assetManifest'
 // player). Cloned props carry no skeleton/anims — they're static geometry.
 // ---------------------------------------------------------------------------
 const _propCache = new Map() // url -> Promise<{ meshes: AbstractMesh[] }>
+
+// Feet-to-origin offset for the ACTIVE map type. Box arenas draw their visual
+// floor 0.5 below the collision-box bottom, mesh maps use one mesh for both —
+// so the body needs a different drop on each. See assetManifest playerBody.
+// Falls back to spec.yOffset when a spec predates yOffsetMeshMap.
+const bodyYOffset = (spec) =>
+  (USE_MESH_MAP && spec.yOffsetMeshMap !== undefined ? spec.yOffsetMeshMap : spec.yOffset)
 
 // ---------------------------------------------------------------------------
 // SINGLE-FLIGHT body import. The preload warm (warmBody) and the first real
@@ -409,7 +417,7 @@ export default class CharacterModel {
     // (played in setCorpse) drives the fall; position still follows the host.
     if (this._corpse) {
       this.holder.setEnabled(!this._hidden)
-      this.holder.position.set(p.x, p.y + this.spec.yOffset, p.z)
+      this.holder.position.set(p.x, p.y + bodyYOffset(this.spec), p.z)
       if (this._nameTag) this._nameTag.style.display = 'none'
       return
     }
@@ -418,7 +426,7 @@ export default class CharacterModel {
     // is running (e.g. a death we never saw a Killed message for). A live corpse
     // animation takes priority via the early return above.
     this.holder.setEnabled(this.host.isAlive !== false)
-    this.holder.position.set(p.x, p.y + this.spec.yOffset, p.z)
+    this.holder.position.set(p.x, p.y + bodyYOffset(this.spec), p.z)
     this.holder.rotation.y = this.host.rotation.y + (this.spec.yawOffset || 0)
 
     // HIT-STOP: while active, near-freeze the animation to sell the impact. The body

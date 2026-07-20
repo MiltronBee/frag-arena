@@ -1,0 +1,150 @@
+CONSULT: "Strong gravity" / slope-slide feel on mesh maps (CTF-Visage)
+
+THE SYMPTOM (player words): "Some maps like Visage have very strong gravity. You get
+pulled down the slope and you kinda slide." On sloped ground you drift downhill even
+while trying to stand still or walk across the slope. Flat maps feel fine.
+
+FACTS YOU SHOULD KNOW BEFORE READING THE CODE:
+- GRAVITY = 18 is a single global constant in the shared sim. No per-map gravity
+  exists anywhere. So "Visage has strong gravity" must be an emergent feel bug.
+- Sim tick: 40Hz (nengiConfig.UPDATE_RATE = 40), so the per-command delta is clamped
+  to MAX_DELTA = 1/40 = 0.025s. Client sends commands, runs the same applyCommand
+  for prediction, server is authoritative, reconciliation replays commands.
+- Collision solver: Babylon.js moveWithCollisions — ellipsoid collide-and-slide
+  against the map triangle mesh. Player ellipsoid = (0.5, 0.5, 0.5) — a SPHERE of
+  radius 0.5m (PlayerCharacter.js: this.mesh.ellipsoid = new Vector3(0.5,0.5,0.5)).
+- Maps: artist-authored OBJ meshes at scale 0.65, rotated -90° about X (Z-up source).
+  CTF-Visage is a remake of UT99 Facing Worlds: two towers + a long central deck,
+  floating in the void. The deck and the tower approaches are SLOPED — long ramps.
+  The map plays large (native scale ~2.5x vs the other map, Grove). Grove has
+  slopes/stairs too but is more terraced; Visage is where the slide is worst.
+- There is no slope limit, no ground-normal query, and no snap-to-ground anywhere.
+  Everything below is the ENTIRE ground/air/collision logic of the game.
+
+THE REAL MOVEMENT CODE — common/applyCommand.js (weapon/reload/ADS sections trimmed;
+line numbers from the real file):
+
+```js
+// UT99 values converted at ~52.5 unreal-units per meter
+export const GROUND_SPEED = 7.6   // GroundSpeed 400
+const GROUND_ACCEL = 10           // quake-style accel coefficient — snappy starts
+const FRICTION = 8                // quick stops (no ice skating)
+const MAX_AIR_WISH_SPEED = 1.2    // quake-style air speed limit
+const AIR_ACCEL = 30              // quake-style air acceleration
+const JUMP_SPEED = 7.2
+const GRAVITY = 18                // 950 uu/s²
+const TERMINAL_FALL = 30
+export const DODGE_SPEED = 11.4   // dodge bursts at 1.5x GroundSpeed
+const DODGE_UP = 3.4
+const DODGE_COOLDOWN = 0.35
+const GROUND_Y = 0
+const MAX_DELTA = 1 / nengiConfig.UPDATE_RATE   // = 0.025 at 40Hz
+
+// quake-style acceleration: only adds speed while the velocity component along
+// wishDir is below wishSpeed — never bleeds speed above it
+const accelerate = (entity, wishX, wishZ, wishSpeed, accel, delta) => {
+	const current = entity.velX * wishX + entity.velZ * wishZ
+	const add = wishSpeed - current
+	if (add <= 0) { return }
+	const speed = Math.min(accel * wishSpeed * delta, add)
+	entity.velX += wishX * speed
+	entity.velZ += wishZ * speed
+}
+
+export default (entity, command) => {
+	if (!entity.isAlive) { return }
+	const delta = Math.min(Math.max(command.delta, 0.0001), MAX_DELTA)
+
+	// aim + wish direction (ix/iz from WASD, rotated by yaw) ... [trimmed, standard]
+	// wishX/wishZ = normalized world-space wish direction, wishLen its magnitude
+
+	if (entity.grounded) {
+		// ground friction, applied even while accelerating
+		const speed = Math.hypot(entity.velX, entity.velZ)
+		if (speed > 0) {
+			const drop = speed * FRICTION * delta
+			const scale = Math.max(speed - drop, 0) / speed
+			entity.velX *= scale
+			entity.velZ *= scale
+		}
+		if (wishLen > 0) {
+			const slow = entity.slowTimer > 0 ? (1 - (entity.slowFactor || 0)) : 1
+			accelerate(entity, wishX, wishZ, GROUND_SPEED * slow, GROUND_ACCEL * slow, delta)
+		}
+		if (entity.dodgeTimer > 0) { entity.dodgeTimer -= delta }
+		if (command.dodge && entity.dodgeTimer <= 0 && DODGE_VECTORS[command.dodge]) {
+			const dir = Vector3.TransformCoordinates(DODGE_VECTORS[command.dodge], yawMatrix)
+			entity.velX = dir.x * DODGE_SPEED
+			entity.velZ = dir.z * DODGE_SPEED
+			entity.velY = DODGE_UP
+			entity.grounded = false
+			entity.dodgeTimer = DODGE_COOLDOWN
+		} else if (command.jump) {
+			entity.velY = JUMP_SPEED
+			entity.grounded = false
+		}
+	} else if (wishLen > 0) {
+		// Quake-style air acceleration / strafe jumping
+		accelerate(entity, wishX, wishZ, MAX_AIR_WISH_SPEED, AIR_ACCEL, delta)
+	}
+
+	// [jump-pad block trimmed — grounded-only, Facing Worlds tower lifts]
+
+	entity.velY -= GRAVITY * delta
+	if (entity.velY < -TERMINAL_FALL) { entity.velY = -TERMINAL_FALL }
+
+	// integrate with collisions
+	const oldX = entity.x
+	const oldY = entity.y
+	const oldZ = entity.z
+	entity.mesh.computeWorldMatrix(true)
+	entity.mesh.moveWithCollisions(new Vector3(
+		entity.velX * delta,
+		entity.velY * delta,
+		entity.velZ * delta
+	))
+	// Mesh maps have REAL floors with edges — no y>=0 clamp (players can fall off).
+	if (!USE_MESH_MAP && entity.y < GROUND_Y) { entity.y = GROUND_Y }
+
+	// horizontal velocity becomes what actually happened, so walls absorb speed
+	// instead of storing a slingshot for when you strafe off them
+	entity.velX = (entity.x - oldX) / delta
+	entity.velZ = (entity.z - oldZ) / delta
+
+	// grounded = a downward move got cut short (the floor plane or an obstacle top)
+	const movedY = entity.y - oldY
+	if (entity.velY <= 0 && movedY - entity.velY * delta > 0.001) {
+		entity.grounded = true
+		entity.velY = 0
+	} else {
+		entity.grounded = false
+	}
+
+	// [slow-debuff tick, weapon switch, reload, ADS ramp, updateWeapon — trimmed;
+	//  none of them touch position/velocity/grounded]
+}
+```
+
+CONSTRAINTS ON ANY FIX:
+- Must stay deterministic and identical on client-prediction + server + replay:
+  pure function of (entity state, command). Raycasts vs the static map mesh are OK
+  (Babylon scene.pickWithRay or mesh intersection is available on both sides —
+  the server runs a NullEngine scene with the same collision mesh).
+- moveWithCollisions is currently the only collision solver; we'd like to keep it.
+- Cheap: this runs 40Hz per player on the server AND per predicted tick on client;
+  reconciliation can replay dozens of ticks in one frame.
+- The Quake-style accel/friction FEEL is loved — don't redesign the movement, kill
+  the slope-slide.
+
+QUESTIONS FOR YOU, VOSS:
+1. Walk the tick-by-tick arithmetic: standing still on Visage's ~15–25° ramps, how
+   fast do we end up creeping downhill, and why doesn't FRICTION=8 stop it?
+2. Is the displacement-based grounded heuristic flickering on these slopes, and how
+   much of the "strong gravity" feel is friction duty-cycling vs gravity-slide
+   promotion via the velX=(x-oldX)/delta re-derivation?
+3. Rank the fixes and tell us the ONE to ship first. If it's snap-to-ground or
+   velocity clipping to the ground plane, give the exact snippet against this code.
+4. Does walking DOWNHILL go ballistic (airborne ticks) with these numbers at 40Hz?
+   Show the math: 7.6 m/s across a 20° slope, does a 0.025s tick outrun gravity's
+   ability to keep the sphere in contact?
+5. Anything here that will bite us on stairs or ledge lips next?
