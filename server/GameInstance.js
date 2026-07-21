@@ -530,6 +530,9 @@ class GameInstance {
 		})
 
 		this.instance.on('command::FireCommand', ({ command, client, tick }) => {
+			// CEASEFIRE: no shots resolve during the MATCH_END intermission (bots hold
+			// trigger in the bot loop; damagePlayer is gated too — belt and braces).
+			if (this.matchPhase === MATCH_PHASE.MATCH_END) return
 			// shoot from the perspective of this client's entity
 			this.performShot(client)
 		})
@@ -1486,6 +1489,12 @@ class GameInstance {
 		const raw = victimClient.rawEntity
 		const smooth = victimClient.smoothEntity
 		if (!raw || !raw.isAlive) return
+		// CEASEFIRE during the MATCH_END intermission: the winner banner + final scores
+		// are a protected moment — no damage lands (hitscan, projectile, grenade splash
+		// alike), so nobody dies "behind" the DEFEAT card and the final score is final.
+		// Fall deaths stay live (they bypass damagePlayer) — walking off the deck during
+		// the intermission is still on you.
+		if (this.matchPhase === MATCH_PHASE.MATCH_END) return
 		// GODMODE: real players take no damage (bots still do — go frag them)
 		if (this._godmode && !victimClient.bot) return
 
@@ -1940,6 +1949,10 @@ class GameInstance {
 			// only attempt the shot when the weapon can actually fire — fire()
 			// would reject it anyway, but noisily (WEAPON_FIRE_FAIL log per tick)
 			const state = entity.weaponsState[entity.currentWeaponIndex]
+			// CEASEFIRE: bots hold the trigger through the MATCH_END intermission — no
+			// muzzle flash / tracer noise behind the winner banner (damage is already
+			// zeroed in damagePlayer; this keeps the moment VISUALLY calm too).
+			if (this.matchPhase === MATCH_PHASE.MATCH_END) return
 			if (command.fireInput && !state.onCooldown && !state.reloading && state.magazineAmmo > 0) {
 				this.performShot(bot)
 			}
