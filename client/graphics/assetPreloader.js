@@ -2,6 +2,7 @@ import { assets, weapons, tpWeapons } from '../assets/assetManifest'
 import { warmViewmodel } from './Viewmodel'
 import { warmProp, warmBody } from './CharacterModel'
 import { WEAPON_MODEL_URL, AMMO_MODEL_URL } from '../../common/pickupConfig'
+import { SPAWN_WEAPON_INDEX } from '../../common/weaponsConfig'
 
 // FULL PRELOAD GATE — the arena is not enterable until EVERY asset is actually
 // imported (GLBs parsed, not merely fetched) and GPU-warmed (materials/shaders
@@ -91,13 +92,14 @@ export default function preloadAssets(renderer, arenaReadyPromise, onProgress) {
 
   // WEAPONS — every first-person viewmodel rig (parse + shader-warm) and every
   // third-person held-weapon prop (shader-warm + dispose the copy).
-  // Skip index 0: the equipped weapon's LIVE viewmodel rig is already instantiated
-  // (Simulator constructs weapons[0] before preload runs), so warming it would put a
-  // second skeleton of the same rig in the scene alongside the live one — the exact
-  // duplicate-skeleton cross-wire Babylon 4.0.3 forbids (only the equipped rig may
-  // exist). The live rig's own import already warmed its shader + browser cache.
+  // Skip the spawn weapon: the equipped weapon's LIVE viewmodel rig is already
+  // instantiated (Simulator constructs weapons[SPAWN_WEAPON_INDEX] before preload
+  // runs), so warming it would put a second skeleton of the same rig in the scene
+  // alongside the live one — the exact duplicate-skeleton cross-wire Babylon 4.0.3
+  // forbids (only the equipped rig may exist). The live rig's own import already
+  // warmed its shader + browser cache.
   weapons.forEach((spec, i) => {
-    if (i !== 0 && spec && spec.url) {
+    if (i !== SPAWN_WEAPON_INDEX && spec && spec.url) {
       items.push({ w: 2, stage: 'WEAPONS', run: () => warmViewmodel(scene, spec) })
     }
   })

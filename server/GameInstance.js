@@ -32,9 +32,12 @@ import {
 	REST_HEIGHT, ARMOR_PICKUP, ARMOR_CAP, ARMOR_ABSORB,
 	UDAMAGE_MULT, UDAMAGE_SECONDS, DROP_DESPAWN_SECONDS, DROP_JITTER,
 } from '../common/pickupConfig'
-import { weapons, DEFAULT_ZONE_MULTIPLIERS } from '../common/weaponsConfig'
+import { weapons, DEFAULT_ZONE_MULTIPLIERS, SPAWN_WEAPON_INDEX } from '../common/weaponsConfig'
 import { PLAYER_NAMES } from '../common/playerNames'
 import BotController from './BotController'
+import AgentBotController from './AgentBotController'
+import AgentGateway from './AgentGateway'
+import BloodLedger from './BloodLedger'
 
 import * as BABYLON from '../common/babylon.node.js'
 import { OBJFileLoader } from '../common/babylon.node.js' // OBJ loader (server-side collision) via node barrel
@@ -311,6 +314,20 @@ class GameInstance {
 		// damage so you can frag them and watch death anims while wandering unkillable.
 		this._godmode = process.env.GODMODE === '1' || process.env.GODMODE === 'true'
 		if (this._godmode) console.log('[GODMODE] real players are immortal')
+
+		// PROOF OF BLOOD: server-side block engine — players mine $BLOOD with
+		// hashpower earned in combat (kills; objective events when modes exist).
+		// Blocks close on wall clock (BLOOD_BLOCK_MS overrides the 10-min default
+		// for testing only); state persists in data/blood-ledger.json.
+		this.bloodLedger = new BloodLedger({ dataDir: 'data' })
+
+		// FRAGBENCH v0: the sanctioned-agent endpoint (FRAGBENCH=1 to enable). External
+		// strategist processes drive real PlayerCharacters through AgentBotController —
+		// same authority path as every bot/human. See server/AgentGateway.js.
+		this.agentGateway = null
+		if (process.env.FRAGBENCH === '1' || process.env.FRAGBENCH === 'true') {
+			this.agentGateway = new AgentGateway(this)
+		}
 
 		this.instance.on('connect', ({ client, callback }) => {
 			// PER player-related state, attached to clients
@@ -855,11 +872,10 @@ class GameInstance {
 	// are server-only. Returns the count dropped (for the kill log). `now` is wall-clock ms.
 	dropWeaponsOnDeath(raw, now) {
 		if (!raw || !raw.weaponsState) return 0
-		const PISTOL = 3
 		const despawnMs = DROP_DESPAWN_SECONDS * 1000
 		let count = 0
 		for (let wi = 0; wi < weapons.length; wi++) {
-			if (wi === PISTOL) continue
+			if (wi === SPAWN_WEAPON_INDEX) continue // the spawn pistol never drops
 			if (!(raw.ownedWeapons & (1 << wi))) continue
 			const st = raw.weaponsState[wi]
 			const carriedMag = st ? (st.magazineAmmo || 0) : 0
@@ -1011,6 +1027,44 @@ class GameInstance {
 		entity.client = handle // hitscan victims resolve to their owner via .client
 		this.bots.push(handle)
 		console.log(`Bot ${entity.nid} joined with ${weapons[entity.currentWeaponIndex].name}`)
+	}
+
+	// FRAGBENCH v0: an agent bot is a regular bot handle whose controller accepts
+	// external strategist intent (AgentBotController). It lives in this.bots so every
+	// existing path — think loop, respawn, teams, match scoring — treats it identically.
+	addAgentBot(label) {
+		const entity = new PlayerCharacter()
+		entity.mesh.checkCollisions = true
+		entity.teamId = this.assignTeam()
+		const spawn = this.spawnPoint(entity.teamId)
+		entity.x = spawn.x
+		entity.y = spawn.y || 0
+		entity.z = spawn.z
+		// same contract as addBot: agents own the full arsenal (they can't reach
+		// pickups reliably in v0 — pickup routing is a deferred intent verb)
+		entity.currentWeaponIndex = 0
+		entity.ownedWeapons = PlayerCharacter.ALL_WEAPONS
+		entity.weaponsState.forEach((state, i) => {
+			state.magazineAmmo = weapons[i].magazineCapacity
+			state.reserveAmmo = weapons[i].maxReserveAmmo
+		})
+		entity.nameIndex = this._nameCounter++ % PLAYER_NAMES.length
+		this.instance.addEntity(entity)
+		const handle = { bot: true, agent: true, rawEntity: entity, smoothEntity: entity, respawnAt: null }
+		handle.controller = new AgentBotController(entity, entity.currentWeaponIndex)
+		handle.controller.agentLabel = label
+		entity.client = handle
+		this.bots.push(handle)
+		console.log(`[fragbench] agent "${label}" joined as nid ${entity.nid}`)
+		return handle
+	}
+
+	removeAgentBot(handle) {
+		const i = this.bots.indexOf(handle)
+		if (i === -1) return
+		this.bots.splice(i, 1)
+		this.instance.removeEntity(handle.rawEntity)
+		console.log(`[fragbench] agent "${handle.controller.agentLabel}" left (nid ${handle.rawEntity.nid})`)
 	}
 
 	// every living entity `except` could fight: human raw entities + bots
@@ -1335,6 +1389,22 @@ class GameInstance {
 		return this.viewBoxFrom(min, max)
 	}
 
+	// PROOF OF BLOOD name resolution — the ledger keys balances by a stable display
+	// name: humans by their callsign (_humanNames, keyed by smooth nid; fallback
+	// PLAYER-<nid> if they never sent one), bots by their roster name, FragBench
+	// agents by 'agent:<label>' so benchmark earnings stay attributable per model.
+	_bloodName(client) {
+		if (!client || !client.smoothEntity) return null
+		if (client.bot) {
+			if (client.agent && client.controller && client.controller.agentLabel) {
+				return 'agent:' + client.controller.agentLabel
+			}
+			const name = PLAYER_NAMES[client.smoothEntity.nameIndex]
+			return name || ('PLAYER-' + client.smoothEntity.nid)
+		}
+		return this._humanNames.get(client.smoothEntity.nid) || ('PLAYER-' + client.smoothEntity.nid)
+	}
+
 	// Canonical damage: a player's authoritative hitpoints live on the CLIENT's
 	// pair of entities and must move in lockstep — the victim reads their own
 	// rawEntity (private channel), everyone else reads the smoothEntity. Applying
@@ -1446,6 +1516,12 @@ class GameInstance {
 				const ak = Math.min(255, attackerClient.rawEntity.kills + 1)
 				attackerClient.rawEntity.kills = ak
 				attackerClient.smoothEntity.kills = ak
+				// PROOF OF BLOOD: every credited frag is 100 hashpower toward the
+				// current block (same self-kill gate as the kills stat — a suicide
+				// mines nothing). Objective hashes (CTF/DOM) wire in when those
+				// modes exist; only DM/TDM/FFA are live today, so kills-only is v0.
+				const killerName = this._bloodName(attackerClient)
+				if (killerName) this.bloodLedger.recordHash(killerName, 100, 'kill')
 			}
 
 			// Mode-aware frag scoring (TDM team score / FFA individual). Also drives the
@@ -1516,7 +1592,7 @@ class GameInstance {
 			})
 			// a respawn always re-equips the pistol so a human never spawns holding a
 			// weapon they no longer own (which fire()/switch would then refuse).
-			if (!client.bot) entity.currentWeaponIndex = 3
+			if (!client.bot) entity.currentWeaponIndex = SPAWN_WEAPON_INDEX
 		}
 		// the client ignores server x/y/z for its own entity (it predicts them),
 		// so hand the teleport over explicitly — same contract as Identity's spawn.
@@ -1732,6 +1808,9 @@ class GameInstance {
 
 		// respawn any players whose death timer has run out
 		const wallNow = Date.now()
+		// PROOF OF BLOOD: advance the block clock every tick (closes + persists
+		// blocks internally when the wall-clock window elapses)
+		this.bloodLedger.tick(wallNow)
 		this.instance.clients.forEach(client => {
 			if (client.respawnAt && wallNow >= client.respawnAt) {
 				client.respawnAt = null

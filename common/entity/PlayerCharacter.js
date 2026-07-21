@@ -1,14 +1,14 @@
 import nengi from 'nengi'
 import * as BABYLON from '../babylon.node.js'
-import { weapons } from '../weaponsConfig'
+import { weapons, SPAWN_WEAPON_INDEX } from '../weaponsConfig'
 
 const red = new BABYLON.Color4(1, 0, 0)
 const blue = new BABYLON.Color4(0, 0, 1)
 const faceColors = [red, blue, blue, blue, blue, blue]
 
-// Spawn loadout: pistol only (roster index 3). One place the "start with the pistol"
-// rule lives — GameInstance.respawnPlayer resets to this too.
-const PISTOL_ONLY = 1 << 3
+// Spawn loadout: pistol only (SPAWN_WEAPON_INDEX). One place the "start with the
+// pistol" rule lives — GameInstance.respawnPlayer resets to this too.
+const PISTOL_ONLY = 1 << SPAWN_WEAPON_INDEX
 
 class PlayerCharacter {
 	constructor() {
@@ -99,7 +99,10 @@ class PlayerCharacter {
 		// Modular weapons state. Non-owned weapons start with ZERO ammo (magazine +
 		// reserve) so an ownership bug can never leak firepower; a weapon pickup refills
 		// its own weapon on grant (GameInstance.updatePickups).
-		this.currentWeaponIndex = 0
+		// Equip the pistol (the one owned weapon) — index 0 is the rifle, which a fresh
+		// spawn doesn't own, so equipping it meant holding an empty gun on first join.
+		// respawnPlayer already re-equips this index; this makes first spawn match.
+		this.currentWeaponIndex = SPAWN_WEAPON_INDEX
 		this.weaponsState = weapons.map((w, i) => {
 			const owned = (this.ownedWeapons & (1 << i)) !== 0
 			return {

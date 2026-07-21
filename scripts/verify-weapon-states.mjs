@@ -89,7 +89,11 @@ try {
       holders: holders.length,
       enabledHolders: holders.filter((n) => n.isEnabled()).length,
       muzzles: scene.transformNodes.filter((n) => n.name === 'muzzle' && live(n)).length,
-      ghosts: vmMeshes.filter((m) => m.isEnabled() && !underLiveHolder(m)).length,
+      // a ghost must be actually RENDERING (isVisible + non-faded). isEnabled() alone
+      // over-counts: pooled muzzle/glow FX sprites keep the vm layerMask after their
+      // flash fades (only isVisible resets), and the vmLightAnchor is a permanently
+      // invisible helper — neither draws a single pixel.
+      ghosts: vmMeshes.filter((m) => m.isEnabled() && m.isVisible && m.visibility > 0.02 && !underLiveHolder(m)).length,
       skeletons: scene.skeletons.length,
       animationGroups: scene.animationGroups.length,
       materials: scene.materials.length,
@@ -115,6 +119,19 @@ try {
   // let any in-flight plasma bolts (lifeTime 3s) expire so their materials don't
   // count as a rig leak
   const clearProjectiles = async () => { for (let i = 0; i < 25; i++) { if ((await stats()).projectiles === 0) return; await sleep(200) } }
+
+  // UT-STYLE OWNERSHIP: a fresh spawn owns only the pistol, and switchWeapon refuses
+  // unowned slots — which would silently no-op every swap below and shrink the suite
+  // to pistol-only. Grant the full arsenal + ammo CLIENT-side: ownedWeapons is
+  // down-only and nengi only re-sends on server-side change (which never happens
+  // here — no pickups are touched), so the override sticks for the whole run. The
+  // server still refuses the unowned fire/switch commands, which is fine — this
+  // suite exercises the client-side visual FSM, not server hit resolution.
+  await page.evaluate(() => {
+    const raw = window.gameClient.simulator.myRawEntity
+    raw.ownedWeapons = (1 << raw.weaponsState.length) - 1
+    raw.weaponsState.forEach((st) => { st.magazineAmmo = Math.max(st.magazineAmmo, 30); st.reserveAmmo = Math.max(st.reserveAmmo, 90) })
+  })
 
   // warm up lazy resources (shadow RTT) before capturing baselines
   const stableTex = async () => { let p = -1; for (let i = 0; i < 40; i++) { const n = (await stats()).textures; if (n === p) return; p = n; await sleep(200) } }

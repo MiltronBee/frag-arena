@@ -61,6 +61,11 @@ export const DEFAULT_ZONE_MULTIPLIERS = {
   legs: LEG_DAMAGE_MULT
 }
 
+// The one weapon a fresh spawn owns AND holds (the pistol). Single source of truth
+// for PlayerCharacter's constructor, respawnPlayer, the client's initial viewmodel,
+// and the asset preloader's "don't double-warm the live rig" skip.
+export const SPAWN_WEAPON_INDEX = 3
+
 export const weapons = [
   {
     index: 0,
