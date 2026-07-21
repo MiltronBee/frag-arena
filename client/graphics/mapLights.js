@@ -19,7 +19,11 @@ const TYPE_WEIGHT = { Steady: 1, Pulse: 0.75, SubtlePulse: 0.85, Blink: 0.5, Str
 export const LIGHT_AMBIENT = 0.25 // floor so unlit BSP never goes pitch black
 export const LIGHT_GAIN = 0.8
 
-export function bakeVertexColors(positions, normals, lights, ambient = LIGHT_AMBIENT, gain = LIGHT_GAIN) {
+// `occlude` (optional) is the OFFLINE bake hook (scripts/bake-map-lighting.mjs):
+// occlude(vertexIndex, px,py,pz, nx,ny,nz, lightEntry, dist) -> true means a shadow
+// ray from the vertex to that light hit level geometry, so the light contributes 0.
+// The runtime (client) bake passes nothing and keeps the distance-only behaviour.
+export function bakeVertexColors(positions, normals, lights, ambient = LIGHT_AMBIENT, gain = LIGHT_GAIN, occlude = null) {
 	const count = positions.length / 3
 	const out = new Float32Array(count * 4)
 	const L = []
@@ -43,6 +47,7 @@ export function bakeVertexColors(positions, normals, lights, ambient = LIGHT_AMB
 			const d2 = dx * dx + dy * dy + dz * dz
 			if (d2 >= l.r * l.r) continue
 			const d = Math.sqrt(d2)
+			if (occlude !== null && occlude(i, px, py, pz, nx, ny, nz, l, d)) continue
 			const att = 1 - d / l.r
 			// soft incidence: faces turned away keep a 0.35 bounce floor so thin
 			// walls don't split into day/night halves at shared edges

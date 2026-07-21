@@ -147,6 +147,24 @@ class BABYLONRenderer {
 		this.scene.activeCameras = [this.camera, this.vmCamera]
 		this.scene.cameraToUseForPointers = this.camera // Route pointer events through main camera
 
+		// 2030 post: FXAA + a whisper of bloom (DefaultRenderingPipeline, non-HDR so it
+		// stays one cheap pass). DESKTOP ONLY — mobile keeps the zero-cost material-level
+		// grading above; a fullscreen post chain is exactly the fill-rate jank the
+		// 2026-07-17 renderer reverts taught us to avoid on phones. Threshold is high and
+		// weight low: bloom lifts muzzle flashes, coronas and emissives, never the walls.
+		try {
+			const isTouch = 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0
+			if (!isTouch) {
+				const post = new BABYLON.DefaultRenderingPipeline('post2030', false, this.scene, [this.camera, this.vmCamera])
+				post.fxaaEnabled = true
+				post.bloomEnabled = true
+				post.bloomThreshold = 0.85
+				post.bloomWeight = 0.18
+				post.bloomKernel = 48
+				post.bloomScale = 0.5
+			}
+		} catch (e) { console.warn('[post] pipeline unavailable', e) }
+
 		// --- lighting: UT99-style dusk arena — a dim cool ambient so shadow sides
 		// stay dark and readable, under a hard warm key light (low sun / sodium
 		// floodlight feel). Contrast carries the mood; the FX are the bright thing.
@@ -549,18 +567,76 @@ class BABYLONRenderer {
 			const resp = await fetch(this.map.dir + this.map.lights)
 			if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
 			const data = await resp.json()
-			let baked = 0
-			meshes.forEach(m => {
-				if (!m.getTotalVertices || m.getTotalVertices() === 0) return
-				const pos = m.getVerticesData(BABYLON.VertexBuffer.PositionKind)
-				const nor = m.getVerticesData(BABYLON.VertexBuffer.NormalKind)
-				if (!pos || !nor) return
-				m.setVerticesData(BABYLON.VertexBuffer.ColorKind, bakeVertexColors(pos, nor, data.lights))
-				baked++
-			})
-			console.log(`[map] baked ${data.lights.length} light actors into ${baked} meshes`)
+			// OFFLINE bake first (scripts/bake-map-lighting.mjs): same accumulation math
+			// as bakeVertexColors PLUS per-light shadow rays + hemisphere AO, precomputed
+			// into a <objbase>.vertexlight.json sidecar (quantized Uint8 rgb, base64).
+			// Applied ONLY if every vertexed mesh matches by name + vertexCount (in load
+			// order); any mismatch/missing sidecar warns and falls back to the runtime
+			// distance-only bake below, so a stale bake can never mis-color a re-export.
+			let usedBaked = false
+			try {
+				const lit = meshes.filter(m => m.getTotalVertices && m.getTotalVertices() > 0)
+				const bresp = await fetch(this.map.dir + this.map.file.replace(/\.obj$/i, '') + '.vertexlight.json')
+				if (bresp.ok) {
+					const bake = await bresp.json()
+					const ok = bake && bake.version === 1 && Array.isArray(bake.meshes)
+						&& bake.meshes.length === lit.length
+						&& bake.meshes.every((bm, i) => bm.name === lit[i].name && bm.vertexCount === lit[i].getTotalVertices())
+					if (!ok) throw new Error('sidecar does not match OBJ meshes (stale bake?)')
+					bake.meshes.forEach((bm, i) => {
+						const bytes = Uint8Array.from(atob(bm.rgb), ch => ch.charCodeAt(0))
+						// 4-component ColorKind, alpha 1 — same buffer format bakeVertexColors returns.
+						const cols = new Float32Array(bm.vertexCount * 4)
+						for (let v = 0; v < bm.vertexCount; v++) {
+							cols[v * 4] = bytes[v * 3] / 255
+							cols[v * 4 + 1] = bytes[v * 3 + 1] / 255
+							cols[v * 4 + 2] = bytes[v * 3 + 2] / 255
+							cols[v * 4 + 3] = 1
+						}
+						lit[i].setVerticesData(BABYLON.VertexBuffer.ColorKind, cols)
+					})
+					usedBaked = true
+					this._vertexlightApplied = true // headless verify hook (_verify-map-cycle.mjs)
+					console.log(`[map] applied offline vertex-light bake (shadow+AO) to ${lit.length} meshes`)
+				}
+			} catch (err) { console.warn('[map] offline vertex-light bake unusable, using runtime bake', err) }
+			if (!usedBaked) {
+				let baked = 0
+				meshes.forEach(m => {
+					if (!m.getTotalVertices || m.getTotalVertices() === 0) return
+					const pos = m.getVerticesData(BABYLON.VertexBuffer.PositionKind)
+					const nor = m.getVerticesData(BABYLON.VertexBuffer.NormalKind)
+					if (!pos || !nor) return
+					m.setVerticesData(BABYLON.VertexBuffer.ColorKind, bakeVertexColors(pos, nor, data.lights))
+					baked++
+				})
+				console.log(`[map] baked ${data.lights.length} light actors into ${baked} meshes`)
+			}
 			this._addLightCoronas(data.lights, mapRoot)
+			this._deriveAtmosphere(data.lights)
 		} catch (err) { console.warn('[map] light bake failed (map stays unlit-shaded)', err) }
+	}
+
+	// PER-MAP ATMOSPHERE, derived not authored: tint the global fog + clear color
+	// toward the map's own average light-actor color (brightness-weighted, colored
+	// actors only) at the SAME dark luminance as the base slate. Every map gets a
+	// distinct mood — Grove reads warm, a crypt reads cold — with zero registry data
+	// and no risk of the too-dark fog regression (luminance is pinned, only hue moves).
+	_deriveAtmosphere(lights) {
+		const colored = lights.filter(l => l.rgb && (l.rgb[0] !== 1 || l.rgb[1] !== 1 || l.rgb[2] !== 1) && l.brightness > 0)
+		if (colored.length < 3) return // near-all-white map: keep the neutral slate
+		let r = 0, g = 0, b = 0, w = 0
+		for (const l of colored) { const k = l.brightness; r += l.rgb[0] * k; g += l.rgb[1] * k; b += l.rgb[2] * k; w += k }
+		r /= w; g /= w; b /= w
+		const lum = Math.max(0.2126 * r + 0.7152 * g + 0.0722 * b, 0.001)
+		const target = 0.062 // the base slate's luminance — hue shifts, value doesn't
+		const MIX = 0.55
+		const base = [0.05, 0.05, 0.08]
+		const tint = [r / lum * target, g / lum * target, b / lum * target]
+		const c = base.map((v, i) => v * (1 - MIX) + tint[i] * MIX)
+		this.scene.fogColor = new BABYLON.Color3(c[0], c[1], c[2])
+		this.scene.clearColor = new BABYLON.Color3(c[0], c[1], c[2])
+		console.log(`[map] atmosphere derived from ${colored.length} colored actors: rgb(${c.map(v => v.toFixed(3)).join(', ')})`)
 	}
 
 	// Retro-style coronas: an additive billboard glow at each interesting light actor
@@ -615,6 +691,10 @@ class BABYLONRenderer {
 			mat.opacityTexture = glowTex
 			mat.disableLighting = true
 			mat.backFaceCulling = false
+			// alpha < 1 forces the alpha-blend render path — without it Babylon 9 keeps
+			// the mesh in the opaque pass and the ALPHA_ADD mode never applies (the
+			// bisected "corona renders nothing" bug from textureHandoff.md)
+			mat.alpha = 0.9999
 			mat.alphaMode = BABYLON.Engine.ALPHA_ADD
 			mat.disableDepthWrite = true
 			const c = l.rgb || [1, 1, 1]
