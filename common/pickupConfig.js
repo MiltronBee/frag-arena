@@ -83,6 +83,30 @@ export const PICKUP_RADIUS = 2.2
 // "about to return" tell — mirrors the mega's CHARGE_LEAD.
 export const CHARGE_LEAD_SECONDS = 5
 
+// ── ARMOR (make the placed armor pickups work) ───────────────────────────────────
+// Grant on touch and the green-armor damage split (server/GameInstance.damagePlayer).
+// ARMOR_ABSORB is the fraction of an incoming (post-zone, post-UDamage) hit the armor
+// soaks until depleted; the rest hits hp. Classic Quake green armor = 0.5. Tunable.
+export const ARMOR_PICKUP = 100 // +armor granted per body-armor pickup
+export const ARMOR_CAP = 150    // max armor a player can hold (matches PlayerCharacter UInt8 range)
+export const ARMOR_ABSORB = 0.5 // armor soaks this fraction of each hit until depleted
+
+// ── UDAMAGE (make the placed powerup pickups work) ───────────────────────────────
+// A powerup pickup grants a timed outgoing-damage buff. While the ATTACKER's timer is
+// live, damagePlayer multiplies the (already zone-scaled) outgoing damage by UDAMAGE_MULT.
+// Stacks with headshots (UT behaviour) — flagged for tuning.
+export const UDAMAGE_MULT = 2.0     // outgoing-damage multiplier while active
+export const UDAMAGE_SECONDS = 30   // buff duration (seconds) from pickup
+
+// ── WEAPON DROP-ON-DEATH ─────────────────────────────────────────────────────────
+// On death a player drops each owned non-pistol weapon as a Pickup carrying its current
+// ammo (server-only fields on the entity; renders as a normal WEAPON pickup so no client
+// factory change is needed). Drops DESPAWN after DROP_DESPAWN_SECONDS (Quake-lineage 30s;
+// UT never despawns = clutter) and never respawn. XZ jitter keeps a multi-weapon drop
+// from stacking on one point.
+export const DROP_DESPAWN_SECONDS = 30
+export const DROP_JITTER = 0.5 // ±metres of XZ scatter per dropped weapon
+
 // ── Client model URLs per type (see client/factories/createFactories.js) ─────────
 // Weapon pickups pick a third-person weapon model by roster index; Plasma reuses the
 // rifle silhouette and Flak the shotgun (no bespoke tp_ model for those two yet).

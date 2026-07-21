@@ -555,6 +555,107 @@ body.overheal #health-fill {
 body.overheal .health-track { border-color: rgba(255, 191, 63, 0.55); }
 body.overheal #health-value { color: var(--hud-over); text-shadow: 0 0 10px rgba(255, 191, 63, 0.6); }
 
+/* ---- Pickup FF: ARMOR bar (under the health track) ----------------------------
+   A slim cyan/steel bar + numeral, hidden until the player actually has armor
+   (Simulator toggles body.has-armor). Green-armor soaks 50% of incoming damage. */
+#armor-row {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+body.has-armor #armor-row { display: flex; }
+#armor-value {
+    font-family: var(--font-numeral);
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 1;
+    color: #8fd7ff;
+    text-shadow: var(--text-shadow-hud);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    min-width: 1.6em;
+    text-align: right;
+}
+.armor-unit {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--bone-dim);
+}
+.armor-track {
+    position: relative;
+    flex: 1;
+    height: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(120, 200, 255, 0.28);
+    background: rgba(120, 200, 255, 0.08);
+}
+#armor-fill {
+    position: absolute;
+    inset: 0;
+    display: block;
+    transform-origin: left center;
+    transform: scaleX(0);
+    will-change: transform;
+    background: linear-gradient(90deg, #4fa8e0, #9fe0ff);
+    box-shadow: 0 0 8px rgba(120, 200, 255, 0.5);
+    transition: transform 120ms ease;
+}
+
+/* ---- Pickup FF: UDAMAGE powerup buff -------------------------------------------
+   A magenta badge + countdown top-centre, plus a full-screen edge tint, both shown
+   only while body.udamage-active (Simulator drives the timer text + the class). */
+#udamage-badge {
+    display: none;
+    position: absolute;
+    top: 96px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    border: 1px solid rgba(210, 90, 255, 0.55);
+    background: rgba(60, 8, 80, 0.4);
+    box-shadow: 0 0 14px rgba(210, 90, 255, 0.45);
+    pointer-events: none;
+}
+body.udamage-active #udamage-badge { display: flex; }
+#udamage-badge .ud-label {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    color: #f0b8ff;
+    text-shadow: 0 0 8px rgba(210, 90, 255, 0.7);
+}
+#udamage-timer {
+    font-family: var(--font-numeral);
+    font-weight: 700;
+    font-size: 15px;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+}
+#udamage-tint {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 200ms ease;
+    box-shadow: inset 0 0 160px rgba(190, 60, 255, 0.28);
+}
+body.udamage-active #udamage-tint {
+    opacity: 1;
+    animation: udamage-pulse 1.4s ease-in-out infinite;
+}
+@keyframes udamage-pulse {
+    0%, 100% { box-shadow: inset 0 0 120px rgba(190, 60, 255, 0.22); }
+    50%      { box-shadow: inset 0 0 190px rgba(190, 60, 255, 0.36); }
+}
+
 /* small weapon-name label (Halo puts the class name quietly above the count) */
 #weapon-name {
     font-family: var(--font-display);

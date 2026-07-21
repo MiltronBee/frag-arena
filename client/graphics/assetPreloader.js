@@ -1,6 +1,7 @@
 import { assets, weapons, tpWeapons } from '../assets/assetManifest'
 import { warmViewmodel } from './Viewmodel'
 import { warmProp, warmBody } from './CharacterModel'
+import { WEAPON_MODEL_URL, AMMO_MODEL_URL } from '../../common/pickupConfig'
 
 // FULL PRELOAD GATE — the arena is not enterable until EVERY asset is actually
 // imported (GLBs parsed, not merely fetched) and GPU-warmed (materials/shaders
@@ -100,6 +101,19 @@ export default function preloadAssets(renderer, arenaReadyPromise, onProgress) {
   // grenade so the first in-match mount (createFactories' MegaHealthPickup factory,
   // via loadPropTemplate) hits the warm browser cache + compiled shader with no hitch.
   items.push({ w: 0.5, stage: 'EFFECTS', run: () => warmProp(scene, '/assets/props/Prop_HealthPack.gltf') })
+
+  // EFFECTS — UT-STYLE PICKUP models. The on-floor weapon pickups (tp_*.glb) and the
+  // ammo box (Prop_Ammo) previously popped in on first sight — they weren't in any warm
+  // pass. Warm each UNIQUE weapon-pickup model (Plasma/Flak reuse Rifle/Shotgun, so the
+  // Set dedupes to 4 files) plus the ammo box behind the gate, so the first pickup mount
+  // (createFactories.attachPickupModel via loadPropTemplate) hits a warm browser cache +
+  // compiled shader with zero ImportMesh hitch. Health (Prop_HealthPack) is already warmed
+  // above; the drop-on-death weapons reuse these same tp_*.glb models. Non-fatal on miss.
+  const pickupModelUrls = new Set(Object.values(WEAPON_MODEL_URL))
+  pickupModelUrls.add(AMMO_MODEL_URL)
+  pickupModelUrls.forEach((url) => {
+    items.push({ w: 0.3, stage: 'EFFECTS', run: () => warmProp(scene, url) })
+  })
 
   // FINALIZING — resolve UI fonts (labeled generically so the last stage the
   // player sees reads as "wrapping up").

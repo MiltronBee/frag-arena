@@ -19,6 +19,20 @@ class PlayerCharacter {
 		this.hitpoints = 100
 		this.isAlive = true
 
+		// UT-STYLE ARMOR (server-authoritative). 0..ARMOR_CAP(150). Absorbs a fixed
+		// fraction of each incoming hit in damagePlayer (green-armor model) until
+		// depleted. Networked (UInt8) so the local player's HUD can draw an armor bar;
+		// set on raw+smooth in lockstep like hitpoints. Reset to 0 on respawn/death.
+		this.armor = 0
+
+		// UT UDAMAGE powerup timer (seconds remaining). While > 0, the player's OUTGOING
+		// damage is multiplied (UDAMAGE_MULT) in damagePlayer. Server-decremented in
+		// GameInstance.update (outside the reconciled applyCommand path, like the grenade
+		// timers) and networked (Float32) so the client renders the buff (HUD countdown +
+		// screen tint on self, glow on others). Set on raw+smooth in lockstep; cleared on
+		// respawn.
+		this.udamageTimer = 0
+
 		// Phase 4 mega-health OVERHEAL decay (server-only, NOT networked — the decay
 		// runs server-side in GameInstance.update and the resulting hitpoints ARE
 		// networked). While hitpoints > 100, HP decays 2/sec, but only AFTER this
@@ -136,6 +150,8 @@ PlayerCharacter.protocol = {
 	velZ: nengi.Float32,
 	isAlive: nengi.Boolean,
 	hitpoints: nengi.UInt8,
+	armor: nengi.UInt8,
+	udamageTimer: nengi.Float32,
 	slowTimer: nengi.Float32,
 	currentWeaponIndex: nengi.UInt8,
 	ownedWeapons: nengi.UInt8,

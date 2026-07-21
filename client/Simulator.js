@@ -1,3 +1,4 @@
+import * as BABYLON from './babylon.js'
 import BABYLONRenderer from './graphics/BABYLONRenderer'
 import InputSystem from './InputSystem'
 import MoveCommand from '../common/command/MoveCommand'
@@ -869,6 +870,52 @@ class Simulator {
 		}
 	}
 
+	// Pickup FF: glow every OTHER player currently holding UDamage (their networked
+	// udamageTimer > 0) magenta, via a lazily-created GlowLayer (the only selective-glow
+	// layer the client/babylon.js barrel re-exports). A `customEmissiveColorSelector`
+	// paints only the buffed players' meshes (tracked in _udGlowMeshes) regardless of
+	// their material's own emissive, so no material is mutated. The layer is created only
+	// when someone is buffed and DISPOSED the moment nobody is, so there is zero glow-pass
+	// cost in the common case. Reads CharacterModel.meshes read-only (no CharacterModel
+	// edit). Fully cosmetic + wrapped: a failure here never affects gameplay.
+	_updateBuffGlow() {
+		try {
+			const models = this.characterModels
+			if (!this._udGlowMeshes) this._udGlowMeshes = new Set()
+			const glowSet = this._udGlowMeshes
+
+			// rebuild the set of buffed remote-player meshes this frame (membership only
+			// really changes on a buff start/stop, so this is a cheap map walk).
+			glowSet.clear()
+			if (models) {
+				for (const [nid, model] of models) {
+					if (nid === this.myRawId || nid === this.mySmoothId) continue
+					if (!model || !model.meshes) continue
+					const ent = this.client.entities.get ? this.client.entities.get(nid) : null
+					if (ent && (ent.udamageTimer || 0) > 0) model.meshes.forEach((m) => glowSet.add(m))
+				}
+			}
+
+			if (glowSet.size === 0) {
+				// nobody buffed — tear the layer down so its render pass stops entirely
+				if (this._udGlowLayer) { this._udGlowLayer.dispose(); this._udGlowLayer = null }
+				return
+			}
+			if (!this._udGlowLayer) {
+				const scene = this.renderer && this.renderer.scene
+				if (!scene) return
+				this._udGlowColor = new BABYLON.Color4(0.78, 0.28, 1.0, 1)
+				const layer = new BABYLON.GlowLayer('udGlow', scene, { blurKernelSize: 24 })
+				layer.intensity = 1.4
+				layer.customEmissiveColorSelector = (mesh, _sub, _mat, result) => {
+					if (glowSet.has(mesh)) result.set(this._udGlowColor.r, this._udGlowColor.g, this._udGlowColor.b, 1)
+					else result.set(0, 0, 0, 0)
+				}
+				this._udGlowLayer = layer
+			}
+		} catch (e) { /* cosmetic buff glow — never fatal */ }
+	}
+
 	// the model's authored (attach-time) uniform scale, cached the first time we see
 	// it so CHARGING scale-in can lerp from it without re-measuring the bbox.
 	_megaBaseScale(model) {
@@ -1403,6 +1450,11 @@ class Simulator {
 		// Phase 4: mega-health pickup bob/spin/glow + hum tell (off networked state)
 		this._updateMegaHealth()
 
+		// Pickup FF: outline OTHER players who hold the UDamage buff (off their networked
+		// udamageTimer). Cheap — a lazily-created HighlightLayer whose membership only
+		// changes on a buff start/stop (tracked in _udGlowNids), not per frame.
+		this._updateBuffGlow()
+
 		// UT-STYLE PICKUPS: mirror our own weapon/ammo refill off networked state
 		// (ownedWeapons + pickup transitions), then bob/spin the visible items.
 		this._syncOwnershipRefill()
@@ -1861,6 +1913,35 @@ class Simulator {
 			}
 		}
 		this._lastHealth = health
+
+		// Pickup FF: ARMOR bar (green-armor, 0..150). Networked UInt8 on the local raw
+		// entity; the bar fills 0..1 over 0..ARMOR_CAP and body.has-armor reveals the row.
+		const armor = Math.max(0, Math.min(150, this.myRawEntity.armor || 0))
+		if (armor !== this._lastArmor) {
+			this._lastArmor = armor
+			const armorValue = document.getElementById('armor-value')
+			if (armorValue) armorValue.textContent = Math.round(armor)
+			const armorFill = document.getElementById('armor-fill')
+			if (armorFill) armorFill.style.transform = `scaleX(${Math.min(1, armor / 150)})`
+			document.body.classList.toggle('has-armor', armor > 0)
+		}
+
+		// Pickup FF: UDAMAGE buff (2x outgoing damage). udamageTimer is networked seconds
+		// on the local raw entity; show a countdown badge + screen tint while it's live.
+		const ud = this.myRawEntity.udamageTimer || 0
+		const udActive = ud > 0
+		if (udActive !== this._lastUdActive) {
+			this._lastUdActive = udActive
+			document.body.classList.toggle('udamage-active', udActive)
+		}
+		if (udActive) {
+			const udSecs = Math.ceil(ud)
+			if (udSecs !== this._lastUdSecs) {
+				this._lastUdSecs = udSecs
+				const udEl = document.getElementById('udamage-timer')
+				if (udEl) udEl.textContent = udSecs + 's'
+			}
+		}
 
 		const dead = this.myRawEntity.isAlive === false
 		document.body.classList.toggle('player-dead', dead)

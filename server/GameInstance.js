@@ -26,7 +26,12 @@ import Grenade from '../common/entity/Grenade'
 import MegaHealthPickup, { MEGA_STATE } from '../common/entity/MegaHealthPickup'
 import MatchState, { MATCH_PHASE, MATCH_WINNER } from '../common/entity/MatchState'
 import setupPickups from './setupPickups'
-import { PICKUP_TYPE, PICKUP_RADIUS, CHARGE_LEAD_SECONDS, HEALTH_HEAL, HEALTH_CAP } from '../common/pickupConfig'
+import Pickup from '../common/entity/Pickup'
+import {
+	PICKUP_TYPE, PICKUP_RADIUS, CHARGE_LEAD_SECONDS, HEALTH_HEAL, HEALTH_CAP,
+	REST_HEIGHT, ARMOR_PICKUP, ARMOR_CAP, ARMOR_ABSORB,
+	UDAMAGE_MULT, UDAMAGE_SECONDS, DROP_DESPAWN_SECONDS, DROP_JITTER,
+} from '../common/pickupConfig'
 import { weapons, DEFAULT_ZONE_MULTIPLIERS } from '../common/weaponsConfig'
 import { PLAYER_NAMES } from '../common/playerNames'
 import BotController from './BotController'
@@ -775,7 +780,29 @@ class GameInstance {
 		for (const b of this.bots) targets.push(b)
 
 		const R2 = PICKUP_RADIUS * PICKUP_RADIUS
+		let removed = false
 		for (const pk of list) {
+			if (pk._removed) continue
+			// DROP-ON-DEATH weapons: no respawn clock — they either get grabbed or DESPAWN
+			// at pk.despawnAt (30s). Removed from the world entirely on grab/despawn so the
+			// client deletes the mesh (map pickups only ever HIDE via `state`).
+			if (pk.isDrop) {
+				if (now >= pk.despawnAt) {
+					this.instance.removeEntity(pk); pk._removed = true; removed = true
+					continue
+				}
+				for (const c of targets) {
+					const raw = c.rawEntity
+					if (!raw || !raw.isAlive) continue
+					const dx = raw.x - pk.x, dy = raw.y - pk.y, dz = raw.z - pk.z
+					if (dx * dx + dy * dy + dz * dz > R2) continue
+					if (this.grantPickup(c, pk)) {
+						this.instance.removeEntity(pk); pk._removed = true; removed = true
+						break
+					}
+				}
+				continue
+			}
 			if (pk.state === MEGA_STATE.AVAILABLE) {
 				for (const c of targets) {
 					const raw = c.rawEntity
@@ -783,8 +810,8 @@ class GameInstance {
 					const dx = raw.x - pk.x, dy = raw.y - pk.y, dz = raw.z - pk.z
 					if (dx * dx + dy * dy + dz * dz > R2) continue
 					// grantPickup returns false when there is nothing to gain (ammo for an
-					// unowned weapon, health at cap, an already-full weapon, or a deferred
-					// armor/powerup) — in that case the pickup is LEFT available.
+					// unowned weapon, health at cap, an already-full weapon) — in that case
+					// the pickup is LEFT available.
 					if (!this.grantPickup(c, pk)) continue
 					pk.state = MEGA_STATE.HIDDEN
 					pk.respawnAt = now + (pk.respawnMs || 30000)
@@ -796,6 +823,49 @@ class GameInstance {
 				if (pk.state !== MEGA_STATE.CHARGING) pk.state = MEGA_STATE.CHARGING
 			}
 		}
+		if (removed) this.pickups = list.filter(p => !p._removed)
+	}
+
+	// DROP-ON-DEATH: spawn a Pickup for each of a dead player's owned NON-PISTOL weapons
+	// at the death location (small XZ jitter), carrying that weapon's CURRENT ammo. Each
+	// drop is drop-probed to the real floor (never spawn floating/unreachable); on a probe
+	// miss we fall back to the exact death spot (where the victim was standing — guaranteed
+	// reachable) rather than losing the weapon. Drops despawn after DROP_DESPAWN_SECONDS.
+	// Server-authoritative; drops render as ordinary WEAPON pickups (weaponIndex on the
+	// wire) so no client factory change is needed — the isDrop/carried*/despawnAt fields
+	// are server-only. Returns the count dropped (for the kill log). `now` is wall-clock ms.
+	dropWeaponsOnDeath(raw, now) {
+		if (!raw || !raw.weaponsState) return 0
+		const PISTOL = 3
+		const despawnMs = DROP_DESPAWN_SECONDS * 1000
+		let count = 0
+		for (let wi = 0; wi < weapons.length; wi++) {
+			if (wi === PISTOL) continue
+			if (!(raw.ownedWeapons & (1 << wi))) continue
+			const st = raw.weaponsState[wi]
+			const carriedMag = st ? (st.magazineAmmo || 0) : 0
+			const carriedReserve = st ? (st.reserveAmmo || 0) : 0
+			let dropX = raw.x + (Math.random() - 0.5) * (DROP_JITTER * 2)
+			let dropZ = raw.z + (Math.random() - 0.5) * (DROP_JITTER * 2)
+			const floorY = this._dropProbeY(dropX, raw.y, dropZ)
+			let dropY
+			if (floorY != null) {
+				dropY = floorY + (REST_HEIGHT[PICKUP_TYPE.WEAPON] || 0.1)
+			} else {
+				// jittered spot has no floor — fall back to the exact (reachable) death spot
+				dropX = raw.x; dropZ = raw.z; dropY = raw.y
+			}
+			const pk = new Pickup(dropX, dropY, dropZ, PICKUP_TYPE.WEAPON, wi)
+			pk.isDrop = true
+			pk.carriedMag = carriedMag
+			pk.carriedReserve = carriedReserve
+			pk.despawnAt = now + despawnMs
+			pk.state = MEGA_STATE.AVAILABLE
+			this.instance.addEntity(pk)
+			this.pickups.push(pk)
+			count++
+		}
+		return count
 	}
 
 	// Apply a pickup's effect to a grabber. Returns true if the pickup was consumed (so
@@ -807,6 +877,25 @@ class GameInstance {
 	grantPickup(c, pk) {
 		const raw = c.rawEntity
 		const smooth = c.smoothEntity
+		// DROP-ON-DEATH weapon (a corpse's dropped gun; renders as a WEAPON pickup but
+		// carries the victim's exact ammo and never refills to full). Always consumed on
+		// touch (returns true → updatePickups removes it). If the grabber does NOT own the
+		// weapon, they gain it + the carried mag/reserve; if they already own it, the
+		// carried ammo is banked into their reserve (capped).
+		if (pk.isDrop) {
+			const wi = pk.weaponIndex
+			const cfg = weapons[wi]
+			const st = raw.weaponsState && raw.weaponsState[wi]
+			const owned = (raw.ownedWeapons & (1 << wi)) !== 0
+			if (!owned) {
+				raw.ownedWeapons |= (1 << wi)
+				if (smooth) smooth.ownedWeapons = raw.ownedWeapons
+				if (st) { st.magazineAmmo = pk.carriedMag; st.reserveAmmo = pk.carriedReserve }
+			} else if (st && cfg) {
+				st.reserveAmmo = Math.min(cfg.maxReserveAmmo, st.reserveAmmo + pk.carriedReserve + pk.carriedMag)
+			}
+			return true
+		}
 		if (pk.type === PICKUP_TYPE.WEAPON) {
 			const wi = pk.weaponIndex
 			const cfg = weapons[wi]
@@ -835,8 +924,20 @@ class GameInstance {
 			if (smooth) smooth.hitpoints = hp
 			return true
 		}
-		// ARMOR + POWERUP: v1-DEFERRED grant (no stat/mechanic yet). Placed + rendered
-		// but NOT consumable — leave them available so nothing looks broken.
+		if (pk.type === PICKUP_TYPE.ARMOR) {
+			if ((raw.armor || 0) >= ARMOR_CAP) return false // full — leave it
+			const a = Math.min(ARMOR_CAP, (raw.armor || 0) + ARMOR_PICKUP)
+			raw.armor = a
+			if (smooth) smooth.armor = a
+			return true
+		}
+		if (pk.type === PICKUP_TYPE.POWERUP) {
+			// UDamage: (re)start the timed outgoing-damage buff. Always consumed (a fresh
+			// pickup refreshes the full duration, UT-style).
+			raw.udamageTimer = UDAMAGE_SECONDS
+			if (smooth) smooth.udamageTimer = UDAMAGE_SECONDS
+			return true
+		}
 		return false
 	}
 
@@ -1259,6 +1360,24 @@ class GameInstance {
 			}
 		}
 
+		// UDAMAGE — while the ATTACKER's powerup timer is live, DOUBLE the outgoing damage
+		// (UDAMAGE_MULT), applied AFTER the zone multiplier so it STACKS with headshots
+		// (that is UT behaviour — flagged for tuning). Rounded so the wire damage matches
+		// the hitpoints actually deducted. Self-damage (own splash) also doubles, matching UT.
+		const atkRaw = attackerClient && attackerClient.rawEntity
+		if (atkRaw && atkRaw.udamageTimer > 0) damage = Math.round(damage * UDAMAGE_MULT)
+
+		// ARMOR — classic Quake green-armor split. The armor soaks ARMOR_ABSORB of the
+		// (already zone/UDamage-scaled) hit until depleted; the remainder passes to hp. We
+		// reduce `damage` IN PLACE to the net hp damage so hpBefore/overkill/wire-damage all
+		// reflect what actually hit health. Server-authoritative; armor lockstep raw+smooth.
+		if (raw.armor > 0 && damage > 0) {
+			const absorbed = Math.min(raw.armor, Math.floor(damage * ARMOR_ABSORB))
+			raw.armor -= absorbed
+			smooth.armor = raw.armor
+			damage -= absorbed
+		}
+
 		// hp BEFORE this hit — overkill is damage beyond what the kill needed
 		const hpBefore = raw.hitpoints
 		const hp = Math.max(0, hpBefore - damage)
@@ -1324,7 +1443,11 @@ class GameInstance {
 			const overkill = Math.min(255, Math.max(0, damage - hpBefore))
 			this.instance.messageAll(new Killed(attackerNid, victimNid, weaponIndex || 0, overkill, isHeadshot))
 
-			console.log(`Player ${raw.nid} died from ${sourceName}!`)
+			// DROP-ON-DEATH: scatter the victim's owned non-pistol weapons (carrying their
+			// current ammo) at the death location. Armor is lost on death (not dropped).
+			const nDropped = this.dropWeaponsOnDeath(raw, Date.now())
+
+			console.log(`Player ${raw.nid} died from ${sourceName}! (dropped ${nDropped} weapon${nDropped === 1 ? '' : 's'})`)
 		}
 	}
 
@@ -1345,6 +1468,9 @@ class GameInstance {
 			entity.z = spawn.z
 			entity.hitpoints = 100
 			entity.isAlive = true
+			// UT-STYLE: armor + UDamage are LOST on death — a fresh spawn has neither.
+			entity.armor = 0
+			entity.udamageTimer = 0
 			entity.velX = 0; entity.velY = 0; entity.velZ = 0
 			if (entity === client.rawEntity) this._recordSpawn(entity)
 			// Phase 4: clear any pending overheal decay so a respawn is a clean 100
@@ -1817,6 +1943,14 @@ class GameInstance {
 		// networked grenadeCharges stays in lockstep for the HUD.
 		const tickGrenades = (raw, smooth) => {
 			if (!raw) return
+			// UDamage powerup countdown (server-authoritative; networked for the buff render).
+			// Same decrement shape as the grenade timers — OUTSIDE the reconciled applyCommand
+			// path, so it can never perturb client movement prediction.
+			if (raw.udamageTimer > 0) {
+				raw.udamageTimer -= delta
+				if (raw.udamageTimer < 0) raw.udamageTimer = 0
+				if (smooth) smooth.udamageTimer = raw.udamageTimer
+			}
 			if (raw.throwCooldown > 0) {
 				raw.throwCooldown -= delta
 				if (raw.throwCooldown < 0) raw.throwCooldown = 0

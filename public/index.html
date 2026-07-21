@@ -24,7 +24,7 @@
          stylesheet + LICENSE at public/assets/fonts/DSEG-LICENSE.txt. -->
     <link rel="preload" as="font" type="font/woff2" href="assets/fonts/DSEG7Classic-Bold.woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-36ff295dbe">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-c4e437575d">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -115,7 +115,20 @@
                     <span id="health-ghost"></span>
                     <span id="health-fill"></span>
                 </div>
+                <!-- Pickup FF: armor bar under the health track. Hidden (body:not(.has-armor))
+                     until the player has armor; Simulator._updateHud drives #armor-fill /
+                     #armor-value + toggles body.has-armor. Green-armor absorbs 50% of hits. -->
+                <div id="armor-row" aria-label="Player armor">
+                    <span id="armor-value">0</span><span class="armor-unit">AR</span>
+                    <div class="armor-track" aria-hidden="true"><span id="armor-fill"></span></div>
+                </div>
             </section>
+
+            <!-- Pickup FF: UDamage powerup badge. Hidden until body.udamage-active; the
+                 countdown text is written by Simulator._updateHud. A full-screen tint
+                 (body.udamage-active #udamage-tint) also signals the buff. -->
+            <div id="udamage-badge" aria-hidden="true"><span class="ud-label">UDAMAGE</span><span id="udamage-timer">30s</span></div>
+            <div id="udamage-tint" aria-hidden="true"></div>
 
             <!-- Bottom-right vitals stack: grenade plate (top) over the weapon/ammo
                  plate (bottom), flowing inside a flex column so the layout no longer
@@ -665,7 +678,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-36ff295dbe";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-36ff295dbe"></script>
+    <script>window.__BUILD_ID__="0.0.1-c4e437575d";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-c4e437575d"></script>
 </body>
 </html>
