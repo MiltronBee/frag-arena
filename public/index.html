@@ -19,9 +19,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Chakra+Petch:ital,wght@0,600;0,700;1,700&family=Inter:wght@400;600&family=Teko:wght@500;600&display=block">
 
-    <!-- DSEG7 preload retired (HUD2030) — readouts use Barlow Condensed. -->
+    <!-- DSEG7 revived (RETRO pass): every numeric readout is a seven-segment LED.
+         Preload so the digits never flash fallback-sans on first paint. -->
+    <link rel="preload" href="assets/fonts/DSEG7Classic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-5215643bed">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-92b937b329">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -57,11 +59,11 @@
                 <div id="tdm-scoreboard" data-myteam="none" aria-label="Team deathmatch score">
                     <span class="tdm-team tdm-side-red">
                         <span class="tdm-tag">RED</span>
-                        <span id="tdm-score-red" class="tdm-num">0</span>
+                        <span class="seg-wrap tdm-num"><span class="seg-under" aria-hidden="true">88</span><span id="tdm-score-red">0</span></span>
                     </span>
-                    <span id="tdm-timer" class="tdm-timer">10:00</span>
+                    <span class="seg-wrap tdm-timer"><span class="seg-under" aria-hidden="true">88:88</span><span id="tdm-timer">10:00</span></span>
                     <span class="tdm-team tdm-side-blue">
-                        <span id="tdm-score-blue" class="tdm-num">0</span>
+                        <span class="seg-wrap tdm-num"><span class="seg-under" aria-hidden="true">88</span><span id="tdm-score-blue">0</span></span>
                         <span class="tdm-tag">BLUE</span>
                     </span>
                 </div>
@@ -104,7 +106,9 @@
                 <div class="hud-cluster">
                     <img class="hud-skull" src="assets/brand/skull.svg" alt="" width="26" height="26" aria-hidden="true">
                     <div class="health-readout">
-                        <span id="health-value">100</span>
+                        <!-- RETRO: live digits stacked over a dim "888" ghost (unlit
+                             segments) — the reusable .seg-wrap/.seg-under pattern. -->
+                        <span class="seg-wrap seg-health"><span class="seg-under" aria-hidden="true">888</span><span id="health-value">100</span></span>
                         <span class="health-unit">HP</span>
                     </div>
                 </div>
@@ -116,7 +120,7 @@
                      until the player has armor; Simulator._updateHud drives #armor-fill /
                      #armor-value + toggles body.has-armor. Green-armor absorbs 50% of hits. -->
                 <div id="armor-row" aria-label="Player armor">
-                    <span id="armor-value">0</span><span class="armor-unit">AR</span>
+                    <span class="seg-wrap seg-armor"><span class="seg-under" aria-hidden="true">888</span><span id="armor-value">0</span></span><span class="armor-unit">AR</span>
                     <div class="armor-track" aria-hidden="true"><span id="armor-fill"></span></div>
                 </div>
             </section>
@@ -137,7 +141,8 @@
                 <section id="grenade-panel" data-charges="2" aria-label="Frag grenades">
                     <span id="grenade-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="14.8" r="6.9"/><path d="M8.5 8.6V7h5v1.6"/><path d="M13.5 7h1.8"/><circle cx="16.8" cy="7" r="1.5"/></svg></span>
                     <span class="grenade-pips" aria-hidden="true"><i class="pip"></i><i class="pip"></i><i class="pip"></i></span>
-                    <span id="grenade-count">x2</span>
+                    <!-- RETRO: bare digit (DSEG7 has no "x" glyph) over a "8" ghost -->
+                    <span class="seg-wrap seg-grenade"><span class="seg-under" aria-hidden="true">8</span><span id="grenade-count">2</span></span>
                 </section>
 
                 <section id="weapon-panel" data-weapon="0" aria-label="Weapon and ammunition">
@@ -145,9 +150,9 @@
                     <div class="weapon-readout">
                         <div id="weapon-name">RIFLE</div>
                         <div id="ammo-counter">
-                            <span id="magazine-ammo">30</span>
+                            <span class="seg-wrap seg-mag"><span class="seg-under" aria-hidden="true">88</span><span id="magazine-ammo">30</span></span>
                             <span class="ammo-separator">/</span>
-                            <span id="reserve-ammo">90</span>
+                            <span class="seg-wrap seg-reserve"><span class="seg-under" aria-hidden="true">888</span><span id="reserve-ammo">90</span></span>
                         </div>
                         <div id="reload-state" aria-live="assertive">RELOAD</div>
                     </div>
@@ -241,6 +246,14 @@
                         </span>
                         <span class="plate-chevron" aria-hidden="true"></span>
                     </button>
+                    <!-- Live rotation readout (Overwatch-style instant play). Filled by
+                         MenuControls from /mapinfo (~10s poll while the menu is open);
+                         hidden (data-live="false") when the server predates the extended
+                         payload. Terminal-retro styling; not a menu item. -->
+                    <div id="now-playing" data-live="false" aria-live="off" data-reveal>
+                        <div class="np-now"><span class="np-kicker">NOW PLAYING —</span> <span id="np-now-text"></span></div>
+                        <div class="np-next"><span class="np-kicker">NEXT —</span> <span id="np-next-text"></span></div>
+                    </div>
                     <button class="menu-plate" type="button" role="menuitem"
                             data-menu-plate data-action="settings" data-reveal>
                         <span class="plate-edge" aria-hidden="true"></span>
@@ -493,11 +506,24 @@
             </div>
         </section>
 
+        <!-- MAP-CHANGE INTERSTITIAL (Overwatch-style rotation). The server rotates maps
+             by closing the socket + restarting (~2-3s); when the drop happens AFTER the
+             player entered the arena, Simulator shows this, waits ~2.5s, then reloads
+             with sessionStorage 'fa-rejoin' so boot skips splash+menu and auto-enters.
+             The tiny inline script below (zero-dep, pre-bundle) re-shows it on the
+             rejoin boot so the whole cycle reads as one continuous loading screen.
+             The spinner is pure CSS: three staggered-pulse "8" segment cells. -->
+        <section id="map-change" aria-hidden="true">
+            <div class="mc-title">CHANGING MAP</div>
+            <div class="mc-seg" aria-hidden="true"><span>8</span><span>8</span><span>8</span></div>
+            <div class="mc-sub">REJOINING ARENA…</div>
+        </section>
+
         <!-- SPLASH: console-style partner boot cards (Part A). A sequence of "POWERED
-             BY" publisher-logo cards over near-black. Card 1 (SOLANA) is the GATE: it
-             holds indefinitely with a blinking "TAP TO INITIALIZE" prompt — that tap is
-             the AUDIO UNLOCK (resumes WebAudio + starts ARENA SIGNAL, the queued 'menu'
-             theme). Cards 2–5 self-advance (~1.2s) and are tap/keypress-skippable. After
+             BY" publisher-logo cards over near-black. Card 1 (SOLANA) holds ~2.6s with a
+             blinking "TAP TO INITIALIZE" prompt — a tap is the AUDIO UNLOCK (resumes
+             WebAudio + starts ARENA SIGNAL, the queued 'menu' theme) AND skips straight
+             to the menu. Untapped, cards 2–5 self-advance (~1.2s each). After
              the last card the splash dismisses like before (fade out, remove node, set
              body.menu-reveal so the menu's staggered rise-in plays). Loading runs behind
              the whole time — the splash never blocks on it. Inline so it paints before
@@ -572,9 +598,26 @@
       (function () {
         var splash = document.getElementById('splash')
         if (!splash) return
+
+        // MAP-ROTATION REJOIN (Part C): a reload flagged 'fa-rejoin' skips the splash
+        // (and the menu — Simulator auto-enters once the gates open). Show the
+        // CHANGING MAP interstitial instead so the rotation reads as one continuous
+        // loading screen. Audio unlock is unaffected: Simulator's one-shot document
+        // gesture listener still performs it on the next tap/keypress.
+        try {
+          if (sessionStorage.getItem('fa-rejoin') === '1') {
+            document.body.classList.add('fa-rejoin', 'menu-reveal')
+            var mc = document.getElementById('map-change')
+            if (mc) mc.classList.add('mc-visible')
+            if (splash.parentNode) splash.parentNode.removeChild(splash)
+            return
+          }
+        } catch (e) {}
+
         var cards = splash.querySelectorAll('.splash-card')
         var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
         var AUTO_MS = reduced ? 900 : 1200
+        var GATE_HOLD_MS = 2600 // card 1 lingers longer, then auto-advances too
         var idx = 0
         var dismissed = false
         var autoTimer = null
@@ -586,9 +629,9 @@
         }
         function scheduleAuto() {
           clearTimeout(autoTimer)
-          // card 0 (Solana) is the GATE — never auto-advances.
-          if (idx === 0) return
-          autoTimer = setTimeout(next, AUTO_MS)
+          // card 0 (Solana) holds longest but DOES auto-advance now — a user who
+          // never taps still reaches the menu (audio unlocks on their next gesture).
+          autoTimer = setTimeout(next, idx === 0 ? GATE_HOLD_MS : AUTO_MS)
         }
         function next() {
           if (dismissed) return
@@ -608,17 +651,12 @@
 
         function onGesture() {
           if (dismissed) return
-          if (idx === 0) {
-            // GATE tap: start ARENA SIGNAL AT THE TAP (also re-attempted on click/
-            // touchend below — Android Chrome rejects an <audio> play() from
-            // pointerdown but allows it from click/touchend on the same tap).
-            startMenuAudio()
-            idx = 1
-            show(idx)
-            scheduleAuto()
-          } else {
-            next()
-          }
+          // ONE gesture = menu ("click play and boom you're in"): the tap unlocks
+          // audio (startMenuAudio — also re-attempted on click/touchend below;
+          // Android Chrome rejects an <audio> play() from pointerdown but allows it
+          // from click/touchend on the same tap) AND skips every remaining card.
+          startMenuAudio()
+          dismiss()
         }
         // Start (or retry) the inline #bg-menu track off a live gesture — works even
         // before the bundle + its MusicManager boot (MusicManager adopts this exact
@@ -675,6 +713,7 @@
         })
 
         show(0)
+        scheduleAuto() // card 0 now auto-advances too (GATE_HOLD_MS)
 
         // stamp the build id into the splash/menu version tags once the bundle sets it
         setTimeout(function () {
@@ -685,7 +724,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-5215643bed";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-5215643bed"></script>
+    <script>window.__BUILD_ID__="0.0.1-92b937b329";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-92b937b329"></script>
 </body>
 </html>

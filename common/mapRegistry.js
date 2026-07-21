@@ -579,6 +579,47 @@ export const mapRecords = { visage, grove, dm_gantry162, dom_elder, dm_somnus }
 export const DEFAULT_MAP_ID = 'visage'
 export const mapList = () => Object.values(mapRecords)
 
+// ---------------------------------------------------------------------------
+// MAP + MODE ROTATION
+// ---------------------------------------------------------------------------
+// The server plays these in fixed order, one map per match, restart-based (maps
+// load ONCE into the NullEngine scene with no dispose path, so "next map" = clean
+// exit 0 + supervisor/pm2 restart — see server/serverMain.js + server/rotation.js).
+//
+// Each entry's mode is the map's EFFECTIVE mode: the registry `mode` field where it
+// names an implemented game mode ('FFA', or 'TDM'/'DM' -> TDM), else TDM. CTF and
+// DOM are NOT implemented yet — Visage and Elder run as TDM until they are.
+
+// Human display string per effective mode (menu / /mapinfo `modeName`).
+export const MODE_DISPLAY = { TDM: 'TEAM DEATHMATCH', FFA: 'FREE FOR ALL' }
+
+// Collapse a record's authored mode to an implemented one: FFA stays FFA, everything
+// else (DM / TDM / CTF / DOM / missing) runs as TDM.
+export function effectiveMode(record) {
+	const m = record && typeof record.mode === 'string' ? record.mode.toUpperCase() : ''
+	return m === 'FFA' ? 'FFA' : 'TDM'
+}
+
+// Human display name for a map (menu / /mapinfo `mapName`): the record's authored
+// display name, uppercased ('DM-Somnus' -> 'DM-SOMNUS').
+export function mapDisplayName(record) {
+	return String((record && (record.displayName || record.name || record.id)) || '').toUpperCase()
+}
+
+// The rotation itself: all 5 mesh maps (all import-complete: full spawns/pickups/
+// killY + verified boot via scripts/_verify-map-cycle.mjs; none excluded). Grove
+// first — it is the current live map, so a fresh state file boots the familiar one.
+export const ROTATION = ['grove', 'dm_gantry162', 'dm_somnus', 'dom_elder', 'visage']
+	.map(id => {
+		const rec = mapRecords[id]
+		return {
+			mapId: id,
+			mode: effectiveMode(rec),                 // 'TDM' | 'FFA'
+			mapName: mapDisplayName(rec),             // e.g. 'DM-SOMNUS'
+			modeName: MODE_DISPLAY[effectiveMode(rec)] // e.g. 'FREE FOR ALL'
+		}
+	})
+
 // Resolve a map ARGUMENT (id string | record object) to a canonical record.
 export function getMapRecord(idOrRecord) {
 	if (idOrRecord && typeof idOrRecord === 'object') return idOrRecord // already a record

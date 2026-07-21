@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "start": "npm-run-all --parallel server client",
-    "server": "tsx watch server/serverMain.js",
+    "server": "bash scripts/serve-loop.sh",
+    "server:watch": "tsx watch server/serverMain.js",
     "server:once": "tsx server/serverMain.js",
     "client": "vite",
     "preview": "vite preview --port 8080",

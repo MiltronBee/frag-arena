@@ -172,9 +172,9 @@ const SPAWN_PROBE_DOWN = 6.0
 // Single tunable. FFA bypasses this entirely — everyone can damage everyone.
 const FRIENDLY_FIRE = false
 // GAME MODE — TDM (two teams) or FFA (free-for-all, individual frags). Default TDM.
-// Resolved per-instance in the constructor from (in order): env MODE=FFA|TDM, the map
-// registry's `mode` field, else TDM. Full map-rotation wiring comes later; this makes
-// the concept real and the harness/testing switchable now.
+// Resolved per-instance in the constructor from (in order): env MODE=FFA|TDM, the
+// constructor's modeArg (the rotation entry's effective mode — serverMain passes it),
+// the map registry's `mode` field, else TDM.
 const GAME_MODE = { TDM: MATCH_MODE.TDM, FFA: MATCH_MODE.FFA }
 // The score cap is the DIFFICULTY dial and ENDS the match early the moment a team
 // (TDM) or a player (FFA) reaches it — at any time, including overtime. Kept at 40 as
@@ -183,8 +183,13 @@ const FRAG_LIMIT = 40
 // Regulation runs to 10:00 — a decided match fills the ~10-minute block window. The
 // score cap can still end it earlier. TIE_CHECK_MS is the 8:00 mark: if the score is
 // EXACTLY tied there we go to SUDDEN DEATH immediately; otherwise play on to 10:00.
-const TIME_LIMIT_MS = 10 * 60 * 1000 // 10:00 regulation
-const TIE_CHECK_MS = 8 * 60 * 1000   // 8:00 sudden-death tie-check
+// MATCH_SECONDS is a DEV/TEST override only (e.g. MATCH_SECONDS=20 to fast-forward a
+// match end and watch the rotation restart); production leaves it unset. The tie-check
+// keeps its 8:00/10:00 ratio (80% of regulation) so the state machine is exercised
+// identically at any length.
+const _matchSeconds = parseInt(process.env.MATCH_SECONDS || '', 10)
+const TIME_LIMIT_MS = _matchSeconds > 0 ? _matchSeconds * 1000 : 10 * 60 * 1000 // 10:00 regulation
+const TIE_CHECK_MS = Math.round(TIME_LIMIT_MS * 0.8)                            // 8:00 sudden-death tie-check
 // MATCH_END intermission (winner banner + final scores) before the scores/kills
 // reset and a fresh ACTIVE match begins.
 const INTERMISSION_MS = 15 * 1000
@@ -195,7 +200,7 @@ const MATCH_PUBLISH_MS = 500
 class GameInstance {
 	static RESPAWN_DELAY_MS = 2500
 
-	constructor(mapArg) {
+	constructor(mapArg, modeArg) {
 		const engine = new BABYLON.NullEngine()
 		engine.enableOfflineSupport = false
 		const scene = new BABYLON.Scene(engine)
@@ -274,10 +279,15 @@ class GameInstance {
 		this._matchPublishAt = 0
 		// fires the 8:00 sudden-death tie-check exactly once per match (reset each match).
 		this._tieChecked = false
-		// GAME MODE resolution (env override → map registry `mode` → default TDM).
+		// GAME MODE resolution (env override → rotation modeArg → map registry `mode`
+		// → default TDM). modeArg is the rotation entry's EFFECTIVE mode string
+		// ('FFA'|'TDM') from serverMain; env MODE stays the dev/probe escape hatch.
 		const envMode = (process.env.MODE || '').toUpperCase()
+		const argMode = (modeArg || '').toUpperCase()
 		this.gameMode = envMode === 'FFA' ? GAME_MODE.FFA
 			: envMode === 'TDM' ? GAME_MODE.TDM
+			: argMode === 'FFA' ? GAME_MODE.FFA
+			: argMode === 'TDM' ? GAME_MODE.TDM
 			: (this.map && typeof this.map.mode === 'string' && this.map.mode.toUpperCase() === 'FFA'
 				? GAME_MODE.FFA : GAME_MODE.TDM)
 		console.log(`[match] mode=${this.gameMode === GAME_MODE.FFA ? 'FFA' : 'TDM'}`)
@@ -305,10 +315,21 @@ class GameInstance {
 		// replay existing human names to late joiners and cleaned up on disconnect.
 		this._humanNames = new Map()
 		this.bots = []
-		// Default 0 = 1v1 player-vs-player (no bots). Set BOTS=N in the env to add
-		// practice bots back for local testing (e.g. `BOTS=4 npm start`).
-		const botCount = process.env.BOTS !== undefined ? (parseInt(process.env.BOTS, 10) || 0) : 0
-		for (let i = 0; i < botCount; i++) this.addBot(i)
+		// BOT AUTO-FILL (default ON). BOT_FILL = target TOTAL combatants (humans +
+		// bots), default 6; the server tops the arena up with bots and swaps them out
+		// 1:1 as humans join/leave (see _rebalanceBots). BOT_FILL=0 disables. Legacy
+		// BOTS=N still means a FIXED bot count with no autofill (probes/harnesses
+		// depend on an exact roster), and takes precedence when set.
+		this._humanCount = 0 // humans past the nengi handshake ('connect' fired)
+		if (process.env.BOTS !== undefined) {
+			this._botFillTarget = 0 // fixed mode: never rebalance
+			const botCount = parseInt(process.env.BOTS, 10) || 0
+			for (let i = 0; i < botCount; i++) this.addBot(i)
+		} else {
+			const fill = parseInt(process.env.BOT_FILL, 10)
+			this._botFillTarget = Number.isNaN(fill) ? 6 : Math.max(0, fill)
+			this._rebalanceBots()
+		}
 
 		// GODMODE: real players are immortal (set GODMODE=1/true). Bots still take
 		// damage so you can frag them and watch death anims while wandering unkillable.
@@ -403,6 +424,11 @@ class GameInstance {
 			this._humanNames.forEach((name, nid) => {
 				this.instance.message(new PlayerName(nid, name), client)
 			})
+
+			// AUTO-FILL: a human took a slot — retire one fill bot to hold the target
+			// headcount (prefers a dead / lowest-scoring one; see _rebalanceBots).
+			this._humanCount++
+			this._rebalanceBots()
 		})
 
 		this.instance.on('disconnect', client => {
@@ -422,6 +448,12 @@ class GameInstance {
 			}
 			if (client.channel) {
 				client.channel.destroy()
+			}
+			// AUTO-FILL: only count down clients that counted UP (rawEntity is assigned
+			// in 'connect'; a pre-handshake drop never incremented _humanCount).
+			if (client.rawEntity) {
+				this._humanCount = Math.max(0, this._humanCount - 1)
+				this._rebalanceBots()
 			}
 		})
 
@@ -1027,6 +1059,47 @@ class GameInstance {
 		entity.client = handle // hitscan victims resolve to their owner via .client
 		this.bots.push(handle)
 		console.log(`Bot ${entity.nid} joined with ${weapons[entity.currentWeaponIndex].name}`)
+	}
+
+	// Retire one bot through the SAME teardown the human disconnect path uses: dispose
+	// the collision mesh, remove the entity from nengi (a bot's raw and smooth are the
+	// SAME entity — one removal covers both), and drop the handle from this.bots so the
+	// think/respawn/fall-death/scoreboard loops stop seeing it. Anything that still
+	// holds its nid (in-flight projectile/grenade ownerNid) already null-guards its
+	// `this.bots.find(...)` lookup, so a retired attacker just becomes unattributed.
+	removeBot(handle) {
+		const i = this.bots.indexOf(handle)
+		if (i === -1) return
+		this.bots.splice(i, 1)
+		if (handle.rawEntity) {
+			const nid = handle.rawEntity.nid // removeEntity reclaims the nid (-1 after)
+			if (handle.rawEntity.mesh) handle.rawEntity.mesh.dispose()
+			this.instance.removeEntity(handle.rawEntity)
+			console.log(`Bot ${nid} retired (auto-fill)`)
+		}
+	}
+
+	// AUTO-FILL rebalance: keep humans + fill bots == BOT_FILL target. Called at boot
+	// and on every human connect/disconnect. No-ops in legacy fixed-BOTS mode
+	// (_botFillTarget 0 there AND no BOT_FILL path ever runs — see the constructor).
+	// FragBench agent bots are sanctioned external players, NOT filler: they count
+	// toward the headcount like humans and are never retired here.
+	_rebalanceBots() {
+		if (process.env.BOTS !== undefined) return // legacy fixed-count mode
+		const fillBots = this.bots.filter(b => !b.agent)
+		const nonFill = this._humanCount + (this.bots.length - fillBots.length)
+		// humans (+agents) alone can exceed the target: desired clamps at 0, never below.
+		const desired = Math.max(0, this._botFillTarget - nonFill)
+		for (let i = fillBots.length; i < desired; i++) this.addBot(i)
+		for (let i = fillBots.length; i > desired; i--) {
+			// prefer retiring a DEAD bot (invisible exit — nobody sees a fighter vanish
+			// mid-duel), else the lowest-scoring one (least disturbance to the match).
+			const pick = fillBots
+				.sort((a, b) => (a.rawEntity.isAlive - b.rawEntity.isAlive)
+					|| ((a.rawEntity.kills | 0) - (b.rawEntity.kills | 0)))
+				.shift()
+			this.removeBot(pick)
+		}
 	}
 
 	// FRAGBENCH v0: an agent bot is a regular bot handle whose controller accepts
@@ -1768,7 +1841,14 @@ class GameInstance {
 			}
 		}
 		if (this.matchPhase === MATCH_PHASE.MATCH_END) {
-			if (now - this.matchEndAt >= INTERMISSION_MS) this.resetMatch(now)
+			if (now - this.matchEndAt >= INTERMISSION_MS) {
+				// MAP ROTATION: when serverMain armed onMatchCycle (rotation-driven boot),
+				// the end of the intermission hands off to a process restart on the NEXT
+				// map instead of resetting in place — clients have had the full banner +
+				// scores moment by now. The callback never returns (process.exit).
+				if (this.onMatchCycle) { this.onMatchCycle(); return }
+				this.resetMatch(now)
+			}
 		}
 		// countdown: real time only during ACTIVE regulation; 0 in overtime / intermission.
 		const remaining = this.matchPhase === MATCH_PHASE.ACTIVE

@@ -1664,6 +1664,7 @@ class Simulator {
 		// continuously rather than only on connection-state changes.
 
 		if (state === 'disconnected') {
+			const wasInArena = this._arenaEntered
 			this._arenaEntered = false
 			body.classList.remove('arena-entered')
 			const overlay = document.getElementById('entry-overlay')
@@ -1671,6 +1672,16 @@ class Simulator {
 			this._closeSettings()
 			if (document.pointerLockElement) document.exitPointerLock()
 			this.music.play('menu') // back on the entry screen -> menu theme
+			if (wasInArena) {
+				// MAP ROTATION (Overwatch-style): the server rotates maps by closing the
+				// socket + restarting. A drop AFTER entry = a rotation, not a failure —
+				// show the CHANGING MAP interstitial and reload with the rejoin flag.
+				this._beginMapChangeRejoin()
+			} else if (this._rejoin) {
+				// rejoin boot whose connection died BEFORE entry: give up on the auto
+				// path and fall back to the menu (entry readout shows UPLINK LOST).
+				this._cancelRejoin()
+			}
 		}
 
 		this._syncEntryState()
@@ -1715,6 +1726,15 @@ class Simulator {
 		this._connectionState = 'connecting'
 		this._lastHealth = null
 		this._wasDead = false
+
+		// MAP-ROTATION REJOIN (Overwatch-style instant play): a reload flagged
+		// 'fa-rejoin' (set when the socket dropped mid-match — see
+		// _beginMapChangeRejoin) skips splash+menu (inline splash controller) and
+		// auto-enters the arena the moment the triple gate opens (_syncEntryState).
+		// 'fa-rejoin-tries' caps the loop at 3 reloads without a successful entry.
+		this._rejoin = false
+		this._rejoinPending = false
+		try { this._rejoin = sessionStorage.getItem('fa-rejoin') === '1' } catch (e) {}
 
 		const enterButton = document.getElementById('enter-arena')
 		const resumeButton = document.getElementById('resume-game')
@@ -1875,6 +1895,71 @@ class Simulator {
 			else text = 'ESTABLISHING UPLINK…'
 			if (status.textContent !== text) status.textContent = text
 		}
+
+		// REJOIN AUTO-ENTER: gates just opened on a map-rotation reload — go straight
+		// in (the CHANGING MAP interstitial has covered the whole boot). Deferred a
+		// tick so entry state changes never re-enter this method mid-run.
+		if (ready && this._rejoin && !this._arenaEntered) {
+			this._rejoin = false
+			setTimeout(() => this._autoEnterArena(), 0)
+		}
+	}
+
+	// Programmatic arena entry for the map-rotation rejoin path. No user gesture is
+	// available here, so desktop CANNOT requestPointerLock — instead we flip the
+	// arena state directly (the touch branch of _enterArena already works this way)
+	// and InputSystem's document pointerdown auto-locks on the first click, because
+	// body.arena-entered is set. Clears the rejoin flag + retry counter (a success).
+	_autoEnterArena() {
+		try {
+			sessionStorage.removeItem('fa-rejoin')
+			sessionStorage.removeItem('fa-rejoin-tries')
+		} catch (e) {}
+		document.body.classList.remove('fa-rejoin')
+		this._pendingPlay = false
+		this._arenaEntered = true
+		document.body.classList.add('arena-entered')
+		if (this._intrusionFeed) this._intrusionFeed.stop()
+		this._closeSettings()
+		const overlay = document.getElementById('entry-overlay')
+		if (overlay) overlay.classList.remove('is-visible')
+		const mc = document.getElementById('map-change')
+		if (mc) mc.classList.remove('mc-visible')
+		// silent until the next gesture unlocks audio (standard autoplay rules)
+		this.music.play('match')
+	}
+
+	// Socket dropped AFTER the player entered the arena: treat it as a map rotation.
+	// Show the fullscreen CHANGING MAP interstitial, flag the reload for rejoin, and
+	// reload once the server has had ~2.5s to come back. Capped at 3 consecutive
+	// reloads without a successful entry — after that, fall back to the menu (the
+	// entry readout's UPLINK LOST state already covers it).
+	_beginMapChangeRejoin() {
+		if (this._rejoinPending) return
+		let tries = 0
+		try { tries = parseInt(sessionStorage.getItem('fa-rejoin-tries') || '0', 10) || 0 } catch (e) {}
+		if (tries >= 3) { this._cancelRejoin(); return }
+		try {
+			sessionStorage.setItem('fa-rejoin', '1')
+			sessionStorage.setItem('fa-rejoin-tries', String(tries + 1))
+		} catch (e) { return } // no sessionStorage → plain menu fallback
+		this._rejoinPending = true
+		const mc = document.getElementById('map-change')
+		if (mc) mc.classList.add('mc-visible')
+		setTimeout(() => location.reload(), 2500)
+	}
+
+	// Abandon the rejoin auto-path: clear the flag/counter and let the normal menu
+	// (with its UPLINK LOST / READY states) take over.
+	_cancelRejoin() {
+		this._rejoin = false
+		try {
+			sessionStorage.removeItem('fa-rejoin')
+			sessionStorage.removeItem('fa-rejoin-tries')
+		} catch (e) {}
+		document.body.classList.remove('fa-rejoin')
+		const mc = document.getElementById('map-change')
+		if (mc) mc.classList.remove('mc-visible')
 	}
 
 	_enterArena() {
@@ -1891,7 +1976,9 @@ class Simulator {
 			this._syncEntryState()
 			return
 		}
-		// Gate open. Clear any pending/ready-cta state and enter for real.
+		// Gate open. Clear any pending/ready-cta state and enter for real. A manual
+		// entry also resets the map-rotation rejoin retry counter (see _autoEnterArena).
+		try { sessionStorage.removeItem('fa-rejoin-tries') } catch (e) {}
 		this._pendingPlay = false
 		const btn = document.getElementById('enter-arena')
 		if (btn) btn.classList.remove('is-arming', 'is-ready-cta')
@@ -2020,9 +2107,9 @@ class Simulator {
 			healthGhost.style.transition = healing ? 'none' : ''
 			healthGhost.style.transform = `scaleX(${healthScale})`
 		}
-		// three-band health color law: mid-health (warn) sits between full and crit.
-		// crit (low-health, <=30) is toggled below and must win, so mid is strictly 30<hp<=60.
-		document.body.classList.toggle('mid-health', health <= 60 && health > 30)
+		// three-band health color law (RETRO phosphor bands): >=70 green, 30<hp<70
+		// amber, <=30 crit red. crit (low-health) is toggled below and must win.
+		document.body.classList.toggle('mid-health', health < 70 && health > 30)
 		// third critical-state channel (spec AGENT C): pulsing red full-screen vignette,
 		// fired by the SAME threshold as the health-panel red so both channels read
 		// together. health is clamped 0..150, so a dead player (health===0) fails the
@@ -2124,8 +2211,10 @@ class Simulator {
 		// Phase 3: frag-grenade charge count (networked UInt8 on the player entity)
 		const grenadeCount = document.getElementById('grenade-count')
 		if (grenadeCount) {
+			// RETRO: bare digit — the count renders in DSEG7, which has no "x" glyph
+			// (the ghost "8" + pips carry the capacity read).
 			const n = this.myRawEntity.grenadeCharges == null ? 0 : this.myRawEntity.grenadeCharges
-			const text = 'x' + n
+			const text = String(n)
 			if (grenadeCount.textContent !== text) grenadeCount.textContent = text
 			const panel = document.getElementById('grenade-panel')
 			if (panel) {

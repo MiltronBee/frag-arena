@@ -168,7 +168,38 @@
 
 * { box-sizing: border-box; }
 
-/* DSEG7 segment font retired (HUD2030 kill #5) — readouts use Barlow Condensed. */
+/* ============================================================================
+   RETRO LAYER — seven-segment phosphor + CRT tokens (owner verdict on HUD2030:
+   "far more retro — segment displays and stuff"). DSEG7 is REVIVED for NUMERALS
+   ONLY (it has no readable letterforms); Chakra/Inter keep every label. Glow is
+   cheap text-shadow (≤8px, never filter/blur); scanlines are one repeating
+   gradient layered over existing plate fills. Use these tokens, not literals.
+   ============================================================================ */
+@font-face {
+    font-family: 'DSEG7';
+    src: url('../assets/fonts/DSEG7Classic-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+:root {
+    /* ---- segment phosphor palette (amber neutral / green healthy / red crit) */
+    --seg-font: 'DSEG7', var(--x30-font-num);
+    --seg-amber: #FFB02E;
+    --seg-green: var(--x30-accent);
+    --seg-red: var(--x30-threat);
+    --seg-cyan: var(--x30-ally);
+    --seg-ghost: rgba(244, 247, 249, 0.07);   /* unlit-segment "888" underlay    */
+    --seg-glow-amber: 0 0 6px rgba(255, 176, 46, 0.45);
+    --seg-glow-green: 0 0 6px rgba(20, 241, 149, 0.45);
+    --seg-glow-red:   0 0 7px rgba(255, 59, 70, 0.55);
+    --seg-glow-cyan:  0 0 6px rgba(127, 233, 255, 0.45);
+
+    /* ---- CRT chrome: ~3px scanlines, top-edge bevel highlight ---- */
+    --crt-scanlines: repeating-linear-gradient(0deg,
+        rgba(0, 0, 0, 0.20) 0px, rgba(0, 0, 0, 0.20) 1px, transparent 1px, transparent 3px);
+    --crt-bevel: inset 0 1px 0 rgba(244, 247, 249, 0.07);
+}
 
 html, body {
     width: 100%;
@@ -1324,29 +1355,31 @@ body.player-dead #crosshair { transform: translate(-50%, -50%) scale(0.7); }
     animation: none;
 }
 
-/* ---- Fractional progress readout (Part B / HUD2030). Barlow Condensed tabular
-   "NN.NN" + a small "%". ink-mid while loading, accent when READY, threat dashes
-   when the uplink is lost. Fixed width so digits never jitter. ---- */
+/* ---- Fractional progress readout (Part B / RETRO revival). True DSEG7 LED:
+   live "NN.NN" digits stacked over the dim "888.88" hardware ghost + a small "%".
+   Amber while loading, green when READY, red dashes when the uplink is lost.
+   Fixed width so digits never jitter. ---- */
 .entry-seg {
     display: inline-flex;
     align-items: baseline;
     gap: 4px;
-    --seg-color: var(--x30-ink-mid);
+    --seg-color: var(--seg-amber);
+    --seg-glow: var(--seg-glow-amber);
 }
-.entry-seg[data-state="ready"] { --seg-color: var(--x30-accent); }
-.entry-seg[data-state="lost"]  { --seg-color: var(--x30-threat); }
+.entry-seg[data-state="ready"] { --seg-color: var(--seg-green); --seg-glow: var(--seg-glow-green); }
+.entry-seg[data-state="lost"]  { --seg-color: var(--seg-red);   --seg-glow: var(--seg-glow-red); }
 .seg-stack {
     position: relative;
     display: inline-block;
-    font-family: var(--x30-font-num);
-    font-weight: 600;
-    font-size: 15px;   /* base = the LARGE integer digits (gas-pump split size) */
+    font-family: var(--seg-font);
+    font-weight: 700;
+    font-size: 14px;   /* base = the LARGE integer digits (gas-pump split size) */
     line-height: 1;
-    letter-spacing: 0;
-    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
     /* Fixed width locked so 1→3 digit swings and the "--" disconnect state never
-       shift the layout (ProgressReadout writes per-frame; no layout thrash). */
-    width: 3.2em;
+       shift the layout (ProgressReadout writes per-frame; no layout thrash).
+       DSEG7 cells are wide — reserve the full "888.88". */
+    width: 4.4em;
     text-align: right;
     /* baseline-align the large int + small frac so they read as one meter */
     white-space: nowrap;
@@ -1354,16 +1387,23 @@ body.player-dead #crosshair { transform: translate(-50%, -50%) scale(0.7); }
 /* split-size sub-spans: integer part LARGE (base size), fractional part SMALL */
 .seg-int { font-size: 1em; }
 .seg-frac { font-size: 0.72em; }
-/* LED "888.88" hardware ghost retired (markup keeps the node) */
-.seg-ghost { display: none; }
-.seg-live {
-    position: relative;
-    color: var(--seg-color);
+/* the "888.88" unlit-segment ghost: absolutely stacked UNDER the live digits,
+   right-aligned so int/frac columns overlay the live glyphs exactly */
+.seg-ghost {
+    display: block;
+    position: absolute;
+    inset: 0;
+    text-align: right;
+    color: var(--seg-ghost);
     text-shadow: none;
+    user-select: none;
 }
 .seg-live {
+    position: relative;
     display: block;
     text-align: right;
+    color: var(--seg-color);
+    text-shadow: var(--seg-glow);
 }
 .seg-live .seg-frac,
 .seg-live .seg-int { vertical-align: baseline; }
@@ -3029,9 +3069,10 @@ body.player-dead #touch-controls {
 }
 @keyframes x30-breathe { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
 
-/* small % echo in the splash corner (Part B). Barlow tabular numerals + a 2px
-   accent progress hairline under the digits (width = load %, JS sets --seg-fill,
-   throttled to whole-percent changes — not a per-frame style write). */
+/* small % echo in the splash corner (Part B / RETRO). DSEG7 LED digits over the
+   "888.88" ghost + a 2px accent progress hairline under the digits (width =
+   load %, JS sets --seg-fill, throttled to whole-percent changes — not a
+   per-frame style write). */
 .splash-seg {
     position: absolute;
     right: calc(20px + env(safe-area-inset-right));
@@ -3039,10 +3080,10 @@ body.player-dead #touch-controls {
     display: inline-flex;
     align-items: baseline;
     gap: 3px;
-    font-family: var(--x30-font-num);
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    color: var(--x30-ink-mid);
+    font-family: var(--seg-font);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--seg-amber);
     opacity: 1;
 }
 /* 2px meter under the digits: hairline track + accent fill */
@@ -3066,19 +3107,19 @@ body.player-dead #touch-controls {
 .splash-seg-live {
     position: relative;
     display: inline-block;
-    width: 3.2em;               /* reserve widest "100" + ".88" (matches header) */
+    width: 4.4em;               /* reserve the full DSEG7 "888.88" (matches header) */
     text-align: right;
-    font-size: 14px;            /* base = LARGE integer digits */
+    font-size: 13px;            /* base = LARGE integer digits */
     line-height: 1;
-    letter-spacing: 0;
+    letter-spacing: 0.04em;
     white-space: nowrap;
 }
 .splash-seg-live > .seg-int,
 .splash-seg-live > .seg-frac {
     position: relative;
-    text-shadow: none;
+    text-shadow: var(--seg-glow-amber);
 }
-.splash-seg-live .seg-ghost { display: none; }
+/* the unlit-segment ghost rides the shared .seg-ghost rule (absolute overlay) */
 .splash-seg-pct {
     font-family: var(--x30-font-num);
     font-size: 9px;
@@ -3199,18 +3240,23 @@ body.player-dead #touch-controls {
 #touch-throw  { right: calc(var(--tc-r) + var(--tc-fire) + var(--tc-aim) + var(--tc-gap) * 2 + (var(--tc-aim) - var(--tc-sec)) / 2); bottom: calc(var(--tc-b) + var(--tc-sec) + var(--tc-gap)); top: auto; left: auto; }
 #touch-gear   { top: calc(12px + env(safe-area-inset-top)); right: calc(12px + env(safe-area-inset-right)); bottom: auto; left: auto; }
 
-/* ---- PORTRAIT (tall, narrow). 2 columns × 3 rows, hugging the right edge.
-        Inboard column R = r+fire+gap keeps its left edge > 50% even on 360px. -- */
+/* ---- PORTRAIT (tall, narrow) — RETRO DE-CLUTTER pass. Smaller contract + a
+        thinner shape: big FIRE bottom-right (primary thumb), AIM beside it,
+        JUMP above-left, and reload/switch/throw as ONE compact 46px column
+        stacked over fire. Cluster top ≈ 310px from the bottom (was ~504px).
+        Every hit target stays ≥ 44px; the --tc-b floor clears the bottom-center
+        LED strip (see the portrait HUD block at the end of this file). -------- */
 @media (orientation: portrait) {
-    #touch-controls { --tc-fire: 84px; --tc-aim: 56px; --tc-sec: 52px; --tc-b: calc(88px + env(safe-area-inset-bottom)); }
-    /* right column (centered over fire): fire(bottom) / reload(mid) / switch(top) */
+    #touch-controls { --tc-fire: 80px; --tc-aim: 52px; --tc-sec: 46px; --tc-gap: 12px; --tc-b: calc(56px + env(safe-area-inset-bottom)); }
+    /* primary pair: fire (corner) + aim inboard of it */
     #touch-fire   { right: var(--tc-r); bottom: var(--tc-b); }
+    #touch-aim    { right: calc(var(--tc-r) + var(--tc-fire) + var(--tc-gap)); bottom: var(--tc-b); }
+    /* jump above-left of fire (over the aim column — the natural thumb roll) */
+    #touch-jump   { right: calc(var(--tc-r) + var(--tc-fire) + var(--tc-gap)); bottom: calc(var(--tc-b) + var(--tc-aim) + var(--tc-gap)); }
+    /* compact small-button column over fire: reload / switch / throw (46px) */
     #touch-reload { right: calc(var(--tc-r) + (var(--tc-fire) - var(--tc-sec)) / 2); bottom: calc(var(--tc-b) + var(--tc-fire) + var(--tc-gap)); }
     #touch-switch { right: calc(var(--tc-r) + (var(--tc-fire) - var(--tc-sec)) / 2); bottom: calc(var(--tc-b) + var(--tc-fire) + var(--tc-sec) + var(--tc-gap) * 2); }
-    /* inboard column: aim(bottom) / jump(mid) / throw(top) */
-    #touch-aim    { right: calc(var(--tc-r) + var(--tc-fire) + var(--tc-gap)); bottom: var(--tc-b); }
-    #touch-jump   { right: calc(var(--tc-r) + var(--tc-fire) + var(--tc-gap)); bottom: calc(var(--tc-b) + var(--tc-aim) + var(--tc-gap)); }
-    #touch-throw  { right: calc(var(--tc-r) + var(--tc-fire) + var(--tc-gap)); bottom: calc(var(--tc-b) + var(--tc-aim) + var(--tc-sec) + var(--tc-gap) * 2); }
+    #touch-throw  { right: calc(var(--tc-r) + (var(--tc-fire) - var(--tc-sec)) / 2); bottom: calc(var(--tc-b) + var(--tc-fire) + var(--tc-sec) * 2 + var(--tc-gap) * 3); }
 }
 
 /* ---- SHORT LANDSCAPE (height ≤ 460, coarse = any phone held sideways).
@@ -3387,4 +3433,248 @@ body.player-dead #touch-controls {
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.08em;
     color: var(--x30-ink-mid);
+}
+
+/* ============================================================================
+   RETRO PASS — seven-segment readouts + CRT chrome (applies over everything
+   above; tokens live in the RETRO LAYER block at the top of this file).
+   Pattern: every numeric readout becomes a .seg-wrap — the live digits stacked
+   (inline-grid, same cell) over a dim .seg-under ghost of 8s, so unlit segments
+   read like real hardware. DSEG7 carries NUMERALS ONLY; labels stay Chakra/Inter.
+   ============================================================================ */
+
+/* ---- the reusable segment-readout pattern ---- */
+.seg-wrap {
+    position: relative;
+    display: inline-grid;
+    white-space: nowrap;
+}
+.seg-wrap > span {
+    grid-area: 1 / 1;
+    text-align: right;
+}
+.seg-wrap .seg-under {
+    color: var(--seg-ghost) !important;
+    text-shadow: none !important;
+    animation: none !important;
+    user-select: none;
+    pointer-events: none;
+}
+
+/* every in-game numeral goes DSEG7 (ghosts inherit via .seg-wrap font) */
+#health-value, #armor-value, #magazine-ammo, #reserve-ammo, #grenade-count,
+#tdm-timer, #tdm-score-red, #tdm-score-blue,
+.seg-wrap .seg-under {
+    font-family: var(--seg-font);
+    font-weight: 700;
+    font-variant-numeric: normal; /* DSEG7 is fixed-cell already */
+    letter-spacing: 0.04em;
+}
+
+/* sizes: DSEG7 cells are ~1.6x wider than Barlow Condensed — step each numeral
+   down so the plates keep their footprint. Size lives on the WRAPPER; live
+   digits + ghost both run at 1em so the two layers can never drift apart. */
+.seg-health { font-size: 30px; line-height: 1; }
+.seg-armor { font-size: 13px; }
+.seg-mag { font-size: 28px; line-height: 1; }
+.seg-reserve { font-size: 13px; }
+.seg-grenade { font-size: 16px; }
+#tdm-scoreboard .tdm-timer, #tdm-scoreboard .tdm-num { font-size: 17px; }
+#health-value, #armor-value, #magazine-ammo, #reserve-ammo, #grenade-count,
+#tdm-timer, #tdm-score-red, #tdm-score-blue { font-size: 1em; line-height: inherit; }
+.ammo-separator { font-family: var(--x30-font-num); font-size: 13px; }
+
+/* ---- phosphor color law: green = healthy/positive, amber = neutral, red =
+   critical (reuses --x30-threat). Glow is cheap text-shadow, live data only. -- */
+#health-value { color: var(--seg-green); text-shadow: var(--seg-glow-green); }
+body.mid-health #health-value { color: var(--seg-amber); text-shadow: var(--seg-glow-amber); }
+/* low-health keeps the existing threat color + hp-glow breathing loop (base rule) */
+body.overheal #health-value { text-shadow: var(--x30-emit-gold); }
+#armor-value { color: var(--seg-cyan); text-shadow: var(--seg-glow-cyan); }
+#magazine-ammo { color: var(--seg-green); text-shadow: var(--seg-glow-green); }
+#weapon-panel.is-low-ammo #magazine-ammo { color: var(--seg-amber); text-shadow: var(--seg-glow-amber); }
+#weapon-panel.is-empty #magazine-ammo { color: var(--seg-red); text-shadow: var(--seg-glow-red); }
+#weapon-panel.is-reloading #magazine-ammo { opacity: 0.35; } /* unchanged contract */
+#reserve-ammo { color: rgba(255, 176, 46, 0.65); text-shadow: none; }
+#grenade-count { color: var(--seg-amber); text-shadow: var(--seg-glow-amber); }
+#grenade-panel.is-empty #grenade-count,
+#grenade-panel[data-charges="0"] #grenade-count { color: var(--x30-ink-low); text-shadow: none; }
+/* scoreboard digits: amber neutral; team identity stays in the 2px underline */
+#tdm-timer, #tdm-score-red, #tdm-score-blue { color: var(--seg-amber); text-shadow: var(--seg-glow-amber); }
+/* sudden death: the clock reads "OT" in threat red (the wrapper rule recolors
+   only the wrapper now — restate on the live digits) */
+#tdm-scoreboard.sudden-death #tdm-timer { color: var(--seg-red); text-shadow: var(--seg-glow-red); }
+
+/* ---- CRT chrome: scanlines layered over the existing plate fills + a 1px
+   top-edge bevel highlight. background-image rides ON TOP of the shorthand
+   background colors set earlier (later rule, same specificity). ---- */
+#health-panel, #weapon-panel, #grenade-panel, .match-strip, #udamage-badge,
+.kill-feed-row, #tdm-banner, .howto-panel, #settings-menu, .hack-feed {
+    background-image: var(--crt-scanlines);
+}
+#health-panel, #weapon-panel, #grenade-panel {
+    box-shadow: var(--x30-el-1), var(--crt-bevel);
+}
+.match-strip { box-shadow: var(--x30-el-1), var(--crt-bevel); }
+
+/* faint in-game vignette (paint-only; ::before stays behind the positioned
+   HUD children). Gated on arena-entered so it never doubles the menu scrim. */
+body.arena-entered #arena-hud::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 62%, rgba(5, 7, 8, 0.16) 100%);
+}
+
+/* menu + splash read as the same machine: full-surface scanlines over the glass
+   (above the content, authentic CRT) + a very subtle phosphor flicker. */
+#entry-overlay::after,
+#splash::after,
+#map-change::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    background: var(--crt-scanlines);
+    opacity: 0.5;
+    animation: crt-flicker 6s ease-in-out infinite;
+}
+@keyframes crt-flicker { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.38; } }
+
+/* ---- menu: PLAY is the hero plate ---- */
+#enter-arena.menu-plate { min-height: 74px; }
+#enter-arena.menu-plate .plate-label { font-size: 24px; }
+
+/* ---- NOW PLAYING line (under the PLAY plate; MenuControls fills it from the
+   /mapinfo poll). Hidden until the extended payload actually arrives. ---- */
+#now-playing {
+    display: none;
+    padding: 10px 18px 12px 26px;
+    border-top: 1px solid var(--x30-hairline);
+    font-family: var(--x30-font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+#now-playing[data-live="true"] { display: block; }
+#now-playing .np-kicker { color: var(--x30-ink-low); text-shadow: none; }
+#now-playing .np-now { color: var(--seg-green); text-shadow: var(--seg-glow-green); }
+#now-playing .np-next { margin-top: 3px; color: var(--x30-ink-mid); text-shadow: none; }
+
+/* ---- MAP-CHANGE interstitial (Overwatch-style rotation; z above everything).
+   Spinner = three staggered-pulse DSEG7 "8" cells — pure CSS, no JS ticks. ---- */
+#map-change {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    background: radial-gradient(circle at 50% 46%, #090C10 0%, var(--x30-void) 70%);
+}
+#map-change.mc-visible { display: flex; }
+.mc-title {
+    font-family: var(--x30-font-display);
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.3em;
+    text-indent: 0.3em;
+    text-transform: uppercase;
+    color: var(--x30-ink);
+}
+.mc-seg {
+    display: flex;
+    gap: 8px;
+    font-family: var(--seg-font);
+    font-weight: 700;
+    font-size: 38px;
+    line-height: 1;
+    color: var(--seg-amber);
+}
+.mc-seg span {
+    text-shadow: var(--seg-glow-amber);
+    animation: mc-pulse 0.9s ease-in-out infinite;
+}
+.mc-seg span:nth-child(2) { animation-delay: 0.15s; }
+.mc-seg span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes mc-pulse { 0%, 100% { opacity: 0.12; } 50% { opacity: 1; } }
+.mc-sub {
+    font-family: var(--x30-font-ui);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: var(--x30-track-label);
+    text-transform: uppercase;
+    color: var(--x30-ink-mid);
+}
+
+/* ============================================================================
+   PORTRAIT DE-CLUTTER (workstream B) — the three HUD plates collapse into ONE
+   chromeless bottom-center LED strip (segment HP | segment ammo | grenade pips)
+   sitting just above the thumb zones; the top keeps only the timer/score.
+   Geometry: strip bottom 20px, digits ~26px tall → strip top ≈ 66px; the touch
+   cluster floor is --tc-b = 56px on the RIGHT side only (fire x 20..100 from the
+   right; the strip's right edge stays left of it on every ≥360px portrait).
+   ============================================================================ */
+@media (orientation: portrait) and (pointer: coarse) {
+    /* top row: timer/score only — brand + connection strip go quiet */
+    .brand-lockup, .match-strip { display: none; }
+    #tdm-scoreboard { top: calc(8px + env(safe-area-inset-top)); }
+
+    /* plates → chromeless phosphor (the digits ARE the plate) */
+    #health-panel, #weapon-panel, #grenade-panel {
+        background: none;
+        border-left: 0;
+        box-shadow: none;
+        padding: 0;
+        min-width: 0;
+    }
+
+    /* HP: right-aligned against the strip's center-left slot */
+    #health-panel {
+        top: auto;
+        left: auto;
+        right: calc(50% + 44px);
+        bottom: calc(20px + env(safe-area-inset-bottom));
+    }
+    #health-panel .health-track,
+    #health-panel .hud-skull,
+    #health-panel .health-unit { display: none !important; }
+    .seg-health { font-size: 26px; }
+    #armor-row { margin-top: 2px; justify-content: flex-end; }
+    #armor-row .armor-track { display: none; }
+    .seg-armor { font-size: 11px; }
+
+    /* ammo (then pips) flow rightward from center — row-reverse puts the DOM's
+       weapon panel first, grenade pips second */
+    #hud-right-group {
+        top: auto;
+        right: auto;
+        left: calc(50% - 32px);
+        bottom: calc(20px + env(safe-area-inset-bottom));
+        flex-direction: row-reverse;
+        align-items: center;
+        gap: 14px;
+    }
+    #weapon-icon, #weapon-name { display: none; }
+    .seg-mag { font-size: 26px; }
+    .seg-reserve, .ammo-separator { font-size: 12px; }
+    #reload-state { min-height: 10px; margin-top: 0; font-size: 8px; letter-spacing: 0.2em; }
+
+    /* grenades: tiny pips only (count + icon add nothing at this size) */
+    #grenade-icon, .seg-grenade { display: none; }
+    .grenade-pips .pip { width: 6px; height: 12px; }
+
+    /* kill feed climbs back up now the top-right corner is free */
+    #kill-feed { top: calc(64px + env(safe-area-inset-top)); }
+}
+
+/* ---- reduced motion: kill the retro loops (flicker / spinner) outright ---- */
+@media (prefers-reduced-motion: reduce) {
+    #entry-overlay::after, #splash::after, #map-change::after { animation: none !important; }
+    .mc-seg span { animation: none !important; opacity: 1 !important; }
 }

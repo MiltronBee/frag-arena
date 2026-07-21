@@ -18,6 +18,55 @@ export default class MenuControls {
     this._wireWallet()
     this._wireModals()
     this._wirePlates()
+    this._wireNowPlaying()
+  }
+
+  // NOW PLAYING readout under the PLAY plate: poll /mapinfo (~10s) while the menu
+  // is the active surface and render the live rotation line. Defensive by design:
+  // an old server returns only { mapId, name, mode } — no modeName/mapName → the
+  // line stays hidden (data-live="false"). Fetch failures are silent.
+  _wireNowPlaying() {
+    this._npEl = document.getElementById('now-playing')
+    if (!this._npEl || typeof fetch !== 'function') return
+    const url = location.protocol === 'https:'
+      ? `https://${location.host}/mapinfo`
+      : `http://${location.hostname}:8078/mapinfo`
+    const poll = async () => {
+      // only while the menu is actually up (interval keeps ticking cheaply)
+      const overlay = document.getElementById('entry-overlay')
+      if (!overlay || !overlay.classList.contains('is-visible')) return
+      if (document.body.classList.contains('arena-entered')) return
+      try {
+        const res = await fetch(url, { cache: 'no-store' })
+        if (res.ok) this._paintNowPlaying(await res.json())
+      } catch (e) { /* unreachable / pre-endpoint server — line stays hidden */ }
+    }
+    poll()
+    this._npTimer = setInterval(poll, 10000)
+  }
+
+  _paintNowPlaying(info) {
+    const el = this._npEl
+    if (!el) return
+    // extended shape only: { mapName, modeName, players, bots, next: {...} }
+    if (!info || !info.modeName || !info.mapName) {
+      el.setAttribute('data-live', 'false')
+      return
+    }
+    const total = (info.players | 0) + (info.bots | 0)
+    const now = `${info.modeName} · ${info.mapName} · ${total} IN ARENA`.toUpperCase()
+    const nowEl = document.getElementById('np-now-text')
+    if (nowEl && nowEl.textContent !== now) nowEl.textContent = now
+    const nextWrap = el.querySelector('.np-next')
+    const nextEl = document.getElementById('np-next-text')
+    if (info.next && info.next.modeName && info.next.mapName) {
+      const next = `${info.next.modeName} · ${info.next.mapName}`.toUpperCase()
+      if (nextEl && nextEl.textContent !== next) nextEl.textContent = next
+      if (nextWrap) nextWrap.style.display = ''
+    } else if (nextWrap) {
+      nextWrap.style.display = 'none'
+    }
+    el.setAttribute('data-live', 'true')
   }
 
   // CALLSIGN: persist to localStorage, prefill on return. Purely cosmetic today
