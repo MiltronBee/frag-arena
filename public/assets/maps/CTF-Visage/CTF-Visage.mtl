@@ -5,7 +5,7 @@ Kd 0.8 0.8 0.8
 Ka 0.1 0.1 0.1
 Ks 0.0 0.0 0.0
 illum 1
-map_Kd textures/CTF_Crypt_C-rst-128-B.webp
+map_Kd textures/CTF_Crypt_C-rst-128-B.webp?v=sol1
 map_bump -bm 1.2 textures/CTF_Crypt_C-rst-128-B_n.webp
 
 
@@ -14,7 +14,7 @@ Kd 0.8 0.8 0.8
 Ka 0.1 0.1 0.1
 Ks 0.0 0.0 0.0
 illum 1
-map_Kd textures/CTF_Crypt_C-st-128-R.webp
+map_Kd textures/CTF_Crypt_C-st-128-R.webp?v=sol1
 map_bump -bm 1.2 textures/CTF_Crypt_C-st-128-R_n.webp
 
 
@@ -204,7 +204,7 @@ Kd 0.8 0.8 0.8
 Ka 0.1 0.1 0.1
 Ks 0.0 0.0 0.0
 illum 1
-map_Kd textures/SkyCity_Deco_runeSgn2.webp
+map_Kd textures/SkyCity_Deco_runeSgn2.webp?v=sol1
 map_bump -bm 1.2 textures/SkyCity_Deco_runeSgn2_n.webp
 
 
@@ -221,7 +221,7 @@ Kd 0.8 0.8 0.8
 Ka 0.1 0.1 0.1
 Ks 0.0 0.0 0.0
 illum 1
-map_Kd textures/SkyCity_Deco_sKantis2.webp
+map_Kd textures/SkyCity_Deco_sKantis2.webp?v=sol1
 map_bump -bm 1.2 textures/SkyCity_Deco_sKantis2_n.webp
 
 
