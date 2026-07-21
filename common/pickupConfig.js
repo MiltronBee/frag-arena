@@ -60,13 +60,15 @@ export const RESPAWN_SECONDS = {
 }
 
 // ── TUNABLE: rest height above the probed floor (world units) ────────────────────
-// Weapons float highest so they read as "grab me"; consumables sit lower.
+// FLAT-EXCEPT-HEALTH (#38): only HEALTH sits high enough to bob (it floats + bobs as
+// its grab-me tell). Weapons, ammo, armor and powerups sit FLAT on the floor (~0.1),
+// no spin, no bob — the client (_updatePickups) pins their y and skips the bob.
 export const REST_HEIGHT = {
 	[PICKUP_TYPE.WEAPON]:  0.1,
-	[PICKUP_TYPE.AMMO]:    0.3,
+	[PICKUP_TYPE.AMMO]:    0.1,
 	[PICKUP_TYPE.HEALTH]:  0.3,
-	[PICKUP_TYPE.ARMOR]:   0.3,
-	[PICKUP_TYPE.POWERUP]: 0.9,
+	[PICKUP_TYPE.ARMOR]:   0.1,
+	[PICKUP_TYPE.POWERUP]: 0.1,
 }
 
 // Grant tuning (server-authoritative). HEALTH heals up to HEALTH_CAP (no overheal —

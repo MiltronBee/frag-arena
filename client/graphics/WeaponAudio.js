@@ -30,6 +30,17 @@ const SFX_NAMES = [
   'grenade_explosion', 'weapon_swap', 'death', 'respawn',
   'impact_flesh', 'pain_grunt', 'kill_confirm',
 ]
+// ANNOUNCER voice clips (public/assets/sfx/announcer/<name>.mp3 — authored OFFLINE by
+// scripts/generate-announcer.mjs; index.json is the manifest). Loaded into the SAME
+// this._buf pool as the weapon SFX and played 2D through the master bus by announce().
+// Headshot + match-event + kill-medal callouts (Simulator/FragLayer trigger them).
+const ANNOUNCER_NAMES = [
+  'headshot', 'first_blood', 'double_kill', 'triple_kill', 'multi_kill',
+  'killing_spree', 'rampage', 'unstoppable', 'godlike',
+  'fight', 'victory', 'defeat', 'draw',
+  'team_deathmatch', 'capture_the_flag', 'domination',
+  'flag_taken', 'flag_captured', 'flag_returned', 'point_captured',
+]
 // weapon index -> clip prefix (0=rifle,1=smg,2=shotgun,3=pistol,4=plasma,5=flak).
 // Any other index has no prefix -> procedural path. Plasma/Flak reloads were
 // previously SILENT (no prefix) and their fire was procedural-only; adding them
@@ -132,12 +143,16 @@ export default class WeaponAudio {
     if (this._samplesLoading || this._samplesLoaded || !this.ctx) return
     this._samplesLoading = true
     const v = (typeof window !== 'undefined' && window.__BUILD_ID__) ? '?v=' + window.__BUILD_ID__ : ''
-    Promise.allSettled(SFX_NAMES.map((name) =>
-      fetch('/assets/sfx/' + name + '.mp3' + v)
+    const load = (path, key) =>
+      fetch('/assets/sfx/' + path + '.mp3' + v)
         .then((r) => { if (!r.ok) throw new Error(String(r.status)); return r.arrayBuffer() })
         .then((ab) => this.ctx.decodeAudioData(ab))
-        .then((buf) => { this._buf[name] = buf })
-    )).then(() => { this._samplesLoaded = true; this._samplesLoading = false })
+        .then((buf) => { this._buf[key] = buf })
+    // weapon SFX (sfx/<name>.mp3) + announcer voice (sfx/announcer/<name>.mp3), all into
+    // the one this._buf pool keyed by name (announcer names never collide with SFX_NAMES).
+    const jobs = SFX_NAMES.map((name) => load(name, name))
+      .concat(ANNOUNCER_NAMES.map((name) => load('announcer/' + name, name)))
+    Promise.allSettled(jobs).then(() => { this._samplesLoaded = true; this._samplesLoading = false })
   }
 
   // Play a loaded sample clip through the master (limiter) bus. Fire-and-forget:
@@ -764,17 +779,26 @@ export default class WeaponAudio {
     osc.start(t0); osc.stop(t0 + (kill ? 0.14 : 0.08))
   }
 
-  // Headshot ANNOUNCER hook (authoritative-only; called from FragLayer.onHitConfirmed
-  // when the server flags a head hit). Reuses the sample pipeline: plays the 'headshot'
-  // voice clip IF it is loaded. NOTE: NO headshot voice asset ships yet — 'headshot' is
-  // absent from SFX_NAMES and scripts/generate-sfx.mjs authors none — so today this is
-  // a wired NO-OP (silent). We deliberately do NOT synthesize a stand-in voice (wire the
-  // hook + note the missing asset, per design). To voice it: add 'headshot' to
-  // SFX_NAMES and generate the clip offline.
+  // Generic ANNOUNCER voice: play a loaded announcer clip (ANNOUNCER_NAMES) 2D through the
+  // master bus. Falls back to silence if the clip isn't loaded (announcer assets now ship —
+  // see loadSamples). A short global cooldown prevents two callouts (e.g. a headshot + a
+  // multi-kill on the same frame) from stacking into mush; the higher-priority caller wins
+  // the frame and the other is dropped rather than layered. Returns true if a clip played.
+  announce(name, opts = {}) {
+    if (!this.ctx || !this._buf[name]) return false
+    const now = this.ctx.currentTime
+    const minGap = opts.minGap != null ? opts.minGap : 0.6
+    if (now - (this._lastAnnounceAt == null ? -9 : this._lastAnnounceAt) < minGap) return false
+    this._lastAnnounceAt = now
+    return this.playClip(name, { gain: opts.gain != null ? opts.gain : 0.85 })
+  }
+
+  // Headshot ANNOUNCER hook (authoritative-only; called from FragLayer.onHitConfirmed when
+  // the server flags a head hit). The 'headshot' voice clip now ships (announcer/headshot.mp3)
+  // and is loaded by loadSamples, so this plays it; a shorter cooldown keeps rapid headshots
+  // punchy without machine-gunning the voice.
   announceHeadshot() {
-    if (!this.ctx) return
-    if (this._buf.headshot) { this.playClip('headshot', { gain: 0.7 }); return }
-    // asset missing -> hook is live but silent.
+    return this.announce('headshot', { gain: 0.75, minGap: 0.35 })
   }
 
   // ==== Procedural UI / feedback layer (Kimi K3 SFX spec, bit 1) =============

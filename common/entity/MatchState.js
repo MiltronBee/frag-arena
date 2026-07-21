@@ -21,11 +21,20 @@ import { Engine, MeshBuilder, Vector3 } from '../babylon.node.js'
 // having no `.client`, can never resolve to a damage target.
 //
 // PHASE mirrors GameInstance.MATCH_PHASE:
-//   0 ACTIVE    — a live match; timeRemainingMs counts down toward TIME_LIMIT_MS
-//   1 MATCH_END — intermission; `winner` is set, scores frozen at their final value
-export const MATCH_PHASE = { ACTIVE: 0, MATCH_END: 1 }
-// WINNER encoding: 0 = team 0 (RED), 1 = team 1 (BLUE), 2 = draw / none-yet.
+//   0 ACTIVE       — a live match; timeRemainingMs counts down toward TIME_LIMIT_MS
+//   1 MATCH_END    — intermission; `winner` is set, scores frozen at their final value
+//   2 SUDDEN_DEATH — overtime: scores were exactly tied at the 8:00 check or at 10:00,
+//                    so the match plays on with NO clock until the first frag / lead
+//                    change decides it (replaces the old DRAW-on-tie outcome).
+export const MATCH_PHASE = { ACTIVE: 0, MATCH_END: 1, SUDDEN_DEATH: 2 }
+// WINNER encoding: 0 = team 0 (RED), 1 = team 1 (BLUE), 2 = draw / none-yet. In FFA the
+// winner is an INDIVIDUAL, so `winner` is unused (stays DRAW) — the client derives its
+// own victory/defeat from the authoritative networked per-player kill counts.
 export const MATCH_WINNER = { TEAM0: 0, TEAM1: 1, DRAW: 2 }
+// MODE encoding carried on the MatchState so the client knows how to read the match:
+//   0 TDM — two team scores, friendly fire off
+//   1 FFA — no teams, individual frag scoring, everyone can damage everyone
+export const MATCH_MODE = { TDM: 0, FFA: 1 }
 
 class MatchState {
 	constructor(startX = 0, startY = 0, startZ = 0) {
@@ -51,6 +60,9 @@ class MatchState {
 		this.teamScore1 = 0
 		this.timeRemainingMs = 0
 		this.winner = MATCH_WINNER.DRAW
+		// game mode (TDM/FFA). Set by GameInstance from the map/constant at boot; the
+		// client reads it to pick the team scoreboard vs the FFA leaderboard + announcer.
+		this.mode = MATCH_MODE.TDM
 	}
 
 	get x() { return this.mesh.position.x }
@@ -73,7 +85,8 @@ MatchState.protocol = {
 	teamScore0: nengi.Int16,
 	teamScore1: nengi.Int16,
 	timeRemainingMs: nengi.UInt32,
-	winner: nengi.UInt8
+	winner: nengi.UInt8,
+	mode: nengi.UInt8
 }
 
 export default MatchState

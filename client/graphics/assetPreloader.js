@@ -55,6 +55,23 @@ function loadFonts() {
     .then(() => (document.fonts.ready || Promise.resolve()).catch(() => null))
 }
 
+// Warm the announcer voice clips into the HTTP cache (fetch-only; no decode — there is no
+// AudioContext until the user-gesture resume in WeaponAudio). Reads the manifest so the set
+// tracks whatever generate-announcer.mjs shipped. Non-fatal: a miss just means WeaponAudio
+// fetches that clip cold later. Cache-busted with __BUILD_ID__ to match WeaponAudio's keys.
+function warmAnnouncer() {
+  if (typeof fetch === 'undefined') return Promise.resolve()
+  const v = (typeof window !== 'undefined' && window.__BUILD_ID__) ? '?v=' + window.__BUILD_ID__ : ''
+  return fetch('/assets/sfx/announcer/index.json' + v)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((manifest) => {
+      const clips = manifest && manifest.clips ? Object.values(manifest.clips) : []
+      const urls = clips.map((c) => c && c.file).filter(Boolean)
+      return Promise.allSettled(urls.map((f) => fetch('/assets/sfx/' + f + v).then((r) => r.arrayBuffer())))
+    })
+    .catch(() => null)
+}
+
 export default function preloadAssets(renderer, arenaReadyPromise, onProgress) {
   const scene = renderer && renderer.scene
 
@@ -114,6 +131,13 @@ export default function preloadAssets(renderer, arenaReadyPromise, onProgress) {
   pickupModelUrls.forEach((url) => {
     items.push({ w: 0.3, stage: 'EFFECTS', run: () => warmProp(scene, url) })
   })
+
+  // SOUNDS — warm the ANNOUNCER voice clips into the HTTP cache behind the gate so
+  // WeaponAudio's first decode (on the user-gesture resume) is instant. Fetch-only (no
+  // AudioContext exists yet at preload time — WeaponAudio decodes them itself). The set is
+  // read from the shipped manifest so it always matches what generate-announcer.mjs wrote.
+  // Cache-busted with the SAME __BUILD_ID__ WeaponAudio uses, so the warm entry hits.
+  items.push({ w: 0.5, stage: 'SOUNDS', run: () => warmAnnouncer() })
 
   // FINALIZING — resolve UI fonts (labeled generically so the last stage the
   // player sees reads as "wrapping up").

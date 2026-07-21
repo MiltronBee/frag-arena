@@ -27,7 +27,7 @@ import { resolveWeaponFx } from './graphics/firingFx'
 import { assets, weapons } from './assets/assetManifest'
 import preloadAssets from './graphics/assetPreloader'
 import { MEGA_STATE } from '../common/entity/MegaHealthPickup'
-import { MATCH_PHASE, MATCH_WINNER } from '../common/entity/MatchState'
+import { MATCH_PHASE, MATCH_WINNER, MATCH_MODE } from '../common/entity/MatchState'
 import { PICKUP_TYPE, PICKUP_RADIUS } from '../common/pickupConfig'
 
 // Aim-safe positional camera pulse on a confirmed LOCAL flesh hit (world units of
@@ -295,11 +295,22 @@ class Simulator {
 		// broadcast: kill feed, frag banner, victim corpse/gib, own-death camera
 		client.on('message::Killed', message => {
 			this.fragLayer.onKilled(message)
-			// local-player death sting: gate on the LOCAL player being the victim
-			// (same iDied test FragLayer.onKilled uses, keyed by our smooth nid)
-			if (this.mySmoothEntity && message.victimNid === this.mySmoothEntity.nid) {
+			const myNid = this.mySmoothEntity ? this.mySmoothEntity.nid : null
+			const suicide = message.killerNid === message.victimNid
+			const iKilled = myNid != null && message.killerNid === myNid && !suicide && message.victimNid !== myNid
+			const iDied = myNid != null && message.victimNid === myNid
+			// local-player death sting + medal reset (streak/multi-kill end on my death)
+			if (iDied) {
 				this.audio.death()
+				this._onLocalDeath()
 			}
+			// FIRST BLOOD: the first non-suicide kill of the match, announced only if I got it.
+			if (!suicide && !this._firstKillSeen) {
+				this._firstKillSeen = true
+				if (iKilled) this.audio.announce('first_blood', { gain: 0.9, minGap: 0 })
+			}
+			// KILL MEDALS for the local player (multi-kill window + no-death streak).
+			if (iKilled) this._onLocalKill()
 		})
 
 		// victim-only: directional damage arc + scaled red screen wash
@@ -325,11 +336,17 @@ class Simulator {
 			if (spec && spec.type === 'hitscan') {
 				const offsets = shotPattern(spec, message.seed, message.heat, message.aimFactor)
 				const maxTracers = (fx.tracer && fx.tracer.pelletTracers) || offsets.length
+				// Bound the observer's wall marks to the SAME server-side reach the local fire
+				// path uses: max(range, ADS-extended falloffEnd) via the shared falloffRange
+				// helper (message.aimFactor is the shot's authoritative ADS ramp). Without this
+				// a remote player's shots painted marks past weapon reach (issue #32).
+				const reach = Math.max(spec.range || 0,
+					falloffRange(spec, message.aimFactor).end) || Number.MAX_VALUE
 				offsets.forEach((off, i) => {
 					const d = applyPattern({ x: message.tx, y: message.ty, z: message.tz }, off)
 					this.renderer.drawHitscan(
 						{ x: message.x, y: message.y, z: message.z, tx: d.x, ty: d.y, tz: d.z },
-						{ fx, muzzle: i === 0, tracer: i < maxTracers }
+						{ fx, muzzle: i === 0, tracer: i < maxTracers, reach }
 					)
 				})
 			} else {
@@ -736,16 +753,93 @@ class Simulator {
 		if (this._matchState && this._matchState.nid === nid) this._matchState = null
 	}
 
-	// Paint the TDM scoreboard (both team scores), the match countdown, and the
-	// MATCH_END winner banner off the networked MatchState. Presentation only — the
-	// server owns every value. Cheap: only touches the DOM when a field changes.
+	// ── LOCAL KILL MEDALS (announcer) ────────────────────────────────────────────
+	// Purely local + client-side: the server owns kills; this just voices UT-style medals
+	// for the LOCAL player off the broadcast Killed feed. Reset each match (new-match phase
+	// transition) and on the local player's death (ends multi-kill window + no-death streak).
+	_resetMedals() {
+		this._killStreak = 0
+		this._multiTimes = []
+		this._firstKillSeen = false
+	}
+
+	// local player died: a no-death streak and the rapid-succession window both end.
+	_onLocalDeath() {
+		this._killStreak = 0
+		this._multiTimes = []
+	}
+
+	// local player got a frag: advance the multi-kill window (~4s) + the no-death streak,
+	// and voice the highest medal earned. A milestone STREAK outranks a multi-kill on the
+	// same frag (the announce cooldown drops the lower-priority second call).
+	_onLocalKill() {
+		const now = performance.now()
+		this._multiTimes = (this._multiTimes || []).filter((t) => now - t <= 4000)
+		this._multiTimes.push(now)
+		const n = this._multiTimes.length
+		this._killStreak = (this._killStreak || 0) + 1
+		const streakClip = this._killStreak === 5 ? 'killing_spree'
+			: this._killStreak === 10 ? 'rampage'
+			: this._killStreak === 15 ? 'unstoppable'
+			: this._killStreak === 20 ? 'godlike' : null
+		const multiClip = n === 2 ? 'double_kill' : n === 3 ? 'triple_kill' : n >= 4 ? 'multi_kill' : null
+		if (!this.audio) return
+		// streak milestone (bigger deal) first, at minGap 0 so it always plays; the multi
+		// callout then hits the default cooldown and is dropped when both land the same frag.
+		if (streakClip) this.audio.announce(streakClip, { gain: 0.95, minGap: 0 })
+		if (multiClip) this.audio.announce(multiClip, { gain: 0.85 })
+	}
+
+	// The local player's FFA standing: my frags (my networked kills), the current TOP frags
+	// across every player entity (server-authoritative kills — the client only READS them),
+	// and whether I'm the leader. Used for the FFA scoreboard + the victory/defeat announcer.
+	_ffaStanding() {
+		let myFrags = 0
+		if (this.myRawEntity && typeof this.myRawEntity.kills === 'number') myFrags = this.myRawEntity.kills | 0
+		else if (this.mySmoothEntity && typeof this.mySmoothEntity.kills === 'number') myFrags = this.mySmoothEntity.kills | 0
+		let topFrags = 0
+		const ents = this.client && this.client.entities
+		if (ents && ents.forEach) {
+			ents.forEach((e) => {
+				// only player entities carry a numeric `kills` (MatchState/Pickup/Mega do not).
+				if (e && typeof e.kills === 'number' && e.kills > topFrags) topFrags = e.kills | 0
+			})
+		}
+		if (myFrags > topFrags) topFrags = myFrags
+		return { myFrags, topFrags, amTop: myFrags >= topFrags }
+	}
+
+	// Paint the scoreboard (TDM: both team scores / FFA: my frags vs the leader), the match
+	// countdown, and the MATCH_END banner off the networked MatchState — and trigger the
+	// match-event ANNOUNCER on phase transitions (fight / mode callout / victory / defeat /
+	// sudden-death). Presentation + reaction only: the server owns phase, scores and winner;
+	// the client never asserts any of them. Cheap: only touches the DOM when a field changes.
 	_updateMatchHud() {
 		const ms = this._matchState
 		const board = document.getElementById('tdm-scoreboard')
 		if (!ms || !board) return
 
-		const s0 = ms.teamScore0 | 0
-		const s1 = ms.teamScore1 | 0
+		const mode = ms.mode | 0
+		const ffa = mode === MATCH_MODE.FFA
+		if (ffa !== this._lastFfa) {
+			this._lastFfa = ffa
+			board.setAttribute('data-mode', ffa ? 'ffa' : 'tdm')
+			// relabel the two score slots for FFA (personal frags vs the leaderboard top).
+			const redTag = board.querySelector('.tdm-side-red .tdm-tag')
+			const blueTag = board.querySelector('.tdm-side-blue .tdm-tag')
+			if (redTag) redTag.textContent = ffa ? 'YOU' : 'RED'
+			if (blueTag) blueTag.textContent = ffa ? 'TOP' : 'BLUE'
+		}
+
+		// score readout. TDM: the two team scores. FFA: my frags (red slot) vs the current
+		// leader's frags (blue slot) — a minimal personal/leaderboard readout.
+		let s0, s1
+		if (ffa) {
+			const st = this._ffaStanding()
+			s0 = st.myFrags; s1 = st.topFrags
+		} else {
+			s0 = ms.teamScore0 | 0; s1 = ms.teamScore1 | 0
+		}
 		if (s0 !== this._lastTdmS0) {
 			this._lastTdmS0 = s0
 			const el = document.getElementById('tdm-score-red')
@@ -757,25 +851,29 @@ class Simulator {
 			if (el) el.textContent = String(s1)
 		}
 
-		// countdown mm:ss (server quantizes to 100ms; ceil so it never shows 0:00 early)
+		const phase = ms.phase | 0
+
+		// countdown mm:ss (server quantizes to 100ms; ceil so it never shows 0:00 early).
+		// SUDDEN_DEATH has no clock — show "OT" instead of a time.
 		const secs = Math.max(0, Math.ceil((ms.timeRemainingMs | 0) / 1000))
-		if (secs !== this._lastTdmSecs) {
-			this._lastTdmSecs = secs
+		const timeText = phase === MATCH_PHASE.SUDDEN_DEATH
+			? 'OT' : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
+		if (timeText !== this._lastTdmTimeText) {
+			this._lastTdmTimeText = timeText
 			const el = document.getElementById('tdm-timer')
-			if (el) el.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
+			if (el) el.textContent = timeText
 		}
 
 		// which team is the local player on? Highlight it (data-myteam), read off our own
-		// entity's replicated teamId (available once we've spawned).
+		// entity's replicated teamId (available once we've spawned). No-op highlight in FFA.
 		const myTeam = this.myRawEntity ? this.myRawEntity.teamId
 			: (this.mySmoothEntity ? this.mySmoothEntity.teamId : undefined)
 		if (myTeam !== this._lastTdmMyTeam) {
 			this._lastTdmMyTeam = myTeam
-			board.setAttribute('data-myteam', myTeam === 0 ? 'red' : myTeam === 1 ? 'blue' : 'none')
+			board.setAttribute('data-myteam', ffa ? 'none' : myTeam === 0 ? 'red' : myTeam === 1 ? 'blue' : 'none')
 		}
 
 		// phase / winner banner
-		const phase = ms.phase | 0
 		const winner = ms.winner | 0
 		if (phase !== this._lastTdmPhase || winner !== this._lastTdmWinner) {
 			this._lastTdmPhase = phase
@@ -783,20 +881,51 @@ class Simulator {
 			const banner = document.getElementById('tdm-banner')
 			const ended = phase === MATCH_PHASE.MATCH_END
 			board.classList.toggle('match-over', ended)
+			board.classList.toggle('sudden-death', phase === MATCH_PHASE.SUDDEN_DEATH)
 			if (banner) {
 				banner.classList.toggle('is-visible', ended)
 				if (ended) {
-					const title = winner === MATCH_WINNER.TEAM0 ? 'RED WINS'
-						: winner === MATCH_WINNER.TEAM1 ? 'BLUE WINS' : 'DRAW'
-					const tEl = document.getElementById('tdm-banner-title')
-					const sEl = document.getElementById('tdm-banner-score')
-					if (tEl) {
-						tEl.textContent = title
-						tEl.className = winner === MATCH_WINNER.TEAM0 ? 'tdm-red'
+					let title, cls
+					if (ffa) {
+						const won = this._ffaStanding().amTop
+						title = won ? 'VICTORY' : 'DEFEAT'
+						cls = won ? 'tdm-red' : ''
+					} else {
+						title = winner === MATCH_WINNER.TEAM0 ? 'RED WINS'
+							: winner === MATCH_WINNER.TEAM1 ? 'BLUE WINS' : 'DRAW'
+						cls = winner === MATCH_WINNER.TEAM0 ? 'tdm-red'
 							: winner === MATCH_WINNER.TEAM1 ? 'tdm-blue' : ''
 					}
+					const tEl = document.getElementById('tdm-banner-title')
+					const sEl = document.getElementById('tdm-banner-score')
+					if (tEl) { tEl.textContent = title; tEl.className = cls }
 					if (sEl) sEl.textContent = `${s0} — ${s1}`
 				}
+			}
+		}
+
+		// ── MATCH-EVENT ANNOUNCER (client reacts to MatchState transitions; no server code) ──
+		// First observed phase seeds the guard so joining mid-match never fires a callout.
+		if (this._annPhase === undefined) {
+			this._annPhase = phase
+		} else if (phase !== this._annPhase && this.audio) {
+			this._annPhase = phase
+			if (phase === MATCH_PHASE.ACTIVE) {
+				// new match kicked off (out of the MATCH_END intermission): reset local kill
+				// medals, then "Fight!" + a staggered mode callout (both heard past cooldown).
+				this._resetMedals()
+				this.audio.announce('fight', { gain: 0.9 })
+				if (!ffa) setTimeout(() => { if (this.audio) this.audio.announce('team_deathmatch', { gain: 0.85, minGap: 0 }) }, 1400)
+			} else if (phase === MATCH_PHASE.SUDDEN_DEATH) {
+				// overtime tension cue (no bespoke sudden-death clip ships — reuse "Fight!").
+				this.audio.announce('fight', { gain: 0.9 })
+			} else if (phase === MATCH_PHASE.MATCH_END) {
+				let won
+				if (ffa) won = this._ffaStanding().amTop
+				else won = (winner === MATCH_WINNER.TEAM0 && myTeam === 0)
+					|| (winner === MATCH_WINNER.TEAM1 && myTeam === 1)
+				const draw = !ffa && winner === MATCH_WINNER.DRAW
+				this.audio.announce(draw ? 'draw' : won ? 'victory' : 'defeat', { gain: 0.95, minGap: 0 })
 			}
 		}
 	}
@@ -971,14 +1100,16 @@ class Simulator {
 			if (model && model.setEnabled) model.setEnabled(shown)
 			if (e._pedestal && e._pedestal.setEnabled) e._pedestal.setEnabled(shown)
 			if (!shown) return
-			if (model) model.rotation.y = (now * 0.0011) % (Math.PI * 2)
-			// WEAPON pickups REST ON THE FLOOR (UT ground-weapon look): slow spin only,
-			// no vertical float. Consumables/other types keep the gentle up/down bob.
-			if (e.type === PICKUP_TYPE.WEAPON) {
-				mesh.position.y = e.y
-			} else {
+			// PICKUP MOTION (#38): ONLY health floats. Health bobs + slow-spins as its
+			// grab-me tell; weapons, ammo, armor and powerups rest FLAT on the floor with
+			// NO spin and NO bob (walks back the old weapon spin + consumable bob).
+			if (e.type === PICKUP_TYPE.HEALTH) {
+				if (model) model.rotation.y = (now * 0.0011) % (Math.PI * 2)
 				const bob = Math.sin(now * 0.0025 + (e.nid || 0)) * 0.1
 				mesh.position.y = e.y + bob
+			} else {
+				if (model) model.rotation.y = 0
+				mesh.position.y = e.y
 			}
 		})
 	}

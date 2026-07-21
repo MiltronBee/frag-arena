@@ -330,6 +330,15 @@ a:focus-visible {
     background: var(--blood-bright);
     box-shadow: var(--glow-blood);
 }
+/* HEADSHOT marker (#33): authoritative head-hit gets a distinct GOLD tick treatment that
+   reads stronger than a heavy body hit, layered over whatever base marker the shot earned
+   (.hit-active or .kill-active). Simulator._showHitMarker toggles .headshot-active alongside
+   the "Headshot!" announcer (FragLayer) + the kill-feed HEADSHOT badge. */
+#hit-marker.headshot-active i {
+    background: var(--amber, #ffd24a);
+    box-shadow: 0 0 8px rgba(255, 210, 90, .95), 0 0 4px rgba(7, 9, 12, .85);
+    height: 3px;
+}
 /* skull micro-icon that pops above the crosshair on a KILL confirm only (spec §5.1).
    BIT 2: .hm-skull is now an inline SVG styled as a FILL target (not a radial mask)
    — deterministic across browsers, no mask-composite eye-hole bug. Hidden
@@ -3117,6 +3126,18 @@ body.player-dead #touch-controls {
 }
 /* dim the strip a touch during the intermission (the banner takes over) */
 #tdm-scoreboard.match-over { opacity: 0.5; }
+
+/* FFA: no teams — neutralize the red/blue team coloring so the two slots read as a plain
+   personal-vs-leader frag readout (JS relabels the tags YOU / TOP). */
+#tdm-scoreboard[data-mode="ffa"] .tdm-side-red,
+#tdm-scoreboard[data-mode="ffa"] .tdm-side-blue { color: #e6e9ef; }
+#tdm-scoreboard[data-mode="ffa"] .tdm-tag::after { content: none !important; }
+/* SUDDEN DEATH overtime: flash the clock (which reads "OT") red so the stakes read. */
+#tdm-scoreboard.sudden-death .tdm-timer {
+    color: var(--tdm-red);
+    animation: sudden-death-pulse 0.9s ease-in-out infinite;
+}
+@keyframes sudden-death-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 
 /* MATCH_END winner banner (centered overlay during the ~15s intermission) */
 #tdm-banner {

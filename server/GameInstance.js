@@ -24,7 +24,7 @@ import lagCompensatedHitscanCheck, { nearestWorldHit } from './lagCompensatedHit
 import Projectile from '../common/entity/Projectile'
 import Grenade from '../common/entity/Grenade'
 import MegaHealthPickup, { MEGA_STATE } from '../common/entity/MegaHealthPickup'
-import MatchState, { MATCH_PHASE, MATCH_WINNER } from '../common/entity/MatchState'
+import MatchState, { MATCH_PHASE, MATCH_WINNER, MATCH_MODE } from '../common/entity/MatchState'
 import setupPickups from './setupPickups'
 import Pickup from '../common/entity/Pickup'
 import {
@@ -165,14 +165,23 @@ const SPAWN_PROBE_DOWN = 6.0
 // TDM (Team Deathmatch) v1 — the first real game mode. All numbers are design
 // constants; the match runs perpetually with bots and a human joins mid-ACTIVE.
 // ---------------------------------------------------------------------------
-// Friendly fire: a shot on a TEAMMATE deals 0 damage and scores nothing. Single
-// tunable — flip to true for FFA-style same-team damage.
+// Friendly fire: a shot on a TEAMMATE deals 0 damage and scores nothing (TDM only).
+// Single tunable. FFA bypasses this entirely — everyone can damage everyone.
 const FRIENDLY_FIRE = false
-// First team to FRAG_LIMIT team-frags wins immediately; otherwise the higher score
-// at TIME_LIMIT_MS wins. On an EXACT tie at the time limit we declare a DRAW (the
-// simplest correct outcome — no sudden-death overtime in v1).
+// GAME MODE — TDM (two teams) or FFA (free-for-all, individual frags). Default TDM.
+// Resolved per-instance in the constructor from (in order): env MODE=FFA|TDM, the map
+// registry's `mode` field, else TDM. Full map-rotation wiring comes later; this makes
+// the concept real and the harness/testing switchable now.
+const GAME_MODE = { TDM: MATCH_MODE.TDM, FFA: MATCH_MODE.FFA }
+// The score cap is the DIFFICULTY dial and ENDS the match early the moment a team
+// (TDM) or a player (FFA) reaches it — at any time, including overtime. Kept at 40 as
+// the tunable starting difficulty (NOT a blowout number).
 const FRAG_LIMIT = 40
-const TIME_LIMIT_MS = 8 * 60 * 1000 // 8:00
+// Regulation runs to 10:00 — a decided match fills the ~10-minute block window. The
+// score cap can still end it earlier. TIE_CHECK_MS is the 8:00 mark: if the score is
+// EXACTLY tied there we go to SUDDEN DEATH immediately; otherwise play on to 10:00.
+const TIME_LIMIT_MS = 10 * 60 * 1000 // 10:00 regulation
+const TIE_CHECK_MS = 8 * 60 * 1000   // 8:00 sudden-death tie-check
 // MATCH_END intermission (winner banner + final scores) before the scores/kills
 // reset and a fresh ACTIVE match begins.
 const INTERMISSION_MS = 15 * 1000
@@ -260,6 +269,15 @@ class GameInstance {
 		this.matchEndAt = 0
 		this.matchWinner = MATCH_WINNER.DRAW
 		this._matchPublishAt = 0
+		// fires the 8:00 sudden-death tie-check exactly once per match (reset each match).
+		this._tieChecked = false
+		// GAME MODE resolution (env override → map registry `mode` → default TDM).
+		const envMode = (process.env.MODE || '').toUpperCase()
+		this.gameMode = envMode === 'FFA' ? GAME_MODE.FFA
+			: envMode === 'TDM' ? GAME_MODE.TDM
+			: (this.map && typeof this.map.mode === 'string' && this.map.mode.toUpperCase() === 'FFA'
+				? GAME_MODE.FFA : GAME_MODE.TDM)
+		console.log(`[match] mode=${this.gameMode === GAME_MODE.FFA ? 'FFA' : 'TDM'}`)
 		// Park it HIGH above the play space but INSIDE the nengi view AABB: centred in
 		// x/z, near the top of the box in y. That keeps it replicated to every client
 		// (the AABB culler reads its x/y/z) while putting its bare historian hitbox where
@@ -271,6 +289,7 @@ class GameInstance {
 		this.matchState.phase = this.matchPhase
 		this.matchState.timeRemainingMs = TIME_LIMIT_MS
 		this.matchState.winner = this.matchWinner
+		this.matchState.mode = this.gameMode
 		this.instance.addEntity(this.matchState)
 
 		// AI players: real PlayerCharacter entities driven by BotController through
@@ -1330,7 +1349,8 @@ class GameInstance {
 		// TDM FRIENDLY FIRE (off by default): a shot on a TEAMMATE deals 0 damage, no
 		// kill, no score. Self-damage (own grenade splash) is preserved — only a
 		// DISTINCT same-team attacker is blocked (attacker/victim are handles here).
-		if (!FRIENDLY_FIRE && attackerClient && attackerClient !== victimClient
+		// FFA has no teams: everyone can damage everyone, so this block is skipped.
+		if (this.gameMode !== GAME_MODE.FFA && !FRIENDLY_FIRE && attackerClient && attackerClient !== victimClient
 			&& attackerClient.rawEntity && raw.teamId === attackerClient.rawEntity.teamId) {
 			return
 		}
@@ -1418,19 +1438,19 @@ class GameInstance {
 			raw.deaths = Math.min(255, raw.deaths + 1)
 			smooth.deaths = raw.deaths
 			victimClient.respawnAt = Date.now() + GameInstance.RESPAWN_DELAY_MS
-			if (attackerClient && attackerClient.rawEntity) {
+			// A frag is only credited for killing SOMEONE ELSE. A self-kill (own grenade
+			// splash where attacker === victim) never increments the killer's kills — this
+			// keeps the kills stat honest AND lets FFA use kills directly as the frag score
+			// (a suicide must not read as +1 frag). deaths still increments above.
+			if (attackerClient && attackerClient !== victimClient && attackerClient.rawEntity) {
 				const ak = Math.min(255, attackerClient.rawEntity.kills + 1)
 				attackerClient.rawEntity.kills = ak
 				attackerClient.smoothEntity.kills = ak
 			}
 
-			// TDM team score: an ENEMY kill = +1 to the attacker's team; a self-kill (own
-			// grenade) or unattributed death = -1 to the victim's OWN team (standard TDM).
-			// Friendly fire is off, so a same-team attacker never reaches this branch.
-			const enemyKill = attackerClient && attackerClient !== victimClient
-				&& attackerClient.rawEntity && attackerClient.rawEntity.teamId !== raw.teamId
-			if (enemyKill) this.addTeamScore(attackerClient.rawEntity.teamId, +1)
-			else this.addTeamScore(raw.teamId, -1)
+			// Mode-aware frag scoring (TDM team score / FFA individual). Also drives the
+			// frag-cap early-end and the SUDDEN_DEATH first-frag decision.
+			this.scoreKill(attackerClient, victimClient)
 
 			// Killed → broadcast to EVERYONE via instance.messageAll. (addLocalMessage
 			// is NOT usable here: nengi local events are spatially culled and REQUIRE
@@ -1524,31 +1544,117 @@ class GameInstance {
 		return n[0] <= n[1] ? 0 : 1
 	}
 
-	// Adjust a team's score (may go negative on a suicide). Only mutates during ACTIVE
-	// — scores freeze through the MATCH_END intermission. A frag-limit reach ends the
-	// match immediately (checked here so a 40th frag wins on the very tick it lands).
-	addTeamScore(team, delta) {
-		if (this.matchPhase !== MATCH_PHASE.ACTIVE) return
-		if (team !== 0 && team !== 1) return
-		this.teamScore[team] += delta
-		if (this.teamScore[team] >= FRAG_LIMIT) this.endMatch()
+	// ---- Scoring (mode-aware) ---------------------------------------------------
+	// Scores only mutate while the match is LIVE (ACTIVE or SUDDEN_DEATH); they freeze
+	// through the MATCH_END intermission.
+	_scoringLive() {
+		return this.matchPhase === MATCH_PHASE.ACTIVE || this.matchPhase === MATCH_PHASE.SUDDEN_DEATH
 	}
 
-	// ACTIVE -> MATCH_END. Winner = higher score; an exact tie is a DRAW (v1 has no
-	// sudden-death overtime). Scores are frozen from here until resetMatch.
+	// Raw team-score mutation (no phase gate, no cap check — callers gate via scoreKill/
+	// scoreSelfKill and the cap is checked in _afterScore). May go negative on a suicide.
+	_addTeamScore(team, delta) {
+		if (team !== 0 && team !== 1) return
+		this.teamScore[team] += delta
+	}
+
+	// Every player's frag score in FFA (== networked kills), sorted DESC. Humans + bots,
+	// each once. Used for tie-checks, the leader, and the cap.
+	_ffaScores() {
+		const arr = []
+		this.instance.clients.forEach(c => { if (c.rawEntity) arr.push(c.rawEntity.kills | 0) })
+		this.bots.forEach(b => { if (b.rawEntity) arr.push(b.rawEntity.kills | 0) })
+		arr.sort((a, b) => b - a)
+		return arr
+	}
+
+	// EXACTLY tied at the top? TDM: the two team scores equal. FFA: the top-TWO players
+	// tied (spec). With <2 players there is no top-two tie (the lone leader stands).
+	scoresTied() {
+		if (this.gameMode === GAME_MODE.FFA) {
+			const s = this._ffaScores()
+			return s.length >= 2 && s[0] === s[1]
+		}
+		return this.teamScore[0] === this.teamScore[1]
+	}
+
+	// The leading score (TDM: higher team; FFA: top player). Drives the cap check.
+	leaderScore() {
+		if (this.gameMode === GAME_MODE.FFA) {
+			const s = this._ffaScores()
+			return s.length ? s[0] : 0
+		}
+		return Math.max(this.teamScore[0], this.teamScore[1])
+	}
+
+	// Post-score bookkeeping: in SUDDEN_DEATH the first frag / lead change (any break of
+	// the tie) decides the match; in ACTIVE the frag cap ends it early the moment it's hit.
+	_afterScore() {
+		if (this.matchPhase === MATCH_PHASE.SUDDEN_DEATH) {
+			if (!this.scoresTied()) this.endMatch()
+			return
+		}
+		if (this.matchPhase === MATCH_PHASE.ACTIVE) {
+			if (this.leaderScore() >= FRAG_LIMIT) this.endMatch()
+		}
+	}
+
+	// A kill by `attackerClient` on `victimClient`. TDM: +1 to the attacker's team on an
+	// enemy kill, else -1 to the victim's own team. FFA: the frag score IS the attacker's
+	// networked kills (already incremented in the kill branch for a genuine enemy frag), so
+	// there is nothing to add — just run the cap / sudden-death check.
+	scoreKill(attackerClient, victimClient) {
+		if (!this._scoringLive()) return
+		if (this.gameMode === GAME_MODE.FFA) {
+			// FFA score == kills (already applied). No suicide penalty in v1, so the server's
+			// winner (max kills) matches the client leaderboard exactly.
+		} else {
+			const raw = victimClient.rawEntity
+			const enemyKill = attackerClient && attackerClient !== victimClient
+				&& attackerClient.rawEntity && attackerClient.rawEntity.teamId !== raw.teamId
+			if (enemyKill) this._addTeamScore(attackerClient.rawEntity.teamId, +1)
+			else this._addTeamScore(raw.teamId, -1)
+		}
+		this._afterScore()
+	}
+
+	// An unattributed / self death (void fall, own grenade). TDM: -1 to the victim's own
+	// team. FFA: no score change (kills is untouched). May decide a TDM sudden-death lead.
+	scoreSelfKill(raw) {
+		if (!this._scoringLive()) return
+		if (this.gameMode !== GAME_MODE.FFA) this._addTeamScore(raw.teamId, -1)
+		this._afterScore()
+	}
+
+	// ACTIVE/SUDDEN_DEATH -> MATCH_END. Winner = higher team (TDM); FFA winner is an
+	// INDIVIDUAL — the client derives its own victory/defeat from the authoritative
+	// per-player kills, so `winner` stays DRAW (unused) in FFA. Scores freeze until reset.
 	endMatch() {
-		if (this.matchPhase !== MATCH_PHASE.ACTIVE) return
+		if (!this._scoringLive()) return
 		this.matchPhase = MATCH_PHASE.MATCH_END
 		this.matchEndAt = Date.now()
-		if (this.teamScore[0] > this.teamScore[1]) this.matchWinner = MATCH_WINNER.TEAM0
+		if (this.gameMode === GAME_MODE.FFA) {
+			this.matchWinner = MATCH_WINNER.DRAW // unused in FFA (individual winner)
+		} else if (this.teamScore[0] > this.teamScore[1]) this.matchWinner = MATCH_WINNER.TEAM0
 		else if (this.teamScore[1] > this.teamScore[0]) this.matchWinner = MATCH_WINNER.TEAM1
 		else this.matchWinner = MATCH_WINNER.DRAW
 		this._matchPublishAt = 0 // force an immediate publish of the end state
-		console.log(`[match] MATCH_END winner=${this.matchWinner} scores=${this.teamScore[0]}-${this.teamScore[1]}`)
+		const score = this.gameMode === GAME_MODE.FFA
+			? `top=${this.leaderScore()}` : `${this.teamScore[0]}-${this.teamScore[1]}`
+		console.log(`[match] MATCH_END winner=${this.matchWinner} ${score}`)
 	}
 
-	// MATCH_END -> ACTIVE. Reset team scores + every player's kills/deaths, restart the
-	// clock. Persistent server: the next match just begins (bots keep playing).
+	// ACTIVE -> SUDDEN_DEATH. Entered when scores are exactly tied at the 8:00 check or at
+	// 10:00. No clock; the next frag / lead change ends it (via _afterScore -> endMatch).
+	enterSuddenDeath() {
+		if (this.matchPhase !== MATCH_PHASE.ACTIVE) return
+		this.matchPhase = MATCH_PHASE.SUDDEN_DEATH
+		this._matchPublishAt = 0 // force an immediate publish of the overtime state
+		console.log('[match] SUDDEN_DEATH — next frag wins')
+	}
+
+	// MATCH_END -> ACTIVE. Reset team scores + every player's kills/deaths + the tie-check,
+	// restart the clock. Persistent server: the next match just begins (bots keep playing).
 	resetMatch(now) {
 		this.matchPhase = MATCH_PHASE.ACTIVE
 		this.teamScore[0] = 0
@@ -1556,6 +1662,7 @@ class GameInstance {
 		this.matchStartAt = now
 		this.matchEndAt = 0
 		this.matchWinner = MATCH_WINNER.DRAW
+		this._tieChecked = false
 		const clearScore = (raw, smooth) => {
 			if (raw) { raw.kills = 0; raw.deaths = 0 }
 			if (smooth) { smooth.kills = 0; smooth.deaths = 0 }
@@ -1566,24 +1673,30 @@ class GameInstance {
 		console.log('[match] new ACTIVE match started')
 	}
 
-	// Drive the match state machine + publish the low-rate MatchState entity. Called
-	// once per server tick; the entity only WRITES (and so nengi only SENDS) on a
-	// score/phase/winner change or every MATCH_PUBLISH_MS for the ticking countdown.
+	// Drive the match state machine + publish the low-rate MatchState entity. Called once
+	// per server tick. Regulation is 10:00 with an 8:00 tie-check; the frag cap can end it
+	// earlier (handled in _afterScore); an exact tie at 8:00 or 10:00 goes to SUDDEN_DEATH,
+	// which is then ended by the next frag. MATCH_END holds the intermission, then resets.
 	updateMatch(now) {
-		let remaining
 		if (this.matchPhase === MATCH_PHASE.ACTIVE) {
-			remaining = Math.max(0, TIME_LIMIT_MS - (now - this.matchStartAt))
-			// frag-limit wins are handled in addTeamScore the moment they happen; here we
-			// only need the time-expiry path (higher score wins; exact tie -> draw).
-			if (remaining <= 0) this.endMatch()
-		}
-		if (this.matchPhase === MATCH_PHASE.MATCH_END) {
-			remaining = 0
-			if (now - this.matchEndAt >= INTERMISSION_MS) {
-				this.resetMatch(now)
-				remaining = TIME_LIMIT_MS
+			const elapsed = now - this.matchStartAt
+			// 8:00 tie-check (once): exactly tied -> sudden death now; else play on to 10:00.
+			if (!this._tieChecked && elapsed >= TIE_CHECK_MS) {
+				this._tieChecked = true
+				if (this.scoresTied()) this.enterSuddenDeath()
+			}
+			// 10:00 regulation end: leader wins; still exactly tied -> sudden death.
+			if (this.matchPhase === MATCH_PHASE.ACTIVE && elapsed >= TIME_LIMIT_MS) {
+				if (this.scoresTied()) this.enterSuddenDeath()
+				else this.endMatch()
 			}
 		}
+		if (this.matchPhase === MATCH_PHASE.MATCH_END) {
+			if (now - this.matchEndAt >= INTERMISSION_MS) this.resetMatch(now)
+		}
+		// countdown: real time only during ACTIVE regulation; 0 in overtime / intermission.
+		const remaining = this.matchPhase === MATCH_PHASE.ACTIVE
+			? Math.max(0, TIME_LIMIT_MS - (now - this.matchStartAt)) : 0
 		this.publishMatchState(now, remaining)
 	}
 
@@ -1597,12 +1710,14 @@ class GameInstance {
 			|| ms.teamScore0 !== this.teamScore[0]
 			|| ms.teamScore1 !== this.teamScore[1]
 			|| ms.winner !== this.matchWinner
+			|| ms.mode !== this.gameMode
 		if (!changed && now < this._matchPublishAt) return
 		this._matchPublishAt = now + MATCH_PUBLISH_MS
 		ms.phase = this.matchPhase
 		ms.teamScore0 = this.teamScore[0]
 		ms.teamScore1 = this.teamScore[1]
 		ms.winner = this.matchWinner
+		ms.mode = this.gameMode
 		// quantize the countdown to 100ms so tiny per-tick drift doesn't churn the wire
 		ms.timeRemainingMs = Math.max(0, Math.round(remaining / 100) * 100)
 	}
@@ -1638,8 +1753,9 @@ class GameInstance {
 				raw.isAlive = false; smooth.isAlive = false
 				raw.velX = 0; raw.velY = 0; raw.velZ = 0
 				raw.deaths = Math.min(255, raw.deaths + 1); smooth.deaths = raw.deaths
-				// TDM: a void death is a suicide — -1 to the victim's own team (standard TDM).
-				this.addTeamScore(raw.teamId, -1)
+				// A void death is a suicide: TDM -1 to the victim's own team; FFA takes no
+				// score change (kills unchanged). May decide a SUDDEN_DEATH lead change (TDM).
+				this.scoreSelfKill(raw)
 				arm(Date.now() + GameInstance.RESPAWN_DELAY_MS)
 				this.instance.messageAll(new Killed(smooth.nid, smooth.nid, 0, 0, false))
 			}

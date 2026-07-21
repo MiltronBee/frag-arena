@@ -1,0 +1,258 @@
+{
+  "generated_at": "2026-07-21T06:48:52.901Z",
+  "voice_id": "bqtGibd9LR6cgGFVVu09",
+  "model_id": "eleven_multilingual_v2",
+  "chosen_variant": "v2",
+  "effect": "ffmpeg monster chain: silenceremove(trim+collapse) -> asetrate/aresample/atempo(deepen, tempo-restored) -> tremolo(oscillation) -> volume+asoftclip=tanh(slight distortion) -> [acrusher on v3] -> lowpass(roll off highs) -> dynaudnorm",
+  "variants": {
+    "v1": {
+      "label": "light",
+      "P": 0.82,
+      "tremF": 5,
+      "tremD": 0.25,
+      "drive": 4,
+      "lowpass": 3500,
+      "crush": null
+    },
+    "v2": {
+      "label": "medium",
+      "P": 0.78,
+      "tremF": 6,
+      "tremD": 0.35,
+      "drive": 7,
+      "lowpass": 3200,
+      "crush": null
+    },
+    "v3": {
+      "label": "heavy",
+      "P": 0.72,
+      "tremF": 7,
+      "tremD": 0.45,
+      "drive": 11,
+      "lowpass": 2900,
+      "crush": 6
+    }
+  },
+  "clips": {
+    "headshot": {
+      "text": "Headshot!",
+      "file": "announcer/headshot.mp3",
+      "duration": 1.463,
+      "candidates": [
+        "announcer/candidates/headshot_v1.mp3",
+        "announcer/candidates/headshot_v2.mp3",
+        "announcer/candidates/headshot_v3.mp3",
+        "announcer/candidates/headshot_raw.mp3"
+      ]
+    },
+    "first_blood": {
+      "text": "First blood!",
+      "file": "announcer/first_blood.mp3",
+      "duration": 1.019,
+      "candidates": [
+        "announcer/candidates/first_blood_v1.mp3",
+        "announcer/candidates/first_blood_v2.mp3",
+        "announcer/candidates/first_blood_v3.mp3",
+        "announcer/candidates/first_blood_raw.mp3"
+      ]
+    },
+    "double_kill": {
+      "text": "Double kill!",
+      "file": "announcer/double_kill.mp3",
+      "duration": 2.09,
+      "candidates": [
+        "announcer/candidates/double_kill_v1.mp3",
+        "announcer/candidates/double_kill_v2.mp3",
+        "announcer/candidates/double_kill_v3.mp3",
+        "announcer/candidates/double_kill_raw.mp3"
+      ]
+    },
+    "triple_kill": {
+      "text": "Triple kill!",
+      "file": "announcer/triple_kill.mp3",
+      "duration": 0.836,
+      "candidates": [
+        "announcer/candidates/triple_kill_v1.mp3",
+        "announcer/candidates/triple_kill_v2.mp3",
+        "announcer/candidates/triple_kill_v3.mp3",
+        "announcer/candidates/triple_kill_raw.mp3"
+      ]
+    },
+    "multi_kill": {
+      "text": "Multi kill!",
+      "file": "announcer/multi_kill.mp3",
+      "duration": 0.862,
+      "candidates": [
+        "announcer/candidates/multi_kill_v1.mp3",
+        "announcer/candidates/multi_kill_v2.mp3",
+        "announcer/candidates/multi_kill_v3.mp3",
+        "announcer/candidates/multi_kill_raw.mp3"
+      ]
+    },
+    "killing_spree": {
+      "text": "Killing spree!",
+      "file": "announcer/killing_spree.mp3",
+      "duration": 2.351,
+      "candidates": [
+        "announcer/candidates/killing_spree_v1.mp3",
+        "announcer/candidates/killing_spree_v2.mp3",
+        "announcer/candidates/killing_spree_v3.mp3",
+        "announcer/candidates/killing_spree_raw.mp3"
+      ]
+    },
+    "rampage": {
+      "text": "Rampage!",
+      "file": "announcer/rampage.mp3",
+      "duration": 1.306,
+      "candidates": [
+        "announcer/candidates/rampage_v1.mp3",
+        "announcer/candidates/rampage_v2.mp3",
+        "announcer/candidates/rampage_v3.mp3",
+        "announcer/candidates/rampage_raw.mp3"
+      ]
+    },
+    "unstoppable": {
+      "text": "Unstoppable!",
+      "file": "announcer/unstoppable.mp3",
+      "duration": 1.176,
+      "candidates": [
+        "announcer/candidates/unstoppable_v1.mp3",
+        "announcer/candidates/unstoppable_v2.mp3",
+        "announcer/candidates/unstoppable_v3.mp3",
+        "announcer/candidates/unstoppable_raw.mp3"
+      ]
+    },
+    "godlike": {
+      "text": "Godlike!",
+      "file": "announcer/godlike.mp3",
+      "duration": 0.81,
+      "candidates": [
+        "announcer/candidates/godlike_v1.mp3",
+        "announcer/candidates/godlike_v2.mp3",
+        "announcer/candidates/godlike_v3.mp3",
+        "announcer/candidates/godlike_raw.mp3"
+      ]
+    },
+    "fight": {
+      "text": "Fight!",
+      "file": "announcer/fight.mp3",
+      "duration": 0.418,
+      "candidates": [
+        "announcer/candidates/fight_v1.mp3",
+        "announcer/candidates/fight_v2.mp3",
+        "announcer/candidates/fight_v3.mp3",
+        "announcer/candidates/fight_raw.mp3"
+      ]
+    },
+    "victory": {
+      "text": "Victory!",
+      "file": "announcer/victory.mp3",
+      "duration": 0.679,
+      "candidates": [
+        "announcer/candidates/victory_v1.mp3",
+        "announcer/candidates/victory_v2.mp3",
+        "announcer/candidates/victory_v3.mp3",
+        "announcer/candidates/victory_raw.mp3"
+      ]
+    },
+    "defeat": {
+      "text": "Defeat!",
+      "file": "announcer/defeat.mp3",
+      "duration": 0.679,
+      "candidates": [
+        "announcer/candidates/defeat_v1.mp3",
+        "announcer/candidates/defeat_v2.mp3",
+        "announcer/candidates/defeat_v3.mp3",
+        "announcer/candidates/defeat_raw.mp3"
+      ]
+    },
+    "draw": {
+      "text": "Draw!",
+      "file": "announcer/draw.mp3",
+      "duration": 0.444,
+      "candidates": [
+        "announcer/candidates/draw_v1.mp3",
+        "announcer/candidates/draw_v2.mp3",
+        "announcer/candidates/draw_v3.mp3",
+        "announcer/candidates/draw_raw.mp3"
+      ]
+    },
+    "team_deathmatch": {
+      "text": "Team Deathmatch!",
+      "file": "announcer/team_deathmatch.mp3",
+      "duration": 2.456,
+      "candidates": [
+        "announcer/candidates/team_deathmatch_v1.mp3",
+        "announcer/candidates/team_deathmatch_v2.mp3",
+        "announcer/candidates/team_deathmatch_v3.mp3",
+        "announcer/candidates/team_deathmatch_raw.mp3"
+      ]
+    },
+    "capture_the_flag": {
+      "text": "Capture the Flag!",
+      "file": "announcer/capture_the_flag.mp3",
+      "duration": 1.306,
+      "candidates": [
+        "announcer/candidates/capture_the_flag_v1.mp3",
+        "announcer/candidates/capture_the_flag_v2.mp3",
+        "announcer/candidates/capture_the_flag_v3.mp3",
+        "announcer/candidates/capture_the_flag_raw.mp3"
+      ]
+    },
+    "domination": {
+      "text": "Domination!",
+      "file": "announcer/domination.mp3",
+      "duration": 0.888,
+      "candidates": [
+        "announcer/candidates/domination_v1.mp3",
+        "announcer/candidates/domination_v2.mp3",
+        "announcer/candidates/domination_v3.mp3",
+        "announcer/candidates/domination_raw.mp3"
+      ]
+    },
+    "flag_taken": {
+      "text": "Flag taken!",
+      "file": "announcer/flag_taken.mp3",
+      "duration": 0.914,
+      "candidates": [
+        "announcer/candidates/flag_taken_v1.mp3",
+        "announcer/candidates/flag_taken_v2.mp3",
+        "announcer/candidates/flag_taken_v3.mp3",
+        "announcer/candidates/flag_taken_raw.mp3"
+      ]
+    },
+    "flag_captured": {
+      "text": "Flag captured!",
+      "file": "announcer/flag_captured.mp3",
+      "duration": 0.967,
+      "candidates": [
+        "announcer/candidates/flag_captured_v1.mp3",
+        "announcer/candidates/flag_captured_v2.mp3",
+        "announcer/candidates/flag_captured_v3.mp3",
+        "announcer/candidates/flag_captured_raw.mp3"
+      ]
+    },
+    "flag_returned": {
+      "text": "Flag returned!",
+      "file": "announcer/flag_returned.mp3",
+      "duration": 1.019,
+      "candidates": [
+        "announcer/candidates/flag_returned_v1.mp3",
+        "announcer/candidates/flag_returned_v2.mp3",
+        "announcer/candidates/flag_returned_v3.mp3",
+        "announcer/candidates/flag_returned_raw.mp3"
+      ]
+    },
+    "point_captured": {
+      "text": "Point captured!",
+      "file": "announcer/point_captured.mp3",
+      "duration": 0.94,
+      "candidates": [
+        "announcer/candidates/point_captured_v1.mp3",
+        "announcer/candidates/point_captured_v2.mp3",
+        "announcer/candidates/point_captured_v3.mp3",
+        "announcer/candidates/point_captured_raw.mp3"
+      ]
+    }
+  }
+}
