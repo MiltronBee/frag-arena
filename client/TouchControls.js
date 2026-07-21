@@ -73,13 +73,13 @@ class TouchControls {
 		this.joyBase = el('div', 'touch-joy-base', root)
 		this.joyKnob = el('div', 'touch-joy-knob', this.joyBase)
 
-		this.fireBtn = el('div', 'touch-fire', root, '◉')
-		this.aimBtn = el('div', 'touch-aim', root, '◎') // ADS hold (also drag-looks)
-		this.jumpBtn = el('div', 'touch-jump', root, '▲')
-		this.reloadBtn = el('div', 'touch-reload', root, '⟳')
-		this.switchBtn = el('div', 'touch-switch', root, '⇄')
-		this.throwBtn = el('div', 'touch-throw', root, '☀') // Phase 3 frag-grenade throw
-		this.gearBtn = el('div', 'touch-gear', root, '⚙')
+		this.fireBtn = el('div', 'touch-fire', root)
+		this.aimBtn = el('div', 'touch-aim', root) // ADS hold (also drag-looks)
+		this.jumpBtn = el('div', 'touch-jump', root)
+		this.reloadBtn = el('div', 'touch-reload', root)
+		this.switchBtn = el('div', 'touch-switch', root)
+		this.throwBtn = el('div', 'touch-throw', root) // Phase 3 frag-grenade throw
+		this.gearBtn = el('div', 'touch-gear', root)
 	}
 
 	// browsers only allow fullscreen from a user gesture, so we piggyback on the

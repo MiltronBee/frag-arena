@@ -22,42 +22,42 @@ const MAX_LINES = 6          // rows kept in the menu panel DOM (CSS caps visibl
 const CADENCE_MIN = 350      // ms
 const CADENCE_MAX = 900      // ms
 
-// tone class per line: 'ok' (bright bracket), 'warn' (amber-ish), plain (dim phosphor).
+// tone class per line: 'ok' (accent-dim), 'warn' (gold), plain (ink-mid telemetry).
 // { t: template, s: stage-bias tag (matches Simulator._assetStage) }
+// HUD2030 rebrand: quiet network telemetry (register: lowercase label · value),
+// degen/solana flavor via rpc/slot/mint lines — telemetry, not burglary.
 const POOL = [
-  { t: 'scanning perimeter nodes ... {n1} found' },
-  { t: 'bypassing firewall [OK]', ok: 1 },
-  { t: 'injecting code subroutine 0x{hex4}' },
-  { t: 'spoofing hardware signature :: {mac}' },
-  { t: 'decrypting weapon vault keys ... OK', ok: 1, s: 'WEAPONS' },
-  { t: 'handshake accepted :: relay {n1}', ok: 1 },
-  { t: 'escalating privileges → root', warn: 1 },
-  { t: 'tunneling through proxy 10.4.{n255}.{n255}' },
-  { t: 'disabling intrusion countermeasures', warn: 1 },
-  { t: 'patching mainframe hooks [OK]', ok: 1 },
-  { t: 'exfiltrating arena schematics ... {kb}kb', s: 'MAP' },
-  { t: 'overriding turret lockouts', warn: 1 },
-  { t: 'seeding frag protocol v{n1}.{n1}' },
-  { t: 'resolving shard cluster {hex4}::{port}' },
-  { t: 'brute-forcing keyslot [{n2}%]', warn: 1 },
-  { t: 'mapping arena geometry ... {n2} sectors', s: 'MAP' },
-  { t: 'loading combat avatars :: {n2} rigs', s: 'CHARACTERS' },
-  { t: 'flashing muzzle firmware 0x{hex4}', s: 'WEAPONS' },
-  { t: 'staging audio payload ... {kb}kb', s: 'SOUNDS' },
-  { t: 'priming particle cannons [OK]', ok: 1, s: 'EFFECTS' },
-  { t: 'compiling shader intrusion kernel', s: 'EFFECTS' },
-  { t: 'rerouting through darknet gateway {ip}' },
-  { t: 'ghosting session id {hex4}{hex4}' },
-  { t: 'cracking vault sig ... {n2}% [{hex4}]' },
-  { t: 'planting rootkit :: node {n255}', warn: 1 },
-  { t: 'sniffing telemetry stream port {port}' },
-  { t: 'forging clearance token [OK]', ok: 1 },
-  { t: 'wiping access trail ... clean', ok: 1 },
-  { t: 'hijacking uplink relay {n1}', warn: 1 },
-  { t: 'defeating countermeasure grid 0x{hex4}', warn: 1 },
-  { t: 'unlocking loadout registry [OK]', ok: 1, s: 'WEAPONS' },
-  { t: 'syncing kill protocol {hex4}' },
-  { t: 'finalizing breach vector [{n2}%]', s: 'FINALIZING' },
+  { t: 'rtt probe · {n2}ms' },
+  { t: 'relay {n1} handshake · ok', ok: 1 },
+  { t: 'session key {hex4}{hex4}' },
+  { t: 'shard {hex4} · port {port}' },
+  { t: 'packet loss 0.0%', ok: 1 },
+  { t: 'tick sync locked · 40hz', ok: 1 },
+  { t: 'jitter buffer · {n1}ms' },
+  { t: 'rpc endpoint pinned · {n2}ms', ok: 1 },
+  { t: 'slot height {kb}{n2}' },
+  { t: 'mint gate verified', ok: 1 },
+  { t: 'cluster route 10.4.{n255}.{n255}' },
+  { t: 'mtu negotiated · 1{n255}' },
+  { t: 'retry budget · {n1} remaining', warn: 1 },
+  { t: 'congestion window scaled', warn: 1 },
+  { t: 'asset stream WEAPONS · {kb}kb', s: 'WEAPONS' },
+  { t: 'ballistics table loaded · {n2} entries', s: 'WEAPONS' },
+  { t: 'viewmodel rig bound · ok', ok: 1, s: 'WEAPONS' },
+  { t: 'map sectors resolved · {n2}', s: 'MAP' },
+  { t: 'arena geometry · {kb}kb', s: 'MAP' },
+  { t: 'nav mesh checksum {hex4}', s: 'MAP' },
+  { t: 'rig cache warm · {n2} avatars', s: 'CHARACTERS' },
+  { t: 'anim clips indexed · {n2}', s: 'CHARACTERS' },
+  { t: 'audio payload staged · {kb}kb', s: 'SOUNDS' },
+  { t: 'spatial mix primed · ok', ok: 1, s: 'SOUNDS' },
+  { t: 'shader kernel compiled', s: 'EFFECTS' },
+  { t: 'particle pool allocated · {n2}', s: 'EFFECTS' },
+  { t: 'telemetry stream · port {port}' },
+  { t: 'clock skew · {n1}ms', ok: 1 },
+  { t: 'lobby heartbeat · ok', ok: 1 },
+  { t: 'input pipeline armed', ok: 1 },
+  { t: 'finalizing · {n2}%', s: 'FINALIZING' },
 ]
 
 function rInt(lo, hi) { return lo + Math.floor(Math.random() * (hi - lo + 1)) }
@@ -145,14 +145,14 @@ export default class IntrusionFeed {
     const { open, disconnected } = this._gate()
 
     if (disconnected) {
-      this._emit({ text: 'CONNECTION TRACED :: UPLINK LOST', tone: 'lost' })
-      this._setHeader('hack-lost', 'UPLINK SEVERED')
+      this._emit({ text: 'LINK LOST', tone: 'lost' })
+      this._setHeader('hack-lost', 'LINK LOST')
       this._finish()
       return
     }
     if (open) {
-      this._emit({ text: 'ACCESS GRANTED — ARENA UPLINK SECURE', tone: 'granted' })
-      this._setHeader('hack-done', 'NETWORK BREACHED')
+      this._emit({ text: 'ARENA LINK SECURE', tone: 'granted' })
+      this._setHeader('hack-done', 'LINK ESTABLISHED')
       this._finish()
       return
     }
@@ -171,7 +171,8 @@ export default class IntrusionFeed {
     }
     if (!pick) pick = POOL[rInt(0, POOL.length - 1)]
     const tone = pick.ok ? 'ok' : (pick.warn ? 'warn' : '')
-    return { text: '> ' + fill(pick.t), tone }
+    // no "> " prompt prefix — telemetry register, not a terminal
+    return { text: fill(pick.t), tone }
   }
 
   // write a line to the menu panel (scrolling) + the splash ticker (single line).

@@ -1,14 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
-  <!-- Mono-bone skull glyph, silhouette synced with logo.svg, features
-       optically enlarged ~12% ("HUD" optical size) for small render sizes.
-       Used as the HUD health icon (26px) and death-screen mark (72px),
-       loaded via <img>. The fill is hardcoded cool ink (#F4F7F9 = x30-ink token), NOT
-       currentColor: an <img>-loaded SVG is isolated from the page, so
-       currentColor/CSS vars don't resolve and the skull renders
-       black-on-dark (invisible). Inline the SVG if runtime recolor is needed.
-       No blood here: a health icon that bleeds is wrong semantics - gore
-       belongs to the death screen FX, not the HUD. -->
-  <path fill="#F4F7F9" d="M128,54
+  <!-- Threat-tinted copy of skull.svg for the YOU DIED card (.combat-skull).
+       Pre-tinted because CSS filter chains (sepia/hue-rotate) flatten the
+       sculpt into a pale pink blob with magenta halos. Fill #FF3B46 = x30-threat
+       token; features stay near-black so the sculpt reads at 48px. Keep the
+       path geometry byte-identical with skull.svg when editing either. -->
+  <path fill="#FF3B46" d="M128,54
     C166,54 190,74 190,100
     C194,112 186,126 174,136
     L174,156
@@ -17,7 +13,7 @@
     L82,136
     C70,126 62,112 66,100
     C66,74 90,54 128,54 Z"/>
-  <g fill="#1B1512">
+  <g fill="#1B0D0E">
     <path d="M142,97 L174,87 C180,97 179,111 170,118 C159,124 145,120 141,110 Z"/>
     <path d="M114,97 L82,87 C76,97 77,111 86,118 C97,124 111,120 115,110 Z"/>
     <path d="M120,126 L136,126 L128,150 Z"/>

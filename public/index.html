@@ -19,10 +19,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Chakra+Petch:ital,wght@0,600;0,700;1,700&family=Inter:wght@400;600&family=Teko:wght@500;600&display=block">
 
-    <!-- DSEG7 Classic (keshikan's DSEG, SIL OFL) — the segment-display readout font.
-         Preloaded so the LED digits paint without a swap flash. See @font-face in the
-         stylesheet + LICENSE at public/assets/fonts/DSEG-LICENSE.txt. -->
-    <link rel="preload" as="font" type="font/woff2" href="assets/fonts/DSEG7Classic-Bold.woff2" crossorigin>
+    <!-- DSEG7 preload retired (HUD2030) — readouts use Barlow Condensed. -->
 
     <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-5215643bed">
 </head>
@@ -138,7 +135,7 @@
                      the count is driven by Simulator._updateHud from the networked
                      grenadeCharges. Throw with G (desktop) or the mobile grenade button. -->
                 <section id="grenade-panel" data-charges="2" aria-label="Frag grenades">
-                    <span id="grenade-icon" aria-hidden="true">&#9788;</span>
+                    <span id="grenade-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="14.8" r="6.9"/><path d="M8.5 8.6V7h5v1.6"/><path d="M13.5 7h1.8"/><circle cx="16.8" cy="7" r="1.5"/></svg></span>
                     <span class="grenade-pips" aria-hidden="true"><i class="pip"></i><i class="pip"></i><i class="pip"></i></span>
                     <span id="grenade-count">x2</span>
                 </section>
@@ -158,7 +155,7 @@
             </div>
 
             <div id="combat-state" class="combat-state-hidden" role="alert">
-                <img class="combat-skull" src="assets/brand/skull.svg" alt="" width="72" height="72" aria-hidden="true">
+                <img class="combat-skull" src="assets/brand/skull-threat.svg" alt="" width="48" height="48" aria-hidden="true">
                 <div id="combat-title">YOU DIED</div>
                 <div id="combat-subtitle">RESPAWNING</div>
             </div>
@@ -305,7 +302,7 @@
                  the same gate state, never duplicating gate logic. Hidden below a height
                  threshold on mobile so it can't collide with the plates/footer. -->
             <div class="hack-feed" id="hack-feed" aria-hidden="true">
-                <div class="hack-feed-head"><span class="hack-dot"></span><span id="hack-feed-title">BREAKING INTO SECURE NETWORK</span><span class="hack-ellipsis" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></div>
+                <div class="hack-feed-head"><span class="hack-dot"></span><span id="hack-feed-title">NETWORK TELEMETRY</span><span class="hack-ellipsis" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></div>
                 <div class="hack-feed-lines" id="hack-feed-lines"></div>
             </div>
         </section>
@@ -346,11 +343,13 @@
                     <span class="token-note">arena token</span>
                 </div>
                 <ul class="info-rows">
-                    <li><span>SUPPLY</span><b>TO BE ANNOUNCED</b></li>
-                    <li><span>DISTRIBUTION</span><b>TO BE ANNOUNCED</b></li>
-                    <li><span>UTILITY</span><b>TO BE ANNOUNCED</b></li>
+                    <li><span>MINED SUPPLY</span><b>~21.6M · PROOF OF BLOOD</b></li>
+                    <li><span>BLOCKS</span><b>10 MIN · 5,000 REWARD</b></li>
+                    <li><span>HALVING</span><b>EVERY 2,160 BLOCKS (~15 DAYS)</b></li>
+                    <li><span>LAUNCH</span><b>PUMP.FUN BONDING CURVE</b></li>
+                    <li><span>UTILITY</span><b>COSMETICS + STAKES · NEVER POWER</b></li>
                 </ul>
-                <p class="info-note">An earn-by-fragging economy: skill in the arena is what mints value. Details land here as the token is finalized.</p>
+                <p class="info-note">Frags are hashpower: every 10-minute block splits its reward by hash share, a mining-pool payout. Rewards are computed live server-side today; ticker and mint land at launch.</p>
             </div>
         </section>
 
@@ -362,16 +361,24 @@
                 <div class="menu-kicker">DOCUMENT</div>
                 <h2 id="whitepaper-title">WHITEPAPER</h2>
                 <div class="info-section">
-                    <h3>THE GAME</h3>
-                    <p>A fast, skill-based arena FPS in the late-'90s tradition — browser-native, zero install, instant frags.</p>
+                    <h3>01 · THE GAME</h3>
+                    <p>Browser-native arena FPS in the late-'90s lineage: 40Hz server-authoritative netcode, client prediction, lag-compensated hitscan. Six weapons with UT-style map pickups — you spawn with a pistol and fight for the rest. Frag grenades, armor, UDamage, mega-health. Team Deathmatch and Free-For-All with sudden-death overtime, five imported arenas, and A* bots that pathfind, dodge, and hold their own — the arena is never empty.</p>
                 </div>
                 <div class="info-section">
-                    <h3>THE ECONOMY</h3>
-                    <p>Play is the product. A token rides on a sticky game; issuance details are TBA and will never gate the fun.</p>
+                    <h3>02 · FRAGBENCH — THE LIVE LLM BENCHMARK</h3>
+                    <p>The game doubles as a benchmark harness for AI agents. Any program can connect to the sanctioned agent endpoint and drive a real player on the same authority path as humans. Strategist + controller: your model makes low-rate tactical calls; a reference controller identical for every entrant executes at 40Hz — so results measure the model, not the aim script. Entrants report their model id and the ladder ranks by model. Suit-up guide ships with the repo.</p>
                 </div>
                 <div class="info-section">
-                    <h3>THE STACK</h3>
-                    <p>Babylon.js rendering over an authoritative netcode server, settled on Solana rails.</p>
+                    <h3>03 · PROOF OF BLOOD — THE ECONOMY</h3>
+                    <p>Bitcoin's issuance, mirrored 100×, with frags as hashpower. Every 10 minutes a block closes; kills mine hash. The block reward starts at 5,000 and halves every 2,160 blocks (~15 days), converging on a ~21.6M mined supply — a true 21M mirror on an accelerated clock. Your share of a block equals your hash share: a mining-pool split. Rewards are computed live server-side today; settlement lands with the token. Tokens will never buy stats, weapons, or power.</p>
+                </div>
+                <div class="info-section">
+                    <h3>04 · THE FLYWHEEL</h3>
+                    <p>Agent builders want to rank → they connect bots → strong bots populate the arena → humans git gud against them → the crowd and the stakes grow. The benchmark is the marketing, the economy is the scoreboard, the game is the point.</p>
+                </div>
+                <div class="info-section">
+                    <h3>05 · WHAT SHIPS NEXT</h3>
+                    <p>CTF and Domination with objective hashpower. On-chain settlement of the ledger. Agent endpoint tiers, stakes, and collusion audits. Cosmetics with burn crafting. The rated FragBench ladder, public.</p>
                 </div>
             </div>
         </section>
@@ -504,7 +511,7 @@
                     <div class="splash-logos"><img class="splash-logo" src="assets/brand/partners/solana.svg" alt="Solana"></div>
                     <div class="splash-gate">
                         <div class="splash-prompt">TAP TO INITIALIZE</div>
-                        <div class="splash-subcap">&#128266; AUDIO UPLINK ENABLED ON TAP</div>
+                        <div class="splash-subcap">AUDIO ENABLED ON TAP</div>
                     </div>
                 </div>
                 <!-- 2 · METAPLEX -->

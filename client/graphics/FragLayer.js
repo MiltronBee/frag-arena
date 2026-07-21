@@ -74,6 +74,17 @@ export default class FragLayer {
       hud.appendChild(this.bannerEl)
     }
 
+    // medal / streak callout: the visual voice for the announcer's double-kill /
+    // spree clips (HUD2030 §C). Sits above the frag banner; Simulator drives it
+    // via showMedal().
+    this.medalEl = document.getElementById('medal-callout')
+    if (!this.medalEl) {
+      this.medalEl = document.createElement('div')
+      this.medalEl.id = 'medal-callout'
+      this.medalEl.setAttribute('aria-hidden', 'true')
+      hud.appendChild(this.medalEl)
+    }
+
     this.arcEl = document.getElementById('damage-arc')
     if (!this.arcEl) {
       this.arcEl = document.createElement('canvas')
@@ -93,7 +104,9 @@ export default class FragLayer {
       Object.assign(this.confirmEl.style, {
         position: 'fixed', top: '0', left: '0', right: '0', bottom: '0',
         pointerEvents: 'none', opacity: '0', zIndex: '5',
-        background: 'radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 55%, rgba(170,0,0,0.9) 100%)',
+        // GOLD confirm vignette (color law: gold/white = own feedback; red stays
+        // incoming-damage only). Fallback if playtest rejects gold: threat hex 255,59,70.
+        background: 'radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 62%, rgba(255,194,75,0.55) 100%)',
         transition: 'opacity 80ms ease-out',
       })
       hud.appendChild(this.confirmEl)
@@ -109,7 +122,7 @@ export default class FragLayer {
     if (r && r._fxTier === 'low') return
     const el = this.confirmEl
     if (!el) return
-    const peak = kill ? '0.3' : '0.2'
+    const peak = kill ? '0.30' : '0.16'
     const fade = kill ? 140 : 80
     // Force a reflow to COMMIT the peak opacity as its own paint before the
     // fade starts. The old single-rAF pattern let the browser coalesce the
@@ -201,7 +214,10 @@ export default class FragLayer {
   _pushKillFeed({ killerNid, victimNid, weaponIndex, suicide, iKilled, iDied, headshot }) {
     const row = document.createElement('div')
     row.className = 'kill-feed-row'
-    if (iKilled || iDied) row.classList.add('kill-feed-mine')
+    if (iKilled || iDied) row.classList.add('kill-feed-mine') // back-compat hook
+    // HUD2030 §5c: split the state edge — own kills accent, own deaths threat.
+    if (iKilled) row.classList.add('kf-own-kill')
+    if (iDied) row.classList.add('kf-own-death')
     // headshot kill-feed flavour (authoritative). A suicide/fall is never a headshot.
     if (headshot && !suicide) row.classList.add('kill-feed-headshot')
 
@@ -237,7 +253,17 @@ export default class FragLayer {
 
   _showFragBanner(victimNid) {
     const el = this.bannerEl
-    el.textContent = `YOU FRAGGED ${this._label(victimNid).toUpperCase()}`
+    // gold verb + ink callsign (HUD2030 §B2). textContent-built spans so a hostile
+    // callsign can never inject markup into the banner.
+    el.textContent = ''
+    const verb = document.createElement('span')
+    verb.className = 'fb-verb'
+    verb.textContent = 'FRAGGED '
+    const name = document.createElement('span')
+    name.className = 'fb-name'
+    name.textContent = this._label(victimNid).toUpperCase()
+    el.appendChild(verb)
+    el.appendChild(name)
     el.classList.remove('frag-banner-show')
     void el.offsetWidth // restart the animation
     el.classList.add('frag-banner-show')
@@ -245,6 +271,19 @@ export default class FragLayer {
     this._bannerTimer = setTimeout(() => {
       el.classList.remove('frag-banner-show')
     }, FRAG_BANNER_LIFE)
+  }
+
+  // medal / streak callout ("DOUBLE KILL", "KILLING SPREE", "FIRST BLOOD").
+  // Driven by Simulator's announcer path so audio + visual land as one moment.
+  showMedal(text) {
+    const el = this.medalEl
+    if (!el) return
+    el.textContent = text
+    el.classList.remove('medal-show')
+    void el.offsetWidth // restart the animation
+    el.classList.add('medal-show')
+    clearTimeout(this._medalTimer)
+    this._medalTimer = setTimeout(() => el.classList.remove('medal-show'), 1800)
   }
 
   // =========================================================================
@@ -517,10 +556,10 @@ export default class FragLayer {
     ctx.save()
     ctx.beginPath()
     ctx.arc(cx, cy, radius, screenAngle - spread, screenAngle + spread)
-    ctx.lineWidth = 16
-    ctx.strokeStyle = `rgba(255, 42, 38, ${(0.8 * alpha).toFixed(3)})`
-    ctx.shadowColor = `rgba(255, 42, 38, ${(0.9 * alpha).toFixed(3)})`
-    ctx.shadowBlur = 18
+    ctx.lineWidth = 12
+    ctx.strokeStyle = `rgba(255, 59, 70, ${(0.8 * alpha).toFixed(3)})` /* --x30-threat */
+    ctx.shadowColor = `rgba(255, 59, 70, ${(0.9 * alpha).toFixed(3)})`
+    ctx.shadowBlur = 8
     ctx.lineCap = 'round'
     ctx.stroke()
     ctx.restore()

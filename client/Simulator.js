@@ -25,6 +25,7 @@ import ProgressReadout from './graphics/ProgressReadout'
 import IntrusionFeed from './graphics/IntrusionFeed'
 import { resolveWeaponFx } from './graphics/firingFx'
 import { assets, weapons } from './assets/assetManifest'
+import { SPAWN_WEAPON_INDEX } from '../common/weaponsConfig'
 import preloadAssets from './graphics/assetPreloader'
 import { MEGA_STATE } from '../common/entity/MegaHealthPickup'
 import { MATCH_PHASE, MATCH_WINNER, MATCH_MODE } from '../common/entity/MatchState'
@@ -55,12 +56,14 @@ const shouldIgnore = (myId, update) => {
 class Simulator {
 	constructor(client) {
 		this.client = client
-		// Map selection is a RUNTIME value on the client too. For now the client plays
-		// the default (CTF-Visage) — later a server handshake will name the instance's
-		// map. setActiveMap pins the module-level active-map bindings that the client's
-		// own applyCommand PREDICTION and reconciliation read, so prediction and the
-		// server agree on USE_MESH_MAP; the renderer is told the same record explicitly.
-		this.map = getMapRecord(DEFAULT_MAP_ID)
+		// Map selection is a RUNTIME value on the client too. The /mapinfo handshake
+		// (clientMain.boot) asks the server which map this instance runs and stashes
+		// it on window.__SERVER_MAP_ID__ before we get here; no answer → default map
+		// (identical to the pre-handshake behavior). setActiveMap pins the module-level
+		// active-map bindings that the client's own applyCommand PREDICTION and
+		// reconciliation read, so prediction and the server agree on USE_MESH_MAP;
+		// the renderer is told the same record explicitly.
+		this.map = getMapRecord((typeof window !== 'undefined' && window.__SERVER_MAP_ID__) || DEFAULT_MAP_ID)
 		setActiveMap(this.map)
 		this.renderer = new BABYLONRenderer(this.map)
 		this.input = new InputSystem()
@@ -133,8 +136,11 @@ class Simulator {
 		// rig lives in the scene: multiple copies of the same skeleton coexisting
 		// cross-wire each other's poses in Babylon 4.0.3, so we dispose + reload on
 		// switch (the .glb is browser-cached; the swap hitch is negligible).
-		this.weaponIndex = 0
-		this.viewmodel = new Viewmodel(this.renderer.scene, this.renderer.camera, weapons[0])
+		// Start on the pistol — the only weapon a fresh spawn owns. The server entity
+		// constructor and the Respawned handler both equip it; starting on 0 here put
+		// an empty rifle in your hands on first join.
+		this.weaponIndex = SPAWN_WEAPON_INDEX
+		this.viewmodel = new Viewmodel(this.renderer.scene, this.renderer.camera, weapons[SPAWN_WEAPON_INDEX])
 		this.viewmodel.setActive(true)
 		this._viewmodelSwapId = 0
 		this._viewmodelSwapQueue = Promise.resolve()
@@ -265,17 +271,17 @@ class Simulator {
 			// UT-STYLE LOADOUT RESET: a respawn returns us to pistol-only (the server does
 			// the same authoritatively). Reset our predicted inventory + re-equip the pistol
 			// so the HUD/viewmodel match and fire()/switch gate on the right ownership.
-			this.myRawEntity.ownedWeapons = 1 << 3
-			this._lastOwned = 1 << 3
+			this.myRawEntity.ownedWeapons = 1 << SPAWN_WEAPON_INDEX
+			this._lastOwned = 1 << SPAWN_WEAPON_INDEX
 			if (this.myRawEntity.weaponsState) {
 				this.myRawEntity.weaponsState.forEach((st, i) => {
-					const owned = i === 3
+					const owned = i === SPAWN_WEAPON_INDEX
 					st.magazineAmmo = owned ? weapons[i].magazineCapacity : 0
 					st.reserveAmmo = owned ? weapons[i].maxReserveAmmo : 0
 					st.onCooldown = false; st.cooldownTimer = 0; st.reloading = false; st.reloadTimer = 0; st.heat = 0
 				})
 			}
-			if (this.weaponIndex !== 3) this.switchWeapon(3) // force-equip the pistol
+			if (this.weaponIndex !== SPAWN_WEAPON_INDEX) this.switchWeapon(SPAWN_WEAPON_INDEX) // force-equip the pistol
 
 			// local respawn cue (this message is our own re-entry — see guard above)
 			this.audio.respawn()
@@ -307,7 +313,10 @@ class Simulator {
 			// FIRST BLOOD: the first non-suicide kill of the match, announced only if I got it.
 			if (!suicide && !this._firstKillSeen) {
 				this._firstKillSeen = true
-				if (iKilled) this.audio.announce('first_blood', { gain: 0.9, minGap: 0 })
+				if (iKilled) {
+					this.audio.announce('first_blood', { gain: 0.9, minGap: 0 })
+					if (this.fragLayer) this.fragLayer.showMedal('FIRST BLOOD')
+				}
 			}
 			// KILL MEDALS for the local player (multi-kill window + no-death streak).
 			if (iKilled) this._onLocalKill()
@@ -788,6 +797,11 @@ class Simulator {
 		// callout then hits the default cooldown and is dropped when both land the same frag.
 		if (streakClip) this.audio.announce(streakClip, { gain: 0.95, minGap: 0 })
 		if (multiClip) this.audio.announce(multiClip, { gain: 0.85 })
+		// visual counterpart (HUD2030 §C): the medal callout mirrors the highest
+		// announce that fired — streak outranks multi, same as the audio priority.
+		const medalText = streakClip ? streakClip.replace(/_/g, ' ').toUpperCase()
+			: multiClip ? multiClip.replace(/_/g, ' ').toUpperCase() : null
+		if (medalText && this.fragLayer) this.fragLayer.showMedal(medalText)
 	}
 
 	// The local player's FFA standing: my frags (my networked kills), the current TOP frags
@@ -889,7 +903,8 @@ class Simulator {
 					if (ffa) {
 						const won = this._ffaStanding().amTop
 						title = won ? 'VICTORY' : 'DEFEAT'
-						cls = won ? 'tdm-red' : ''
+						// color law: gold underline for own victory, threat for defeat
+						cls = won ? 'tdm-win' : 'tdm-red'
 					} else {
 						title = winner === MATCH_WINNER.TEAM0 ? 'RED WINS'
 							: winner === MATCH_WINNER.TEAM1 ? 'BLUE WINS' : 'DRAW'
@@ -1301,10 +1316,10 @@ class Simulator {
 			this._cycleWeapon(e.deltaY > 0 ? 1 : -1) // cycle over OWNED weapons only
 		})
 		const el = document.getElementById('weapon-name')
-		if (el) el.textContent = weapons[0].name.toUpperCase()
+		if (el) el.textContent = weapons[this.weaponIndex].name.toUpperCase()
 
 		// initial spawn: set the crosshair to the starting weapon so the first
-		// reticle is correct before any switch (matches this.weaponIndex = 0)
+		// reticle is correct before any switch (matches the initial this.weaponIndex)
 		this._applyCrosshairWeapon(this.weaponIndex)
 		// same for the Halo ammo-HUD weapon icon (presentation only)
 		this._applyWeaponIcon(this.weaponIndex)

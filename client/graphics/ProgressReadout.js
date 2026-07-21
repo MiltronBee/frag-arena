@@ -47,6 +47,8 @@ export default class ProgressReadout {
     this._wrapEl = null
     this._splashIntEl = null
     this._splashFracEl = null
+    this._splashWrapEl = null
+    this._splashFillPct = -1   // last whole-percent written to --seg-fill (throttle)
   }
 
   _cacheEls() {
@@ -58,6 +60,7 @@ export default class ProgressReadout {
     // cheap and self-heals (returns null once gone → guarded below).
     this._splashIntEl = document.getElementById('splash-seg-int')
     this._splashFracEl = document.getElementById('splash-seg-frac')
+    this._splashWrapEl = document.querySelector('.splash-seg')
   }
 
   // Recompute the 0..100 target from the live gate state on the simulator. Called
@@ -144,5 +147,15 @@ export default class ProgressReadout {
     // ---- splash echo (guard: nodes removed once splash dismisses) ----
     if (this._splashIntEl && this._splashIntEl.textContent !== int) this._splashIntEl.textContent = int
     if (this._splashFracEl && this._splashFracEl.textContent !== frac) this._splashFracEl.textContent = frac
+    // 2px accent progress hairline (CSS ::before width = --seg-fill). Throttled to
+    // whole-percent changes so this is not a per-frame style write.
+    if (this._splashWrapEl) {
+      const pct = this._disconnected ? 0
+        : Math.max(0, Math.min(100, Math.floor(this._display)))
+      if (pct !== this._splashFillPct) {
+        this._splashFillPct = pct
+        this._splashWrapEl.style.setProperty('--seg-fill', pct + '%')
+      }
+    }
   }
 }

@@ -27,13 +27,39 @@ const browser = await puppeteer.launch({
   ],
 })
 
-const enterArena = async (page) => {
+// Drive the REAL boot flow: tap the splash gate (card 1 holds for the audio-unlock
+// tap), key-skip cards 2-5, land on the menu. `menuShotPath` optionally captures the
+// revealed menu before entering the arena.
+const enterArena = async (page, menuShotPath = null) => {
   await page.goto(URL, { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(
     'window.gameClient && window.gameClient.simulator && window.gameClient.simulator.myRawEntity',
     { timeout: 30000 }
   )
+  // splash gate: tap card 1, then skip the self-advancing cards until it dismisses
+  for (let i = 0; i < 12 && await page.$('#splash'); i++) {
+    await page.mouse.click(640, 360)
+    await sleep(400)
+  }
+  await sleep(600) // menu rise-in
+  if (menuShotPath) {
+    // stray gate-skip clicks can land on a menu plate (e.g. SETTINGS) once the
+    // splash goes pointer-events:none — close any panel so the shot is the MENU.
+    await page.evaluate(() => {
+      const s = document.getElementById('settings-menu')
+      if (s) s.classList.add('settings-closed')
+      document.body.classList.remove('menu-open')
+      const h = document.getElementById('howto-modal')
+      if (h) h.classList.add('howto-closed')
+      document.querySelectorAll('.info-modal').forEach((m) => m.classList.add('info-closed'))
+    })
+    await sleep(250)
+    await page.screenshot({ path: menuShotPath })
+    console.log('wrote', menuShotPath)
+  }
   await page.evaluate(() => {
+    const sp = document.getElementById('splash')
+    if (sp) sp.remove() // belt-and-braces if the tap loop raced the dismiss
     const ov = document.getElementById('entry-overlay')
     if (ov) ov.classList.remove('is-visible')
     document.body.classList.add('arena-entered')
@@ -71,7 +97,7 @@ try {
   await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 })
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
-  await enterArena(page)
+  await enterArena(page, `${OUT}/ui-menu.png`)
   await sleep(4000)
   console.log('framed(desktop):', JSON.stringify(await frameTarget(page)))
   await sleep(500)
