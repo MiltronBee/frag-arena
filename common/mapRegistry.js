@@ -215,9 +215,367 @@ const grove = mesh({
 	mega: { x: -5.300, y: 17.069, z: 5.269 }
 })
 
+// ---------------------------------------------------------------------------
+// IMPORTED MESH MAPS (first-tranche 4-mode rotation) — added by the map-import
+// pipeline (scripts/import-map.py + validate-map.mjs). Each was validated through
+// probeThisForEachMap.md (geometry loads, spawns drop-probe with headroom, killY
+// below all nav-reachable floor with margin, walkable + view box derive, winding
+// resolved). Values come from the merged/v1 extraction (make_registry.py, or
+// scripts/extract-map.mjs for DM-Somnus). Registering these does NOT change the
+// DEFAULT (CTF-Visage stays default).
+// ---------------------------------------------------------------------------
+
+// DM-Gantry16][ (UT original DM-Deck16][) — imported TDM. killY nav-gated (margin 12.66 m world);
+// winding sign 1; longest sightline 36.8 m (default fog OK — no per-map fogDensity).
+// Isolation: kept 1672 faces, dropped 0 detached (margin 39 m).
+const dm_gantry162 = mesh({
+		id: 'dm_gantry162',
+		name: 'DM-Gantry16][',
+		mode: 'TDM',
+		dir: '/assets/maps/DM-Gantry16][/',
+		file: 'DM-Gantry16][.obj',
+		lights: 'DM-Gantry16][.lights.json',
+		killY: -45,
+		spawns: [
+			{ x: -3.078, y: -13.41, z: 17.212 },
+			{ x: -3.679, y: -13.41, z: -18.301 },
+			{ x: -6.667, y: -12.19, z: -34.095 },
+			{ x: 17.322, y: -13.41, z: 36.505 },
+			{ x: -0.693, y: -13.41, z: 29.75 },
+			{ x: 43.852, y: -10.36, z: -18.31 },
+			{ x: 17.052, y: -3.66, z: -29.148 },
+			{ x: 30.53, y: -4.27, z: 16.604 },
+			{ x: 44.866, y: -10.36, z: 0.003 },
+			{ x: 33.813, y: -13.41, z: 29.473 },
+			{ x: 2.351, y: -8.53, z: 15.606 },
+			{ x: 20.705, y: -15.77, z: 12.777 },
+			{ x: -6.665, y: -14.63, z: -21.679 },
+			{ x: -10.053, y: -13.41, z: -3.843 },
+			{ x: 16.976, y: -14.63, z: -29.68 }
+		],
+		walkable: { minX: -28.6, maxX: 46.4, minY: -45.0, maxY: -1.8, minZ: -40.2, maxZ: 39.1 },
+		mega: { x: 13.432, y: -12.192, z: -23.873 },
+		mode_data: { teams: 2 },
+		SPAWN_POINTS: [
+			{ x: -3.078, y: -13.41, z: 17.212, yaw: 276.81, team: 1, team_source: 'derived_2means', headroom: 4.84 },
+			{ x: -3.679, y: -13.41, z: -18.301, yaw: 57.3, team: 0, team_source: 'derived_2means', headroom: 3.67 },
+			{ x: -6.667, y: -12.19, z: -34.095, yaw: 134.91, team: 0, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: 17.322, y: -13.41, z: 36.505, yaw: 270.18, team: 1, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: -0.693, y: -13.41, z: 29.75, yaw: 319.48, team: 1, team_source: 'derived_2means', headroom: 1.89 },
+			{ x: 43.852, y: -10.36, z: -18.31, yaw: 181.05, team: 1, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: 17.052, y: -3.66, z: -29.148, yaw: 89.74, team: 0, team_source: 'derived_2means', headroom: 6.09 },
+			{ x: 30.53, y: -4.27, z: 16.604, yaw: 175.96, team: 1, team_source: 'derived_2means', headroom: 2.49 },
+			{ x: 44.866, y: -10.36, z: 0.003, yaw: 178.46, team: 1, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: 33.813, y: -13.41, z: 29.473, yaw: 184.57, team: 1, team_source: 'derived_2means', headroom: 2.25 },
+			{ x: 2.351, y: -8.53, z: 15.606, yaw: 278.26, team: 1, team_source: 'derived_2means', headroom: 6.23 },
+			{ x: 20.705, y: -15.77, z: 12.777, yaw: 277.73, team: 1, team_source: 'derived_2means', headroom: 14.81 },
+			{ x: -6.665, y: -14.63, z: -21.679, yaw: 273.6, team: 0, team_source: 'derived_2means', headroom: 9.26 },
+			{ x: -10.053, y: -13.41, z: -3.843, yaw: 178.51, team: 0, team_source: 'derived_2means', headroom: 2.12 },
+			{ x: 16.976, y: -14.63, z: -29.68, yaw: 147.79, team: 0, team_source: 'derived_2means', headroom: 6.09 }
+		],
+		PICKUPS: {
+			weapon: [
+				{ x: 17.122, z: 28.111, y: -23.43, class: 'ShockRifle', item: 'shock_rifle', tag: 'ShockRifle' },
+				{ x: 29.66, z: 18.684, y: -3.903, class: 'ut_biorifle', item: 'bio_rifle', tag: 'ut_biorifle' },
+				{ x: 17.126, z: -24.048, y: -3.313, class: 'SniperRifle', item: 'sniper_rifle', yaw: 0.0, tag: 'SniperRifle' },
+				{ x: 2.135, z: 2.136, y: -11.714, class: 'PulseGun', item: 'pulse_gun', tag: 'PulseGun' },
+				{ x: 43.748, z: 30.282, y: -9.98, class: 'SniperRifle', item: 'sniper_rifle', yaw: 0.0, tag: 'SniperRifle' },
+				{ x: 41.98, z: -21.207, y: -8.704, class: 'UT_FlakCannon', item: 'flak_cannon', tag: 'UT_FlakCannon' },
+				{ x: -19.652, z: -4.012, y: -12.171, class: 'UT_Eightball', item: 'rocket_launcher', tag: 'UT_Eightball' },
+				{ x: -4.04, z: 29.825, y: -13.276, class: 'ripper', tag: 'ripper' },
+				{ x: 16.799, z: -27.052, y: -24.039, class: 'UT_Eightball', item: 'rocket_launcher', tag: 'UT_Eightball' },
+				{ x: 17.388, z: 27.055, y: -5.58, class: 'WarheadLauncher', item: 'redeemer', tag: 'WarheadLauncher' },
+				{ x: -20.158, z: -21.821, y: -16.534, class: 'UT_FlakCannon', item: 'flak_cannon', tag: 'UT_FlakCannon' },
+				{ x: 22.546, z: 18.564, y: -15.448, class: 'minigun2', item: 'minigun', tag: 'minigun2' },
+				{ x: 20.78, z: -22.67, y: -14.476, class: 'ShockRifle', item: 'shock_rifle', tag: 'ShockRifle' }
+			],
+			ammo: [
+				{ x: 19.079, z: 28.231, y: -23.353, class: 'ShockCore', item: 'shock_core', yaw: 300.5, tag: 'ShockCore' },
+				{ x: 15.376, z: 28.194, y: -23.354, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: 17.488, z: 32.125, y: -20.305, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: 17.247, z: 37.184, y: -19.048, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: 18.267, z: 38.393, y: -19.048, class: 'RocketPack', item: 'rockets', yaw: 262.09, tag: 'RocketPack' },
+				{ x: 28.267, z: 18.614, y: -4.094, class: 'bioammo', item: 'bio_ammo', tag: 'bioammo' },
+				{ x: 30.988, z: 18.7, y: -4.094, class: 'bioammo', item: 'bio_ammo', tag: 'bioammo' },
+				{ x: 31.26, z: -18.892, y: -4.094, class: 'bioammo', item: 'bio_ammo', tag: 'bioammo' },
+				{ x: 28.279, z: -18.796, y: -4.094, class: 'bioammo', item: 'bio_ammo', tag: 'bioammo' },
+				{ x: 18.883, z: -22.986, y: -3.465, class: 'BulletBox', item: 'bullets', tag: 'BulletBox' },
+				{ x: 15.812, z: -22.962, y: -3.465, class: 'BulletBox', item: 'bullets', tag: 'BulletBox' },
+				{ x: 15.93, z: -25.162, y: -3.465, class: 'BulletBox', item: 'bullets', yaw: 142.73, tag: 'BulletBox' },
+				{ x: 18.715, z: -25.351, y: -3.465, class: 'BulletBox', item: 'bullets', yaw: 279.93, tag: 'BulletBox' },
+				{ x: 1.072, z: -17.047, y: -13.181, class: 'PAmmo', item: 'pulse_ammo', tag: 'PAmmo' },
+				{ x: 1.065, z: -17.687, y: -13.181, class: 'PAmmo', item: 'pulse_ammo', tag: 'PAmmo' },
+				{ x: 1.619, z: -2.324, y: -13.181, class: 'PAmmo', item: 'pulse_ammo', tag: 'PAmmo' },
+				{ x: 1.176, z: -2.359, y: -13.181, class: 'PAmmo', item: 'pulse_ammo', tag: 'PAmmo' },
+				{ x: 42.235, z: 30.898, y: -10.171, class: 'BulletBox', item: 'bullets', tag: 'BulletBox' },
+				{ x: 44.965, z: 30.959, y: -10.171, class: 'BulletBox', item: 'bullets', yaw: 305.2, tag: 'BulletBox' },
+				{ x: 44.529, z: -21.186, y: -10.152, class: 'flakammo', item: 'flak_shells', tag: 'flakammo' },
+				{ x: 39.097, z: -21.184, y: -10.152, class: 'flakammo', item: 'flak_shells', tag: 'flakammo' },
+				{ x: -21.664, z: -3.956, y: -12.266, class: 'RocketPack', item: 'rockets', yaw: 298.17, tag: 'RocketPack' },
+				{ x: -3.77, z: 23.153, y: -13.219, class: 'BladeHopper', item: 'ripper_blades', tag: 'BladeHopper' },
+				{ x: -3.769, z: 23.84, y: -13.219, class: 'BladeHopper', item: 'ripper_blades', tag: 'BladeHopper' },
+				{ x: 18.956, z: -27.217, y: -24.001, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: 15.199, z: -27.224, y: -24.001, class: 'RocketPack', item: 'rockets', yaw: 285.29, tag: 'RocketPack' },
+				{ x: -21.581, z: -21.549, y: -16.857, class: 'flakammo', item: 'flak_shells', tag: 'flakammo' },
+				{ x: -18.74, z: -21.568, y: -16.857, class: 'flakammo', item: 'flak_shells', tag: 'flakammo' },
+				{ x: -5.994, z: -35.968, y: -14.4, class: 'RocketPack', item: 'rockets', yaw: 184.48, tag: 'RocketPack' },
+				{ x: -5.99, z: -36.855, y: -14.209, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: -6.181, z: -37.777, y: -14.495, class: 'BulletBox', item: 'bullets', yaw: 245.26, tag: 'BulletBox' },
+				{ x: 12.767, z: 18.862, y: -15.562, class: 'Miniammo', item: 'minigun_ammo', yaw: 352.44, tag: 'Miniammo' },
+				{ x: 12.744, z: 18.242, y: -15.562, class: 'Miniammo', item: 'minigun_ammo', yaw: 194.15, tag: 'Miniammo' },
+				{ x: 19.027, z: -25.527, y: -14.209, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: 18.759, z: -25.591, y: -14.209, class: 'ShockCore', item: 'shock_core', yaw: 233.31, tag: 'ShockCore' }
+			],
+			health: [
+				{ x: 15.782, z: 38.505, y: -24.077, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: 15.787, z: 37.688, y: -24.077, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: 18.037, z: -4.889, y: -19.81, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 18.314, z: -4.892, y: -19.81, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 15.755, z: -4.891, y: -19.81, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 16.056, z: -4.893, y: -19.81, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 4.161, z: -21.493, y: -14.476, class: 'MedBox', item: 'health_pack', yaw: 270.83, tag: 'MedBox' },
+				{ x: -1.097, z: -21.448, y: -14.476, class: 'MedBox', item: 'health_pack', yaw: 270.83, tag: 'MedBox' },
+				{ x: 43.279, z: -12.17, y: -9.79, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 43.61, z: -11.868, y: -9.79, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 43.614, z: -12.484, y: -9.79, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 42.965, z: -11.852, y: -9.79, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 42.975, z: -12.486, y: -9.79, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -0.619, z: 14.635, y: -13.104, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -0.637, z: 13.965, y: -13.104, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -0.618, z: 13.168, y: -13.104, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' }
+			],
+			armor: [
+				{ x: 23.107, z: 31.086, y: -22.534, class: 'armor2', item: 'body_armor', tag: 'armor2' },
+				{ x: 17.059, z: -4.894, y: -19.448, class: 'ut_shieldbelt', item: 'shield_belt', yaw: 322.91, tag: 'ut_shieldbelt' },
+				{ x: 30.385, z: -12.703, y: -3.694, class: 'ThighPads', item: 'thigh_pads', tag: 'ThighPads' },
+				{ x: 17.032, z: 9.778, y: -24.096, class: 'ut_jumpboots', item: 'jump_boots', tag: 'ut_jumpboots' }
+			],
+			powerup: [
+				{ x: 13.432, z: -23.873, y: -11.619, class: 'UDamage', item: 'damage_amplifier', tag: 'UDamage' }
+			]
+		}
+	})
+
+// DOM-Elder (UT original DOM-Olden) — imported DOM. killY nav-gated (margin 10.90 m world);
+// winding sign 1; longest sightline 34.3 m (default fog OK — no per-map fogDensity).
+// Isolation: kept 3755 faces, dropped 222 detached (margin 32 m).
+const dom_elder = mesh({
+		id: 'dom_elder',
+		name: 'DOM-Elder',
+		mode: 'DOM',
+		dir: '/assets/maps/DOM-Elder/',
+		file: 'DOM-Elder.obj',
+		lights: 'DOM-Elder.lights.json',
+		killY: -25,
+		spawns: [
+			{ x: 14.316, y: -2.44, z: 16.113 },
+			{ x: 1.967, y: -2.44, z: 34.863 },
+			{ x: -26.856, y: 5.79, z: 53.9 },
+			{ x: -2.449, y: -2.44, z: 2.352 },
+			{ x: 4.536, y: -2.44, z: 8.67 },
+			{ x: 28.101, y: -2.44, z: 27.859 },
+			{ x: 28.633, y: -2.44, z: 37.968 },
+			{ x: 13.662, y: -2.44, z: 50.013 },
+			{ x: -14.728, y: -2.44, z: 49.509 },
+			{ x: -35.341, y: -2.44, z: 44.887 },
+			{ x: -35.373, y: -2.44, z: 36.799 },
+			{ x: -34.011, y: -2.44, z: 25.193 },
+			{ x: -35.085, y: -2.44, z: 10.991 },
+			{ x: -11.134, y: -2.44, z: 10.258 },
+			{ x: -15.365, y: 5.79, z: 41.379 },
+			{ x: 0.901, y: 5.79, z: 41.362 }
+		],
+		walkable: { minX: -36.6, maxX: 30.5, minY: -25.0, maxY: 18.9, minZ: -4.9, maxZ: 58.6 },
+		mega: { x: 24.663, y: 11.43, z: 50.159 },
+		mode_data: {
+			controlPoints: [
+				{ id: 'A', x: -2.497, y: 4.002, z: 2.556 },
+				{ id: 'B', x: -3.081, y: -1.484, z: 50.687 },
+				{ id: 'C', x: -25.891, y: 6.86, z: 19.48 }
+			],
+			scorePerTickPerPoint: 1,
+			geometry: {
+				triangle_area_m2: 235.8,
+				sides_m: [31.3, 25.1, 18.8],
+				vertical_spread_m: 5.42,
+				coplanar: false
+			}
+		},
+		SPAWN_POINTS: [
+			{ x: 14.316, y: -2.44, z: 16.113, yaw: 24.52, team: 0, team_source: 'derived_2means', headroom: 5.89 },
+			{ x: 1.967, y: -2.44, z: 34.863, yaw: 78.57, team: 0, team_source: 'derived_2means', headroom: 7.03 },
+			{ x: -26.856, y: 5.79, z: 53.9, yaw: 270.66, team: 1, team_source: 'derived_2means', headroom: 2.13 },
+			{ x: -2.449, y: -2.44, z: 2.352, yaw: 89.87, team: 0, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: 4.536, y: -2.44, z: 8.67, yaw: 122.43, team: 0, team_source: 'derived_2means', headroom: 6.53 },
+			{ x: 28.101, y: -2.44, z: 27.859, yaw: 182.37, team: 0, team_source: 'derived_2means', headroom: 4.43 },
+			{ x: 28.633, y: -2.44, z: 37.968, yaw: 178.9, team: 0, team_source: 'derived_2means', headroom: 5.32 },
+			{ x: 13.662, y: -2.44, z: 50.013, yaw: 354.02, team: 0, team_source: 'derived_2means', headroom: 4.47 },
+			{ x: -14.728, y: -2.44, z: 49.509, yaw: 255.32, team: 1, team_source: 'derived_2means', headroom: 5.13 },
+			{ x: -35.341, y: -2.44, z: 44.887, yaw: null, team: 1, team_source: 'derived_2means', headroom: 4.53 },
+			{ x: -35.373, y: -2.44, z: 36.799, yaw: null, team: 1, team_source: 'derived_2means', headroom: 4.48 },
+			{ x: -34.011, y: -2.44, z: 25.193, yaw: null, team: 1, team_source: 'derived_2means', headroom: 6.25 },
+			{ x: -35.085, y: -2.44, z: 10.991, yaw: null, team: 1, team_source: 'derived_2means', headroom: 4.53 },
+			{ x: -11.134, y: -2.44, z: 10.258, yaw: null, team: 1, team_source: 'derived_2means', headroom: 4.3 },
+			{ x: -15.365, y: 5.79, z: 41.379, yaw: null, team: 1, team_source: 'derived_2means', headroom: 3.91 },
+			{ x: 0.901, y: 5.79, z: 41.362, yaw: 175.78, team: 0, team_source: 'derived_2means', headroom: 3.91 }
+		],
+		PICKUPS: {
+			weapon: [
+				{ x: -2.136, z: -2.611, y: 3.202, class: 'minigun2', item: 'minigun', tag: 'minigun2' },
+				{ x: -2.399, z: 7.583, y: -2.075, class: 'ut_biorifle', item: 'bio_rifle', tag: 'ut_biorifle' },
+				{ x: 14.783, z: 11.576, y: -1.979, class: 'ShockRifle', item: 'shock_rifle', tag: 'ShockRifle' },
+				{ x: 28.62, z: 49.216, y: -1.694, class: 'UT_FlakCannon', item: 'flak_cannon', tag: 'UT_FlakCannon' },
+				{ x: -26.868, z: 28.267, y: 6.231, class: 'UT_FlakCannon', item: 'flak_cannon', yaw: 0.62, tag: 'UT_FlakCannon' },
+				{ x: -18.832, z: 49.079, y: -2.303, class: 'ripper', yaw: 91.98, tag: 'ripper' },
+				{ x: 0.298, z: 37.666, y: 5.984, class: 'UT_Eightball', item: 'rocket_launcher', tag: 'UT_Eightball' },
+				{ x: -12.914, z: 22.352, y: 7.565, class: 'SniperRifle', item: 'sniper_rifle', yaw: 269.78, tag: 'SniperRifle' }
+			],
+			ammo: [
+				{ x: 0.192, z: -3.39, y: 3.26, class: 'Miniammo', item: 'minigun_ammo', tag: 'Miniammo' },
+				{ x: -4.643, z: -3.362, y: 3.259, class: 'Miniammo', item: 'minigun_ammo', yaw: 263.14, tag: 'Miniammo' },
+				{ x: 6.027, z: 15.343, y: -2.003, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: 6.238, z: 17.33, y: -2.227, class: 'flakammo', item: 'flak_shells', yaw: 275.36, tag: 'flakammo' },
+				{ x: 0.425, z: 0.876, y: -2.265, class: 'bioammo', item: 'bio_ammo', tag: 'bioammo' },
+				{ x: -4.866, z: 1.614, y: -2.265, class: 'bioammo', item: 'bio_ammo', yaw: 330.42, tag: 'bioammo' },
+				{ x: 5.85, z: 33.217, y: 6.326, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: 3.872, z: 32.896, y: 6.327, class: 'RocketPack', item: 'rockets', yaw: 88.24, tag: 'RocketPack' },
+				{ x: -28.952, z: 17.368, y: 6.003, class: 'flakammo', item: 'flak_shells', tag: 'flakammo' },
+				{ x: -28.996, z: 21.382, y: 6.003, class: 'flakammo', item: 'flak_shells', yaw: 207.2, tag: 'flakammo' },
+				{ x: 27.625, z: 11.741, y: -2.208, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: 6.341, z: 27.688, y: -2.246, class: 'BladeHopper', item: 'ripper_blades', tag: 'BladeHopper' },
+				{ x: -11.094, z: 27.975, y: -2.227, class: 'flakammo', item: 'flak_shells', tag: 'flakammo' },
+				{ x: -30.712, z: 50.224, y: -2.246, class: 'BladeHopper', item: 'ripper_blades', tag: 'BladeHopper' },
+				{ x: -17.405, z: 44.966, y: -1.027, class: 'BladeHopper', item: 'ripper_blades', tag: 'BladeHopper' },
+				{ x: 24.051, z: 47.122, y: -2.227, class: 'flakammo', item: 'flak_shells', tag: 'flakammo' },
+				{ x: 24.056, z: 49.446, y: -2.227, class: 'flakammo', item: 'flak_shells', yaw: 91.32, tag: 'flakammo' },
+				{ x: 11.272, z: 15.134, y: -2.003, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: 11.789, z: 17.847, y: -2.003, class: 'ShockCore', item: 'shock_core', yaw: 89.74, tag: 'ShockCore' },
+				{ x: -2.085, z: 33.506, y: -2.003, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: 16.612, z: 32.272, y: -2.003, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: -16.129, z: 23.821, y: 7.508, class: 'BulletBox', item: 'bullets', tag: 'BulletBox' },
+				{ x: -14.17, z: 24.038, y: 7.603, class: 'RifleShell', item: 'sniper_rounds', tag: 'RifleShell' },
+				{ x: -13.717, z: 24.029, y: 7.603, class: 'RifleShell', item: 'sniper_rounds', tag: 'RifleShell' },
+				{ x: -13.216, z: 24.038, y: 7.603, class: 'RifleShell', item: 'sniper_rounds', tag: 'RifleShell' }
+			],
+			health: [
+				{ x: -9.664, z: 32.973, y: 6.25, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: -11.623, z: 32.893, y: 6.25, class: 'MedBox', item: 'health_pack', yaw: 269.91, tag: 'MedBox' },
+				{ x: 10.089, z: 22.579, y: 7.689, class: 'HealthPack', item: 'health_pack', tag: 'HealthPack' },
+				{ x: -31.538, z: 19.483, y: 0.764, class: 'MedBox', item: 'health_pack', yaw: 91.01, tag: 'MedBox' },
+				{ x: 16.601, z: 22.939, y: -2.284, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: -17.605, z: 27.362, y: -2.036, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -18.692, z: 27.715, y: -2.036, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -17.935, z: 28.127, y: -2.036, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -18.753, z: 28.677, y: -2.036, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -17.709, z: 28.912, y: -2.036, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -8.21, z: 13.95, y: -7.923, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -7.468, z: 12.573, y: -7.923, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -6.383, z: 12.442, y: -7.923, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -8.031, z: 11.098, y: -7.923, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -5.449, z: 11.375, y: -7.923, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' }
+			],
+			armor: [
+				{ x: -17.927, z: 10.852, y: -1.902, class: 'armor2', item: 'body_armor', yaw: 89.96, tag: 'armor2' },
+				{ x: 24.663, z: 50.159, y: 9.184, class: 'ut_shieldbelt', item: 'shield_belt', yaw: 270.66, tag: 'ut_shieldbelt' }
+			]
+		}
+	})
+
+// DM-Somnus (UT original DM-Morpheus) — imported FFA. killY nav-gated (margin 11.49 m world);
+// winding sign 1; longest sightline 23.7 m (default fog OK — no per-map fogDensity).
+// Isolation: kept 2452 faces, dropped 324 detached (margin 30 m).
+const dm_somnus = mesh({
+		id: 'dm_somnus',
+		name: 'DM-Somnus',
+		mode: 'FFA',
+		dir: '/assets/maps/DM-Somnus/',
+		file: 'DM-Somnus.obj',
+		lights: 'DM-Somnus.lights.json',
+		killY: 0,
+		spawns: [
+			{ x: 7.597, y: 36.576, z: 25.307 },
+			{ x: 10.934, y: 34.138, z: -10.053 },
+			{ x: -19.494, y: 39.014, z: -4.137 },
+			{ x: -11.166, y: 41.453, z: -13.252 },
+			{ x: 14.232, y: 36.576, z: -9.172 },
+			{ x: 8.391, y: 39.014, z: 21.73 },
+			{ x: 5.011, y: 39.014, z: 17.334 },
+			{ x: -17.91, y: 41.453, z: -7.655 },
+			{ x: -23.226, y: 39.014, z: -7.706 },
+			{ x: 14.355, y: 34.138, z: -14.544 },
+			{ x: 11.632, y: 36.576, z: 19.185 },
+			{ x: 26.105, y: 36.576, z: -10.023 },
+			{ x: 11.396, y: 36.576, z: 22.492 },
+			{ x: 3.504, y: 39.014, z: 15.867 },
+			{ x: -0.803, y: 19.507, z: 0.244 }
+		],
+		walkable: { minX: -25.3, maxX: 33.6, minY: 0, maxY: 68.3, minZ: -26.3, maxZ: 29.3 },
+		mega: { x: 19.525, y: 48.768, z: -6.886 },
+		mode_data: { teams: 0 },
+		SPAWN_POINTS: [
+			{ x: 7.597, y: 36.576, z: 25.307, yaw: 221.13, team: 1, team_source: 'derived_2means', headroom: 1.33 },
+			{ x: 10.934, y: 34.138, z: -10.053, yaw: null, team: 1, team_source: 'derived_2means', headroom: 1.33 },
+			{ x: -19.494, y: 39.014, z: -4.137, yaw: 299.18, team: 0, team_source: 'derived_2means', headroom: 1.33 },
+			{ x: -11.166, y: 41.453, z: -13.252, yaw: null, team: 0, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: 14.232, y: 36.576, z: -9.172, yaw: 217.71, team: 1, team_source: 'derived_2means', headroom: 15 },
+			{ x: 8.391, y: 39.014, z: 21.73, yaw: 37.4, team: 1, team_source: 'derived_2means', headroom: 15 },
+			{ x: 5.011, y: 39.014, z: 17.334, yaw: 314.17, team: 1, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: -17.91, y: 41.453, z: -7.655, yaw: 65.26, team: 0, team_source: 'derived_2means', headroom: 3.49 },
+			{ x: -23.226, y: 39.014, z: -7.706, yaw: 313.42, team: 0, team_source: 'derived_2means', headroom: 1.33 },
+			{ x: 14.355, y: 34.138, z: -14.544, yaw: 38.01, team: 1, team_source: 'derived_2means', headroom: 1.33 },
+			{ x: 11.632, y: 36.576, z: 19.185, yaw: 211.03, team: 1, team_source: 'derived_2means', headroom: 1.33 },
+			{ x: 26.105, y: 36.576, z: -10.023, yaw: 87.14, team: 1, team_source: 'derived_2means', headroom: 2.24 },
+			{ x: 11.396, y: 36.576, z: 22.492, yaw: 221.13, team: 1, team_source: 'derived_2means', headroom: 1.33 },
+			{ x: 3.504, y: 39.014, z: 15.867, yaw: 299.05, team: 1, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: -0.803, y: 19.507, z: 0.244, yaw: null, team: 1, team_source: 'derived_2means', headroom: 15 }
+		],
+		PICKUPS: {
+			weapon: [
+				{ x: -5.898, z: -16.796, y: 47.767, class: 'UT_Eightball', item: 'rocket_launcher', tag: 'UT_Eightball' },
+				{ x: 25.565, z: 2.402, y: 42.826, class: 'ShockRifle', item: 'shock_rifle', tag: 'ShockRifle' },
+				{ x: -2.288, z: 9.621, y: 45.265, class: 'minigun2', item: 'minigun', tag: 'minigun2' },
+				{ x: -8.433, z: -15.45, y: 35.492, class: 'ripper', tag: 'ripper' },
+				{ x: 21.439, z: 1.021, y: 30.634, class: 'SniperRifle', item: 'sniper_rifle', yaw: 347.12, tag: 'SniperRifle' },
+				{ x: 1.147, z: 11.24, y: 33.492, class: 'PulseGun', item: 'pulse_gun', tag: 'PulseGun' },
+				{ x: 12.537, z: 9.818, y: 19.7, class: 'UT_Eightball', item: 'rocket_launcher', yaw: 113.82, tag: 'UT_Eightball' },
+				{ x: -15.741, z: -12.521, y: 54.084, class: 'WarheadLauncher', item: 'redeemer', yaw: 4.04, tag: 'WarheadLauncher' }
+			],
+			ammo: [
+				{ x: -5.721, z: -15.321, y: 47.818, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: -5.907, z: -19.068, y: 47.818, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: 25.6, z: 0.581, y: 43.085, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: 25.881, z: 4.538, y: 43.085, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: -2.268, z: 11.657, y: 45.392, class: 'Miniammo', item: 'minigun_ammo', tag: 'Miniammo' },
+				{ x: -2.426, z: 7.858, y: 45.39, class: 'Miniammo', item: 'minigun_ammo', tag: 'Miniammo' },
+				{ x: -7.291, z: -14.77, y: 35.549, class: 'BladeHopper', item: 'ripper_blades', tag: 'BladeHopper' },
+				{ x: -7.361, z: -13.819, y: 35.549, class: 'BladeHopper', item: 'ripper_blades', tag: 'BladeHopper' },
+				{ x: 22.729, z: -0.966, y: 30.672, class: 'BulletBox', item: 'bullets', yaw: 320.93, tag: 'BulletBox' },
+				{ x: 22.44, z: -0.548, y: 30.672, class: 'BulletBox', item: 'bullets', yaw: 25.49, tag: 'BulletBox' },
+				{ x: -0.955, z: 13.005, y: 33.149, class: 'PAmmo', item: 'pulse_ammo', yaw: 355.74, tag: 'PAmmo' },
+				{ x: -0.716, z: 12.252, y: 33.149, class: 'PAmmo', item: 'pulse_ammo', yaw: 337.54, tag: 'PAmmo' },
+				{ x: 13.631, z: 11.091, y: 19.738, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: 12.971, z: 11.557, y: 19.738, class: 'RocketPack', item: 'rockets', yaw: 39.99, tag: 'RocketPack' }
+			],
+			health: [
+				{ x: 16.532, z: -5.321, y: 36.73, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: 17.484, z: -4.664, y: 36.731, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: -3.853, z: 25.742, y: 39.168, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: -2.928, z: 26.547, y: 39.168, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: -22.403, z: -18.229, y: 41.608, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: -21.652, z: -19.346, y: 41.607, class: 'MedBox', item: 'health_pack', tag: 'MedBox' }
+			],
+			armor: [
+				{ x: 2.839, z: 19.516, y: 51.72, class: 'armor2', item: 'body_armor', yaw: 228.91, tag: 'armor2' }
+			],
+			powerup: [
+				{ x: 19.525, z: -6.886, y: 49.15, class: 'UT_invisibility', item: 'invisibility', tag: 'UT_invisibility' }
+			]
+		}
+	})
+
 // The runtime registry. Add mesh maps here (or via registerMap at boot); the DEFAULT is
 // CTF-Visage so a no-argument GameInstance / client behaves exactly as the live game.
-export const mapRecords = { visage, grove }
+export const mapRecords = { visage, grove, dm_gantry162, dom_elder, dm_somnus }
 export const DEFAULT_MAP_ID = 'visage'
 export const mapList = () => Object.values(mapRecords)
 

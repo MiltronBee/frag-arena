@@ -1,0 +1,217 @@
+# DM-Somnus play mesh (skybox stripped) - web textures
+
+newmtl FractalFX_DaveJump
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/FractalFX_DaveJump.webp
+
+
+newmtl FractalFX_ShanConc01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/FractalFX_ShanConc01.webp
+
+
+newmtl FractalFX_TrimConc01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/FractalFX_TrimConc01.webp
+
+
+newmtl FractalFX_jptrimA_00
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/FractalFX_jptrimA_00.webp
+
+
+newmtl FractalFX_lanPad01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/FractalFX_lanPad01.webp
+
+
+newmtl FractalFX_runway01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/FractalFX_runway01.webp
+
+
+newmtl RainFX_Locker
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/RainFX_Locker.webp
+
+
+newmtl RainFX_Rmetl2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/RainFX_Rmetl2.webp
+
+
+newmtl RainFX_Rtrim1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/RainFX_Rtrim1.webp
+
+
+newmtl RainFX_Rtrim1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/RainFX_Rtrim1a.webp
+
+
+newmtl Scripted_CondemnedScroll
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Scripted_CondemnedScroll.webp
+
+
+newmtl Scripted_MessageScroll2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Scripted_MessageScroll2.webp
+
+
+newmtl Scripted_MessageScroll3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Scripted_MessageScroll3.webp
+
+
+newmtl Slums_Lights_Light8
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Slums_Lights_Light8.webp
+
+
+newmtl Slums_Miscellaneous_Pavmtcr2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Slums_Miscellaneous_Pavmtcr2.webp
+
+
+newmtl Slums_Signs_Bnews01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Slums_Signs_Bnews01.webp
+
+
+newmtl Slums_Signs_Movie01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Slums_Signs_Movie01.webp
+
+
+newmtl Slums_Signs_Movie02
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Slums_Signs_Movie02.webp
+
+
+newmtl Slums_metal_Metalr02
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Slums_metal_Metalr02.webp
+
+
+newmtl UTtech1_Light_aw_lit1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech1_Light_aw_lit1a.webp
+
+
+newmtl UTtech2_Light_rClfLit2x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Light_rClfLit2x.webp
+
+
+newmtl UTtech3_Deco_sg-bill-1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech3_Deco_sg-bill-1a.webp
+
+
+newmtl UTtech3_Deco_sg-bill2a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech3_Deco_sg-bill2a.webp
+
+
+newmtl city_Lite1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/city_Lite1.webp
+
+
+newmtl city_Red-lit2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/city_Red-lit2.webp
+
+
+newmtl city_Win-gray
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/city_Win-gray.webp
+
+
+newmtl city_Xan
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/city_Xan.webp
+

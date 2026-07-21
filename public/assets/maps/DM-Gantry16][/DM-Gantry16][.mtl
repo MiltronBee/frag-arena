@@ -1,0 +1,224 @@
+# DM-Gantry16][ play mesh (skybox stripped) - web textures
+
+newmtl DecayedS_Base_Base1C
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Base_Base1C.webp
+
+
+newmtl DecayedS_Base_Base2a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Base_Base2a.webp
+
+
+newmtl DecayedS_Base_Basesml1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Base_Basesml1.webp
+
+
+newmtl DecayedS_Base_dBase2b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Base_dBase2b.webp
+
+
+newmtl DecayedS_Base_dClgBas2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Base_dClgBas2.webp
+
+
+newmtl DecayedS_Base_dSlimeBs
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Base_dSlimeBs.webp
+
+
+newmtl DecayedS_Ceiling_dCeilng4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Ceiling_dCeilng4.webp
+
+
+newmtl DecayedS_Deco_DWindow4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Deco_DWindow4.webp
+
+
+newmtl DecayedS_Deco_dHull2a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Deco_dHull2a.webp
+
+
+newmtl DecayedS_Deco_dSewer1c
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Deco_dSewer1c.webp
+
+
+newmtl DecayedS_Light_Light5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Light_Light5.webp
+
+
+newmtl DecayedS_Mask_dmesh1m
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Mask_dmesh1m.webp
+
+
+newmtl DecayedS_Wall_LOPANELB
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Wall_LOPANELB.webp
+
+
+newmtl DecayedS_Wall_dWallA3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/DecayedS_Wall_dWallA3.webp
+
+
+newmtl UTtech2_Base_rClfBsB2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Base_rClfBsB2.webp
+
+
+newmtl UTtech2_Ceiling_rClfClg2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Ceiling_rClfClg2.webp
+
+
+newmtl UTtech2_Deco_rClfBox2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Deco_rClfBox2.webp
+
+
+newmtl UTtech2_Deco_rClfBoxX
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Deco_rClfBoxX.webp
+
+
+newmtl UTtech2_Floor_rClfFlr9x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Floor_rClfFlr9x.webp
+
+
+newmtl UTtech2_Light_rClfLit2x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Light_rClfLit2x.webp
+
+
+newmtl UTtech2_Trim_rClfTrm3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Trim_rClfTrm3.webp
+
+
+newmtl UTtech2_Wall_rClfWl1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Wall_rClfWl1a.webp
+
+
+newmtl UTtech2_Wall_rClfWl2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Wall_rClfWl2.webp
+
+
+newmtl UTtech2_Wall_rClfWl3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Wall_rClfWl3.webp
+
+
+newmtl UTtech2_Wall_rClfWl5x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Wall_rClfWl5x.webp
+
+
+newmtl UTtech2_Wall_rClfWl7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_Wall_rClfWl7.webp
+
+
+newmtl UTtech2_pillar_rClfPlr3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech2_pillar_rClfPlr3.webp
+
+
+newmtl UTtech3_Light_rnd_lite2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech3_Light_rnd_lite2.webp
