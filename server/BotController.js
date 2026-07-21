@@ -390,6 +390,10 @@ class BotController {
 			let best = null
 			let bestDist = Infinity
 			combatants.forEach(candidate => {
+				// TDM: never target a TEAMMATE. A bot only fights the enemy team, so it can
+				// never shoot or path-to-attack a friendly (LoS/nav are unchanged otherwise).
+				if (candidate.teamId !== undefined && me.teamId !== undefined
+					&& candidate.teamId === me.teamId) return
 				const d = Math.hypot(candidate.x - me.x, candidate.z - me.z)
 				if (d < bestDist) { bestDist = d; best = candidate }
 			})

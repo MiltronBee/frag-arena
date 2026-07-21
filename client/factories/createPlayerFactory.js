@@ -82,6 +82,14 @@ export default ({ simulator }) => {
 				const model = simulator.characterModels.get(entity.nid)
 				if (model) model.setName(name)
 			},
+			// TDM team color: the replicated teamId (also fires on create with the initial
+			// value) drives the remote player's nametag color + body tint so the local
+			// player can tell teammate from enemy at a glance. Server-authoritative — the
+			// client only reads it.
+			teamId({ entity, value }) {
+				const model = simulator.characterModels.get(entity.nid)
+				if (model) model.setTeam(value)
+			},
 			// observers can detect damage on any remote player via replicated hitpoints
 			// decreasing — play a brief hit-react one-shot (RecieveHit). Priority in
 			// CharacterModel keeps this from stomping an active shoot/death.

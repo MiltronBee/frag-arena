@@ -24,7 +24,7 @@
          stylesheet + LICENSE at public/assets/fonts/DSEG-LICENSE.txt. -->
     <link rel="preload" as="font" type="font/woff2" href="assets/fonts/DSEG7Classic-Bold.woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-a86f6d0bdf">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-36ff295dbe">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -54,7 +54,28 @@
                     <span class="status-divider" aria-hidden="true"></span>
                     <span id="frag-count">0 FRAGS · 0 DEATHS</span>
                 </div>
+                <!-- TDM team scoreboard: RED score · countdown · BLUE score. data-myteam
+                     highlights the local player's own team. Populated by Simulator._updateMatchHud
+                     from the networked MatchState entity (server-authoritative). -->
+                <div id="tdm-scoreboard" data-myteam="none" aria-label="Team deathmatch score">
+                    <span class="tdm-team tdm-side-red">
+                        <span class="tdm-tag">RED</span>
+                        <span id="tdm-score-red" class="tdm-num">0</span>
+                    </span>
+                    <span id="tdm-timer" class="tdm-timer">8:00</span>
+                    <span class="tdm-team tdm-side-blue">
+                        <span id="tdm-score-blue" class="tdm-num">0</span>
+                        <span class="tdm-tag">BLUE</span>
+                    </span>
+                </div>
             </header>
+
+            <!-- TDM MATCH_END banner (winner + final score) shown during the intermission.
+                 Toggled via #tdm-banner.is-visible by Simulator._updateMatchHud. -->
+            <div id="tdm-banner" aria-live="assertive" aria-hidden="true">
+                <div id="tdm-banner-title">RED WINS</div>
+                <div id="tdm-banner-score">0 — 0</div>
+            </div>
 
             <!-- Per-weapon, spread-reactive crosshair (see _work/ui/CROSSHAIR-proposal.md).
                  Dynamic SVG keeps the #crosshair id, centering anchor + death-fade CSS.
@@ -644,7 +665,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-a86f6d0bdf";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-a86f6d0bdf"></script>
+    <script>window.__BUILD_ID__="0.0.1-36ff295dbe";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-36ff295dbe"></script>
 </body>
 </html>

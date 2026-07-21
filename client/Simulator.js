@@ -26,6 +26,7 @@ import { resolveWeaponFx } from './graphics/firingFx'
 import { assets, weapons } from './assets/assetManifest'
 import preloadAssets from './graphics/assetPreloader'
 import { MEGA_STATE } from '../common/entity/MegaHealthPickup'
+import { MATCH_PHASE, MATCH_WINNER } from '../common/entity/MatchState'
 import { PICKUP_TYPE, PICKUP_RADIUS } from '../common/pickupConfig'
 
 // Aim-safe positional camera pulse on a confirmed LOCAL flesh hit (world units of
@@ -724,6 +725,79 @@ class Simulator {
 		if (this._megaHealth && this._megaHealth.nid === nid) this._megaHealth = null
 		if (this.audio.megaHumStop) this.audio.megaHumStop()
 		this._megaState = -1
+	}
+
+	// TDM: the low-rate MatchState entity (team scores / timer / phase / winner). Stored
+	// so _updateHud can paint the team scoreboard + banner each frame off its networked
+	// fields. Server-authoritative — the client only reads it, never asserts a score.
+	registerMatchState(entity) { if (entity) this._matchState = entity }
+	unregisterMatchState(nid) {
+		if (this._matchState && this._matchState.nid === nid) this._matchState = null
+	}
+
+	// Paint the TDM scoreboard (both team scores), the match countdown, and the
+	// MATCH_END winner banner off the networked MatchState. Presentation only — the
+	// server owns every value. Cheap: only touches the DOM when a field changes.
+	_updateMatchHud() {
+		const ms = this._matchState
+		const board = document.getElementById('tdm-scoreboard')
+		if (!ms || !board) return
+
+		const s0 = ms.teamScore0 | 0
+		const s1 = ms.teamScore1 | 0
+		if (s0 !== this._lastTdmS0) {
+			this._lastTdmS0 = s0
+			const el = document.getElementById('tdm-score-red')
+			if (el) el.textContent = String(s0)
+		}
+		if (s1 !== this._lastTdmS1) {
+			this._lastTdmS1 = s1
+			const el = document.getElementById('tdm-score-blue')
+			if (el) el.textContent = String(s1)
+		}
+
+		// countdown mm:ss (server quantizes to 100ms; ceil so it never shows 0:00 early)
+		const secs = Math.max(0, Math.ceil((ms.timeRemainingMs | 0) / 1000))
+		if (secs !== this._lastTdmSecs) {
+			this._lastTdmSecs = secs
+			const el = document.getElementById('tdm-timer')
+			if (el) el.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`
+		}
+
+		// which team is the local player on? Highlight it (data-myteam), read off our own
+		// entity's replicated teamId (available once we've spawned).
+		const myTeam = this.myRawEntity ? this.myRawEntity.teamId
+			: (this.mySmoothEntity ? this.mySmoothEntity.teamId : undefined)
+		if (myTeam !== this._lastTdmMyTeam) {
+			this._lastTdmMyTeam = myTeam
+			board.setAttribute('data-myteam', myTeam === 0 ? 'red' : myTeam === 1 ? 'blue' : 'none')
+		}
+
+		// phase / winner banner
+		const phase = ms.phase | 0
+		const winner = ms.winner | 0
+		if (phase !== this._lastTdmPhase || winner !== this._lastTdmWinner) {
+			this._lastTdmPhase = phase
+			this._lastTdmWinner = winner
+			const banner = document.getElementById('tdm-banner')
+			const ended = phase === MATCH_PHASE.MATCH_END
+			board.classList.toggle('match-over', ended)
+			if (banner) {
+				banner.classList.toggle('is-visible', ended)
+				if (ended) {
+					const title = winner === MATCH_WINNER.TEAM0 ? 'RED WINS'
+						: winner === MATCH_WINNER.TEAM1 ? 'BLUE WINS' : 'DRAW'
+					const tEl = document.getElementById('tdm-banner-title')
+					const sEl = document.getElementById('tdm-banner-score')
+					if (tEl) {
+						tEl.textContent = title
+						tEl.className = winner === MATCH_WINNER.TEAM0 ? 'tdm-red'
+							: winner === MATCH_WINNER.TEAM1 ? 'tdm-blue' : ''
+					}
+					if (sEl) sEl.textContent = `${s0} — ${s1}`
+				}
+			}
+		}
 	}
 
 	// Drive the mega-health pickup presentation off its networked `state`:
@@ -1717,6 +1791,9 @@ class Simulator {
 				pingEl.classList.toggle('is-bad', ping > 120)
 			}
 		}
+
+		// TDM team scoreboard + timer + phase banner (runs even before we've spawned).
+		this._updateMatchHud()
 
 		if (!this.myRawEntity) return
 		if (!this._arenaReady) this.setArenaReady()

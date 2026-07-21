@@ -24,6 +24,7 @@ import lagCompensatedHitscanCheck, { nearestWorldHit } from './lagCompensatedHit
 import Projectile from '../common/entity/Projectile'
 import Grenade from '../common/entity/Grenade'
 import MegaHealthPickup, { MEGA_STATE } from '../common/entity/MegaHealthPickup'
+import MatchState, { MATCH_PHASE, MATCH_WINNER } from '../common/entity/MatchState'
 import setupPickups from './setupPickups'
 import { PICKUP_TYPE, PICKUP_RADIUS, CHARGE_LEAD_SECONDS, HEALTH_HEAL, HEALTH_CAP } from '../common/pickupConfig'
 import { weapons, DEFAULT_ZONE_MULTIPLIERS } from '../common/weaponsConfig'
@@ -155,6 +156,25 @@ const SPAWN_REST = 0.5
 const SPAWN_PROBE_UP = 2.0
 const SPAWN_PROBE_DOWN = 6.0
 
+// ---------------------------------------------------------------------------
+// TDM (Team Deathmatch) v1 — the first real game mode. All numbers are design
+// constants; the match runs perpetually with bots and a human joins mid-ACTIVE.
+// ---------------------------------------------------------------------------
+// Friendly fire: a shot on a TEAMMATE deals 0 damage and scores nothing. Single
+// tunable — flip to true for FFA-style same-team damage.
+const FRIENDLY_FIRE = false
+// First team to FRAG_LIMIT team-frags wins immediately; otherwise the higher score
+// at TIME_LIMIT_MS wins. On an EXACT tie at the time limit we declare a DRAW (the
+// simplest correct outcome — no sudden-death overtime in v1).
+const FRAG_LIMIT = 40
+const TIME_LIMIT_MS = 8 * 60 * 1000 // 8:00
+// MATCH_END intermission (winner banner + final scores) before the scores/kills
+// reset and a fresh ACTIVE match begins.
+const INTERMISSION_MS = 15 * 1000
+// How often the low-rate MatchState entity re-publishes the ticking countdown while
+// nothing else changed (score/phase/winner changes publish immediately). ~2Hz.
+const MATCH_PUBLISH_MS = 500
+
 class GameInstance {
 	static RESPAWN_DELAY_MS = 2500
 
@@ -225,6 +245,29 @@ class GameInstance {
 		this.instance.addEntity(this.megaHealth)
 		// (the rest is just attached to client objects when they connect)
 
+		// TDM MATCH STATE. Team scores live on the instance (authoritative); the
+		// MatchState entity is the low-rate wire carrier the HUD reads. The match runs
+		// perpetually — boot straight into an ACTIVE match so a human always joins one
+		// in progress (no lobby / warmup gate).
+		this.teamScore = [0, 0]
+		this.matchPhase = MATCH_PHASE.ACTIVE
+		this.matchStartAt = Date.now()
+		this.matchEndAt = 0
+		this.matchWinner = MATCH_WINNER.DRAW
+		this._matchPublishAt = 0
+		// Park it HIGH above the play space but INSIDE the nengi view AABB: centred in
+		// x/z, near the top of the box in y. That keeps it replicated to every client
+		// (the AABB culler reads its x/y/z) while putting its bare historian hitbox where
+		// no shot ever travels (walkable ceiling is far below). See MatchState.js.
+		const msX = this.viewBox.x
+		const msY = this.viewBox.y + this.viewBox.halfHeight * 0.85
+		const msZ = this.viewBox.z
+		this.matchState = new MatchState(msX, msY, msZ)
+		this.matchState.phase = this.matchPhase
+		this.matchState.timeRemainingMs = TIME_LIMIT_MS
+		this.matchState.winner = this.matchWinner
+		this.instance.addEntity(this.matchState)
+
 		// AI players: real PlayerCharacter entities driven by BotController through
 		// the same applyCommand physics + performShot weapon authority as humans.
 		// Each bot is wrapped in a client-like handle whose rawEntity and
@@ -252,10 +295,14 @@ class GameInstance {
 			const rawEntity = new PlayerCharacter()
 			rawEntity.mesh.checkCollisions = true
 
+			// TDM: auto-balance onto the team with fewer players (tie -> team 0). Set
+			// BEFORE the spawn so we spawn on the assigned team's spawn points.
+			rawEntity.teamId = this.assignTeam()
+
 			// spread spawns out — spawning everyone at the exact origin puts players
 			// INSIDE each other's collision boxes, and moveWithCollisions can't escape
 			// from inside a collider (you'd be frozen until the other player moves)
-			const spawn = this.spawnPoint()
+			const spawn = this.spawnPoint(rawEntity.teamId)
 			rawEntity.x = spawn.x
 			rawEntity.y = spawn.y || 0
 			rawEntity.z = spawn.z
@@ -283,6 +330,10 @@ class GameInstance {
 			// the victim reads raw (private channel), everyone else reads smooth.
 			rawEntity.nameIndex = HUMAN_NAME_SENTINEL
 			smoothEntity.nameIndex = HUMAN_NAME_SENTINEL
+
+			// mirror the assigned team onto the smooth entity — remote clients read THAT
+			// one for team colors (same lockstep rule as hitpoints / nameIndex).
+			smoothEntity.teamId = rawEntity.teamId
 
 			// tell the client which entities it controls + where it spawned
 			this.instance.message(new Identity(rawEntity.nid, smoothEntity.nid, rawEntity.x, rawEntity.y, rawEntity.z), client)
@@ -815,7 +866,10 @@ class GameInstance {
 	addBot(index) {
 		const entity = new PlayerCharacter()
 		entity.mesh.checkCollisions = true
-		const spawn = this.spawnPoint()
+		// TDM: bots count in the auto-balance exactly like humans. Assign BEFORE spawn so
+		// the bot spawns on its team's spawn points.
+		entity.teamId = this.assignTeam()
+		const spawn = this.spawnPoint(entity.teamId)
 		entity.x = spawn.x
 		entity.y = spawn.y || 0
 		entity.z = spawn.z
@@ -979,7 +1033,7 @@ class GameInstance {
 		return Number.isFinite(dist) ? origin.y - dist : null
 	}
 
-	spawnPoint() {
+	spawnPoint(teamId = null) {
 		if (this.useMeshMap) {
 			const sc = this.map.scale || 1
 			// Prefer the UT-extracted SPAWN_POINTS (20, team-tagged, yaw, headroom) on the
@@ -988,7 +1042,13 @@ class GameInstance {
 			const pts = this.map.SPAWN_POINTS
 			if (Array.isArray(pts) && pts.length) {
 				const usable = pts.filter(p => p.headroom === undefined || p.headroom >= SPAWN_MIN_HEADROOM)
-				const pool = usable.length ? usable : pts
+				let pool = usable.length ? usable : pts
+				// TDM: spawn on the requesting team's own points. If a team has NONE (a map
+				// with untagged spawns), fall back to the full pool rather than failing.
+				if (teamId !== null) {
+					const teamPool = pool.filter(p => p.team === teamId)
+					if (teamPool.length) pool = teamPool
+				}
 				const p = pool[Math.floor(Math.random() * pool.length)]
 				const wx = p.x * sc + (Math.random() - 0.5) * 1.2
 				const wz = p.z * sc + (Math.random() - 0.5) * 1.2
@@ -1006,7 +1066,13 @@ class GameInstance {
 		// symmetric SPAWN_POINTS with a small jitter so two players picking the same
 		// point don't spawn inside each other's collider. Server-side only (not the
 		// deterministic movement path), so Math.random is fine here.
-		const p = SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)]
+		// TDM: if the box arena's spawns carry team tags, honour them; otherwise use all.
+		let boxPool = SPAWN_POINTS
+		if (teamId !== null) {
+			const teamPool = SPAWN_POINTS.filter(p => p.team === teamId)
+			if (teamPool.length) boxPool = teamPool
+		}
+		const p = boxPool[Math.floor(Math.random() * boxPool.length)]
 		return { x: p.x + (Math.random() - 0.5) * 2, z: p.z + (Math.random() - 0.5) * 2, y: 0 }
 	}
 
@@ -1160,6 +1226,14 @@ class GameInstance {
 		// GODMODE: real players take no damage (bots still do — go frag them)
 		if (this._godmode && !victimClient.bot) return
 
+		// TDM FRIENDLY FIRE (off by default): a shot on a TEAMMATE deals 0 damage, no
+		// kill, no score. Self-damage (own grenade splash) is preserved — only a
+		// DISTINCT same-team attacker is blocked (attacker/victim are handles here).
+		if (!FRIENDLY_FIRE && attackerClient && attackerClient !== victimClient
+			&& attackerClient.rawEntity && raw.teamId === attackerClient.rawEntity.teamId) {
+			return
+		}
+
 		// BODY-ZONE multiplier — AUTHORITATIVE, applied HERE (outside the reconciled
 		// applyCommand path), never on the predicted client path. `zone` is the server-
 		// classified head/torso/legs from lagCompensatedHitscanCheck; it is null for
@@ -1231,6 +1305,14 @@ class GameInstance {
 				attackerClient.smoothEntity.kills = ak
 			}
 
+			// TDM team score: an ENEMY kill = +1 to the attacker's team; a self-kill (own
+			// grenade) or unattributed death = -1 to the victim's OWN team (standard TDM).
+			// Friendly fire is off, so a same-team attacker never reaches this branch.
+			const enemyKill = attackerClient && attackerClient !== victimClient
+				&& attackerClient.rawEntity && attackerClient.rawEntity.teamId !== raw.teamId
+			if (enemyKill) this.addTeamScore(attackerClient.rawEntity.teamId, +1)
+			else this.addTeamScore(raw.teamId, -1)
+
 			// Killed → broadcast to EVERYONE via instance.messageAll. (addLocalMessage
 			// is NOT usable here: nengi local events are spatially culled and REQUIRE
 			// x/y in their schema — Killed carries none — and they decode through the
@@ -1252,7 +1334,10 @@ class GameInstance {
 	// spawn point → snap) and mirrors the ammo reset when it observes its own
 	// isAlive flip back to true (Simulator._updateHud).
 	respawnPlayer(client) {
-		const spawn = this.spawnPoint()
+		// TDM: respawn on the player's OWN team spawns; teamId persists across death
+		// (never reset here), so a respawn keeps the same team.
+		const teamId = client.rawEntity ? client.rawEntity.teamId : null
+		const spawn = this.spawnPoint(teamId)
 		for (const entity of [client.rawEntity, client.smoothEntity]) {
 			if (!entity) continue
 			entity.x = spawn.x
@@ -1296,6 +1381,106 @@ class GameInstance {
 		console.log(`${client.bot ? 'Bot' : 'Player'} ${client.rawEntity.nid} respawned at (${spawn.x.toFixed(1)}, ${spawn.z.toFixed(1)})`)
 	}
 
+	// ---- TDM team/match helpers -------------------------------------------------
+
+	// Head count per team across EVERY player (humans + bots), each counted once.
+	countTeams() {
+		const n = [0, 0]
+		this.instance.clients.forEach(c => { if (c.rawEntity && (c.rawEntity.teamId === 0 || c.rawEntity.teamId === 1)) n[c.rawEntity.teamId]++ })
+		this.bots.forEach(b => { if (b.rawEntity && (b.rawEntity.teamId === 0 || b.rawEntity.teamId === 1)) n[b.rawEntity.teamId]++ })
+		return n
+	}
+
+	// Auto-balance: the team with fewer players; a tie goes to team 0. Counts the
+	// EXISTING roster (the new player is assigned this result, then added).
+	assignTeam() {
+		const n = this.countTeams()
+		return n[0] <= n[1] ? 0 : 1
+	}
+
+	// Adjust a team's score (may go negative on a suicide). Only mutates during ACTIVE
+	// — scores freeze through the MATCH_END intermission. A frag-limit reach ends the
+	// match immediately (checked here so a 40th frag wins on the very tick it lands).
+	addTeamScore(team, delta) {
+		if (this.matchPhase !== MATCH_PHASE.ACTIVE) return
+		if (team !== 0 && team !== 1) return
+		this.teamScore[team] += delta
+		if (this.teamScore[team] >= FRAG_LIMIT) this.endMatch()
+	}
+
+	// ACTIVE -> MATCH_END. Winner = higher score; an exact tie is a DRAW (v1 has no
+	// sudden-death overtime). Scores are frozen from here until resetMatch.
+	endMatch() {
+		if (this.matchPhase !== MATCH_PHASE.ACTIVE) return
+		this.matchPhase = MATCH_PHASE.MATCH_END
+		this.matchEndAt = Date.now()
+		if (this.teamScore[0] > this.teamScore[1]) this.matchWinner = MATCH_WINNER.TEAM0
+		else if (this.teamScore[1] > this.teamScore[0]) this.matchWinner = MATCH_WINNER.TEAM1
+		else this.matchWinner = MATCH_WINNER.DRAW
+		this._matchPublishAt = 0 // force an immediate publish of the end state
+		console.log(`[match] MATCH_END winner=${this.matchWinner} scores=${this.teamScore[0]}-${this.teamScore[1]}`)
+	}
+
+	// MATCH_END -> ACTIVE. Reset team scores + every player's kills/deaths, restart the
+	// clock. Persistent server: the next match just begins (bots keep playing).
+	resetMatch(now) {
+		this.matchPhase = MATCH_PHASE.ACTIVE
+		this.teamScore[0] = 0
+		this.teamScore[1] = 0
+		this.matchStartAt = now
+		this.matchEndAt = 0
+		this.matchWinner = MATCH_WINNER.DRAW
+		const clearScore = (raw, smooth) => {
+			if (raw) { raw.kills = 0; raw.deaths = 0 }
+			if (smooth) { smooth.kills = 0; smooth.deaths = 0 }
+		}
+		this.instance.clients.forEach(c => clearScore(c.rawEntity, c.smoothEntity))
+		this.bots.forEach(b => clearScore(b.rawEntity, b.smoothEntity))
+		this._matchPublishAt = 0 // force an immediate publish of the fresh state
+		console.log('[match] new ACTIVE match started')
+	}
+
+	// Drive the match state machine + publish the low-rate MatchState entity. Called
+	// once per server tick; the entity only WRITES (and so nengi only SENDS) on a
+	// score/phase/winner change or every MATCH_PUBLISH_MS for the ticking countdown.
+	updateMatch(now) {
+		let remaining
+		if (this.matchPhase === MATCH_PHASE.ACTIVE) {
+			remaining = Math.max(0, TIME_LIMIT_MS - (now - this.matchStartAt))
+			// frag-limit wins are handled in addTeamScore the moment they happen; here we
+			// only need the time-expiry path (higher score wins; exact tie -> draw).
+			if (remaining <= 0) this.endMatch()
+		}
+		if (this.matchPhase === MATCH_PHASE.MATCH_END) {
+			remaining = 0
+			if (now - this.matchEndAt >= INTERMISSION_MS) {
+				this.resetMatch(now)
+				remaining = TIME_LIMIT_MS
+			}
+		}
+		this.publishMatchState(now, remaining)
+	}
+
+	// Write the MatchState entity fields (nengi delta-compresses, so identical writes
+	// cost nothing on the wire). Publish immediately on any score/phase/winner change;
+	// otherwise re-publish the ticking countdown at ~MATCH_PUBLISH_MS (2Hz).
+	publishMatchState(now, remaining) {
+		const ms = this.matchState
+		if (!ms) return
+		const changed = ms.phase !== this.matchPhase
+			|| ms.teamScore0 !== this.teamScore[0]
+			|| ms.teamScore1 !== this.teamScore[1]
+			|| ms.winner !== this.matchWinner
+		if (!changed && now < this._matchPublishAt) return
+		this._matchPublishAt = now + MATCH_PUBLISH_MS
+		ms.phase = this.matchPhase
+		ms.teamScore0 = this.teamScore[0]
+		ms.teamScore1 = this.teamScore[1]
+		ms.winner = this.matchWinner
+		// quantize the countdown to 100ms so tiny per-tick drift doesn't churn the wire
+		ms.timeRemainingMs = Math.max(0, Math.round(remaining / 100) * 100)
+	}
+
 	update(delta, tick, now) {
 		// Pin the module-level active map to THIS instance's map before ticking. A tick is
 		// synchronous, so every applyCommand call below (and any reconciliation replay of
@@ -1327,6 +1512,8 @@ class GameInstance {
 				raw.isAlive = false; smooth.isAlive = false
 				raw.velX = 0; raw.velY = 0; raw.velZ = 0
 				raw.deaths = Math.min(255, raw.deaths + 1); smooth.deaths = raw.deaths
+				// TDM: a void death is a suicide — -1 to the victim's own team (standard TDM).
+				this.addTeamScore(raw.teamId, -1)
 				arm(Date.now() + GameInstance.RESPAWN_DELAY_MS)
 				this.instance.messageAll(new Killed(smooth.nid, smooth.nid, 0, 0, false))
 			}
@@ -1653,6 +1840,11 @@ class GameInstance {
 		this.updateMegaHealth(wallNow)
 		this.updatePickups(wallNow)
 		this.updateOverhealDecay(delta)
+
+		// TDM: advance the match state machine (win check, intermission, reset) and
+		// publish the low-rate MatchState entity. After scoring events this tick so a
+		// frag-limit / time-limit win is reflected the same tick it occurs.
+		this.updateMatch(wallNow)
 
 		// for each player ...
 		this.instance.clients.forEach(client => {

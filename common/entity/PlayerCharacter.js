@@ -34,6 +34,13 @@ class PlayerCharacter {
 		this.kills = 0
 		this.deaths = 0
 
+		// TDM team (0 or 1). Server-authoritative — assigned on join/spawn by
+		// GameInstance auto-balance and networked down (UInt8). Drives friendly-fire,
+		// team spawns, team scoring, bot targeting and the client's team colors.
+		// Kept across respawns (respawnPlayer never resets it). The client NEVER
+		// asserts it (down-only; a mismatch just snaps).
+		this.teamId = 0
+
 		// movement state (see common/applyCommand.js) — velocities are synced +
 		// predicted so reconciliation replays land on the server's trajectory
 		this.velX = 0
@@ -135,7 +142,8 @@ PlayerCharacter.protocol = {
 	grenadeCharges: nengi.UInt8,
 	kills: nengi.UInt8,
 	deaths: nengi.UInt8,
-	nameIndex: nengi.UInt8
+	nameIndex: nengi.UInt8,
+	teamId: nengi.UInt8
 }
 
 // Exposed so server code (GameInstance.respawnPlayer) resets to the same spawn loadout.

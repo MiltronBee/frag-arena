@@ -2,6 +2,14 @@ import * as BABYLON from '../babylon.js'
 import { tpWeapons } from '../assets/assetManifest'
 import { USE_MESH_MAP } from '../../common/mapMesh'
 
+// TDM TEAM COLORS. Classic RED (team 0) vs BLUE (team 1): maximum hue separation,
+// universally read as "us vs them" in competitive shooters, and distinguishable for
+// the common red-green color-vision deficiencies (red vs blue, not red vs green). The
+// body tint is a dim emissive wash (keeps the model readable, just team-tinted); the
+// nametag uses the brighter CSS variant for an at-a-glance teammate/enemy call.
+const TEAM_BODY_TINT = [new BABYLON.Color3(0.55, 0.06, 0.06), new BABYLON.Color3(0.06, 0.20, 0.60)]
+const TEAM_NAMETAG_CSS = ['#ff5a5a', '#5aa6ff']
+
 // A visual character bound to (but not parented to) a host transform — typically
 // another player's replicated collision box. Each frame it copies the host's
 // position + yaw and picks idle/run from how fast the host is moving. Pitch is
@@ -244,6 +252,28 @@ export default class CharacterModel {
     if (this._nameTag) this._nameTag.textContent = name
   }
 
+  // TDM: color this body + nametag by team (0 red / 1 blue). Called from the player
+  // factory's teamId watch (fires on create + on change). The nametag is a DOM node
+  // (color it now); the body tint needs the GLB materials, so if the model has not
+  // finished loading yet we stash the team and _load applies it once meshes exist.
+  setTeam(teamId) {
+    this._teamId = teamId
+    if (this._nameTag && TEAM_NAMETAG_CSS[teamId]) this._nameTag.style.color = TEAM_NAMETAG_CSS[teamId]
+    this._applyTeamTint()
+  }
+
+  // dim emissive team wash over every body material. Idempotent (safe to call again
+  // on a team change or after load). No-op until the model's meshes are in.
+  _applyTeamTint() {
+    if (this._teamId == null) return
+    const tint = TEAM_BODY_TINT[this._teamId]
+    if (!tint || !this.meshes) return
+    this.meshes.forEach((m) => {
+      const mat = m.material
+      if (mat && mat.emissiveColor) mat.emissiveColor.copyFrom(tint)
+    })
+  }
+
   async _load() {
     // Single-flight claim: if the preload warm's import for this url is still
     // in-flight and unclaimed, we take ownership of that copy (no second 20MB
@@ -269,6 +299,10 @@ export default class CharacterModel {
     result.meshes.forEach((m) => {
       m.metadata = Object.assign({}, m.metadata, { fragSurface: 'flesh' })
     })
+
+    // TDM: apply the team body tint now that the materials exist (setTeam may have
+    // fired before the async load resolved, in which case it only stashed the team).
+    this._applyTeamTint()
 
     result.animationGroups.forEach((g) => { g.stop(); this.groups[g.name] = g })
     this.idle = this.groups[this.spec.anims.idle]

@@ -294,6 +294,22 @@ export default ({ simulator /* inject depenencies here */ }) => {
 					entity.mesh.dispose(false, true)
 				}
 			}
+		},
+		// TDM MATCH STATE. A DATA entity: the low-rate carrier for the team scores /
+		// timer / phase / winner the HUD reads. Its placeholder mesh is built invisible
+		// (see MatchState.js) and never rendered. create() hands the entity to the
+		// Simulator, which reads its networked fields each frame in _updateHud;
+		// delete() only fires on server shutdown.
+		'MatchState': {
+			create({ data, entity }) {
+				simulator.registerMatchState(entity)
+			},
+			delete({ nid, entity }) {
+				simulator.unregisterMatchState(nid)
+				if (entity && entity.mesh && typeof entity.mesh.dispose === 'function') {
+					entity.mesh.dispose()
+				}
+			}
 		}
 	}
 }

@@ -2947,3 +2947,114 @@ body.player-dead #touch-controls {
         --tc-b: calc(16px + env(safe-area-inset-bottom));
     }
 }
+
+/* ===========================================================================
+   TDM (Team Deathmatch) HUD — team scoreboard strip + MATCH_END winner banner.
+   Colors: RED (team 0) vs BLUE (team 1), matching CharacterModel's team tint.
+   =========================================================================== */
+:root {
+    --tdm-red: #ff5a5a;
+    --tdm-blue: #5aa6ff;
+}
+
+/* the centered top scoreboard: RED n · M:SS · n BLUE */
+#tdm-scoreboard {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 4px 14px;
+    border-radius: 10px;
+    background: rgba(6, 10, 18, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-family: 'Teko', 'Chakra Petch', sans-serif;
+    pointer-events: none;
+    z-index: 6;
+    line-height: 1;
+}
+#tdm-scoreboard .tdm-team {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 7px;
+}
+#tdm-scoreboard .tdm-tag {
+    font-size: 15px;
+    letter-spacing: 0.14em;
+    font-weight: 700;
+    opacity: 0.85;
+}
+#tdm-scoreboard .tdm-num {
+    font-size: 30px;
+    font-weight: 600;
+    min-width: 26px;
+    text-align: center;
+}
+#tdm-scoreboard .tdm-side-red { color: var(--tdm-red); }
+#tdm-scoreboard .tdm-side-blue { color: var(--tdm-blue); }
+#tdm-scoreboard .tdm-timer {
+    font-size: 24px;
+    font-weight: 500;
+    color: #eaf2ff;
+    letter-spacing: 0.04em;
+    padding: 0 4px;
+    opacity: 0.9;
+}
+/* highlight the local player's own team */
+#tdm-scoreboard[data-myteam="red"] .tdm-side-red,
+#tdm-scoreboard[data-myteam="blue"] .tdm-side-blue {
+    text-shadow: 0 0 10px currentColor;
+}
+#tdm-scoreboard[data-myteam="red"] .tdm-side-red .tdm-tag::after,
+#tdm-scoreboard[data-myteam="blue"] .tdm-side-blue .tdm-tag::after {
+    content: " ◂ YOU";
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    opacity: 0.75;
+}
+/* dim the strip a touch during the intermission (the banner takes over) */
+#tdm-scoreboard.match-over { opacity: 0.5; }
+
+/* MATCH_END winner banner (centered overlay during the ~15s intermission) */
+#tdm-banner {
+    position: absolute;
+    top: 32%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 22px 46px;
+    border-radius: 14px;
+    background: rgba(4, 8, 16, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    text-align: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    pointer-events: none;
+    z-index: 40;
+}
+#tdm-banner.is-visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, -50%) scale(1);
+}
+#tdm-banner-title {
+    font-family: 'Chakra Petch', sans-serif;
+    font-size: 54px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #f2f6ff;
+}
+#tdm-banner-title.tdm-red { color: var(--tdm-red); text-shadow: 0 0 24px rgba(255, 90, 90, 0.55); }
+#tdm-banner-title.tdm-blue { color: var(--tdm-blue); text-shadow: 0 0 24px rgba(90, 166, 255, 0.55); }
+#tdm-banner-score {
+    font-family: 'Teko', sans-serif;
+    font-size: 34px;
+    letter-spacing: 0.12em;
+    color: #cdd8ea;
+}
