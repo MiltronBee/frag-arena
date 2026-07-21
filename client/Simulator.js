@@ -851,9 +851,14 @@ class Simulator {
 			if (e._pedestal && e._pedestal.setEnabled) e._pedestal.setEnabled(shown)
 			if (!shown) return
 			if (model) model.rotation.y = (now * 0.0011) % (Math.PI * 2)
-			// gentle bob of the whole holder (item + pedestal) around the networked base
-			const bob = Math.sin(now * 0.0025 + (e.nid || 0)) * 0.1
-			mesh.position.y = e.y + bob
+			// WEAPON pickups REST ON THE FLOOR (UT ground-weapon look): slow spin only,
+			// no vertical float. Consumables/other types keep the gentle up/down bob.
+			if (e.type === PICKUP_TYPE.WEAPON) {
+				mesh.position.y = e.y
+			} else {
+				const bob = Math.sin(now * 0.0025 + (e.nid || 0)) * 0.1
+				mesh.position.y = e.y + bob
+			}
 		})
 	}
 

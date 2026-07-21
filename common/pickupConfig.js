@@ -62,7 +62,7 @@ export const RESPAWN_SECONDS = {
 // ── TUNABLE: rest height above the probed floor (world units) ────────────────────
 // Weapons float highest so they read as "grab me"; consumables sit lower.
 export const REST_HEIGHT = {
-	[PICKUP_TYPE.WEAPON]:  0.6,
+	[PICKUP_TYPE.WEAPON]:  0.1,
 	[PICKUP_TYPE.AMMO]:    0.3,
 	[PICKUP_TYPE.HEALTH]:  0.3,
 	[PICKUP_TYPE.ARMOR]:   0.3,

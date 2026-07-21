@@ -133,7 +133,7 @@ async function attachHealthModel(entity) {
 // constructor's cyan placeholder box so the item is still visible on the map.
 function pickupModelSpec(type, weaponIndex) {
 	switch (type) {
-		case PICKUP_TYPE.WEAPON: return { url: WEAPON_MODEL_URL[weaponIndex] || WEAPON_MODEL_URL[3], size: 0.9, pedestal: true }
+		case PICKUP_TYPE.WEAPON: return { url: WEAPON_MODEL_URL[weaponIndex] || WEAPON_MODEL_URL[3], size: 0.9, pedestal: false }
 		case PICKUP_TYPE.HEALTH: return { url: PICKUP_HEALTH_MODEL_URL, size: 0.7, pedestal: false }
 		case PICKUP_TYPE.AMMO:   return { url: AMMO_MODEL_URL, size: 0.5, pedestal: false }
 		default:                 return null // ARMOR / POWERUP — leave the placeholder box
