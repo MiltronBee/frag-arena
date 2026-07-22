@@ -1,0 +1,478 @@
+# materials for AS-Keep
+
+newmtl Crypt2_Base_C_rsteel
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Crypt2_Base_C_rsteel.png
+
+newmtl Crypt2_Base_Cgold
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Crypt2_Base_Cgold.png
+
+newmtl Crypt2_Base_Cston19d
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Crypt2_Base_Cston19d.png
+
+newmtl Crypt2_Base_StonBas1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Crypt2_Base_StonBas1.png
+
+newmtl Crypt2_Base_cRivtStl
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Crypt2_Base_cRivtStl.png
+
+newmtl Crypt2_Base_cStonbas
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Crypt2_Base_cStonbas.png
+
+newmtl Crypt2_Deco_C_seal8
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Crypt2_Deco_C_seal8.png
+
+newmtl GenEarth_Ground_Grass
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Ground_Grass.png
+
+newmtl GenEarth_Rock_Msrock2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Msrock2.png
+
+newmtl GenEarth_Rock_Rock7b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Rock7b.png
+
+newmtl GenEarth_Rock_Wrcka1x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Wrcka1x.png
+
+newmtl GenEarth_Rock_Wrcka3x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Wrcka3x.png
+
+newmtl GenIn_Cloth_Gclth3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Cloth_Gclth3.png
+
+newmtl GenIn_Cloth_Gclth4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Cloth_Gclth4.png
+
+newmtl NaliCast_Base_Wmcsb
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_Wmcsb.png
+
+newmtl NaliCast_Base_block2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_block2.png
+
+newmtl NaliCast_Base_metal
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_metal.png
+
+newmtl NaliCast_Base_metal1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_metal1.png
+
+newmtl NaliCast_Base_metalS1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_metalS1.png
+
+newmtl NaliCast_Base_wbase3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_wbase3.png
+
+newmtl NaliCast_Base_wrcb
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_wrcb.png
+
+newmtl NaliCast_Deco_Dirthtch
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Deco_Dirthtch.png
+
+newmtl NaliCast_Deco_block2a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Deco_block2a.png
+
+newmtl NaliCast_Deco_block2b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Deco_block2b.png
+
+newmtl NaliCast_Deco_bookcas1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Deco_bookcas1.png
+
+newmtl NaliCast_Deco_bookcas2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Deco_bookcas2.png
+
+newmtl NaliCast_Deco_deco1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Deco_deco1.png
+
+newmtl NaliCast_Floor_n-floor5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Floor_n-floor5.png
+
+newmtl NaliCast_Floor_n-floor6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Floor_n-floor6.png
+
+newmtl NaliCast_Floor_nCob4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Floor_nCob4.png
+
+newmtl NaliCast_Floor_nblock2z
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Floor_nblock2z.png
+
+newmtl NaliCast_Floor_oldflor
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Floor_oldflor.png
+
+newmtl NaliCast_Floor_oldflor2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Floor_oldflor2.png
+
+newmtl NaliCast_Floor_steps
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Floor_steps.png
+
+newmtl NaliCast_Mask_Grate3-m
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Mask_Grate3-m.png
+
+newmtl NaliCast_Panel_Wood2A
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Panel_Wood2A.png
+
+newmtl NaliCast_Panel_Wood2B
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Panel_Wood2B.png
+
+newmtl NaliCast_Panel_t-wood
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Panel_t-wood.png
+
+newmtl NaliCast_Panel_t-wood2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Panel_t-wood2.png
+
+newmtl NaliCast_Panel_wood1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Panel_wood1a.png
+
+newmtl NaliCast_Panel_wood2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Panel_wood2.png
+
+newmtl NaliCast_Trim_METTRIM1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Trim_METTRIM1.png
+
+newmtl NaliCast_Wall_CasFLOR
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Wall_CasFLOR.png
+
+newmtl NaliCast_Wall_CasWAL
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Wall_CasWAL.png
+
+newmtl NaliCast_Wall_oldwall3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Wall_oldwall3.png
+
+newmtl NaliCast_door_Casdoor2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_door_Casdoor2.png
+
+newmtl NaliFX_ShaneFx_TORCHES2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliFX_ShaneFx_TORCHES2.png
+
+newmtl NaliFX_TORCHES3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliFX_TORCHES3.png
+
+newmtl Old_FX_AWendstraw1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Old_FX_AWendstraw1.png
+
+newmtl Old_FX_AWstraw1C
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Old_FX_AWstraw1C.png
+
+newmtl Old_FX_Ceiling_ralAlClg
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Old_FX_Ceiling_ralAlClg.png
+
+newmtl Old_FX_Effects_Pad_FX
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+Ke 1.000 0.450 0.100
+map_Kd textures_hd/Old_FX_Effects_Pad_FX.png
+
+newmtl ShaneDay_DayskyB
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneDay_DayskyB.png
+
+newmtl ShaneDay_FLARE10
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneDay_FLARE10.png
+
+newmtl ShaneSky_moon-2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneSky_moon-2.png
+
+newmtl Skybox_2nd_Lnd2_1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skybox_2nd_Lnd2_1.png
+
+newmtl Skybox_2nd_Lnd2_1b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skybox_2nd_Lnd2_1b.png
+
+newmtl Skybox_2nd_Lnd2_2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skybox_2nd_Lnd2_2.png
+
+newmtl Skybox_2nd_Lnd2_3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skybox_2nd_Lnd2_3.png
+
+newmtl Skybox_2nd_Lnd2_4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skybox_2nd_Lnd2_4.png
+
+newmtl Skybox_grd
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skybox_grd.png
+
+newmtl UTcrypt_Deco_indi3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTcrypt_Deco_indi3.png
+
+newmtl UTcrypt_Floor_rAWFlr0
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTcrypt_Floor_rAWFlr0.png
+
+newmtl UTcrypt_Floor_rClfFlr0
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTcrypt_Floor_rClfFlr0.png
+
+newmtl UTcrypt_Wall_cbutnubrik22b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTcrypt_Wall_cbutnubrik22b.png
+
+newmtl UTcrypt_Wall_utAlanWal2a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTcrypt_Wall_utAlanWal2a.png
+
+newmtl genfluid_Sky_gmist3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Sky_gmist3.png
+
+newmtl genfluid_cloud1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_cloud1a.png

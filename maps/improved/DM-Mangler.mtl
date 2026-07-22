@@ -1,0 +1,330 @@
+# materials for DM-Mangler
+
+newmtl GenEarth_Rock_Wrcka2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Wrcka2.png
+
+newmtl Indus6_Woods_DeckSm1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_DeckSm1.png
+
+newmtl Metalmys_MysIrn10
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIrn10.png
+
+newmtl Metalmys_MysIrn13
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIrn13.png
+
+newmtl Metalmys_MysIron1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIron1.png
+
+newmtl Metalmys_MysIron5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIron5.png
+
+newmtl Metalmys_MysMetl2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysMetl2.png
+
+newmtl Metalmys_NaziBox4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_NaziBox4.png
+
+newmtl Mine_Base_MCMETL
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Base_MCMETL.png
+
+newmtl Mine_Ceiling_GRNCEIL1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Ceiling_GRNCEIL1.png
+
+newmtl Mine_Ceiling_mPanel
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Ceiling_mPanel.png
+
+newmtl Mine_Deco_Belt1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Deco_Belt1.png
+
+newmtl Mine_Floor_floor4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Floor_floor4.png
+
+newmtl Mine_Light_LANTRN3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Light_LANTRN3.png
+
+newmtl Mine_Light_Lantern
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Light_Lantern.png
+
+newmtl Mine_Light_mmlight2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Light_mmlight2.png
+
+newmtl Mine_Light_mmlight3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Light_mmlight3.png
+
+newmtl Mine_Mask_mgr8ms3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Mask_mgr8ms3.png
+
+newmtl Mine_Mask_mgr8ms4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Mask_mgr8ms4.png
+
+newmtl Mine_Trim_Girdr2m
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Trim_Girdr2m.png
+
+newmtl Mine_Trim_Ironbar
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Trim_Ironbar.png
+
+newmtl Mine_Trim_Rustpl1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Trim_Rustpl1.png
+
+newmtl Mine_Trim_steel01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Trim_steel01.png
+
+newmtl Mine_Trim_vGirder1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Trim_vGirder1.png
+
+newmtl Mine_Wall_Hiirnw1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Wall_Hiirnw1.png
+
+newmtl Mine_Wall_IRNWALL4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Wall_IRNWALL4.png
+
+newmtl Mine_Wall_Irnwall2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Wall_Irnwall2.png
+
+newmtl Mine_Wall_Irnwall5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Wall_Irnwall5.png
+
+newmtl Mine_Wall_Pinkwal1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Wall_Pinkwal1.png
+
+newmtl Mine_pillar_Girderm3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_pillar_Girderm3.png
+
+newmtl Mine_pillar_M_RUST4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_pillar_M_RUST4.png
+
+newmtl Mine_pillar_Pillaro1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_pillar_Pillaro1.png
+
+newmtl Mine_pillar_pillaro2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_pillar_pillaro2.png
+
+newmtl SKYBox_2nd_Lnd2_2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_2nd_Lnd2_2.png
+
+newmtl SKYBox_2nd_Lnd2_4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_2nd_Lnd2_4.png
+
+newmtl SKYBox_Lnd_2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_Lnd_2.png
+
+newmtl SKYBox_Lnd_3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_Lnd_3.png
+
+newmtl UTtech1_Floor_hashlow-cont
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Floor_hashlow-cont.png
+
+newmtl UTtech1_Wall_ClifCon8
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_ClifCon8.png
+
+newmtl UTtech1_Wall_ClifConc
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_ClifConc.png
+
+newmtl UTtech1_Window_ClifBrk3x2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Window_ClifBrk3x2.png
+
+newmtl UTtech1_Window_rClifWn1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Window_rClifWn1.png
+
+newmtl UTtech1_pillar_ClfPilr3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_pillar_ClfPilr3.png
+
+newmtl genfluid_Sky_NghSky
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Sky_NghSky.png
+
+newmtl genfluid_cloud1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_cloud1a.png
+
+newmtl shaneDAY_Dbottm
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/shaneDAY_Dbottm.png
+
+newmtl shaneDAY_FLARE10
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/shaneDAY_FLARE10.png

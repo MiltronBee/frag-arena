@@ -1,0 +1,344 @@
+# materials for CTF-December
+
+newmtl Crypt2_Base_Rusteel1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Crypt2_Base_Rusteel1.png
+
+newmtl DDayFX_NaziFlag
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DDayFX_NaziFlag.png
+
+newmtl DecayedS_Base_Base6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Base_Base6.png
+
+newmtl DecayedS_Base_Dark1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Base_Dark1.png
+
+newmtl DecayedS_Base_dClgBas2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Base_dClgBas2.png
+
+newmtl DecayedS_Light_DLight2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Light_DLight2.png
+
+newmtl DecayedS_Mask_T-Grate2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Mask_T-Grate2.png
+
+newmtl GenEarth_Rock_Wrcka2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Wrcka2.png
+
+newmtl Indus5_Galleon_ShpWod11
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus5_Galleon_ShpWod11.png
+
+newmtl Metalmys_MysIrn13
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIrn13.png
+
+newmtl Metalmys_MysLetrs
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysLetrs.png
+
+newmtl Metalmys_MysLite5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysLite5.png
+
+newmtl Metalmys_MysMetl1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysMetl1.png
+
+newmtl Metalmys_MysMetl2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysMetl2.png
+
+newmtl Metalmys_MysMetl3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysMetl3.png
+
+newmtl Metalmys_NaziBox4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_NaziBox4.png
+
+newmtl Mine_Light_LANTRN3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Light_LANTRN3.png
+
+newmtl Mine_Light_Lantern
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Light_Lantern.png
+
+newmtl Mine_Trim_Girdr2m
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Trim_Girdr2m.png
+
+newmtl PlayrShp_Base_VBlack
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_VBlack.png
+
+newmtl SKYBox_2nd_Lnd2_2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_2nd_Lnd2_2.png
+
+newmtl SKYBox_2nd_Lnd2_4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_2nd_Lnd2_4.png
+
+newmtl SKYBox_Lnd_2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_Lnd_2.png
+
+newmtl SKYBox_Lnd_3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_Lnd_3.png
+
+newmtl TrenchesFX_Conc27
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/TrenchesFX_Conc27.png
+
+newmtl TrenchesFX_Conc29
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/TrenchesFX_Conc29.png
+
+newmtl TrenchesFX_NflagB
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/TrenchesFX_NflagB.png
+
+newmtl UT_Rockfac1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_Rockfac1.png
+
+newmtl UT_Woodf3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_Woodf3.png
+
+newmtl UT_cementf1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_cementf1.png
+
+newmtl UT_cementf2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_cementf2.png
+
+newmtl UT_metalf3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_metalf3.png
+
+newmtl UT_sewerg
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_sewerg.png
+
+newmtl UT_wchip1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_wchip1.png
+
+newmtl UT_wchip5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_wchip5.png
+
+newmtl UTtech1_Floor_pmbfloor-D
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Floor_pmbfloor-D.png
+
+newmtl UTtech1_Light_Ylight3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_Ylight3.png
+
+newmtl UTtech1_Light_ylight3c
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_ylight3c.png
+
+newmtl UTtech1_Wall_ClifBrk1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_ClifBrk1.png
+
+newmtl UTtech1_Wall_ClifBrk2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_ClifBrk2.png
+
+newmtl UTtech1_Wall_ClifCon1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_ClifCon1.png
+
+newmtl UTtech1_Wall_ClifCon2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_ClifCon2.png
+
+newmtl UTtech1_Wall_ClifCon7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_ClifCon7.png
+
+newmtl UTtech1_Wall_ClifCon8
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_ClifCon8.png
+
+newmtl UTtech1_Wall_ClifConc
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_ClifConc.png
+
+newmtl genfluid_Sky_NghSky
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Sky_NghSky.png
+
+newmtl genfluid_cloud1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_cloud1a.png
+
+newmtl shaneDAY_Dbottm
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/shaneDAY_Dbottm.png
+
+newmtl shaneDAY_FLARE10
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/shaneDAY_FLARE10.png

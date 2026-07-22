@@ -1,0 +1,134 @@
+# materials for DM-Training
+
+newmtl RainFX_Swater4a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/RainFX_Swater4a.png
+
+newmtl Screenshot
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Screenshot.png
+
+newmtl ShaneChurch_Angle1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_Angle1.png
+
+newmtl ShaneChurch_Angle2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_Angle2.png
+
+newmtl ShaneChurch_Boards1c
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_Boards1c.png
+
+newmtl ShaneChurch_BrownBase
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_BrownBase.png
+
+newmtl ShaneChurch_BrownFloor
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_BrownFloor.png
+
+newmtl ShaneChurch_BrownTrim2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_BrownTrim2.png
+
+newmtl ShaneChurch_BrownWinBase
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_BrownWinBase.png
+
+newmtl ShaneChurch_DemGlass1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_DemGlass1.png
+
+newmtl ShaneChurch_DemGlass2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_DemGlass2.png
+
+newmtl ShaneChurch_Demon1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_Demon1.png
+
+newmtl ShaneChurch_Demon2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_Demon2.png
+
+newmtl ShaneChurch_Demwall
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_Demwall.png
+
+newmtl ShaneChurch_Demwall2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_Demwall2.png
+
+newmtl ShaneChurch_Demwin6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_Demwin6.png
+
+newmtl ShaneChurch_Lampon2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_Lampon2.png
+
+newmtl ShaneChurch_RailTrim
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_RailTrim.png
+
+newmtl ShaneChurch_archeBloks2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_archeBloks2.png

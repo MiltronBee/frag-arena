@@ -721,6 +721,23 @@ class Simulator {
 	registerProjectile(entity) {
 		if (!entity) return
 		this._projectiles.set(entity.nid, { entity, px: entity.x, py: entity.y, pz: entity.z })
+
+		// Calculate visual start offset for muzzle origin blending
+		let muzzleWorld = null
+		if (entity.ownerNid === this.myRawId || entity.ownerNid === this.mySmoothId) {
+			muzzleWorld = this.viewmodel ? this.viewmodel.muzzleWorldPos() : null
+		} else {
+			const model = this.characterModels.get(entity.ownerNid)
+			if (model && model._weaponRoot) {
+				muzzleWorld = model._weaponRoot.getAbsolutePosition()
+			}
+		}
+
+		if (muzzleWorld) {
+			entity.visualOffset = muzzleWorld.subtract(new BABYLON.Vector3(entity.x, entity.y, entity.z))
+		} else {
+			entity.visualOffset = new BABYLON.Vector3(0, 0, 0)
+		}
 	}
 
 	unregisterProjectile(nid) {
@@ -738,13 +755,27 @@ class Simulator {
 		})
 	}
 
-	_updateProjectiles() {
+	_updateProjectiles(delta) {
 		if (this._projectiles.size === 0) return
 		const STREAK = 3.2
 		this._projectiles.forEach((rec) => {
 			const e = rec.entity
 			const mesh = e && e.mesh
 			if (!mesh || (mesh.isDisposed && mesh.isDisposed())) return
+
+			// Decay visual offset over time (smoothly interpolate to 0)
+			if (e.visualOffset && e.visualOffset.lengthSquared() > 1e-6) {
+				// decay by half every 0.05 seconds (approx. 3 frames at 60fps)
+				const decay = Math.pow(0.5, delta / 0.05)
+				e.visualOffset.scaleInPlace(decay)
+			}
+
+			// Apply visual offset to the mesh position
+			mesh.position.set(e.x, e.y, e.z)
+			if (e.visualOffset) {
+				mesh.position.addInPlace(e.visualOffset)
+			}
+
 			const dx = e.x - rec.px, dy = e.y - rec.py, dz = e.z - rec.pz
 			if ((dx * dx + dy * dy + dz * dz) > 1e-8) {
 				mesh.lookAt(new BABYLON.Vector3(e.x + dx, e.y + dy, e.z + dz))
@@ -1663,7 +1694,7 @@ class Simulator {
 		})
 
 		// orient + stretch live plasma bolts into hot travel streaks
-		this._updateProjectiles()
+		this._updateProjectiles(delta)
 
 		// blink live frag grenades' arming light (accelerating toward the fuse)
 		this._updateGrenades()

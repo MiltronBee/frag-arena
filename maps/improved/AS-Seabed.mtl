@@ -1,0 +1,449 @@
+# materials for AS-Seabed
+
+newmtl GenEarth_Rock_Atitn_~1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Atitn_~1.png
+
+newmtl GenEarth_Rock_Wrcka4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Wrcka4.png
+
+newmtl GenFX_LensFlar_new3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_new3.png
+
+newmtl Indus1_PLight2a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus1_PLight2a.png
+
+newmtl Indus3_Wall1Pipes
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus3_Wall1Pipes.png
+
+newmtl Indus7_Monitor1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus7_Monitor1.png
+
+newmtl Indus7_Monitor2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus7_Monitor2.png
+
+newmtl Indus7_Monitor3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus7_Monitor3.png
+
+newmtl Indus7_Monitor4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus7_Monitor4.png
+
+newmtl Indus7_Monitor5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus7_Monitor5.png
+
+newmtl Indus7_Monitor6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus7_Monitor6.png
+
+newmtl Indus7_Monitor7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus7_Monitor7.png
+
+newmtl Indus7_Monitor8
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus7_Monitor8.png
+
+newmtl PlayrShp_Animated_scrn_A00
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Animated_scrn_A00.png
+
+newmtl PlayrShp_Base_Blakm31d
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_Blakm31d.png
+
+newmtl PlayrShp_Base_Blakm_31
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_Blakm_31.png
+
+newmtl PlayrShp_Base_Blakm_d
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_Blakm_d.png
+
+newmtl PlayrShp_Base_Blakmetl
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_Blakmetl.png
+
+newmtl PlayrShp_Base_Bumpmetl
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_Bumpmetl.png
+
+newmtl PlayrShp_Base_DANGER
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_DANGER.png
+
+newmtl PlayrShp_Base_Fibrg_30
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_Fibrg_30.png
+
+newmtl PlayrShp_Deco_Flrwkb
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_Flrwkb.png
+
+newmtl PlayrShp_Deco_Slotted2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_Slotted2.png
+
+newmtl PlayrShp_Deco_Slotted3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_Slotted3.png
+
+newmtl PlayrShp_Deco_Ventwk
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_Ventwk.png
+
+newmtl PlayrShp_Floor_Flrwka
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Floor_Flrwka.png
+
+newmtl PlayrShp_Floor_Warn
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Floor_Warn.png
+
+newmtl PlayrShp_Light_Clngwk1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Light_Clngwk1.png
+
+newmtl PlayrShp_Light_Lights9
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Light_Lights9.png
+
+newmtl PlayrShp_Light_Lights9d
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Light_Lights9d.png
+
+newmtl PlayrShp_Light_VLight2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Light_VLight2.png
+
+newmtl PlayrShp_Light_lights9a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Light_lights9a.png
+
+newmtl PlayrShp_Panel_Vscreen1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Panel_Vscreen1.png
+
+newmtl PlayrShp_Panel_vScr2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Panel_vScr2.png
+
+newmtl PlayrShp_Trim_Girder2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Trim_Girder2.png
+
+newmtl PlayrShp_Wall_HULLRIB2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_HULLRIB2.png
+
+newmtl PlayrShp_Wall_HULLRI~1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_HULLRI~1.png
+
+newmtl PlayrShp_Wall_PANEL6B
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_PANEL6B.png
+
+newmtl PlayrShp_Wall_PANELS4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_PANELS4.png
+
+newmtl PlayrShp_Wall_Panel6c
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_Panel6c.png
+
+newmtl PlayrShp_Wall_Panels3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_Panels3.png
+
+newmtl PlayrShp_Wall_Panels6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_Panels6.png
+
+newmtl PlayrShp_Wall_VWall2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_VWall2.png
+
+newmtl PlayrShp_Wall_Wallwkb
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_Wallwkb.png
+
+newmtl PlayrShp_door_VDoor
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_door_VDoor.png
+
+newmtl PlayrShp_door_vDoor2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_door_vDoor2.png
+
+newmtl PlayrShp_pillar_Conduit1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_pillar_Conduit1.png
+
+newmtl PlayrShp_pillar_Conduit2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_pillar_Conduit2.png
+
+newmtl PlayrShp_pillar_Conduit3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_pillar_Conduit3.png
+
+newmtl PlayrShp_pillar_Girdrwk3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_pillar_Girdrwk3.png
+
+newmtl PlayrShp_pillar_Hullrib1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_pillar_Hullrib1.png
+
+newmtl PlayrShp_pillar_Panels9
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_pillar_Panels9.png
+
+newmtl ShaneDay_DayskyB
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneDay_DayskyB.png
+
+newmtl UTtech1_Ceiling_bmCeiling3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Ceiling_bmCeiling3.png
+
+newmtl UTtech1_Deco_bmBox2b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Deco_bmBox2b.png
+
+newmtl UTtech1_Deco_bmBox2c
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Deco_bmBox2c.png
+
+newmtl UTtech1_Deco_bmBox3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Deco_bmBox3.png
+
+newmtl UTtech1_Deco_bmBox3c
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Deco_bmBox3c.png
+
+newmtl UTtech1_Light_Xlight2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_Xlight2.png
+
+newmtl UTtech1_Wall_bmwall3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_bmwall3.png
+
+newmtl UTtech1_Wall_bmwall3d
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_bmwall3d.png
+
+newmtl UTtech1_Wall_wallt3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_wallt3.png
+
+newmtl UTtech1_XbmTechWall2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_XbmTechWall2.png
+
+newmtl UTtech1_pillar_pillarpln
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_pillar_pillarpln.png

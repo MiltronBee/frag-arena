@@ -1,0 +1,50 @@
+# UT99 Map Materials
+
+newmtl Engine_Texture
+Kd 0.8 0.8 0.8
+Ka 0.2 0.2 0.2
+Ks 0.0 0.0 0.0
+d 1.0
+illum 2
+map_Kd Engine_Texture.png
+
+newmtl Wall_01
+Kd 0.8 0.8 0.8
+Ka 0.2 0.2 0.2
+Ks 0.0 0.0 0.0
+d 1.0
+illum 2
+map_Kd Wall_01.png
+
+newmtl Wall_02
+Kd 0.8 0.8 0.8
+Ka 0.2 0.2 0.2
+Ks 0.0 0.0 0.0
+d 1.0
+illum 2
+map_Kd Wall_02.png
+
+newmtl Wall_03
+Kd 0.8 0.8 0.8
+Ka 0.2 0.2 0.2
+Ks 0.0 0.0 0.0
+d 1.0
+illum 2
+map_Kd Wall_03.png
+
+newmtl Wood_sid
+Kd 0.8 0.8 0.8
+Ka 0.2 0.2 0.2
+Ks 0.0 0.0 0.0
+d 1.0
+illum 2
+map_Kd Wood_sid.png
+
+newmtl floor_01_center
+Kd 0.8 0.8 0.8
+Ka 0.2 0.2 0.2
+Ks 0.0 0.0 0.0
+d 1.0
+illum 2
+map_Kd floor_01_center.png
+

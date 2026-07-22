@@ -1,0 +1,218 @@
+# materials for DM-Abyss
+
+newmtl GenFX_LensFlar_Flarel~6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_Flarel~6.png
+
+newmtl GenFX_LensFlar_softlens
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_softlens.png
+
+newmtl GenIn_Glass_Glass
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Glass_Glass.png
+
+newmtl Metalmys_MysIrn10
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIrn10.png
+
+newmtl Metalmys_MysIrn11
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIrn11.png
+
+newmtl Metalmys_MysIrn12
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIrn12.png
+
+newmtl Metalmys_MysIrn9a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIrn9a.png
+
+newmtl Metalmys_MysIron1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIron1.png
+
+newmtl Metalmys_MysIron2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIron2.png
+
+newmtl Metalmys_MysIron3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIron3.png
+
+newmtl Metalmys_MysLite5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysLite5.png
+
+newmtl Metalmys_MysMeta1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysMeta1.png
+
+newmtl Metalmys_MysMetl1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysMetl1.png
+
+newmtl Metalmys_MysMetl2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysMetl2.png
+
+newmtl RainFX_Rmetl2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/RainFX_Rmetl2.png
+
+newmtl RainFX_Rtrim1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/RainFX_Rtrim1.png
+
+newmtl RainFX_r-plates
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/RainFX_r-plates.png
+
+newmtl UTtech1_Deco_bmBox2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Deco_bmBox2.png
+
+newmtl UTtech1_Deco_bmBox2b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Deco_bmBox2b.png
+
+newmtl UTtech1_Deco_bmBox2c
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Deco_bmBox2c.png
+
+newmtl UTtech1_Deco_bmBox3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Deco_bmBox3.png
+
+newmtl UTtech1_Deco_bmBox3b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Deco_bmBox3b.png
+
+newmtl UTtech1_Floor_bmFloor2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Floor_bmFloor2.png
+
+newmtl UTtech1_Floor_bmFloor4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Floor_bmFloor4.png
+
+newmtl UTtech1_Light_Xlight3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_Xlight3.png
+
+newmtl UTtech1_Light_rClifLt1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_rClifLt1.png
+
+newmtl UTtech1_Light_ylight3c
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_ylight3c.png
+
+newmtl UTtech1_Wall_bmTechWall2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_bmTechWall2.png
+
+newmtl UTtech1_Wall_bmwall3c_2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_bmwall3c_2.png
+
+newmtl UTtech1_Wall_bwall3a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_bwall3a.png
+
+newmtl genfluid_Sky_NghSky
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Sky_NghSky.png

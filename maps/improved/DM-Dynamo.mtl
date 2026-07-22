@@ -1,0 +1,239 @@
+# materials for DM-Dynamo
+
+newmtl DecayedS_Base_Awall1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Base_Awall1.png
+
+newmtl DecayedS_Mask_T-Grate2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Mask_T-Grate2.png
+
+newmtl Indus1_Stonestuff_ralPanBk
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus1_Stonestuff_ralPanBk.png
+
+newmtl Liquids_liquid9
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Liquids_liquid9.png
+
+newmtl Metalmys_MysIrn11
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIrn11.png
+
+newmtl Metalmys_MysIron1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysIron1.png
+
+newmtl Metalmys_MysMetl3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_MysMetl3.png
+
+newmtl Metalmys_NaziBox4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Metalmys_NaziBox4.png
+
+newmtl Mine_Base_BASEIRM3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Base_BASEIRM3.png
+
+newmtl Mine_Base_Ironwalx
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Base_Ironwalx.png
+
+newmtl Mine_Trim_DUCT
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Trim_DUCT.png
+
+newmtl Mine_Trim_MIRONBR1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Trim_MIRONBR1.png
+
+newmtl Mine_Trim_mIronf_3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Trim_mIronf_3.png
+
+newmtl Mine_Wall_Irnwall2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Wall_Irnwall2.png
+
+newmtl Mine_pillar_Girderm3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_pillar_Girderm3.png
+
+newmtl Mine_pillar_Irnedge
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_pillar_Irnedge.png
+
+newmtl RainFX_Rtrim1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/RainFX_Rtrim1a.png
+
+newmtl Slums_Miscellaneous_Pavmtcr2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Miscellaneous_Pavmtcr2.png
+
+newmtl UT_cementf1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_cementf1.png
+
+newmtl UTtech1_Base_ClifRok2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Base_ClifRok2.png
+
+newmtl UTtech1_Base_metals6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Base_metals6.png
+
+newmtl UTtech1_Base_panelbase2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Base_panelbase2.png
+
+newmtl UTtech1_Deco_grate1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Deco_grate1.png
+
+newmtl UTtech1_Floor_hash-ice-32
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Floor_hash-ice-32.png
+
+newmtl UTtech1_Light_Xlight2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_Xlight2.png
+
+newmtl UTtech1_Light_Xlight3x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_Xlight3x.png
+
+newmtl UTtech1_Light_pmbLight3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_pmbLight3.png
+
+newmtl UTtech1_Light_pmbLight3or
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_pmbLight3or.png
+
+newmtl UTtech1_Light_rClifLt2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_rClifLt2.png
+
+newmtl UTtech1_Light_ylight3c
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_ylight3c.png
+
+newmtl UTtech1_Misc_UTdirt1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Misc_UTdirt1.png
+
+newmtl UTtech1_Wall_ClifCon2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_ClifCon2.png
+
+newmtl UTtech1_pillar_ClfPilr2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_pillar_ClfPilr2.png
+
+newmtl UTtech1_pillar_ClfPilr3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_pillar_ClfPilr3.png

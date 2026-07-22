@@ -1,0 +1,253 @@
+# materials for DM-Compression
+
+newmtl Indus1_Minesign
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus1_Minesign.png
+
+newmtl Indus1_Stonestuff_rMtlBrk1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus1_Stonestuff_rMtlBrk1.png
+
+newmtl Indus1_Stonestuff_rPanMtl1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus1_Stonestuff_rPanMtl1.png
+
+newmtl Indus1_Stonestuff_rPnchdr1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus1_Stonestuff_rPnchdr1.png
+
+newmtl Indus1_Stonestuff_ralPanBk
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus1_Stonestuff_ralPanBk.png
+
+newmtl Mine_Base_Ironwalx
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Base_Ironwalx.png
+
+newmtl Mine_Base_MCMETL
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Base_MCMETL.png
+
+newmtl Mine_Base_Mbrkbase2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Base_Mbrkbase2.png
+
+newmtl Mine_Base_Rust2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Base_Rust2.png
+
+newmtl Mine_Deco_MU_BOX2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Deco_MU_BOX2.png
+
+newmtl Mine_Deco_Mcmetl_22
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Deco_Mcmetl_22.png
+
+newmtl Mine_Deco_Pipe2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Deco_Pipe2.png
+
+newmtl Mine_Deco_Pipe3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Deco_Pipe3.png
+
+newmtl Mine_Deco_U_box2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Deco_U_box2.png
+
+newmtl Mine_Floor_MFLOOR4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Floor_MFLOOR4.png
+
+newmtl Mine_Floor_Mironfx2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Floor_Mironfx2.png
+
+newmtl Mine_Floor_Mironfx3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Floor_Mironfx3.png
+
+newmtl Mine_Light_mmlight2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Light_mmlight2.png
+
+newmtl Mine_Trim_Girdr2m
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Trim_Girdr2m.png
+
+newmtl Mine_Wall_IRNWALL4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Wall_IRNWALL4.png
+
+newmtl Mine_Wall_Irnwall2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Wall_Irnwall2.png
+
+newmtl Mine_Wall_Irnwal~4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Wall_Irnwal~4.png
+
+newmtl Mine_Wall_Ironwal
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Wall_Ironwal.png
+
+newmtl Mine_pillar_mPillar1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_pillar_mPillar1.png
+
+newmtl RainFX_Blok-dang3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/RainFX_Blok-dang3.png
+
+newmtl RainFX_Blok-tin
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/RainFX_Blok-tin.png
+
+newmtl RainFX_Concrete
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/RainFX_Concrete.png
+
+newmtl RainFX_Rmetl2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/RainFX_Rmetl2.png
+
+newmtl RainFX_Rtrim1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/RainFX_Rtrim1.png
+
+newmtl RainFX_Rtrim1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/RainFX_Rtrim1a.png
+
+newmtl RainFX_hatch3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/RainFX_hatch3.png
+
+newmtl RainFX_r-plates
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/RainFX_r-plates.png
+
+newmtl Slums_Stone_StoneP15
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Stone_StoneP15.png
+
+newmtl UTtech1_Floor_FLOOR2B
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Floor_FLOOR2B.png
+
+newmtl UTtech1_Misc_UTdirt1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Misc_UTdirt1.png
+
+newmtl _untextured
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/_untextured.png

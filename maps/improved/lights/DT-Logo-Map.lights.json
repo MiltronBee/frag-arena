@@ -1,0 +1,25 @@
+{
+ "map": "DT-Logo-Map",
+ "space": "right-handed Z-up, meters",
+ "lights": [
+  {
+   "class": "Light",
+   "name": "Light2",
+   "pos_m": [
+    18.9,
+    0.0273,
+    3.2342
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 166,
+   "radius_m": 21.908,
+   "type": "Steady",
+   "effect": "None"
+  }
+ ],
+ "ambient": []
+}

@@ -1,0 +1,171 @@
+# materials for DM-Mandel
+
+newmtl FireEng_SFX_JWSFX1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+Ke 1.000 0.450 0.100
+map_Kd textures_hd/FireEng_SFX_JWSFX1.png
+
+newmtl FractalFX_DavOpen
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/FractalFX_DavOpen.png
+
+newmtl FractalFX_KScan2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/FractalFX_KScan2.png
+
+newmtl ISVFX_energy4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+Ke 1.000 0.450 0.100
+map_Kd textures_hd/ISVFX_energy4.png
+
+newmtl Indus2_powerg2b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus2_powerg2b.png
+
+newmtl Starship_Base_basic2a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Starship_Base_basic2a.png
+
+newmtl Starship_Ceiling_sh_cel2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Starship_Ceiling_sh_cel2.png
+
+newmtl Starship_Ceiling_sh_cel3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Starship_Ceiling_sh_cel3.png
+
+newmtl Starship_Ceiling_sh_cels
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Starship_Ceiling_sh_cels.png
+
+newmtl Starship_Deco_Ext_bs2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Starship_Deco_Ext_bs2.png
+
+newmtl Starship_Deco_sh_en4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Starship_Deco_sh_en4.png
+
+newmtl Starship_Floor_sh_bs7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Starship_Floor_sh_bs7.png
+
+newmtl Starship_Floor_sh_bs8
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Starship_Floor_sh_bs8.png
+
+newmtl Starship_Light_sh_el
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Starship_Light_sh_el.png
+
+newmtl Starship_Wall_sh_wl3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Starship_Wall_sh_wl3.png
+
+newmtl Starship_door_Adr
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Starship_door_Adr.png
+
+newmtl UTtech1_Base_bmetalbase
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Base_bmetalbase.png
+
+newmtl UTtech1_Floor_bmFloor2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Floor_bmFloor2.png
+
+newmtl UTtech1_Floor_bmFloor3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Floor_bmFloor3.png
+
+newmtl UTtech1_Light_Xlight3a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_Xlight3a.png
+
+newmtl UTtech1_Wall_bmTechWall2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_bmTechWall2.png
+
+newmtl UTtech1_Wall_bmdirtyt
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_bmdirtyt.png
+
+newmtl UTtech1_Wall_bmetalw4copy
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_bmetalw4copy.png
+
+newmtl UTtech1_Wall_bmwall3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_bmwall3.png

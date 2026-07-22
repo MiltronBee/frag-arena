@@ -1,0 +1,255 @@
+# materials for DM-MysticShrine
+
+newmtl Ancient_Base_ABasic3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_ABasic3.png
+
+newmtl Ancient_Base_BASIC2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_BASIC2.png
+
+newmtl Ancient_Base_GRENMRBL
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_GRENMRBL.png
+
+newmtl Ancient_Base_UNCARVD2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_UNCARVD2.png
+
+newmtl Ancient_Deco_A_hd
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Deco_A_hd.png
+
+newmtl Ancient_Deco_az-3a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Deco_az-3a.png
+
+newmtl Ancient_Deco_az-ia
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Deco_az-ia.png
+
+newmtl Ancient_Deco_hyro6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Deco_hyro6.png
+
+newmtl Ancient_Floor_az-floor
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Floor_az-floor.png
+
+newmtl Ancient_Panel_az0pan
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Panel_az0pan.png
+
+newmtl Ancient_Wall_Basic2-v2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Wall_Basic2-v2.png
+
+newmtl Ancient_Wall_Basicrok
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Wall_Basicrok.png
+
+newmtl GenEarth_Ground_Grass
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Ground_Grass.png
+
+newmtl GenEarth_Rock_Rock9
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Rock9.png
+
+newmtl GenEarth_Rock_Wrcka3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Wrcka3.png
+
+newmtl GenIn_Deco_Rotwood
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Deco_Rotwood.png
+
+newmtl GenIn_Deco_Rotwood2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Deco_Rotwood2.png
+
+newmtl GreatFire_ancflame2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+Ke 1.000 0.450 0.100
+map_Kd textures_hd/GreatFire_ancflame2.png
+
+newmtl HubEffects_Smoke1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/HubEffects_Smoke1.png
+
+newmtl HubEffects_WaterRings2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/HubEffects_WaterRings2.png
+
+newmtl NaliCast_Base_wbase3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_wbase3.png
+
+newmtl ShaneDay_DayskyB
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneDay_DayskyB.png
+
+newmtl ShaneDay_Dbottm
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneDay_Dbottm.png
+
+newmtl ShaneDay_FLARE10
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneDay_FLARE10.png
+
+newmtl ShaneSky_moon-4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneSky_moon-4.png
+
+newmtl chizraefx_lightning6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+Ke 1.000 0.450 0.100
+map_Kd textures_hd/chizraefx_lightning6.png
+
+newmtl genfluid_Sky_BlueSky
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Sky_BlueSky.png
+
+newmtl genfluid_Sky_SkytstA
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Sky_SkytstA.png
+
+newmtl genfx_Mask_cob-web2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfx_Mask_cob-web2.png
+
+newmtl genfx_Mask_moss2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfx_Mask_moss2.png
+
+newmtl skybox_Lnd_1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/skybox_Lnd_1.png
+
+newmtl skybox_Lnd_2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/skybox_Lnd_2.png
+
+newmtl skybox_Lnd_3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/skybox_Lnd_3.png
+
+newmtl skybox_Lnd_4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/skybox_Lnd_4.png
+
+newmtl skybox_Lnd_4b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/skybox_Lnd_4b.png
+
+newmtl skybox_grd
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/skybox_grd.png

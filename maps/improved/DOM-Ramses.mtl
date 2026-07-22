@@ -1,0 +1,275 @@
+# materials for DOM-Ramses
+
+newmtl Ancient_Base_A_bs1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_A_bs1.png
+
+newmtl Ancient_Base_A_bs3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_A_bs3.png
+
+newmtl Ancient_Base_A_bs4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_A_bs4.png
+
+newmtl Ancient_Base_CRUNCHYA
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_CRUNCHYA.png
+
+newmtl Egypt_DomPoint2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_DomPoint2.png
+
+newmtl Egypt_EgyptDr1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_EgyptDr1.png
+
+newmtl Egypt_GHiero7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_GHiero7.png
+
+newmtl Egypt_GypMur1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_GypMur1.png
+
+newmtl Egypt_GypTrim1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_GypTrim1.png
+
+newmtl Egypt_GypTrim4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_GypTrim4.png
+
+newmtl Egypt_GypTrim5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_GypTrim5.png
+
+newmtl Egypt_GypTrim6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_GypTrim6.png
+
+newmtl Egypt_GypWal1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_GypWal1.png
+
+newmtl Egypt_GypWal2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_GypWal2.png
+
+newmtl Egypt_GypWal3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_GypWal3.png
+
+newmtl Egypt_HierEnd1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_HierEnd1.png
+
+newmtl Egypt_Hiero1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_Hiero1.png
+
+newmtl Egypt_Hiero2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_Hiero2.png
+
+newmtl Egypt_Hiero3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_Hiero3.png
+
+newmtl Egypt_Hiero4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_Hiero4.png
+
+newmtl Egypt_Hiero5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_Hiero5.png
+
+newmtl Egypt_Hiero6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_Hiero6.png
+
+newmtl Egypt_PaveBase
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_PaveBase.png
+
+newmtl Egypt_Paver1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_Paver1.png
+
+newmtl Egypt_Paver1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Egypt_Paver1a.png
+
+newmtl EgyptPan_Heiroglyphs1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/EgyptPan_Heiroglyphs1.png
+
+newmtl EgyptPan_Skybox_SkyBPyramid1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/EgyptPan_Skybox_SkyBPyramid1.png
+
+newmtl EgyptPan_Skybox_SkyBPyramid2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/EgyptPan_Skybox_SkyBPyramid2.png
+
+newmtl EgyptPan_Skybox_SkyBPyramid3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/EgyptPan_Skybox_SkyBPyramid3.png
+
+newmtl EgyptPan_Skybox_SkyBPyramid4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/EgyptPan_Skybox_SkyBPyramid4.png
+
+newmtl EgyptPan_Skybox_SkyBPyramid5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/EgyptPan_Skybox_SkyBPyramid5.png
+
+newmtl EgyptPan_Skybox_SkyBPyramid6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/EgyptPan_Skybox_SkyBPyramid6.png
+
+newmtl EgyptPan_Skybox_SkyBPyramid7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/EgyptPan_Skybox_SkyBPyramid7.png
+
+newmtl EgyptPan_Skybox_SkyBPyramid8
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/EgyptPan_Skybox_SkyBPyramid8.png
+
+newmtl EgyptPan_Skybox_SkyBPyramidTop
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/EgyptPan_Skybox_SkyBPyramidTop.png
+
+newmtl EgyptPan_TheHEAD
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/EgyptPan_TheHEAD.png
+
+newmtl GenEarth_Rock_Icer
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Icer.png
+
+newmtl GenFX_LensFlar_flare6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_flare6.png
+
+newmtl HubEffects_SmallFireH3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+Ke 1.000 0.450 0.100
+map_Kd textures_hd/HubEffects_SmallFireH3.png

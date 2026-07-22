@@ -1,0 +1,289 @@
+# materials for DM-KSchooner
+
+newmtl Crypt2_Mask_C_barsm
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Crypt2_Mask_C_barsm.png
+
+newmtl Crypt2_Panel_C_wPnl1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Crypt2_Panel_C_wPnl1.png
+
+newmtl GenIn_Deco_Rotwood
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Deco_Rotwood.png
+
+newmtl GenIn_Deco_rug-rt3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Deco_rug-rt3.png
+
+newmtl HubEffects_Goop3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/HubEffects_Goop3.png
+
+newmtl HubEffects_SmallFireH3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+Ke 1.000 0.450 0.100
+map_Kd textures_hd/HubEffects_SmallFireH3.png
+
+newmtl Indus5_Galleon_RufWod1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus5_Galleon_RufWod1a.png
+
+newmtl Indus5_Galleon_ShpWod11
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus5_Galleon_ShpWod11.png
+
+newmtl Indus5_Galleon_ShpWood1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus5_Galleon_ShpWood1.png
+
+newmtl Indus5_Galleon_ShpWood2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus5_Galleon_ShpWood2.png
+
+newmtl Indus5_Galleon_ShpWood3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus5_Galleon_ShpWood3.png
+
+newmtl Indus5_Galleon_ShpWood9
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus5_Galleon_ShpWood9.png
+
+newmtl Indus5_Galleon_TableMap
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus5_Galleon_TableMap.png
+
+newmtl Indus6_Glass_LeadW1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Glass_LeadW1.png
+
+newmtl Indus6_Sky1_skySetC_back
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Sky1_skySetC_back.png
+
+newmtl Indus6_Sky1_skySetC_front
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Sky1_skySetC_front.png
+
+newmtl Indus6_Sky1_skySetC_left
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Sky1_skySetC_left.png
+
+newmtl Indus6_Sky1_skySetC_right
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Sky1_skySetC_right.png
+
+newmtl Indus6_Sky1_skySetC_up
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Sky1_skySetC_up.png
+
+newmtl Indus6_WetStuff_WetBeams1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_WetStuff_WetBeams1.png
+
+newmtl Indus6_Woods_DeckRf1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_DeckRf1.png
+
+newmtl Indus6_Woods_DeckSm1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_DeckSm1.png
+
+newmtl Indus6_Woods_RopeWk2a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_RopeWk2a.png
+
+newmtl Indus6_Woods_Sail1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_Sail1.png
+
+newmtl Indus6_Woods_Sail1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_Sail1a.png
+
+newmtl Indus6_Woods_ShpBanr1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_ShpBanr1.png
+
+newmtl Indus6_Woods_ShpBanr2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_ShpBanr2.png
+
+newmtl Indus6_Woods_ShpBeam2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_ShpBeam2.png
+
+newmtl Indus6_Woods_rBedHang
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_rBedHang.png
+
+newmtl Indus6_Woods_rPCarpet
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_rPCarpet.png
+
+newmtl Mine_Deco_MU_BOX2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Deco_MU_BOX2.png
+
+newmtl Mine_Deco_U_box2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Mine_Deco_U_box2.png
+
+newmtl NaliCast_Base_metal1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_metal1.png
+
+newmtl NaliCast_Base_metalS1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_metalS1.png
+
+newmtl NaliCast_Deco_Nmesh1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Deco_Nmesh1.png
+
+newmtl NaliCast_Panel_Wood2A
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Panel_Wood2A.png
+
+newmtl NaliCast_Panel_smlpanl
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Panel_smlpanl.png
+
+newmtl ShaneDay_DayskyB
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneDay_DayskyB.png
+
+newmtl SkyCity_Deco_sBkShlvs
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SkyCity_Deco_sBkShlvs.png
+
+newmtl UT_Woodf2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_Woodf2.png
+
+newmtl genfluid_Water_r5000w
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Water_r5000w.png

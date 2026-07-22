@@ -1,0 +1,235 @@
+# materials for CTF-EndlessCavern
+
+newmtl Ancient_Base_ABasic4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_ABasic4.png
+
+newmtl Ancient_Base_A_bs3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_A_bs3.png
+
+newmtl Ancient_Base_A_bs4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_A_bs4.png
+
+newmtl Ancient_Base_BASIC2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_BASIC2.png
+
+newmtl Ancient_Base_Basic2~1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_Basic2~1.png
+
+newmtl Ancient_Base_GRENMRBL
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_GRENMRBL.png
+
+newmtl Ancient_Base_STONTSTE
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_STONTSTE.png
+
+newmtl Ancient_Deco_AWallwkc
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Deco_AWallwkc.png
+
+newmtl Ancient_Deco_A_stt2a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Deco_A_stt2a.png
+
+newmtl Ancient_Floor_FLOOR1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Floor_FLOOR1.png
+
+newmtl Ancient_Floor_FLOOR2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Floor_FLOOR2.png
+
+newmtl Ancient_Floor_FLOOR2B
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Floor_FLOOR2B.png
+
+newmtl Ancient_Floor_az-floor
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Floor_az-floor.png
+
+newmtl Ancient_Panel_HIWALL3D
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Panel_HIWALL3D.png
+
+newmtl Ancient_Pillar_APillar
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Pillar_APillar.png
+
+newmtl Ancient_Trim_GOUGEDE2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Trim_GOUGEDE2.png
+
+newmtl Ancient_Trim_TRIM1A
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Trim_TRIM1A.png
+
+newmtl Ancient_Wall_BRIXK3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Wall_BRIXK3.png
+
+newmtl Ancient_Wall_Basic2-v2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Wall_Basic2-v2.png
+
+newmtl CTF_Ancient_Anc3_blue
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/CTF_Ancient_Anc3_blue.png
+
+newmtl CTF_Ancient_Anc3_red
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/CTF_Ancient_Anc3_red.png
+
+newmtl GenEarth_Ground_Dirt1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Ground_Dirt1.png
+
+newmtl GenEarth_Rock_Sroc2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Sroc2.png
+
+newmtl GenFX_Mask_cob-web2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_Mask_cob-web2.png
+
+newmtl GenFX_Mask_lilymix
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_Mask_lilymix.png
+
+newmtl GenFX_Mask_moss2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_Mask_moss2.png
+
+newmtl GenFX_Mask_vines
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_Mask_vines.png
+
+newmtl HubEffects_SmallFireH3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+Ke 1.000 0.450 0.100
+map_Kd textures_hd/HubEffects_SmallFireH3.png
+
+newmtl Indus4_BlueFire
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+Ke 1.000 0.450 0.100
+map_Kd textures_hd/Indus4_BlueFire.png
+
+newmtl Indus4_RedFire
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+Ke 1.000 0.450 0.100
+map_Kd textures_hd/Indus4_RedFire.png
+
+newmtl UT_crumbf1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_crumbf1.png
+
+newmtl UTtech1_Misc_rok2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Misc_rok2.png
+
+newmtl genfluid_Sky_pSky2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Sky_pSky2.png

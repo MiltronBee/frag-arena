@@ -1,0 +1,274 @@
+# materials for CTF-Satellite
+
+newmtl GenFX_LensFlar_5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_5.png
+
+newmtl GenFX_LensFlar_flare4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_flare4.png
+
+newmtl GenFX_LensFlar_flare7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_flare7.png
+
+newmtl GenFX_LensFlar_haze2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_haze2.png
+
+newmtl GenFX_LensFlar_new2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_new2.png
+
+newmtl GenIn_Glass_Glassf
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Glass_Glassf.png
+
+newmtl JWSky_Sky_HAZE
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_Sky_HAZE.png
+
+newmtl ShaneChurch_SMoon
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_SMoon.png
+
+newmtl UTtech1_Deco_TESTBLUE
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Deco_TESTBLUE.png
+
+newmtl UTtech1_Deco_TESTred
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Deco_TESTred.png
+
+newmtl UTtech1_Light_Xlight3a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_Xlight3a.png
+
+newmtl UTtech1_Light_rClifLt1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_rClifLt1.png
+
+newmtl UTtech2_Base_rClClgbas1x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Base_rClClgbas1x.png
+
+newmtl UTtech2_Ceiling_rClfClg1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Ceiling_rClfClg1.png
+
+newmtl UTtech2_Floor_aClfFlr1b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Floor_aClfFlr1b.png
+
+newmtl UTtech2_Floor_rClfFlr1x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Floor_rClfFlr1x.png
+
+newmtl UTtech2_Floor_rClfFlr6x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Floor_rClfFlr6x.png
+
+newmtl UTtech2_Floor_rClfFlr9x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Floor_rClfFlr9x.png
+
+newmtl UTtech2_Light_rClfLit1x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Light_rClfLit1x.png
+
+newmtl UTtech2_Wall_aClfWl2g
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_aClfWl2g.png
+
+newmtl UTtech2_Wall_rClfWl1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rClfWl1.png
+
+newmtl UTtech2_Wall_rClfWl2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rClfWl2.png
+
+newmtl UTtech2_Wall_rClfWl3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rClfWl3.png
+
+newmtl UTtech2_Wall_rClfWl4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rClfWl4.png
+
+newmtl UTtech2_Wall_rClfWl5x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rClfWl5x.png
+
+newmtl UTtech2_Wall_rClfWl5y
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rClfWl5y.png
+
+newmtl UTtech2_Wall_rClfWl7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rClfWl7.png
+
+newmtl UTtech2_Wall_rclfwl4-BLU
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rclfwl4-BLU.png
+
+newmtl UTtech2_Wall_rclfwl4-RED
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rclfwl4-RED.png
+
+newmtl UTtech2_pillar_rClfPlr2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_pillar_rClfPlr2.png
+
+newmtl UTtech2_pillar_rClfPlr4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_pillar_rClfPlr4.png
+
+newmtl UTtech2_pillar_rClfPlr5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_pillar_rClfPlr5.png
+
+newmtl XbpFX_Nebula1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/XbpFX_Nebula1.png
+
+newmtl XbpFX_Nebula2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/XbpFX_Nebula2.png
+
+newmtl XbpFX_inxspc1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/XbpFX_inxspc1.png
+
+newmtl XbpFX_inxspc2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/XbpFX_inxspc2.png
+
+newmtl XbpFX_inxspc3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/XbpFX_inxspc3.png
+
+newmtl XbpFX_inxspc4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/XbpFX_inxspc4.png
+
+newmtl genfluid_Sky_NghSky3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Sky_NghSky3.png

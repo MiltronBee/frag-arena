@@ -1,0 +1,372 @@
+# materials for DM-MedBay][
+
+newmtl DecayedS_Base_Base11
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Base_Base11.png
+
+newmtl DecayedS_Base_Base6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Base_Base6.png
+
+newmtl DecayedS_Base_Base9d
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Base_Base9d.png
+
+newmtl DecayedS_Base_Base9dr
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Base_Base9dr.png
+
+newmtl DecayedS_Base_dBase2c
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Base_dBase2c.png
+
+newmtl DecayedS_Deco_dSewer1b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Deco_dSewer1b.png
+
+newmtl GenIn_Glass_Glass
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Glass_Glass.png
+
+newmtl GenIn_Glass_Glass2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Glass_Glass2.png
+
+newmtl GenIn_Glass_Glassh
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Glass_Glassh.png
+
+newmtl GenIn_Glass_d_mgrd
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Glass_d_mgrd.png
+
+newmtl UTtech1_Base_cbnubase2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Base_cbnubase2.png
+
+newmtl UTtech1_Light_Xlight3a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Light_Xlight3a.png
+
+newmtl UTtech1_Wall_bmpanels8
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_bmpanels8.png
+
+newmtl UTtech2_Base_rClfBsB2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Base_rClfBsB2.png
+
+newmtl UTtech2_Base_rClfBsG3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Base_rClfBsG3.png
+
+newmtl UTtech2_Base_rClfBsY2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Base_rClfBsY2.png
+
+newmtl UTtech2_Ceiling_rClfClg1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Ceiling_rClfClg1.png
+
+newmtl UTtech2_Ceiling_rClfClg2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Ceiling_rClfClg2.png
+
+newmtl UTtech2_Ceiling_rClfClg3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Ceiling_rClfClg3.png
+
+newmtl UTtech2_Deco_rClfBox1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Deco_rClfBox1.png
+
+newmtl UTtech2_Deco_rClfBox2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Deco_rClfBox2.png
+
+newmtl UTtech2_Deco_ralScrn1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Deco_ralScrn1.png
+
+newmtl UTtech2_Deco_ralScrn2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Deco_ralScrn2.png
+
+newmtl UTtech2_Deco_ralScrn3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Deco_ralScrn3.png
+
+newmtl UTtech2_Floor_aClfFlr1b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Floor_aClfFlr1b.png
+
+newmtl UTtech2_Floor_rCFlr12x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Floor_rCFlr12x.png
+
+newmtl UTtech2_Floor_rClfFlr1y
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Floor_rClfFlr1y.png
+
+newmtl UTtech2_Floor_rClfFlr6x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Floor_rClfFlr6x.png
+
+newmtl UTtech2_Light_rClfLit1xy
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Light_rClfLit1xy.png
+
+newmtl UTtech2_Light_rClfLit2x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Light_rClfLit2x.png
+
+newmtl UTtech2_Light_rClfLit3x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Light_rClfLit3x.png
+
+newmtl UTtech2_Light_rClfLt_b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Light_rClfLt_b.png
+
+newmtl UTtech2_Light_rClfPlr6a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Light_rClfPlr6a.png
+
+newmtl UTtech2_Trim_rClfTrm2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Trim_rClfTrm2.png
+
+newmtl UTtech2_Trim_rClfTrm2x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Trim_rClfTrm2x.png
+
+newmtl UTtech2_Trim_rClfTrm3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Trim_rClfTrm3.png
+
+newmtl UTtech2_Wall_aClfWl2g
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_aClfWl2g.png
+
+newmtl UTtech2_Wall_rClfWl2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rClfWl2.png
+
+newmtl UTtech2_Wall_rClfWl3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rClfWl3.png
+
+newmtl UTtech2_Wall_rClfWl3x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rClfWl3x.png
+
+newmtl UTtech2_Wall_rClfWl4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rClfWl4.png
+
+newmtl UTtech2_Wall_rClfWl5y
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rClfWl5y.png
+
+newmtl UTtech2_Wall_rClfWl7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_Wall_rClfWl7.png
+
+newmtl UTtech2_pillar_rClfLT4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_pillar_rClfLT4.png
+
+newmtl UTtech2_pillar_rClfPlr1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_pillar_rClfPlr1.png
+
+newmtl UTtech2_pillar_rClfPlr2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_pillar_rClfPlr2.png
+
+newmtl UTtech2_pillar_rClfPlr4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_pillar_rClfPlr4.png
+
+newmtl UTtech2_pillar_rClfPlr5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_pillar_rClfPlr5.png
+
+newmtl UTtech2_pillar_rClfPlr6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech2_pillar_rClfPlr6.png
+
+newmtl UTtech3_Deco_AW_lft1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech3_Deco_AW_lft1.png
+
+newmtl UTtech3_Light_ceillite1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech3_Light_ceillite1.png
+
+newmtl UTtech3_Light_rnd_lite1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech3_Light_rnd_lite1.png
+
+newmtl UTtech3_Light_rnd_lite2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech3_Light_rnd_lite2.png

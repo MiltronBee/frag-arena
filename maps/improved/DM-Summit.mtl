@@ -1,0 +1,184 @@
+# materials for DM-Summit
+
+newmtl GenEarth_Rock_Wrcka4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Wrcka4.png
+
+newmtl GenFX_LensFlar_1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_1.png
+
+newmtl GenFX_LensFlar_Flarel~6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_Flarel~6.png
+
+newmtl GenFX_LensFlar_softlens
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_softlens.png
+
+newmtl GenIn_Deco_Roof
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Deco_Roof.png
+
+newmtl GenIn_Deco_Rotwood
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Deco_Rotwood.png
+
+newmtl GenIn_Deco_Rotwood2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenIn_Deco_Rotwood2.png
+
+newmtl HubEffects_SmallFireH3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+Ke 1.000 0.450 0.100
+map_Kd textures_hd/HubEffects_SmallFireH3.png
+
+newmtl Indus1_Skybox_Ptm_1b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus1_Skybox_Ptm_1b.png
+
+newmtl Indus6_Woods_DeckRf1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_DeckRf1.png
+
+newmtl Indus6_stones_Tiles1A256
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_stones_Tiles1A256.png
+
+newmtl NaliCast_Base_Wmcsb
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_Wmcsb.png
+
+newmtl NaliCast_Base_metal
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_metal.png
+
+newmtl NaliCast_Base_nblock2a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_nblock2a.png
+
+newmtl NaliCast_Base_nmysbas1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_nmysbas1.png
+
+newmtl NaliCast_Base_wbase3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_wbase3.png
+
+newmtl NaliCast_Floor_n-floor6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Floor_n-floor6.png
+
+newmtl NaliCast_Floor_nCob4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Floor_nCob4.png
+
+newmtl NaliCast_Floor_oldflor2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Floor_oldflor2.png
+
+newmtl NaliCast_Trim_METTRIM1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Trim_METTRIM1.png
+
+newmtl NaliCast_Trim_ntrim
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Trim_ntrim.png
+
+newmtl NaliCast_Window_Nwin3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Window_Nwin3.png
+
+newmtl UTcrypt_Base_cmbnastywal2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTcrypt_Base_cmbnastywal2.png
+
+newmtl UTcrypt_Wall_cbutnubrik22b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTcrypt_Wall_cbutnubrik22b.png
+
+newmtl UTcrypt_Wall_utAlanWal2a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTcrypt_Wall_utAlanWal2a.png
+
+newmtl genfluid_Sky_gmist3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Sky_gmist3.png

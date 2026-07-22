@@ -1,0 +1,1596 @@
+{
+ "map": "DM-Ziggurat",
+ "space": "right-handed Z-up, meters",
+ "lights": [
+  {
+   "class": "Light",
+   "name": "Light0",
+   "pos_m": [
+    -0.0437,
+    0.0011,
+    22.6102
+   ],
+   "rgb": [
+    0.251,
+    0.9912,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 14.288,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light14",
+   "pos_m": [
+    -0.0229,
+    15.0966,
+    3.9002
+   ],
+   "rgb": [
+    1.0,
+    0.877,
+    0.502
+   ],
+   "brightness": 128,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light2",
+   "pos_m": [
+    15.127,
+    -0.0093,
+    3.9002
+   ],
+   "rgb": [
+    1.0,
+    0.877,
+    0.502
+   ],
+   "brightness": 128,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light13",
+   "pos_m": [
+    -0.0463,
+    -15.0967,
+    3.9002
+   ],
+   "rgb": [
+    1.0,
+    0.877,
+    0.502
+   ],
+   "brightness": 128,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light4",
+   "pos_m": [
+    -15.042,
+    -0.027,
+    3.9002
+   ],
+   "rgb": [
+    1.0,
+    0.877,
+    0.502
+   ],
+   "brightness": 128,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light5",
+   "pos_m": [
+    0.0194,
+    -9.3603,
+    10.9678
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.9121
+   ],
+   "brightness": 80,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light6",
+   "pos_m": [
+    -9.5252,
+    0.097,
+    10.9678
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.9121
+   ],
+   "brightness": 80,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light7",
+   "pos_m": [
+    -0.003,
+    9.6205,
+    10.9678
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.9121
+   ],
+   "brightness": 80,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light15",
+   "pos_m": [
+    9.2318,
+    0.1881,
+    10.9678
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.9121
+   ],
+   "brightness": 80,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light16",
+   "pos_m": [
+    0.0817,
+    -4.764,
+    18.0544
+   ],
+   "rgb": [
+    0.3765,
+    0.5232,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 14.288,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light17",
+   "pos_m": [
+    6.0932,
+    0.014,
+    18.0544
+   ],
+   "rgb": [
+    0.3765,
+    0.5232,
+    1.0
+   ],
+   "brightness": 96,
+   "radius_m": 9.525,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light11",
+   "pos_m": [
+    -0.1305,
+    5.9486,
+    18.0544
+   ],
+   "rgb": [
+    0.3765,
+    0.5232,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 14.288,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light12",
+   "pos_m": [
+    -6.126,
+    0.1349,
+    18.0544
+   ],
+   "rgb": [
+    0.3765,
+    0.5232,
+    1.0
+   ],
+   "brightness": 96,
+   "radius_m": 9.525,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light3",
+   "pos_m": [
+    -179.5427,
+    500.2003,
+    -117.0396
+   ],
+   "rgb": [
+    0.6275,
+    0.6275,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 76.2,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light1",
+   "pos_m": [
+    -152.6371,
+    527.0092,
+    -78.0192
+   ],
+   "rgb": [
+    0.6275,
+    0.6275,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 76.2,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light8",
+   "pos_m": [
+    -152.6294,
+    473.3736,
+    -78.0192
+   ],
+   "rgb": [
+    0.6275,
+    0.6275,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 76.2,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light9",
+   "pos_m": [
+    -206.2882,
+    527.0209,
+    -78.0192
+   ],
+   "rgb": [
+    0.6275,
+    0.6275,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 76.2,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light10",
+   "pos_m": [
+    -206.3082,
+    473.3479,
+    -78.0192
+   ],
+   "rgb": [
+    0.6275,
+    0.6275,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 76.2,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light28",
+   "pos_m": [
+    -9.783,
+    260.8967,
+    -47.5474
+   ],
+   "rgb": [
+    1.0,
+    0.0627,
+    0.9669
+   ],
+   "brightness": 96,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light29",
+   "pos_m": [
+    14.5602,
+    282.8368,
+    -48.75
+   ],
+   "rgb": [
+    0.251,
+    1.0,
+    0.9207
+   ],
+   "brightness": 86,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light30",
+   "pos_m": [
+    -0.0161,
+    273.0974,
+    -48.772
+   ],
+   "rgb": [
+    0.3765,
+    0.8606,
+    1.0
+   ],
+   "brightness": 192,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light31",
+   "pos_m": [
+    -9.779,
+    282.8451,
+    -48.75
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.502
+   ],
+   "brightness": 64,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light32",
+   "pos_m": [
+    14.5919,
+    260.9362,
+    -48.75
+   ],
+   "rgb": [
+    0.251,
+    0.4272,
+    1.0
+   ],
+   "brightness": 96,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light33",
+   "pos_m": [
+    -31.7213,
+    305.1058,
+    -48.7718
+   ],
+   "rgb": [
+    0.502,
+    0.8535,
+    1.0
+   ],
+   "brightness": 32,
+   "radius_m": 45.72,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light34",
+   "pos_m": [
+    31.6646,
+    305.1131,
+    -48.7718
+   ],
+   "rgb": [
+    0.502,
+    0.8535,
+    1.0
+   ],
+   "brightness": 32,
+   "radius_m": 45.72,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light35",
+   "pos_m": [
+    -31.741,
+    241.7127,
+    -48.7718
+   ],
+   "rgb": [
+    0.502,
+    0.8535,
+    1.0
+   ],
+   "brightness": 32,
+   "radius_m": 45.72,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light36",
+   "pos_m": [
+    31.7022,
+    241.7209,
+    -48.7718
+   ],
+   "rgb": [
+    0.502,
+    0.8535,
+    1.0
+   ],
+   "brightness": 32,
+   "radius_m": 45.72,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light89",
+   "pos_m": [
+    238.3242,
+    471.8183,
+    -47.5474
+   ],
+   "rgb": [
+    1.0,
+    0.0627,
+    0.9669
+   ],
+   "brightness": 96,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light90",
+   "pos_m": [
+    262.6674,
+    493.7584,
+    -48.75
+   ],
+   "rgb": [
+    0.251,
+    1.0,
+    0.9207
+   ],
+   "brightness": 86,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light91",
+   "pos_m": [
+    248.0911,
+    484.019,
+    -48.772
+   ],
+   "rgb": [
+    0.3765,
+    0.8606,
+    1.0
+   ],
+   "brightness": 192,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light93",
+   "pos_m": [
+    238.3282,
+    493.7667,
+    -48.75
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.502
+   ],
+   "brightness": 64,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light94",
+   "pos_m": [
+    262.6991,
+    471.8579,
+    -48.75
+   ],
+   "rgb": [
+    0.251,
+    0.4272,
+    1.0
+   ],
+   "brightness": 96,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light95",
+   "pos_m": [
+    216.3859,
+    516.0274,
+    -48.7718
+   ],
+   "rgb": [
+    0.502,
+    0.8535,
+    1.0
+   ],
+   "brightness": 32,
+   "radius_m": 45.72,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light96",
+   "pos_m": [
+    279.7718,
+    516.0347,
+    -48.7718
+   ],
+   "rgb": [
+    0.502,
+    0.8535,
+    1.0
+   ],
+   "brightness": 32,
+   "radius_m": 45.72,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light97",
+   "pos_m": [
+    216.3662,
+    452.6343,
+    -48.7718
+   ],
+   "rgb": [
+    0.502,
+    0.8535,
+    1.0
+   ],
+   "brightness": 32,
+   "radius_m": 45.72,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light98",
+   "pos_m": [
+    279.8094,
+    452.6425,
+    -48.7718
+   ],
+   "rgb": [
+    0.502,
+    0.8535,
+    1.0
+   ],
+   "brightness": 32,
+   "radius_m": 45.72,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light18",
+   "pos_m": [
+    26.5085,
+    -31.4242,
+    29.6433
+   ],
+   "rgb": [
+    0.925,
+    0.7451,
+    1.0
+   ],
+   "brightness": 96,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light19",
+   "pos_m": [
+    0.0005,
+    19.8098,
+    -5.5105
+   ],
+   "rgb": [
+    1.0,
+    0.877,
+    0.502
+   ],
+   "brightness": 80,
+   "radius_m": 38.1,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light20",
+   "pos_m": [
+    19.4672,
+    -0.0297,
+    -5.5105
+   ],
+   "rgb": [
+    1.0,
+    0.877,
+    0.502
+   ],
+   "brightness": 80,
+   "radius_m": 38.1,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light21",
+   "pos_m": [
+    -0.1374,
+    -19.307,
+    -5.5105
+   ],
+   "rgb": [
+    1.0,
+    0.877,
+    0.502
+   ],
+   "brightness": 80,
+   "radius_m": 38.1,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light22",
+   "pos_m": [
+    -19.4717,
+    0.0093,
+    -5.5105
+   ],
+   "rgb": [
+    1.0,
+    0.877,
+    0.502
+   ],
+   "brightness": 80,
+   "radius_m": 38.1,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light23",
+   "pos_m": [
+    32.0526,
+    31.9512,
+    -37.6587
+   ],
+   "rgb": [
+    0.3765,
+    0.5965,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light24",
+   "pos_m": [
+    32.2327,
+    -32.2358,
+    -37.6587
+   ],
+   "rgb": [
+    0.3765,
+    0.5965,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light25",
+   "pos_m": [
+    -32.1194,
+    -32.0613,
+    -37.6587
+   ],
+   "rgb": [
+    0.3765,
+    0.5965,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light26",
+   "pos_m": [
+    -32.075,
+    31.7375,
+    -37.6447
+   ],
+   "rgb": [
+    0.3765,
+    0.5965,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light27",
+   "pos_m": [
+    -29.2212,
+    -29.2342,
+    -37.319
+   ],
+   "rgb": [
+    0.502,
+    0.6777,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light37",
+   "pos_m": [
+    27.8224,
+    -28.121,
+    -37.319
+   ],
+   "rgb": [
+    0.502,
+    0.6777,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light38",
+   "pos_m": [
+    27.9804,
+    27.8013,
+    -37.319
+   ],
+   "rgb": [
+    0.502,
+    0.6777,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light39",
+   "pos_m": [
+    -27.703,
+    27.5838,
+    -37.319
+   ],
+   "rgb": [
+    0.502,
+    0.6777,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light41",
+   "pos_m": [
+    1.8265,
+    -1.8354,
+    -5.4642
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light42",
+   "pos_m": [
+    -1.8369,
+    -1.8281,
+    -5.4642
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light43",
+   "pos_m": [
+    -1.8421,
+    1.8247,
+    -5.4642
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light44",
+   "pos_m": [
+    1.8215,
+    1.8257,
+    -5.4642
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light45",
+   "pos_m": [
+    1.8158,
+    1.8287,
+    -12.0891
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light46",
+   "pos_m": [
+    1.822,
+    -1.829,
+    -12.0891
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light47",
+   "pos_m": [
+    -1.8358,
+    -1.8321,
+    -12.0891
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light48",
+   "pos_m": [
+    -1.845,
+    1.8319,
+    -12.0891
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light49",
+   "pos_m": [
+    18.4036,
+    -1.8228,
+    -5.4642
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light50",
+   "pos_m": [
+    18.3986,
+    1.8382,
+    -5.4642
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light51",
+   "pos_m": [
+    1.8256,
+    18.6229,
+    -5.4642
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None",
+   "rotation_deg": [
+    0.0,
+    -90.44,
+    0.0
+   ]
+  },
+  {
+   "class": "Light",
+   "name": "Light52",
+   "pos_m": [
+    -1.8353,
+    18.5899,
+    -5.4642
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None",
+   "rotation_deg": [
+    0.0,
+    -90.44,
+    0.0
+   ]
+  },
+  {
+   "class": "Light",
+   "name": "Light53",
+   "pos_m": [
+    -18.7322,
+    1.8137,
+    -5.4642
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None",
+   "rotation_deg": [
+    0.0,
+    -179.87,
+    0.0
+   ]
+  },
+  {
+   "class": "Light",
+   "name": "Light54",
+   "pos_m": [
+    -18.7357,
+    -1.8473,
+    -5.4642
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None",
+   "rotation_deg": [
+    0.0,
+    -179.87,
+    0.0
+   ]
+  },
+  {
+   "class": "Light",
+   "name": "Light55",
+   "pos_m": [
+    1.8178,
+    -18.5767,
+    -5.4642
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None",
+   "rotation_deg": [
+    0.0,
+    -89.87,
+    0.0
+   ]
+  },
+  {
+   "class": "Light",
+   "name": "Light56",
+   "pos_m": [
+    -1.8432,
+    -18.5733,
+    -5.4642
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None",
+   "rotation_deg": [
+    0.0,
+    -89.87,
+    0.0
+   ]
+  },
+  {
+   "class": "Light",
+   "name": "Light40",
+   "pos_m": [
+    -6.7384,
+    -0.3273,
+    10.4984
+   ],
+   "rgb": [
+    0.3765,
+    0.9927,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light57",
+   "pos_m": [
+    6.8062,
+    0.0346,
+    10.4984
+   ],
+   "rgb": [
+    0.3765,
+    0.9927,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light58",
+   "pos_m": [
+    4.936,
+    -4.9909,
+    17.7755
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.9121
+   ],
+   "brightness": 160,
+   "radius_m": 17.145,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light59",
+   "pos_m": [
+    -5.8049,
+    6.1878,
+    18.0613
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.9121
+   ],
+   "brightness": 160,
+   "radius_m": 17.145,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light60",
+   "pos_m": [
+    11.7782,
+    0.187,
+    3.1642
+   ],
+   "rgb": [
+    0.502,
+    0.9941,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 19.05,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light61",
+   "pos_m": [
+    -10.9865,
+    0.2061,
+    3.1642
+   ],
+   "rgb": [
+    0.502,
+    0.9941,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 19.05,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light62",
+   "pos_m": [
+    0.0323,
+    0.1164,
+    -6.5932
+   ],
+   "rgb": [
+    1.0,
+    0.251,
+    0.251
+   ],
+   "brightness": 128,
+   "radius_m": 22.86,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light63",
+   "pos_m": [
+    0.2611,
+    -0.3037,
+    15.1426
+   ],
+   "rgb": [
+    0.251,
+    0.9912,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 19.05,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light64",
+   "pos_m": [
+    0.5659,
+    -0.6085,
+    7.3512
+   ],
+   "rgb": [
+    0.251,
+    0.9912,
+    1.0
+   ],
+   "brightness": 190,
+   "radius_m": 19.05,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light65",
+   "pos_m": [
+    0.8707,
+    -0.9133,
+    0.1884
+   ],
+   "rgb": [
+    0.251,
+    0.9912,
+    1.0
+   ],
+   "brightness": 190,
+   "radius_m": 19.05,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light66",
+   "pos_m": [
+    -6.3822,
+    -6.3207,
+    17.7755
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.9121
+   ],
+   "brightness": 160,
+   "radius_m": 17.145,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light67",
+   "pos_m": [
+    6.3581,
+    6.549,
+    17.7755
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.9121
+   ],
+   "brightness": 160,
+   "radius_m": 17.145,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light68",
+   "pos_m": [
+    -9.0016,
+    8.9816,
+    10.9678
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.9121
+   ],
+   "brightness": 80,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light69",
+   "pos_m": [
+    9.0109,
+    9.0832,
+    10.9678
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.9121
+   ],
+   "brightness": 80,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light70",
+   "pos_m": [
+    8.9623,
+    -8.8763,
+    10.9678
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.9121
+   ],
+   "brightness": 80,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light71",
+   "pos_m": [
+    -8.9002,
+    -8.8807,
+    10.9678
+   ],
+   "rgb": [
+    0.502,
+    1.0,
+    0.9121
+   ],
+   "brightness": 80,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light72",
+   "pos_m": [
+    17.6305,
+    17.6386,
+    3.9002
+   ],
+   "rgb": [
+    1.0,
+    0.877,
+    0.502
+   ],
+   "brightness": 128,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light73",
+   "pos_m": [
+    -18.2908,
+    18.0493,
+    3.9002
+   ],
+   "rgb": [
+    1.0,
+    0.877,
+    0.502
+   ],
+   "brightness": 128,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light74",
+   "pos_m": [
+    -17.7475,
+    -17.5992,
+    3.9002
+   ],
+   "rgb": [
+    1.0,
+    0.877,
+    0.502
+   ],
+   "brightness": 128,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light75",
+   "pos_m": [
+    17.9726,
+    -18.0471,
+    3.9002
+   ],
+   "rgb": [
+    1.0,
+    0.877,
+    0.502
+   ],
+   "brightness": 128,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  }
+ ],
+ "ambient": [
+  {
+   "class": "ZoneInfo",
+   "rgb": [
+    0.5098,
+    0.5098,
+    1.0
+   ],
+   "brightness": 4,
+   "pos_m": [
+    -247.7565,
+    568.4405,
+    -48.679
+   ]
+  },
+  {
+   "class": "ZoneInfo",
+   "rgb": [
+    0.5098,
+    0.5098,
+    1.0
+   ],
+   "brightness": 4,
+   "pos_m": [
+    -245.3615,
+    566.0108,
+    -109.7207
+   ]
+  }
+ ]
+}

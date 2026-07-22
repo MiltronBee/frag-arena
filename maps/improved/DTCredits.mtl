@@ -1,0 +1,8 @@
+# materials for DTCredits
+
+newmtl credits_Base_blackground
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/credits_Base_blackground.png

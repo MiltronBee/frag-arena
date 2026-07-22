@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FragBench FINETUNE ROUNDTABLE — 5 ML experts, round robin, Gemini 3.5 Flash.
+FragBench FINETUNE ROUNDTABLE — 5 ML experts, round robin, Gemini 3.6 Flash.
 
 Same machinery as autogen-mode-roundtable.py (the SESSION 3 script that locked the
 Proof-of-Blood + FragBench design): Microsoft AutoGen RoundRobinGroupChat, one
@@ -27,8 +27,8 @@ from autogen_ext.models.openai import OpenAIChatCompletionClient
 from autogen_core.models import ModelInfo
 
 ENV_PATH = "/home/miltron/solSoccer/.env"
-MODEL = "gemini-3.5-flash"
-FALLBACKS = ["gemini-2.0-flash", "gemini-1.5-flash"]
+MODEL = "gemini-3.6-flash"
+FALLBACKS = ["gemini-3.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
 BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 TRANSCRIPT = Path.home() / "unreal" / "_work" / "fragbench" / "roundtable-fragbench.md"
 MAX_MESSAGES = 24

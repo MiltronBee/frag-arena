@@ -1,0 +1,6 @@
+# textures with no palette reference in their (v61) package;
+# exported as grayscale from the palette-index data
+Botpack_Ammocount_AmmoCountJunk
+UTMenu_Skins_DoorR
+UnrealI_Skins_AAsbSuit1
+UnrealShare_Belt_fx_ShieldBelt_newblue

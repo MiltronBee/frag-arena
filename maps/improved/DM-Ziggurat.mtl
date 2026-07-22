@@ -1,0 +1,183 @@
+# materials for DM-Ziggurat
+
+newmtl Ancient_Base_GRENMRBL
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_GRENMRBL.png
+
+newmtl Ancient_Floor_FLOOR1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Floor_FLOOR1.png
+
+newmtl Ancient_Trim_dth_tr
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Trim_dth_tr.png
+
+newmtl GenEarth_Rock_Wrcka1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Rock_Wrcka1.png
+
+newmtl JWSky_Sky_neb
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_Sky_neb.png
+
+newmtl JWSky_SkyCity_r_1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_SkyCity_r_1.png
+
+newmtl JWSky_SkyCity_r_10
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_SkyCity_r_10.png
+
+newmtl JWSky_SkyCity_r_11
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_SkyCity_r_11.png
+
+newmtl JWSky_SkyCity_r_2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_SkyCity_r_2.png
+
+newmtl JWSky_SkyCity_r_3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_SkyCity_r_3.png
+
+newmtl JWSky_SkyCity_r_4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_SkyCity_r_4.png
+
+newmtl JWSky_SkyCity_r_5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_SkyCity_r_5.png
+
+newmtl JWSky_SkyCity_r_6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_SkyCity_r_6.png
+
+newmtl JWSky_SkyCity_r_7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_SkyCity_r_7.png
+
+newmtl JWSky_SkyCity_r_8
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_SkyCity_r_8.png
+
+newmtl JWSky_SkyCity_r_9
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_SkyCity_r_9.png
+
+newmtl SKYBox_Effects_NCld
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_Effects_NCld.png
+
+newmtl SKYBox_Rpl
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_Rpl.png
+
+newmtl ShaneChurch_BrownFloor
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_BrownFloor.png
+
+newmtl ShaneChurch_BrownTrim2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_BrownTrim2.png
+
+newmtl ShaneChurch_BrownWall
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_BrownWall.png
+
+newmtl ShaneChurch_Bwood2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_Bwood2.png
+
+newmtl ShaneChurch_Celing2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_Celing2.png
+
+newmtl ShaneSky_moon-5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneSky_moon-5.png
+
+newmtl genfluid_Sky_Ntskyt
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Sky_Ntskyt.png
+
+newmtl genfluid_cloud1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_cloud1.png

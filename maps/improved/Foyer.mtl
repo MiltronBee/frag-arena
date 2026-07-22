@@ -1,0 +1,29 @@
+# materials for Foyer
+
+newmtl Logo_UTLogo1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Logo_UTLogo1.png
+
+newmtl Logo_UTLogo2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Logo_UTLogo2.png
+
+newmtl Logo_UTLogo3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Logo_UTLogo3.png
+
+newmtl credits_Base_blackground
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/credits_Base_blackground.png

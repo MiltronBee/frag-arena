@@ -154,9 +154,26 @@ if _cut_idx:
 arms_bones = set(b.name for b in arms_arm.data.bones)
 gun_bones = set(b.name for b in gun_arm.data.bones)
 
+def get_fcurves(act):
+    if not act:
+        return []
+    if hasattr(act, 'fcurves'):
+        return act.fcurves
+    fcurves = []
+    if hasattr(act, 'layers') and act.layers:
+        for layer in act.layers:
+            for strip in layer.strips:
+                if hasattr(act, 'slots'):
+                    for slot in act.slots:
+                        cb = strip.channelbag(slot)
+                        if cb:
+                            for fc in cb.fcurves:
+                                fcurves.append(fc)
+    return fcurves
+
 def targets_of(act):
     bones = set()
-    for fc in act.fcurves:
+    for fc in get_fcurves(act):
         m = re.match(r'pose\.bones\["([^"]+)"\]', fc.data_path)
         if m: bones.add(m.group(1))
     return bones
@@ -172,7 +189,7 @@ def pad_short(act):
     # duplicate the pose one frame later so every clip spans >= 2 frames. Idempotent.
     if act and act.frame_range[1] - act.frame_range[0] < 1.0:
         f = act.frame_range[0]
-        for fc in act.fcurves:
+        for fc in get_fcurves(act):
             if len(fc.keyframe_points):
                 fc.keyframe_points.insert(f + 1, fc.keyframe_points[0].co.y)
         print(f'   padded 1-frame clip: {act.name}')
@@ -217,22 +234,50 @@ if weapon_spec:
         collision (would mean the families are not disjoint)."""
         merged = bpy.data.actions.new(merged_name)
         seen = set()
-        for an in action_names:
-            src = A(an)
-            if not src:
-                print('   !! MISSING gun action %r for merge %s' % (an, merged_name)); continue
-            for fc in src.fcurves:
-                key = (fc.data_path, fc.array_index)
-                if key in seen:
-                    raise RuntimeError('gun action merge collision on %s[%d] (%s)'
-                                       % (fc.data_path, fc.array_index, merged_name))
-                seen.add(key)
-                nfc = merged.fcurves.new(fc.data_path, index=fc.array_index)
-                nfc.keyframe_points.add(len(fc.keyframe_points))
-                for i, kp in enumerate(fc.keyframe_points):
-                    nfc.keyframe_points[i].co = kp.co
-                    nfc.keyframe_points[i].interpolation = kp.interpolation
-            merged.frame_range  # touch so range recomputes
+        
+        # If modern Blender, assign merged action to gun_arm temporarily
+        orig_action = None
+        if not hasattr(merged, 'fcurves'):
+            if not gun_arm.animation_data:
+                gun_arm.animation_data_create()
+            orig_action = gun_arm.animation_data.action
+            gun_arm.animation_data.action = merged
+            
+        try:
+            for an in action_names:
+                src = A(an)
+                if not src:
+                    print('   !! MISSING gun action %r for merge %s' % (an, merged_name)); continue
+                
+                # Retrieve fcurves compatibly
+                fcurves = get_fcurves(src)
+                
+                for fc in fcurves:
+                    key = (fc.data_path, fc.array_index)
+                    if key in seen:
+                        raise RuntimeError('gun action merge collision on %s[%d] (%s)'
+                                           % (fc.data_path, fc.array_index, merged_name))
+                    seen.add(key)
+                    
+                    if hasattr(merged, 'fcurves'):
+                        nfc = merged.fcurves.new(fc.data_path, index=fc.array_index)
+                    else:
+                        # Blender 4.4+ / 5.x
+                        nfc = merged.fcurve_ensure_for_datablock(gun_arm, fc.data_path, index=fc.array_index)
+                    
+                    nfc.keyframe_points.add(len(fc.keyframe_points))
+                    for i, kp in enumerate(fc.keyframe_points):
+                        nfc.keyframe_points[i].co = kp.co
+                        nfc.keyframe_points[i].interpolation = kp.interpolation
+                
+                if hasattr(merged, 'frame_range'):
+                    merged.frame_range  # touch so range recomputes
+        finally:
+            # Restore original action if we modified it
+            if not hasattr(merged, 'fcurves'):
+                if gun_arm.animation_data:
+                    gun_arm.animation_data.action = orig_action
+                    
         return merged
 
     # collapse every multi-action gun clip to a single unioned action, in place

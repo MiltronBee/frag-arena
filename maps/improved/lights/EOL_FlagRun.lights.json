@@ -1,0 +1,156 @@
+{
+ "map": "EOL_FlagRun",
+ "space": "right-handed Z-up, meters",
+ "lights": [
+  {
+   "class": "Light",
+   "name": "Light10",
+   "pos_m": [
+    -0.0476,
+    10.5382,
+    4.5618
+   ],
+   "rgb": [
+    1.0,
+    0.8627,
+    0.6235
+   ],
+   "brightness": 141,
+   "radius_m": 19.526,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light11",
+   "pos_m": [
+    0.0579,
+    -4.2528,
+    1.7396
+   ],
+   "rgb": [
+    1.0,
+    0.6797,
+    0.302
+   ],
+   "brightness": 161,
+   "radius_m": 9.525,
+   "type": "Steady",
+   "effect": "None",
+   "rotation_deg": [
+    0.0,
+    -52.71,
+    0.0
+   ]
+  },
+  {
+   "class": "Light",
+   "name": "Light12",
+   "pos_m": [
+    -2.9931,
+    2.8575,
+    -1.1697
+   ],
+   "rgb": [
+    0.6647,
+    0.6392,
+    1.0
+   ],
+   "brightness": 60,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light15",
+   "pos_m": [
+    -2.9699,
+    -0.4679,
+    2.033
+   ],
+   "rgb": [
+    1.0,
+    0.9024,
+    0.4471
+   ],
+   "brightness": 94,
+   "radius_m": 10.954,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light16",
+   "pos_m": [
+    2.8276,
+    -0.5109,
+    2.033
+   ],
+   "rgb": [
+    1.0,
+    0.9002,
+    0.5961
+   ],
+   "brightness": 133,
+   "radius_m": 8.096,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light17",
+   "pos_m": [
+    0.0486,
+    2.8445,
+    -0.9174
+   ],
+   "rgb": [
+    0.4745,
+    0.524,
+    1.0
+   ],
+   "brightness": 93,
+   "radius_m": 6.191,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light71",
+   "pos_m": [
+    -0.2657,
+    -169.8404,
+    139.9249
+   ],
+   "rgb": [
+    0.8681,
+    0.8275,
+    1.0
+   ],
+   "brightness": 115,
+   "radius_m": 87.154,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light72",
+   "pos_m": [
+    -0.2069,
+    -170.576,
+    142.8773
+   ],
+   "rgb": [
+    0.8,
+    1.0,
+    0.9694
+   ],
+   "brightness": 255,
+   "radius_m": 3.81,
+   "type": "Steady",
+   "effect": "None"
+  }
+ ],
+ "ambient": []
+}

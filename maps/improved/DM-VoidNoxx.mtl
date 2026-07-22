@@ -1,0 +1,197 @@
+# materials for DM-VoidNoxx
+
+newmtl FractalFX_DaveJump
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/FractalFX_DaveJump.png
+
+newmtl FractalFX_jptrim2A_00
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/FractalFX_jptrim2A_00.png
+
+newmtl GenFX_LensFlar_5
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_5.png
+
+newmtl GenFX_LensFlar_flare4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_flare4.png
+
+newmtl GenFX_LensFlar_flare7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_flare7.png
+
+newmtl GenFX_LensFlar_haze2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_haze2.png
+
+newmtl GenFX_LensFlar_new2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFX_LensFlar_new2.png
+
+newmtl GenFluid_Sky_NghSky3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenFluid_Sky_NghSky3.png
+
+newmtl JWSky_Sky_HAZE
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/JWSky_Sky_HAZE.png
+
+newmtl ShaneChurch_SMoon
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneChurch_SMoon.png
+
+newmtl SpaceFX_newneb1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SpaceFX_newneb1.png
+
+newmtl XFX_lightVision
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/XFX_lightVision.png
+
+newmtl XbpFX_Nebula1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/XbpFX_Nebula1.png
+
+newmtl XbpFX_Nebula2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/XbpFX_Nebula2.png
+
+newmtl XbpFX_inxspc1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/XbpFX_inxspc1.png
+
+newmtl XbpFX_inxspc2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/XbpFX_inxspc2.png
+
+newmtl XbpFX_inxspc3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/XbpFX_inxspc3.png
+
+newmtl XbpFX_inxspc4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/XbpFX_inxspc4.png
+
+newmtl uttech2_Base_rClfBsG2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/uttech2_Base_rClfBsG2.png
+
+newmtl uttech2_Ceiling_rClfClg3x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/uttech2_Ceiling_rClfClg3x.png
+
+newmtl uttech2_Deco_rClfBox1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/uttech2_Deco_rClfBox1.png
+
+newmtl uttech2_Floor_rClfFlr6x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/uttech2_Floor_rClfFlr6x.png
+
+newmtl uttech2_Light_rClfLit1xy
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/uttech2_Light_rClfLit1xy.png
+
+newmtl uttech2_Pillar_rClfLT4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/uttech2_Pillar_rClfLT4.png
+
+newmtl uttech2_Pillar_rClfPlr4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/uttech2_Pillar_rClfPlr4.png
+
+newmtl uttech2_Wall_rClfWl1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/uttech2_Wall_rClfWl1.png
+
+newmtl uttech2_Wall_rClfWl3x
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/uttech2_Wall_rClfWl3x.png
+
+newmtl uttech2_Wall_rClfWl7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/uttech2_Wall_rClfWl7.png

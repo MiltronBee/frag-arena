@@ -1,0 +1,513 @@
+# materials for DOM-Derelict
+
+newmtl DecayedS_Mask_dmesh4m
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Mask_dmesh4m.png
+
+newmtl HubEffects_SmallFireH3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+Ke 1.000 0.450 0.100
+map_Kd textures_hd/HubEffects_SmallFireH3.png
+
+newmtl Scripted_CondemnedScroll
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Scripted_CondemnedScroll.png
+
+newmtl Skybox_Effects_NCld
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skybox_Effects_NCld.png
+
+newmtl Slums_Concrete_Conc18
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Concrete_Conc18.png
+
+newmtl Slums_Concrete_Conc19
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Concrete_Conc19.png
+
+newmtl Slums_Concrete_Conc22
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Concrete_Conc22.png
+
+newmtl Slums_Concrete_Conc23
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Concrete_Conc23.png
+
+newmtl Slums_Concrete_Conc26
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Concrete_Conc26.png
+
+newmtl Slums_Concrete_Conc27
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Concrete_Conc27.png
+
+newmtl Slums_Concrete_Conc28
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Concrete_Conc28.png
+
+newmtl Slums_Concrete_Conc39
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Concrete_Conc39.png
+
+newmtl Slums_Concrete_Conc41
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Concrete_Conc41.png
+
+newmtl Slums_Concrete_conc23a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Concrete_conc23a.png
+
+newmtl Slums_Graffiti_Face3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Graffiti_Face3.png
+
+newmtl Slums_Graffiti_Free1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Graffiti_Free1a.png
+
+newmtl Slums_Graffiti_Free1b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Graffiti_Free1b.png
+
+newmtl Slums_Graffiti_Gen01b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Graffiti_Gen01b.png
+
+newmtl Slums_Grates_Grate07
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Grates_Grate07.png
+
+newmtl Slums_Harbour_Garbage1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Harbour_Garbage1.png
+
+newmtl Slums_Harbour_Garbh1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Harbour_Garbh1.png
+
+newmtl Slums_Harbour_Gdoor01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Harbour_Gdoor01.png
+
+newmtl Slums_Lights_Light2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Lights_Light2.png
+
+newmtl Slums_Lights_Light6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Lights_Light6.png
+
+newmtl Slums_Lights_Light8
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Lights_Light8.png
+
+newmtl Slums_Miscellaneous_Door02
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Miscellaneous_Door02.png
+
+newmtl Slums_Miscellaneous_Door03
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Miscellaneous_Door03.png
+
+newmtl Slums_Miscellaneous_Gravel1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Miscellaneous_Gravel1.png
+
+newmtl Slums_Miscellaneous_Pavmtcr2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Miscellaneous_Pavmtcr2.png
+
+newmtl Slums_Miscellaneous_Window06
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Miscellaneous_Window06.png
+
+newmtl Slums_Miscellaneous_Window09
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Miscellaneous_Window09.png
+
+newmtl Slums_Signs_Arturo~1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Signs_Arturo~1.png
+
+newmtl Slums_Signs_Bdoor01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Signs_Bdoor01.png
+
+newmtl Slums_Signs_Bkroon01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Signs_Bkroon01.png
+
+newmtl Slums_Signs_Bnews01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Signs_Bnews01.png
+
+newmtl Slums_Signs_Ethels01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Signs_Ethels01.png
+
+newmtl Slums_Signs_Ethels02
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Signs_Ethels02.png
+
+newmtl Slums_Signs_Movie01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Signs_Movie01.png
+
+newmtl Slums_Signs_Movie02
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Signs_Movie02.png
+
+newmtl Slums_Stone_StoneP15
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_Stone_StoneP15.png
+
+newmtl Slums_brick_Brick05
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_brick_Brick05.png
+
+newmtl Slums_brick_Brick06
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_brick_Brick06.png
+
+newmtl Slums_brick_Brick08
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_brick_Brick08.png
+
+newmtl Slums_brick_Brickw01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_brick_Brickw01.png
+
+newmtl Slums_brick_Brickw02
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_brick_Brickw02.png
+
+newmtl Slums_brick_LitWinC1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_brick_LitWinC1.png
+
+newmtl Slums_brick_LitWinC2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_brick_LitWinC2.png
+
+newmtl Slums_metal_Metal08
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_metal_Metal08.png
+
+newmtl Slums_metal_Metal10
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_metal_Metal10.png
+
+newmtl Slums_metal_Metalr02
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_metal_Metalr02.png
+
+newmtl Slums_metal_Metalr06
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_metal_Metalr06.png
+
+newmtl Slums_metal_Metalr08
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_metal_Metalr08.png
+
+newmtl Slums_metal_Metalr09
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Slums_metal_Metalr09.png
+
+newmtl TrenchesFX_Conc29
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/TrenchesFX_Conc29.png
+
+newmtl TrenchesFX_Conc30
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/TrenchesFX_Conc30.png
+
+newmtl TrenchesFX_Grate10
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/TrenchesFX_Grate10.png
+
+newmtl TrenchesFX_Light1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/TrenchesFX_Light1.png
+
+newmtl TrenchesFX_Metalr05
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/TrenchesFX_Metalr05.png
+
+newmtl UT_WOODf
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_WOODf.png
+
+newmtl UT_Woodf2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_Woodf2.png
+
+newmtl UT_Woodf3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_Woodf3.png
+
+newmtl UT_metalb1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_metalb1.png
+
+newmtl UTtech1_Wall_ClifCon7
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Wall_ClifCon7.png
+
+newmtl _untextured
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/_untextured.png
+
+newmtl city_Arena2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/city_Arena2.png
+
+newmtl city_Dangass
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/city_Dangass.png
+
+newmtl city_Lite1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/city_Lite1.png
+
+newmtl city_Red-lit2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/city_Red-lit2.png
+
+newmtl city_SkylineA1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/city_SkylineA1.png
+
+newmtl city_Win-blue2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/city_Win-blue2.png
+
+newmtl city_Win-gray
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/city_Win-gray.png
+
+newmtl city_Win-gren
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/city_Win-gren.png
+
+newmtl genfluid_cloud1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_cloud1a.png

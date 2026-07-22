@@ -1,0 +1,204 @@
+# materials for CTF-Crucible
+
+newmtl CTF_Crypt_C-st-128-B
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/CTF_Crypt_C-st-128-B.png
+
+newmtl CTF_Crypt_C-st-128-R
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/CTF_Crypt_C-st-128-R.png
+
+newmtl Crypt2_Base_Cston18b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Crypt2_Base_Cston18b.png
+
+newmtl Crypt2_Base_Rusteel1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Crypt2_Base_Rusteel1.png
+
+newmtl Crypt2_Deco_Cpanel1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Crypt2_Deco_Cpanel1.png
+
+newmtl DDayFX_NaziFlag
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DDayFX_NaziFlag.png
+
+newmtl Indus6_Woods_DeckRf1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_DeckRf1.png
+
+newmtl ShaneSky_STARS
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneSky_STARS.png
+
+newmtl SkyCity_Base_sDavW27b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SkyCity_Base_sDavW27b.png
+
+newmtl TrenchesFX_NflagB
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/TrenchesFX_NflagB.png
+
+newmtl UT_cementf1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_cementf1.png
+
+newmtl UT_metalf3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_metalf3.png
+
+newmtl UT_metals2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_metals2.png
+
+newmtl UT_morter1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UT_morter1.png
+
+newmtl UTtech1_Floor_floor3b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Floor_floor3b.png
+
+newmtl _untextured
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/_untextured.png
+
+newmtl genfluid_Sky_SkytstA
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Sky_SkytstA.png
+
+newmtl shaneDAY_Dbottm
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/shaneDAY_Dbottm.png
+
+newmtl utcrypt_Base_cmbnastywal2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Base_cmbnastywal2.png
+
+newmtl utcrypt_Base_nucryptmetl1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Base_nucryptmetl1.png
+
+newmtl utcrypt_Deco_indi4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Deco_indi4.png
+
+newmtl utcrypt_Floor_rClfFlr12
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Floor_rClfFlr12.png
+
+newmtl utcrypt_Light_bluxlamp13
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Light_bluxlamp13.png
+
+newmtl utcrypt_Light_lanternl2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Light_lanternl2.png
+
+newmtl utcrypt_Light_lanternsq2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Light_lanternsq2.png
+
+newmtl utcrypt_Light_redxlamp13
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Light_redxlamp13.png
+
+newmtl utcrypt_Wall_distex4A
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Wall_distex4A.png
+
+newmtl utcrypt_Wall_ut-toc-brick2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Wall_ut-toc-brick2.png
+
+newmtl utcrypt_pillar_nuwood
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_pillar_nuwood.png

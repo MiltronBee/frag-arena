@@ -1,0 +1,176 @@
+# materials for DM-Cipher
+
+newmtl Ancient_Base_STONTSTC
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Ancient_Base_STONTSTC.png
+
+newmtl Indus6_Woods_DeckRf1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Indus6_Woods_DeckRf1.png
+
+newmtl NaliCast_Base_metal4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Base_metal4.png
+
+newmtl NaliCast_Trim_ttrm2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/NaliCast_Trim_ttrm2.png
+
+newmtl SKYBox_2nd_Lnd2_1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_2nd_Lnd2_1.png
+
+newmtl SKYBox_2nd_Lnd2_1b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_2nd_Lnd2_1b.png
+
+newmtl SKYBox_2nd_Lnd2_2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_2nd_Lnd2_2.png
+
+newmtl SKYBox_2nd_Lnd2_3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_2nd_Lnd2_3.png
+
+newmtl SKYBox_2nd_Lnd2_4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_2nd_Lnd2_4.png
+
+newmtl SKYBox_grd
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SKYBox_grd.png
+
+newmtl ShaneSky_STARS
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneSky_STARS.png
+
+newmtl UTtech1_Floor_floor3b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Floor_floor3b.png
+
+newmtl UTtech1_Misc_UTdirt1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Misc_UTdirt1.png
+
+newmtl genfluid_Sky_SkytstA
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Sky_SkytstA.png
+
+newmtl shaneDAY_Dbottm
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/shaneDAY_Dbottm.png
+
+newmtl utcrypt_Arch_Utgreydoor
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Arch_Utgreydoor.png
+
+newmtl utcrypt_Base_nucryptmetl1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Base_nucryptmetl1.png
+
+newmtl utcrypt_Base_rClfFlr0base
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Base_rClfFlr0base.png
+
+newmtl utcrypt_Floor_rClfFlr0
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Floor_rClfFlr0.png
+
+newmtl utcrypt_Light_bluxlamp13
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Light_bluxlamp13.png
+
+newmtl utcrypt_Light_lanternl2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Light_lanternl2.png
+
+newmtl utcrypt_Light_lanternsq2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Light_lanternsq2.png
+
+newmtl utcrypt_Wall_utAlanWal2b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_Wall_utAlanWal2b.png
+
+newmtl utcrypt_pillar_nuwood
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/utcrypt_pillar_nuwood.png
+
+newmtl uttech2_Deco_xmetex2x1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/uttech2_Deco_xmetex2x1.png

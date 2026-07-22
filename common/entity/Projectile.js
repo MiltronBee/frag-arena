@@ -3,6 +3,10 @@ import { Engine, MeshBuilder, StandardMaterial, Color3, Vector3 } from '../babyl
 
 class Projectile {
 	constructor(startX = 0, startY = 0, startZ = 0) {
+		this._x = startX
+		this._y = startY
+		this._z = startZ
+
 		// Only create mesh in the scene if there is a LastCreatedScene available
 		const scene = Engine.LastCreatedScene
 		if (scene) {
@@ -68,20 +72,30 @@ class Projectile {
 		this.slowDuration = 0
 	}
 
-	get x() { return this.mesh.position.x }
-	set x(value) { this.mesh.position.x = value }
+	get x() { return this._x }
+	set x(value) {
+		this._x = value
+		if (this.mesh) this.mesh.position.x = value
+	}
 
-	get y() { return this.mesh.position.y }
-	set y(value) { this.mesh.position.y = value }
+	get y() { return this._y }
+	set y(value) {
+		this._y = value
+		if (this.mesh) this.mesh.position.y = value
+	}
 
-	get z() { return this.mesh.position.z }
-	set z(value) { this.mesh.position.z = value }
+	get z() { return this._z }
+	set z(value) {
+		this._z = value
+		if (this.mesh) this.mesh.position.z = value
+	}
 }
 
 Projectile.protocol = {
 	x: { type: nengi.Float32, interp: true },
 	y: { type: nengi.Float32, interp: true },
-	z: { type: nengi.Float32, interp: true }
+	z: { type: nengi.Float32, interp: true },
+	ownerNid: nengi.UInt16
 }
 
 export default Projectile

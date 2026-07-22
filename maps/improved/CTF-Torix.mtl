@@ -1,0 +1,610 @@
+# materials for CTF-Torix
+
+newmtl CTF_PlayrShp_AJW_Wal1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/CTF_PlayrShp_AJW_Wal1.png
+
+newmtl CTF_PlayrShp_AJW_Wal2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/CTF_PlayrShp_AJW_Wal2.png
+
+newmtl CTF_PlayrShp_Pnl1_blue
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/CTF_PlayrShp_Pnl1_blue.png
+
+newmtl CTF_PlayrShp_pnl2_red
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/CTF_PlayrShp_pnl2_red.png
+
+newmtl Coret_FX_Base_A_Base1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Base_A_Base1.png
+
+newmtl Coret_FX_Base_Br_base1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Base_Br_base1.png
+
+newmtl Coret_FX_Floor_A_Flr-Cor1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Floor_A_Flr-Cor1.png
+
+newmtl Coret_FX_Floor_A_Flr-Cor1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Floor_A_Flr-Cor1a.png
+
+newmtl Coret_FX_Floor_A_Flr-Cor2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Floor_A_Flr-Cor2.png
+
+newmtl Coret_FX_Floor_A_Flr-Cor3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Floor_A_Flr-Cor3.png
+
+newmtl Coret_FX_Floor_A_Flr-Cor3b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Floor_A_Flr-Cor3b.png
+
+newmtl Coret_FX_Floor_A_Flr-Cor6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Floor_A_Flr-Cor6.png
+
+newmtl Coret_FX_Glass_SpecGlas
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Glass_SpecGlas.png
+
+newmtl Coret_FX_Glass_SpecGlas2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Glass_SpecGlas2.png
+
+newmtl Coret_FX_Lights_A_Vlight1_a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Lights_A_Vlight1_a.png
+
+newmtl Coret_FX_Lights_light_broke2_re
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Lights_light_broke2_re.png
+
+newmtl Coret_FX_Lights_light_redpcx
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Lights_light_redpcx.png
+
+newmtl Coret_FX_Panels_A_Screen1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Panels_A_Screen1.png
+
+newmtl Coret_FX_Walls_APanel1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_APanel1.png
+
+newmtl Coret_FX_Walls_APanel2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_APanel2.png
+
+newmtl Coret_FX_Walls_APanel_a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_APanel_a.png
+
+newmtl Coret_FX_Walls_APanel_b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_APanel_b.png
+
+newmtl Coret_FX_Walls_A_Wal1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_A_Wal1.png
+
+newmtl Coret_FX_Walls_A_Wal1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_A_Wal1a.png
+
+newmtl Coret_FX_Walls_A_Wal1b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_A_Wal1b.png
+
+newmtl Coret_FX_Walls_A_Wal1d
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_A_Wal1d.png
+
+newmtl Coret_FX_Walls_A_Wal1f
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_A_Wal1f.png
+
+newmtl Coret_FX_Walls_A_Wal2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_A_Wal2.png
+
+newmtl Coret_FX_Walls_A_Wal2a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_A_Wal2a.png
+
+newmtl Coret_FX_Walls_A_Wal2b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_A_Wal2b.png
+
+newmtl Coret_FX_Walls_A_Wal2crk
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_A_Wal2crk.png
+
+newmtl Coret_FX_Walls_A_Wal2d
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_A_Wal2d.png
+
+newmtl Coret_FX_Walls_A_Wal2e
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_A_Wal2e.png
+
+newmtl Coret_FX_Walls_A_Wal2f
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_A_Wal2f.png
+
+newmtl Coret_FX_Walls_wall_red
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_Walls_wall_red.png
+
+newmtl Coret_FX_pillar_A_Pilr-Cor1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_pillar_A_Pilr-Cor1.png
+
+newmtl Coret_FX_pillar_A_Pilr-Cor1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Coret_FX_pillar_A_Pilr-Cor1a.png
+
+newmtl DecayedS_Mask_dmesh3m
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/DecayedS_Mask_dmesh3m.png
+
+newmtl FractalFX_jptrim2A_01
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/FractalFX_jptrim2A_01.png
+
+newmtl FractalFX_jptrimA_00
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/FractalFX_jptrimA_00.png
+
+newmtl PlayrShp_Base_Blakm31d
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_Blakm31d.png
+
+newmtl PlayrShp_Base_Blakm_31
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_Blakm_31.png
+
+newmtl PlayrShp_Base_Blakm_d
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_Blakm_d.png
+
+newmtl PlayrShp_Base_Blakmetl
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_Blakmetl.png
+
+newmtl PlayrShp_Base_DANGER
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_DANGER.png
+
+newmtl PlayrShp_Base_VBlack
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_VBlack.png
+
+newmtl PlayrShp_Base_vbase1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Base_vbase1.png
+
+newmtl PlayrShp_Ceiling_Hullwk2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Ceiling_Hullwk2.png
+
+newmtl PlayrShp_Deco_Locker1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_Locker1.png
+
+newmtl PlayrShp_Deco_Locker1b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_Locker1b.png
+
+newmtl PlayrShp_Deco_PANELS1B
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_PANELS1B.png
+
+newmtl PlayrShp_Deco_Slotted1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_Slotted1.png
+
+newmtl PlayrShp_Deco_Slotted2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_Slotted2.png
+
+newmtl PlayrShp_Deco_Slotted3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_Slotted3.png
+
+newmtl PlayrShp_Deco_VVent
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_VVent.png
+
+newmtl PlayrShp_Deco_Ventwk
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_Ventwk.png
+
+newmtl PlayrShp_Deco_pblood2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_pblood2.png
+
+newmtl PlayrShp_Deco_pblood3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_pblood3.png
+
+newmtl PlayrShp_Deco_vHullD1a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Deco_vHullD1a.png
+
+newmtl PlayrShp_Floor_Flrwka
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Floor_Flrwka.png
+
+newmtl PlayrShp_Floor_Warn
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Floor_Warn.png
+
+newmtl PlayrShp_Light_Clngwk1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Light_Clngwk1.png
+
+newmtl PlayrShp_Light_LIGHTX
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Light_LIGHTX.png
+
+newmtl PlayrShp_Light_LITEPNL1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Light_LITEPNL1.png
+
+newmtl PlayrShp_Light_VLight1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Light_VLight1.png
+
+newmtl PlayrShp_Light_lights9a
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Light_lights9a.png
+
+newmtl PlayrShp_Panel_AREA_A
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Panel_AREA_A.png
+
+newmtl PlayrShp_Panel_Area_c
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Panel_Area_c.png
+
+newmtl PlayrShp_Panel_Vscreen1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Panel_Vscreen1.png
+
+newmtl PlayrShp_Trim_Girder2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Trim_Girder2.png
+
+newmtl PlayrShp_Trim_Girdrwk2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Trim_Girdrwk2.png
+
+newmtl PlayrShp_Trim_Sockets1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Trim_Sockets1.png
+
+newmtl PlayrShp_Trim_VTrim2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Trim_VTrim2.png
+
+newmtl PlayrShp_Wall_HULLRIB2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_HULLRIB2.png
+
+newmtl PlayrShp_Wall_PANEL6B
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_PANEL6B.png
+
+newmtl PlayrShp_Wall_PNL1_30
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_PNL1_30.png
+
+newmtl PlayrShp_Wall_Panel6c
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_Panel6c.png
+
+newmtl PlayrShp_Wall_Ribbed2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_Wall_Ribbed2.png
+
+newmtl PlayrShp_door_VDoor
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_door_VDoor.png
+
+newmtl PlayrShp_pillar_Conduit1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_pillar_Conduit1.png
+
+newmtl PlayrShp_pillar_Conduit3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_pillar_Conduit3.png
+
+newmtl PlayrShp_pillar_Girdrwk3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/PlayrShp_pillar_Girdrwk3.png
+
+newmtl ShaneSky_FLARE9
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneSky_FLARE9.png
+
+newmtl ShaneSky_STARS
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/ShaneSky_STARS.png
+
+newmtl Skybox_Effects_nebula
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skybox_Effects_nebula.png
+
+newmtl Skybox_Rpl
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skybox_Rpl.png
+
+newmtl genfluid_Sky_gmist3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/genfluid_Sky_gmist3.png

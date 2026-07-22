@@ -1,0 +1,85 @@
+# representative static frames baked from procedural texture parameters
+ChizraEFX_wfall2	WetTexture	source + ripple
+DDayFX_shore20	WetTexture	source + ripple
+DDayFX_waterDD!	WetTexture	source + ripple
+FireEng_SFX_JWSFX1	FireTexture	fire CA rebake
+GreatFire2_slipgoop	WetTexture	source + ripple
+GreatFire_ancflame2	FireTexture	fire CA rebake
+GreatFire_ancpurp	FireTexture	fire CA rebake
+GreatFire_ancsconc	FireTexture	fire CA rebake
+GreatFire_anctoast	FireTexture	fire CA rebake
+HubEffects_Goop3	WetTexture	source + ripple
+HubEffects_LavaX2	WetTexture	source + ripple
+HubEffects_Pond1	WetTexture	source + ripple
+HubEffects_SmallFireH2	FireTexture	fire CA rebake
+HubEffects_SmallFireH3	FireTexture	fire CA rebake
+HubEffects_WaterFall2	FireTexture	fire CA rebake
+HubEffects_WaterRings	WetTexture	source + ripple
+HubEffects_WaterRings2	WaveTexture	source + ripple
+HubEffects_lIGHTING3	FireTexture	fire CA rebake
+ISVFX_Energy2	WetTexture	source + ripple
+ISVFX_energy3	FireTexture	fire CA rebake
+ISVFX_energy4	FireTexture	fire CA rebake
+Indus4_BlueFire	FireTexture	fire CA rebake
+Indus4_EngineEx	FireTexture	fire CA rebake
+Indus4_RedFire	FireTexture	fire CA rebake
+Indus6_WetStuff_WetBeams1	WetTexture	source + ripple
+Indus7_Monitor1	ScriptedTexture	flat placeholder
+Indus7_Monitor2	ScriptedTexture	flat placeholder
+Indus7_Monitor3	ScriptedTexture	flat placeholder
+Indus7_Monitor4	ScriptedTexture	flat placeholder
+Indus7_Monitor5	ScriptedTexture	flat placeholder
+Indus7_Monitor6	ScriptedTexture	flat placeholder
+Indus7_Monitor7	ScriptedTexture	flat placeholder
+Indus7_Monitor8	ScriptedTexture	flat placeholder
+LavaFX_lava7	WetTexture	source + ripple
+Lian-X_Lavas_Lava_AW	WetTexture	source + ripple
+Liquids_liquid1	WetTexture	source + ripple
+Liquids_liquid11	WetTexture	source + ripple
+Liquids_liquid2	WetTexture	source + ripple
+Liquids_liquid4	WetTexture	source + ripple
+Liquids_liquid5	WetTexture	source + ripple
+Liquids_liquid6	WetTexture	source + ripple
+Liquids_liquid7	WetTexture	source + ripple
+Liquids_liquid9	WetTexture	source + ripple
+NaliFX_fireplace	FireTexture	fire CA rebake
+NaliFX_swater6	WetTexture	source + ripple
+NaliFX_warer3	WetTexture	source + ripple
+NivenFX_Deco_Burnup1	FireTexture	fire CA rebake
+NivenFX_Redburn	FireTexture	fire CA rebake
+NivenFX_det_Water	WetTexture	source + ripple
+Old_FX_Effects_Pad_FX	FireTexture	fire CA rebake
+RainFX_Hfluid2	WetTexture	source + ripple
+RainFX_Swater4a	WetTexture	source + ripple
+RainFX_wetglass	WetTexture	source + ripple
+RainFX_wetwall1	WetTexture	source + ripple
+Scripted_CondemnedScroll	ScriptedTexture	flat placeholder
+Scripted_MessageScroll2	ScriptedTexture	flat placeholder
+Scripted_MessageScroll3	ScriptedTexture	flat placeholder
+SpaceFX_spac-l1	FireTexture	fire CA rebake
+SpaceFX_space-l2	FireTexture	fire CA rebake
+SpaceFX_worm3b	WetTexture	source + ripple
+SpaceFX_worm3c	WetTexture	source + ripple
+SpaceFX_worm3e	WetTexture	source + ripple
+SpaceFX_worm3f	WetTexture	source + ripple
+SpaceFX_worm3g	WetTexture	source + ripple
+SpaceFX_wormhole	WetTexture	source + ripple
+UTtech1_Misc_Snow_1	FireTexture	fire CA rebake
+UTtech1_Misc_donfire	FireTexture	fire CA rebake
+UnrealI_Effect13_fireeffect13	FireTexture	fire CA rebake
+XFX_lightVision	IceTexture	source + ripple
+XFX_mandarin	FireTexture	fire CA rebake
+XFX_xeolighting	FireTexture	fire CA rebake
+XbpFX_blueplasma	IceTexture	source + ripple
+chizraefx_lightning6	FireTexture	fire CA rebake
+hubeffects_Goop3	WetTexture	source + ripple
+hubeffects_LavaBEF	WetTexture	source + ripple
+hubeffects_LavaX2	WetTexture	source + ripple
+hubeffects_Pond1	WetTexture	source + ripple
+hubeffects_WaterFall2	FireTexture	fire CA rebake
+hubeffects_WaterRings	WetTexture	source + ripple
+liquids_liquid4	WetTexture	source + ripple
+liquids_liquid6	WetTexture	source + ripple
+liquids_liquid9	WetTexture	source + ripple
+xfx_mandarin	FireTexture	fire CA rebake
+xfx_xbeg_xfx1	FireTexture	fire CA rebake

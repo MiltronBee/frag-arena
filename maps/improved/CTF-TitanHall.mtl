@@ -1,0 +1,162 @@
+# materials for CTF-TitanHall
+
+newmtl GenEarth_Ground_Dirt_sw2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/GenEarth_Ground_Dirt_sw2.png
+
+newmtl Skaarj_Base_Bs_1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Base_Bs_1.png
+
+newmtl Skaarj_Deco_Aa_cl
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Deco_Aa_cl.png
+
+newmtl Skaarj_Deco_E_eng4f
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Deco_E_eng4f.png
+
+newmtl Skaarj_Deco_E_mech
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Deco_E_mech.png
+
+newmtl Skaarj_Deco_E_mech2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Deco_E_mech2.png
+
+newmtl Skaarj_Deco_E_mech3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Deco_E_mech3.png
+
+newmtl Skaarj_Floor_Ebfloor3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Floor_Ebfloor3.png
+
+newmtl Skaarj_Floor_Ebfloor4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Floor_Ebfloor4.png
+
+newmtl Skaarj_Floor_Tpth
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Floor_Tpth.png
+
+newmtl Skaarj_Floor_Xipth
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Floor_Xipth.png
+
+newmtl Skaarj_Light_Elight5b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Light_Elight5b.png
+
+newmtl Skaarj_Light_Elight6
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Light_Elight6.png
+
+newmtl Skaarj_Mask_E_eng4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Mask_E_eng4.png
+
+newmtl Skaarj_Trim_Evwl_3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Trim_Evwl_3.png
+
+newmtl Skaarj_Trim_Evwl_4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Trim_Evwl_4.png
+
+newmtl Skaarj_Wall_E_twl
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Wall_E_twl.png
+
+newmtl Skaarj_Wall_Epips4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Wall_Epips4.png
+
+newmtl Skaarj_Wall_Epipsb
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Wall_Epipsb.png
+
+newmtl Skaarj_Wall_Epse
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_Wall_Epse.png
+
+newmtl Skaarj_pillar_Ebeam_3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/Skaarj_pillar_Ebeam_3.png
+
+newmtl SpaceFX_wormhole
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/SpaceFX_wormhole.png
+
+newmtl UTtech1_Misc_UTdirt1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures_hd/UTtech1_Misc_UTdirt1.png

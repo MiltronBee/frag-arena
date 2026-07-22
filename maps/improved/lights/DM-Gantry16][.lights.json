@@ -1,0 +1,4195 @@
+{
+ "map": "DM-Gantry16][",
+ "space": "right-handed Z-up, meters",
+ "lights": [
+  {
+   "class": "Light",
+   "name": "Light0",
+   "pos_m": [
+    6.1366,
+    16.6144,
+    1.7089
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light1",
+   "pos_m": [
+    39.1559,
+    -24.2331,
+    -6.2266
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light2",
+   "pos_m": [
+    38.9928,
+    -28.8985,
+    -6.2266
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light3",
+   "pos_m": [
+    44.1258,
+    -24.331,
+    -6.2266
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light4",
+   "pos_m": [
+    43.9628,
+    -28.9964,
+    -6.2266
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light5",
+   "pos_m": [
+    41.2755,
+    -19.3208,
+    -5.9473
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light6",
+   "pos_m": [
+    41.2152,
+    -14.6519,
+    -5.9473
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light7",
+   "pos_m": [
+    41.2908,
+    -9.2775,
+    -5.9473
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light8",
+   "pos_m": [
+    41.2304,
+    -4.6086,
+    -5.9473
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light9",
+   "pos_m": [
+    41.49,
+    5.1377,
+    -5.9473
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light10",
+   "pos_m": [
+    41.4296,
+    9.8065,
+    -5.9473
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light11",
+   "pos_m": [
+    41.5052,
+    15.1809,
+    -5.9473
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Flicker",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light12",
+   "pos_m": [
+    41.4449,
+    19.8498,
+    -5.9473
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light13",
+   "pos_m": [
+    44.1229,
+    0.0603,
+    -5.9473
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light14",
+   "pos_m": [
+    38.9915,
+    0.0835,
+    -5.9473
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light15",
+   "pos_m": [
+    33.9791,
+    0.021,
+    -5.9473
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light16",
+   "pos_m": [
+    28.8477,
+    0.0442,
+    -5.9473
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light18",
+   "pos_m": [
+    6.1372,
+    12.3025,
+    1.7089
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light19",
+   "pos_m": [
+    6.0994,
+    7.0655,
+    1.7089
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light20",
+   "pos_m": [
+    6.0999,
+    2.7536,
+    1.7089
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light25",
+   "pos_m": [
+    6.0263,
+    -2.9814,
+    1.7089
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light26",
+   "pos_m": [
+    6.0269,
+    -7.2933,
+    1.7089
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light27",
+   "pos_m": [
+    5.9891,
+    -12.6257,
+    1.7089
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light28",
+   "pos_m": [
+    5.9896,
+    -16.9376,
+    1.7089
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light29",
+   "pos_m": [
+    17.1224,
+    17.9544,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light30",
+   "pos_m": [
+    17.1229,
+    13.6903,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light31",
+   "pos_m": [
+    17.0851,
+    8.3578,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light32",
+   "pos_m": [
+    17.0379,
+    4.0459,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light33",
+   "pos_m": [
+    16.9643,
+    -1.7368,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light34",
+   "pos_m": [
+    16.9649,
+    -6.0487,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light35",
+   "pos_m": [
+    16.9271,
+    -11.3811,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light36",
+   "pos_m": [
+    16.9276,
+    -15.693,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light37",
+   "pos_m": [
+    27.3508,
+    16.8771,
+    1.8305
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light38",
+   "pos_m": [
+    27.3513,
+    12.5652,
+    1.8305
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light39",
+   "pos_m": [
+    27.3135,
+    7.2327,
+    1.8305
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light40",
+   "pos_m": [
+    27.3141,
+    2.9208,
+    1.8305
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light41",
+   "pos_m": [
+    27.2405,
+    -2.8619,
+    1.8305
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light42",
+   "pos_m": [
+    27.241,
+    -7.1738,
+    1.8305
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light43",
+   "pos_m": [
+    27.2032,
+    -12.5062,
+    1.8305
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light44",
+   "pos_m": [
+    27.2038,
+    -16.8181,
+    1.8305
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light45",
+   "pos_m": [
+    6.3939,
+    16.5382,
+    -12.5865
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light46",
+   "pos_m": [
+    6.3945,
+    12.2263,
+    -12.5865
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light47",
+   "pos_m": [
+    6.3567,
+    6.9893,
+    -12.5865
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light48",
+   "pos_m": [
+    6.3572,
+    2.6774,
+    -12.5865
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light49",
+   "pos_m": [
+    6.2836,
+    -3.0576,
+    -12.5865
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light50",
+   "pos_m": [
+    6.2842,
+    -7.3695,
+    -12.5865
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light51",
+   "pos_m": [
+    6.2464,
+    -12.7019,
+    -12.5865
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light52",
+   "pos_m": [
+    6.2469,
+    -17.0138,
+    -12.5865
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light53",
+   "pos_m": [
+    16.9189,
+    18.0214,
+    -12.5503
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light54",
+   "pos_m": [
+    16.9195,
+    13.7572,
+    -12.5503
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light55",
+   "pos_m": [
+    17.2801,
+    10.0113,
+    -3.6758
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light56",
+   "pos_m": [
+    17.1054,
+    4.1129,
+    -10.4374
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light57",
+   "pos_m": [
+    17.1593,
+    -1.6698,
+    -3.6758
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 80.963,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light58",
+   "pos_m": [
+    17.1599,
+    -5.9817,
+    -3.6758
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light59",
+   "pos_m": [
+    17.1221,
+    -11.3141,
+    -3.6758
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light60",
+   "pos_m": [
+    17.0163,
+    -15.626,
+    -12.2235
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light61",
+   "pos_m": [
+    27.427,
+    16.8009,
+    -3.5541
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light62",
+   "pos_m": [
+    27.4275,
+    12.489,
+    -3.5541
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light63",
+   "pos_m": [
+    27.3897,
+    7.1565,
+    -3.5541
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light64",
+   "pos_m": [
+    27.3903,
+    2.8446,
+    -3.5541
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light65",
+   "pos_m": [
+    27.3167,
+    -2.9381,
+    -3.5541
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light66",
+   "pos_m": [
+    27.3172,
+    -7.25,
+    -3.5541
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light67",
+   "pos_m": [
+    27.2794,
+    -12.5824,
+    -3.5541
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light68",
+   "pos_m": [
+    27.28,
+    -16.8943,
+    -3.5541
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light69",
+   "pos_m": [
+    23.3886,
+    16.0259,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light70",
+   "pos_m": [
+    23.3891,
+    11.7617,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light71",
+   "pos_m": [
+    23.3513,
+    6.4293,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light72",
+   "pos_m": [
+    23.3042,
+    2.1174,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light73",
+   "pos_m": [
+    23.2306,
+    -3.6653,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light74",
+   "pos_m": [
+    23.2311,
+    -7.9772,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light75",
+   "pos_m": [
+    23.1933,
+    -13.3096,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light76",
+   "pos_m": [
+    23.1939,
+    -17.6215,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light77",
+   "pos_m": [
+    11.0581,
+    15.9497,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light78",
+   "pos_m": [
+    11.0586,
+    11.6855,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light79",
+   "pos_m": [
+    11.0208,
+    6.3531,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light80",
+   "pos_m": [
+    10.9737,
+    2.0412,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light81",
+   "pos_m": [
+    10.9001,
+    -3.7415,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light82",
+   "pos_m": [
+    10.9006,
+    -8.0534,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light83",
+   "pos_m": [
+    10.8628,
+    -13.3858,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light84",
+   "pos_m": [
+    10.8634,
+    -17.6977,
+    5.7814
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light85",
+   "pos_m": [
+    17.3835,
+    -36.2363,
+    -6.5904
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light86",
+   "pos_m": [
+    24.1246,
+    -36.2809,
+    -6.5904
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light87",
+   "pos_m": [
+    10.1947,
+    -36.4388,
+    -6.5904
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light88",
+   "pos_m": [
+    17.5795,
+    -33.3958,
+    -18.989
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light89",
+   "pos_m": [
+    24.3206,
+    -36.3571,
+    -21.8422
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light90",
+   "pos_m": [
+    10.3907,
+    -36.515,
+    -21.8422
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light91",
+   "pos_m": [
+    17.1116,
+    -27.9459,
+    -18.6784
+   ],
+   "rgb": [
+    0.251,
+    0.4272,
+    1.0
+   ],
+   "brightness": 255,
+   "radius_m": 5.715,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light92",
+   "pos_m": [
+    17.0551,
+    -30.7177,
+    -22.5539
+   ],
+   "rgb": [
+    0.0,
+    0.4706,
+    1.0
+   ],
+   "brightness": 200,
+   "radius_m": 13.335,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light93",
+   "pos_m": [
+    21.5215,
+    21.8313,
+    -23.511
+   ],
+   "rgb": [
+    0.5098,
+    1.0,
+    0.5098
+   ],
+   "brightness": 96,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light94",
+   "pos_m": [
+    11.8848,
+    20.1898,
+    -23.511
+   ],
+   "rgb": [
+    0.5098,
+    1.0,
+    0.5098
+   ],
+   "brightness": 96,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light95",
+   "pos_m": [
+    10.4759,
+    5.3034,
+    -23.511
+   ],
+   "rgb": [
+    0.5098,
+    1.0,
+    0.7866
+   ],
+   "brightness": 96,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light96",
+   "pos_m": [
+    23.9978,
+    10.7639,
+    -23.511
+   ],
+   "rgb": [
+    0.5098,
+    1.0,
+    0.5098
+   ],
+   "brightness": 96,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light97",
+   "pos_m": [
+    24.0338,
+    -1.5559,
+    -23.511
+   ],
+   "rgb": [
+    0.5098,
+    1.0,
+    0.5098
+   ],
+   "brightness": 96,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light98",
+   "pos_m": [
+    23.5883,
+    -10.6225,
+    -23.511
+   ],
+   "rgb": [
+    0.5098,
+    1.0,
+    0.8097
+   ],
+   "brightness": 96,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light99",
+   "pos_m": [
+    10.6603,
+    -9.896,
+    -23.511
+   ],
+   "rgb": [
+    0.5098,
+    1.0,
+    0.6021
+   ],
+   "brightness": 96,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light100",
+   "pos_m": [
+    17.1139,
+    -7.3674,
+    -23.511
+   ],
+   "rgb": [
+    0.5098,
+    1.0,
+    0.5098
+   ],
+   "brightness": 96,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light101",
+   "pos_m": [
+    16.8661,
+    28.0957,
+    -23.511
+   ],
+   "rgb": [
+    0.0,
+    0.9412,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light102",
+   "pos_m": [
+    19.8047,
+    29.895,
+    -22.7109
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 150,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light103",
+   "pos_m": [
+    14.186,
+    29.8539,
+    -22.7109
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 150,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light104",
+   "pos_m": [
+    17.4063,
+    9.609,
+    -16.3851
+   ],
+   "rgb": [
+    0.5098,
+    1.0,
+    0.5098
+   ],
+   "brightness": 96,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light105",
+   "pos_m": [
+    17.4284,
+    -2.5324,
+    -16.3851
+   ],
+   "rgb": [
+    0.5098,
+    1.0,
+    0.5098
+   ],
+   "brightness": 96,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light106",
+   "pos_m": [
+    25.8983,
+    -27.7943,
+    -22.7444
+   ],
+   "rgb": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "brightness": 128,
+   "radius_m": 3.81,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light107",
+   "pos_m": [
+    25.8906,
+    -22.2561,
+    -22.7444
+   ],
+   "rgb": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "brightness": 128,
+   "radius_m": 3.81,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light108",
+   "pos_m": [
+    8.2296,
+    -27.7306,
+    -22.7444
+   ],
+   "rgb": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "brightness": 128,
+   "radius_m": 3.81,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light109",
+   "pos_m": [
+    8.2891,
+    -22.2326,
+    -22.7444
+   ],
+   "rgb": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "brightness": 128,
+   "radius_m": 3.81,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light110",
+   "pos_m": [
+    33.7174,
+    -26.6176,
+    -9.2318
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light111",
+   "pos_m": [
+    29.4244,
+    -26.6113,
+    -9.2318
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light112",
+   "pos_m": [
+    39.069,
+    -28.9747,
+    -13.0015
+   ],
+   "rgb": [
+    0.3922,
+    1.0,
+    0.3922
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light113",
+   "pos_m": [
+    45.1823,
+    -23.7567,
+    -13.0015
+   ],
+   "rgb": [
+    0.1255,
+    1.0,
+    0.1255
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light114",
+   "pos_m": [
+    -23.2936,
+    26.8253,
+    -16.2473
+   ],
+   "rgb": [
+    0.251,
+    1.0,
+    0.251
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder",
+   "rotation_deg": [
+    0.0,
+    0.18,
+    0.0
+   ]
+  },
+  {
+   "class": "Light",
+   "name": "Light115",
+   "pos_m": [
+    -16.6798,
+    25.8006,
+    -16.2473
+   ],
+   "rgb": [
+    0.251,
+    1.0,
+    0.251
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder",
+   "rotation_deg": [
+    0.0,
+    0.18,
+    0.0
+   ]
+  },
+  {
+   "class": "Light",
+   "name": "Light116",
+   "pos_m": [
+    -23.3612,
+    36.3791,
+    -16.2473
+   ],
+   "rgb": [
+    0.251,
+    1.0,
+    0.251
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder",
+   "rotation_deg": [
+    0.0,
+    0.18,
+    0.0
+   ]
+  },
+  {
+   "class": "Light",
+   "name": "Light117",
+   "pos_m": [
+    -16.7473,
+    35.3544,
+    -16.2473
+   ],
+   "rgb": [
+    0.251,
+    1.0,
+    0.251
+   ],
+   "brightness": 64,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder",
+   "rotation_deg": [
+    0.0,
+    0.18,
+    0.0
+   ]
+  },
+  {
+   "class": "Light",
+   "name": "Light118",
+   "pos_m": [
+    -7.3434,
+    23.5594,
+    -1.2769
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 200,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light119",
+   "pos_m": [
+    -7.2553,
+    27.8389,
+    -1.2769
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 200,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light120",
+   "pos_m": [
+    -7.2672,
+    32.9917,
+    -1.2769
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 200,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light121",
+   "pos_m": [
+    -7.1791,
+    37.2712,
+    -1.2769
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 200,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light127",
+   "pos_m": [
+    -7.032,
+    13.4463,
+    -11.555
+   ],
+   "rgb": [
+    0.3922,
+    1.0,
+    0.9356
+   ],
+   "brightness": 160,
+   "radius_m": 5.715,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light128",
+   "pos_m": [
+    -7.0648,
+    -4.8056,
+    -11.555
+   ],
+   "rgb": [
+    0.3922,
+    1.0,
+    0.9356
+   ],
+   "brightness": 160,
+   "radius_m": 5.715,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light129",
+   "pos_m": [
+    -12.8746,
+    4.0128,
+    -11.555
+   ],
+   "rgb": [
+    0.3922,
+    1.0,
+    0.9356
+   ],
+   "brightness": 160,
+   "radius_m": 5.715,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light130",
+   "pos_m": [
+    -13.5062,
+    18.5549,
+    -11.555
+   ],
+   "rgb": [
+    0.3922,
+    1.0,
+    0.9356
+   ],
+   "brightness": 160,
+   "radius_m": 5.715,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light131",
+   "pos_m": [
+    -13.165,
+    -16.1554,
+    -11.555
+   ],
+   "rgb": [
+    0.3922,
+    1.0,
+    0.9356
+   ],
+   "brightness": 160,
+   "radius_m": 5.715,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light132",
+   "pos_m": [
+    -9.1958,
+    -25.1053,
+    -11.555
+   ],
+   "rgb": [
+    0.3922,
+    1.0,
+    0.9356
+   ],
+   "brightness": 160,
+   "radius_m": 5.715,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light133",
+   "pos_m": [
+    -2.5516,
+    -26.7618,
+    -11.555
+   ],
+   "rgb": [
+    0.3922,
+    1.0,
+    0.9356
+   ],
+   "brightness": 160,
+   "radius_m": 5.715,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light134",
+   "pos_m": [
+    -20.2063,
+    21.4891,
+    -16.23
+   ],
+   "rgb": [
+    0.0,
+    1.0,
+    0.2588
+   ],
+   "brightness": 192,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light135",
+   "pos_m": [
+    17.5712,
+    26.9842,
+    -10.8925
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 32,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light17",
+   "pos_m": [
+    17.6923,
+    24.828,
+    -1.3986
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 64,
+   "radius_m": 30.48,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light21",
+   "pos_m": [
+    17.2924,
+    -19.6954,
+    -3.5931
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 200,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light22",
+   "pos_m": [
+    17.0166,
+    -24.9197,
+    -3.5931
+   ],
+   "rgb": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "brightness": 200,
+   "radius_m": 10.478,
+   "type": "Steady",
+   "effect": "None",
+   "rotation_deg": [
+    0.0,
+    -180.0,
+    0.0
+   ]
+  },
+  {
+   "class": "Light",
+   "name": "Light23",
+   "pos_m": [
+    20.8151,
+    -25.2661,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light24",
+   "pos_m": [
+    20.8739,
+    -27.7548,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light136",
+   "pos_m": [
+    18.2759,
+    -25.2611,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light137",
+   "pos_m": [
+    18.3347,
+    -27.7498,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light138",
+   "pos_m": [
+    15.875,
+    -25.2919,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light139",
+   "pos_m": [
+    15.9338,
+    -27.7806,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light140",
+   "pos_m": [
+    13.3358,
+    -25.2869,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light141",
+   "pos_m": [
+    13.3946,
+    -27.7756,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light142",
+   "pos_m": [
+    20.8913,
+    -25.5317,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light143",
+   "pos_m": [
+    20.9501,
+    -28.0203,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light144",
+   "pos_m": [
+    18.3521,
+    -25.5266,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light145",
+   "pos_m": [
+    18.4109,
+    -28.0153,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light146",
+   "pos_m": [
+    15.9512,
+    -25.5574,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light147",
+   "pos_m": [
+    16.01,
+    -28.0461,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light148",
+   "pos_m": [
+    13.412,
+    -25.5524,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light149",
+   "pos_m": [
+    13.4708,
+    -28.0411,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light150",
+   "pos_m": [
+    19.1945,
+    30.8574,
+    -20.4684
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light151",
+   "pos_m": [
+    14.8896,
+    30.8484,
+    -20.4684
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light152",
+   "pos_m": [
+    25.9745,
+    -27.7481,
+    -19.8455
+   ],
+   "rgb": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "brightness": 128,
+   "radius_m": 0.953,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light153",
+   "pos_m": [
+    25.9668,
+    -22.2098,
+    -19.8455
+   ],
+   "rgb": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "brightness": 128,
+   "radius_m": 0.953,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light154",
+   "pos_m": [
+    8.3058,
+    -27.6844,
+    -19.8455
+   ],
+   "rgb": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "brightness": 128,
+   "radius_m": 0.953,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light155",
+   "pos_m": [
+    8.3653,
+    -22.1864,
+    -19.8455
+   ],
+   "rgb": [
+    1.0,
+    0.0,
+    0.0
+   ],
+   "brightness": 128,
+   "radius_m": 0.953,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light156",
+   "pos_m": [
+    17.4597,
+    -36.3125,
+    -11.9191
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light157",
+   "pos_m": [
+    20.7389,
+    -35.3245,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 0.953,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light158",
+   "pos_m": [
+    20.7977,
+    -37.8132,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 0.953,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light159",
+   "pos_m": [
+    18.1997,
+    -35.3195,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 0.953,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light160",
+   "pos_m": [
+    18.2585,
+    -37.8082,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 0.953,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light161",
+   "pos_m": [
+    15.7988,
+    -35.3503,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 0.953,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light162",
+   "pos_m": [
+    15.8576,
+    -37.839,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 0.953,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light163",
+   "pos_m": [
+    13.2596,
+    -35.3453,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 0.953,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light164",
+   "pos_m": [
+    13.3184,
+    -37.834,
+    -8.8212
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 128,
+   "radius_m": 0.953,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light165",
+   "pos_m": [
+    20.8151,
+    -35.5901,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light166",
+   "pos_m": [
+    20.8739,
+    -38.0787,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light167",
+   "pos_m": [
+    18.2759,
+    -35.585,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light168",
+   "pos_m": [
+    18.3347,
+    -38.0737,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light169",
+   "pos_m": [
+    15.875,
+    -35.6158,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light170",
+   "pos_m": [
+    15.9338,
+    -38.1045,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light171",
+   "pos_m": [
+    13.3358,
+    -35.6108,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light172",
+   "pos_m": [
+    13.3946,
+    -38.0995,
+    -12.797
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 160,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light173",
+   "pos_m": [
+    -6.9558,
+    13.3701,
+    -9.0226
+   ],
+   "rgb": [
+    0.0,
+    1.0,
+    0.8941
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light174",
+   "pos_m": [
+    -6.9886,
+    -4.8818,
+    -9.0226
+   ],
+   "rgb": [
+    0.0,
+    1.0,
+    0.8941
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light175",
+   "pos_m": [
+    -12.7984,
+    3.9366,
+    -9.0226
+   ],
+   "rgb": [
+    0.0,
+    1.0,
+    0.8941
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light176",
+   "pos_m": [
+    -13.43,
+    18.4787,
+    -9.0226
+   ],
+   "rgb": [
+    0.0,
+    1.0,
+    0.8941
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light177",
+   "pos_m": [
+    -13.0888,
+    -16.2316,
+    -9.0226
+   ],
+   "rgb": [
+    0.0,
+    1.0,
+    0.8941
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light178",
+   "pos_m": [
+    -2.4754,
+    -26.838,
+    -9.0226
+   ],
+   "rgb": [
+    0.0,
+    1.0,
+    0.8941
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light179",
+   "pos_m": [
+    -16.1842,
+    30.1953,
+    -13.1366
+   ],
+   "rgb": [
+    0.3922,
+    1.0,
+    0.3922
+   ],
+   "brightness": 96,
+   "radius_m": 15.24,
+   "type": "Steady",
+   "effect": "Cylinder",
+   "rotation_deg": [
+    0.0,
+    0.18,
+    0.0
+   ]
+  },
+  {
+   "class": "Light",
+   "name": "Light180",
+   "pos_m": [
+    -20.4675,
+    3.987,
+    -11.555
+   ],
+   "rgb": [
+    0.0,
+    0.2353,
+    1.0
+   ],
+   "brightness": 200,
+   "radius_m": 5.715,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light181",
+   "pos_m": [
+    -20.3913,
+    3.9108,
+    -9.0226
+   ],
+   "rgb": [
+    0.0,
+    1.0,
+    0.8941
+   ],
+   "brightness": 160,
+   "radius_m": 1.905,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light122",
+   "pos_m": [
+    17.0641,
+    18.5421,
+    -22.193
+   ],
+   "rgb": [
+    0.251,
+    1.0,
+    0.251
+   ],
+   "brightness": 96,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light123",
+   "pos_m": [
+    37.7755,
+    -22.8271,
+    -13.0015
+   ],
+   "rgb": [
+    0.1255,
+    1.0,
+    0.1255
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light124",
+   "pos_m": [
+    45.0115,
+    -30.8378,
+    -13.0015
+   ],
+   "rgb": [
+    0.3922,
+    1.0,
+    0.3922
+   ],
+   "brightness": 128,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light125",
+   "pos_m": [
+    17.0217,
+    30.9446,
+    -20.7598
+   ],
+   "rgb": [
+    0.0,
+    0.9412,
+    1.0
+   ],
+   "brightness": 255,
+   "radius_m": 11.43,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light126",
+   "pos_m": [
+    15.7439,
+    4.8355,
+    -23.511
+   ],
+   "rgb": [
+    0.1255,
+    1.0,
+    0.1255
+   ],
+   "brightness": 32,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light182",
+   "pos_m": [
+    18.3393,
+    4.8184,
+    -23.511
+   ],
+   "rgb": [
+    0.1255,
+    1.0,
+    0.1255
+   ],
+   "brightness": 32,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "Cylinder"
+  },
+  {
+   "class": "Light",
+   "name": "Light183",
+   "pos_m": [
+    15.4925,
+    -32.3567,
+    -2.707
+   ],
+   "rgb": [
+    1.0,
+    0.9135,
+    0.7059
+   ],
+   "brightness": 32,
+   "radius_m": 10.478,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light184",
+   "pos_m": [
+    18.5272,
+    -32.4246,
+    -2.707
+   ],
+   "rgb": [
+    1.0,
+    0.9135,
+    0.7059
+   ],
+   "brightness": 32,
+   "radius_m": 10.478,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light185",
+   "pos_m": [
+    15.4732,
+    -34.0451,
+    -2.707
+   ],
+   "rgb": [
+    1.0,
+    0.9135,
+    0.7059
+   ],
+   "brightness": 32,
+   "radius_m": 10.478,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light186",
+   "pos_m": [
+    18.5079,
+    -34.1131,
+    -2.707
+   ],
+   "rgb": [
+    1.0,
+    0.9135,
+    0.7059
+   ],
+   "brightness": 32,
+   "radius_m": 10.478,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light187",
+   "pos_m": [
+    15.5859,
+    -35.5528,
+    -2.707
+   ],
+   "rgb": [
+    1.0,
+    0.9135,
+    0.7059
+   ],
+   "brightness": 32,
+   "radius_m": 10.478,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light188",
+   "pos_m": [
+    18.5634,
+    -35.6208,
+    -2.707
+   ],
+   "rgb": [
+    1.0,
+    0.9135,
+    0.7059
+   ],
+   "brightness": 32,
+   "radius_m": 10.478,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light189",
+   "pos_m": [
+    15.5616,
+    -32.3498,
+    -4.8025
+   ],
+   "rgb": [
+    1.0,
+    0.9135,
+    0.7059
+   ],
+   "brightness": 48,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light190",
+   "pos_m": [
+    18.5962,
+    -32.4178,
+    -4.8025
+   ],
+   "rgb": [
+    1.0,
+    0.9135,
+    0.7059
+   ],
+   "brightness": 48,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light191",
+   "pos_m": [
+    15.5423,
+    -34.0383,
+    -4.8025
+   ],
+   "rgb": [
+    1.0,
+    0.9135,
+    0.7059
+   ],
+   "brightness": 48,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light192",
+   "pos_m": [
+    18.5769,
+    -34.1062,
+    -4.8025
+   ],
+   "rgb": [
+    1.0,
+    0.9135,
+    0.7059
+   ],
+   "brightness": 48,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light193",
+   "pos_m": [
+    15.5978,
+    -35.546,
+    -4.8025
+   ],
+   "rgb": [
+    1.0,
+    0.9135,
+    0.7059
+   ],
+   "brightness": 48,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light194",
+   "pos_m": [
+    18.6324,
+    -35.6139,
+    -4.8025
+   ],
+   "rgb": [
+    1.0,
+    0.9135,
+    0.7059
+   ],
+   "brightness": 48,
+   "radius_m": 7.62,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light196",
+   "pos_m": [
+    19.7599,
+    29.8282,
+    -20.3106
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 150,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light197",
+   "pos_m": [
+    14.1413,
+    29.7871,
+    -20.3106
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 150,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light198",
+   "pos_m": [
+    19.8309,
+    29.7762,
+    -17.9865
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 150,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light199",
+   "pos_m": [
+    14.2123,
+    29.7352,
+    -17.9865
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 150,
+   "radius_m": 4.763,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light195",
+   "pos_m": [
+    19.5794,
+    -7.3447,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light200",
+   "pos_m": [
+    19.5696,
+    -2.4174,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light201",
+   "pos_m": [
+    19.6828,
+    -17.1365,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light202",
+   "pos_m": [
+    19.6729,
+    -12.2092,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light203",
+   "pos_m": [
+    19.4236,
+    2.439,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light204",
+   "pos_m": [
+    19.4138,
+    7.3663,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light205",
+   "pos_m": [
+    19.4363,
+    12.165,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light206",
+   "pos_m": [
+    19.4265,
+    17.0923,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light207",
+   "pos_m": [
+    14.7077,
+    -7.3876,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light208",
+   "pos_m": [
+    14.6978,
+    -2.4604,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light209",
+   "pos_m": [
+    14.811,
+    -17.1794,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light210",
+   "pos_m": [
+    14.8012,
+    -12.2521,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light211",
+   "pos_m": [
+    14.5519,
+    2.3961,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light212",
+   "pos_m": [
+    14.542,
+    7.3234,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light213",
+   "pos_m": [
+    14.5646,
+    12.1221,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light214",
+   "pos_m": [
+    14.5548,
+    17.0494,
+    7.3054
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light215",
+   "pos_m": [
+    6.2924,
+    -7.5844,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light216",
+   "pos_m": [
+    6.3958,
+    -17.3761,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light217",
+   "pos_m": [
+    6.386,
+    -12.4489,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light218",
+   "pos_m": [
+    6.2238,
+    7.3055,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light219",
+   "pos_m": [
+    6.3271,
+    -2.4862,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light220",
+   "pos_m": [
+    6.3173,
+    2.441,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light221",
+   "pos_m": [
+    6.0968,
+    17.1188,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light222",
+   "pos_m": [
+    6.1903,
+    12.2544,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light223",
+   "pos_m": [
+    27.6504,
+    -7.364,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light224",
+   "pos_m": [
+    27.7538,
+    -17.1558,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light225",
+   "pos_m": [
+    27.744,
+    -12.2285,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light226",
+   "pos_m": [
+    27.5818,
+    7.5259,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light227",
+   "pos_m": [
+    27.6851,
+    -2.2659,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light228",
+   "pos_m": [
+    27.6753,
+    2.6614,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light229",
+   "pos_m": [
+    27.4548,
+    17.3392,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  },
+  {
+   "class": "Light",
+   "name": "Light230",
+   "pos_m": [
+    27.5483,
+    12.4747,
+    2.3524
+   ],
+   "rgb": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "brightness": 0,
+   "radius_m": 121.444,
+   "type": "Steady",
+   "effect": "None"
+  }
+ ],
+ "ambient": []
+}
