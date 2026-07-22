@@ -623,9 +623,169 @@ const dm_somnus = mesh({
 		}
 	})
 
+// DM-Baroque (UT original DM-Gothic) — imported TDM. killY nav-gated (margin 11.41 m world);
+// winding sign 1; longest sightline 25.6 m (default fog OK — no per-map fogDensity).
+// Isolation: kept 8025 faces, dropped 0 detached (margin 54 m).
+const dm_baroque = mesh({
+		id: 'dm_baroque',
+		name: 'DM-Baroque',
+		mode: 'TDM',
+		dir: '/assets/maps/DM-Baroque/',
+		file: 'DM-Baroque.obj',
+		lights: 'DM-Baroque.lights.json',
+		killY: -20,
+		spawns: [
+			{ x: 7.776, y: 0, z: 0.866 },
+			{ x: -18.88, y: 2.44, z: 52.225 },
+			{ x: -7.365, y: -2.44, z: -36.678 },
+			{ x: -32.666, y: 0, z: 31.272 },
+			{ x: -19.244, y: 2.44, z: 16.752 },
+			{ x: 2.48, y: 12.19, z: 25.634 },
+			{ x: 40.589, y: 7.32, z: 20.606 },
+			{ x: 21.165, y: 9.75, z: 37.442 },
+			{ x: 51.203, y: 0, z: 34.057 },
+			{ x: -17.833, y: 0, z: 31.455 },
+			{ x: -11.864, y: 12.19, z: 46.322 },
+			{ x: 29.381, y: 2.44, z: 26.24 },
+			{ x: 40.954, y: 0, z: 1.286 },
+			{ x: 51.902, y: 0, z: 11.468 },
+			{ x: -2.665, y: 0, z: -12.326 },
+			{ x: 12.701, y: -2.44, z: -52.099 },
+			{ x: 3.75, y: 12.19, z: -5.811 },
+			{ x: -3.655, y: 0, z: 26.17 }
+		],
+		walkable: { minX: -78.1, maxX: 78.1, minY: -20.0, maxY: 42.7, minZ: -87.8, maxZ: 56.1 },
+		mega: { x: 2.417, y: 2.438, z: -41.477 },
+		mode_data: { teams: 2 },
+		SPAWN_POINTS: [
+			{ x: 7.776, y: 0, z: 0.866, yaw: 223.86, team: 1, team_source: 'derived_2means', headroom: 4.96 },
+			{ x: -18.88, y: 2.44, z: 52.225, yaw: 269.56, team: 0, team_source: 'derived_2means', headroom: 4.5 },
+			{ x: -7.365, y: -2.44, z: -36.678, yaw: 39.9, team: 1, team_source: 'derived_2means', headroom: 15 },
+			{ x: -32.666, y: 0, z: 31.272, yaw: null, team: 0, team_source: 'derived_2means', headroom: 4.77 },
+			{ x: -19.244, y: 2.44, z: 16.752, yaw: 92.9, team: 0, team_source: 'derived_2means', headroom: 4.5 },
+			{ x: 2.48, y: 12.19, z: 25.634, yaw: 89.91, team: 0, team_source: 'derived_2means', headroom: 3.73 },
+			{ x: 40.589, y: 7.32, z: 20.606, yaw: 132.89, team: 0, team_source: 'derived_2means', headroom: 4.5 },
+			{ x: 21.165, y: 9.75, z: 37.442, yaw: null, team: 0, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: 51.203, y: 0, z: 34.057, yaw: 90.04, team: 0, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: -17.833, y: 0, z: 31.455, yaw: 120.41, team: 0, team_source: 'derived_2means', headroom: 4.81 },
+			{ x: -11.864, y: 12.19, z: 46.322, yaw: 338.55, team: 0, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: 29.381, y: 2.44, z: 26.24, yaw: 43.77, team: 0, team_source: 'derived_2means', headroom: 7.67 },
+			{ x: 40.954, y: 0, z: 1.286, yaw: 132.1, team: 1, team_source: 'derived_2means', headroom: 4.5 },
+			{ x: 51.902, y: 0, z: 11.468, yaw: 180.88, team: 1, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: -2.665, y: 0, z: -12.326, yaw: 268.64, team: 1, team_source: 'derived_2means', headroom: 2.58 },
+			{ x: 12.701, y: -2.44, z: -52.099, yaw: 127.0, team: 1, team_source: 'derived_2means', headroom: 15 },
+			{ x: 3.75, y: 12.19, z: -5.811, yaw: 55.77, team: 1, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: -3.655, y: 0, z: 26.17, yaw: 1.85, team: 0, team_source: 'derived_2means', headroom: 6.09 }
+		],
+		PICKUPS: {
+			weapon: [
+				{ x: 45.098, z: 34.13, y: 7.508, class: 'UT_Eightball', item: 'rocket_launcher', tag: 'UT_Eightball' },
+				{ x: -11.853, z: 34.123, y: 12.537, class: 'SniperRifle', item: 'sniper_rifle', yaw: 89.56, tag: 'SniperRifle' },
+				{ x: -24.402, z: 17.06, y: 2.834, class: 'PulseGun', item: 'pulse_gun', yaw: 90.0, tag: 'PulseGun' },
+				{ x: 2.404, z: -5.775, y: 0.44, class: 'UT_FlakCannon', item: 'flak_cannon', tag: 'UT_FlakCannon' },
+				{ x: -13.414, z: 34.205, y: 5.031, class: 'ShockRifle', item: 'shock_rifle', yaw: 269.12, tag: 'ShockRifle' },
+				{ x: 23.228, z: 34.176, y: 10.117, class: 'ut_biorifle', item: 'bio_rifle', tag: 'ut_biorifle' },
+				{ x: -24.303, z: 51.207, y: 2.777, class: 'ripper', yaw: 270.53, tag: 'ripper' },
+				{ x: 2.468, z: 41.517, y: 0.154, class: 'minigun2', item: 'minigun', tag: 'minigun2' },
+				{ x: 73.159, z: 34.155, y: 0.44, class: 'WarheadLauncher', item: 'redeemer', tag: 'WarheadLauncher' },
+				{ x: 35.445, z: 8.469, y: -0.151, class: 'minigun2', item: 'minigun', tag: 'minigun2' },
+				{ x: 32.821, z: -5.567, y: 9.946, class: 'ShockRifle', item: 'shock_rifle', tag: 'ShockRifle' },
+				{ x: -2.366, z: 12.249, y: 12.632, class: 'UT_FlakCannon', item: 'flak_cannon', tag: 'UT_FlakCannon' }
+			],
+			ammo: [
+				{ x: 46.951, z: 33.193, y: 7.546, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: 46.887, z: 35.04, y: 7.546, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: -11.851, z: 36.49, y: 12.384, class: 'BulletBox', item: 'bullets', tag: 'BulletBox' },
+				{ x: -11.87, z: 31.619, y: 12.384, class: 'BulletBox', item: 'bullets', tag: 'BulletBox' },
+				{ x: -26.84, z: 17.097, y: 2.653, class: 'PAmmo', item: 'pulse_ammo', yaw: 90.0, tag: 'PAmmo' },
+				{ x: -21.958, z: 17.097, y: 2.653, class: 'PAmmo', item: 'pulse_ammo', yaw: 90.0, tag: 'PAmmo' },
+				{ x: 0.008, z: -5.793, y: 0.211, class: 'flakammo', item: 'flak_shells', tag: 'flakammo' },
+				{ x: 4.861, z: -5.753, y: 0.211, class: 'flakammo', item: 'flak_shells', tag: 'flakammo' },
+				{ x: -13.516, z: 17.88, y: 2.917, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: -13.408, z: 50.501, y: 2.859, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: 23.065, z: 25.595, y: 8.738, class: 'bioammo', item: 'bio_ammo', yaw: 270.0, tag: 'bioammo' },
+				{ x: 23.146, z: 41.489, y: 8.738, class: 'bioammo', item: 'bio_ammo', yaw: 270.0, tag: 'bioammo' },
+				{ x: -26.828, z: 45.703, y: 2.651, class: 'BladeHopper', item: 'ripper_blades', tag: 'BladeHopper' },
+				{ x: -21.958, z: 45.733, y: 2.651, class: 'BladeHopper', item: 'ripper_blades', tag: 'BladeHopper' },
+				{ x: 4.288, z: 40.855, y: 0.211, class: 'Miniammo', item: 'minigun_ammo', tag: 'Miniammo' },
+				{ x: 0.513, z: 40.811, y: 0.211, class: 'Miniammo', item: 'minigun_ammo', tag: 'Miniammo' },
+				{ x: 35.383, z: 6.063, y: -0.093, class: 'Miniammo', item: 'minigun_ammo', tag: 'Miniammo' },
+				{ x: 35.339, z: 10.983, y: -0.093, class: 'Miniammo', item: 'minigun_ammo', tag: 'Miniammo' },
+				{ x: -8.72, z: -19.334, y: 0.231, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: -8.679, z: -20.008, y: 0.211, class: 'Miniammo', item: 'minigun_ammo', tag: 'Miniammo' },
+				{ x: -7.987, z: -19.234, y: 0.23, class: 'PAmmo', item: 'pulse_ammo', tag: 'PAmmo' },
+				{ x: 31.589, z: -7.207, y: 10.137, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: 34.092, z: -7.189, y: 10.137, class: 'ShockCore', item: 'shock_core', yaw: 333.5, tag: 'ShockCore' },
+				{ x: -2.356, z: 9.836, y: 12.403, class: 'flakammo', item: 'flak_shells', tag: 'flakammo' },
+				{ x: -2.39, z: 14.651, y: 12.403, class: 'flakammo', item: 'flak_shells', yaw: 300.59, tag: 'flakammo' }
+			],
+			health: [
+				{ x: -35.27, z: 21.077, y: 2.745, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -35.344, z: 25.66, y: 4.061, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -35.356, z: 28.654, y: 5.092, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -35.37, z: 39.677, y: 4.935, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -35.375, z: 47.154, y: 2.745, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -35.336, z: 42.709, y: 4.022, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -7.871, z: 32.348, y: 5.031, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: -7.884, z: 35.973, y: 5.031, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: -4.124, z: 0.668, y: 0.154, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: -4.108, z: 1.584, y: 0.154, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: 2.485, z: -52.58, y: -0.151, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: 35.402, z: 47.113, y: 7.469, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: 5.502, z: -41.692, y: 2.745, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -0.623, z: -41.683, y: 2.745, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -2.669, z: 20.091, y: 0.916, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 17.064, z: 12.511, y: 12.565, class: 'HealthPack', item: 'health_pack', yaw: 180.18, tag: 'HealthPack' },
+				{ x: 26.163, z: 0.485, y: 9.908, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: 26.396, z: 0.461, y: 0.154, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: -0.622, z: -41.22, y: 2.745, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 5.499, z: -41.216, y: 2.745, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -2.229, z: 20.094, y: 0.916, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 7.09, z: 20.109, y: 0.916, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 7.53, z: 20.112, y: 0.916, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 7.11, z: 4.253, y: 0.916, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 7.55, z: 4.256, y: 0.916, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -2.656, z: 4.27, y: 0.916, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -2.216, z: 4.273, y: 0.916, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 26.403, z: -0.566, y: 0.154, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: 35.403, z: 47.868, y: 7.47, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: 35.193, z: 20.341, y: 7.47, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: 35.191, z: 21.155, y: 7.47, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: -2.061, z: -9.469, y: 0.307, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -2.383, z: -9.177, y: 0.307, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -2.797, z: -9.411, y: 0.307, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -2.818, z: -10.068, y: 0.307, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -2.426, z: -9.818, y: 0.307, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -2.093, z: -10.103, y: 0.307, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 26.182, z: -0.468, y: 9.908, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: 2.504, z: -53.399, y: -0.151, class: 'MedBox', item: 'health_pack', tag: 'MedBox' }
+			],
+			armor: [
+				{ x: -24.38, z: 34.093, y: 0.573, class: 'ThighPads', item: 'thigh_pads', tag: 'ThighPads' },
+				{ x: -6.121, z: 34.278, y: 12.727, class: 'armor2', item: 'body_armor', yaw: 88.73, tag: 'armor2' },
+				{ x: 2.419, z: 21.969, y: 5.069, class: 'ut_shieldbelt', item: 'shield_belt', tag: 'ut_shieldbelt' }
+			],
+			powerup: [
+				{ x: 2.417, z: -41.477, y: 3.202, class: 'UDamage', item: 'damage_amplifier', tag: 'UDamage' }
+			]
+		},
+		// --- UT-EXTRACTED TELEPORTERS (6, native units) — copied verbatim from
+		// _work/ut-actors/registry/dm_baroque.json. Three bidirectional pairs
+		// (TeleBottm<->TopDeck, TeleTop<->TelePed, Balcony<->UnderStairs) — all 6
+		// functional per common/teleporterData.js pairPortals.
+		TELEPORTERS: [
+			{ x: -31.686, z: 34.128, y: 0.764, class: 'VisibleTeleporter', yaw: 359.96, tag: 'TeleBottm', url: 'TopDeck' },
+			{ x: -15.954, z: 34.116, y: 12.956, class: 'VisibleTeleporter', yaw: 359.34, tag: 'TeleTop', url: 'TelePed' },
+			{ x: 49.0, z: 34.134, y: 8.232, class: 'VisibleTeleporter', yaw: 179.91, tag: 'TelePed', url: 'TeleTop' },
+			{ x: 2.439, z: 12.249, y: 12.937, class: 'VisibleTeleporter', yaw: 179.82, tag: 'TopDeck', url: 'TeleBottm' },
+			{ x: 35.449, z: 2.479, y: 10.517, class: 'VisibleTeleporter', yaw: 267.93, tag: 'Balcony', url: 'UnderStairs' },
+			{ x: 2.338, z: -48.734, y: -1.674, class: 'VisibleTeleporter', tag: 'UnderStairs', url: 'Balcony' },
+		]
+	})
+
 // The runtime registry. Add mesh maps here (or via registerMap at boot); the DEFAULT is
 // CTF-Visage so a no-argument GameInstance / client behaves exactly as the live game.
-export const mapRecords = { visage, grove, dm_gantry162, dom_elder, dm_somnus }
+export const mapRecords = { visage, grove, dm_gantry162, dom_elder, dm_somnus, dm_baroque }
 export const DEFAULT_MAP_ID = 'visage'
 export const mapList = () => Object.values(mapRecords)
 
@@ -659,7 +819,7 @@ export function mapDisplayName(record) {
 // The rotation itself: all 5 mesh maps (all import-complete: full spawns/pickups/
 // killY + verified boot via scripts/_verify-map-cycle.mjs; none excluded). Grove
 // first — it is the current live map, so a fresh state file boots the familiar one.
-export const ROTATION = ['grove', 'dm_gantry162', 'dm_somnus', 'dom_elder', 'visage']
+export const ROTATION = ['grove', 'dm_gantry162', 'dm_somnus', 'dm_baroque', 'visage']
 	.map(id => {
 		const rec = mapRecords[id]
 		return {
