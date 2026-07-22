@@ -152,16 +152,26 @@ if (process.argv.includes('--v2')) {
   // §5 prompt skeleton, one variant per zone. accent = colourblind-safe bright
   // hue (warm orange-red / cobalt), base charcoal shifted warm|cool.
   const zonePrompt = (zone, accent, shift) => {
-    const common = `This is a UV texture atlas (flat albedo) of a low-poly game character — NOT a picture of a person. Skin islands (tan/orange face, arms, hands) MUST stay EXACTLY as-is: do not move, resize, restyle or recolour any skin. Keep every island/shape exactly in place; repaint colour and surface detail only. Flat game albedo: clean FLAT shading with baked ambient occlusion only in the seams and crevices, crisp hard-edged panel lines, NO painterly brush texture, NO soft gradients (except the single accent gradient noted below), NO cast lighting or drop shadows. Video-game texture style, Team Fortress 2 material read. Square, no text, no watermark, no borders. Base suit charcoal/graphite shifted ${shift}.`
+    // PUNCH-UP (v2.1): the charcoal v2 read as flat colour on a small model in
+    // dark maps — 1024px fine detail averages to grey. So: a MEDIUM GUNMETAL GREY
+    // base (mid-tone, NOT black/charcoal — must survive being shrunk), FEW but
+    // BIG chunky plates (512px-visible shapes, not 2048px filigree), and THICK
+    // hard black seam lines for maximum panel contrast.
+    const common = `This is a UV texture atlas (flat albedo) of a low-poly game character — NOT a picture of a person. Skin islands (tan/orange face, arms, hands) MUST stay EXACTLY as-is: do not move, resize, restyle or recolour any skin. Keep every island/shape exactly in place; repaint colour and surface detail only. Flat game albedo: clean FLAT shading, NO painterly brush texture, NO cast lighting or drop shadows, NO soft gradients except the single accent gradient noted below. HIGH CONTRAST read: a MEDIUM GUNMETAL / STEEL GREY base (clearly mid-tone, NOT black or charcoal — it must still read when the texture is shrunk to 512px), broken by THICK hard-edged BLACK panel lines and deep AO only in the seams. FEW but BIG chunky armor plates — bold large segments, not fine filigree; every shape must be legible at low resolution. Video-game texture style, Team Fortress 2 / Quake material read. Square, no text, no watermark, no borders. Base grey shifted ${shift}.`
     if (zone === 'chest') {
-      return `${common}\nFocus: the CHEST plate and shoulder yokes carry ONE bold ${accent} accent SPLASH with a single clean gradient — bright, high-contrast, the panel the eye should land on. Molded armor plates with hard panel edges. Overall brightness increases toward the collar.`
+      return `${common}\nFocus: the CHEST plate and shoulder yokes carry ONE bold ${accent} accent SPLASH with a single clean gradient — bright, high-saturation, the big panel the eye lands on. A few LARGE molded armor plates with thick hard black panel edges. Overall brightness increases toward the collar.`
     }
-    return `${common}\nRepaint the dark navy clothing as a worn tactical composite suit: ripstop weave on soft panels, molded armor plates on hard panels, webbing straps, thin seams and zips, knee pads, subtle scuffed edges. Keep the team accent QUIET everywhere — only a thin ${accent} trim on cuffs and panel edges; legs and boots stay desaturated dark neutral (they are the quiet, darker end of the value range).`
+    if (zone === 'boots') {
+      return `${common}\nFocus: the BOOT islands — repaint them as chunky tactical COMBAT BOOTS that clearly read as boots, not suit legs: molded dark composite upper, a distinct hard SOLE line along the bottom edge, a big reinforced toe cap, two thick calf straps with simple buckles, lightly scuffed/worn toe. Mid-dark grey (a step darker than the suit, NOT black), with one thin ${accent} trim line on the upper strap only.`
+    }
+    return `${common}\nRepaint the dark navy clothing as a tactical composite suit built from a FEW big chunky armor plates and panels: thick hard black seams between large segments, bold knee pads, a couple of large webbing straps — keep it simple and readable, no busy micro-detail. Keep the team accent QUIET everywhere — only a thin ${accent} trim on a couple of panel edges; legs and boots are the darker (but still mid-grey, not black) quiet end of the value range.`
   }
 
   const V2_TEAMS = [
-    { team: 'red', accent: 'bright warm orange-red (#d94a35)', shift: 'slightly WARM', accentHueRange: [335, 45] },
-    { team: 'blue', accent: 'cobalt blue (#2f66c8)', shift: 'slightly COOL', accentHueRange: [195, 255] },
+    // accentHue = HSV hue of the accent hex (d94a35 -> ~10deg, 2f66c8 -> ~218deg),
+    // used by the chest-plate injection to hard-tint a weak (grey) chest splash.
+    { team: 'red', accent: 'bright warm orange-red (#d94a35)', shift: 'slightly WARM', accentHueRange: [335, 45], accentHue: 12 },
+    { team: 'blue', accent: 'cobalt blue (#2f66c8)', shift: 'slightly COOL', accentHueRange: [195, 255], accentHue: 218 },
   ]
 
   for (const t of V2_TEAMS) {
@@ -185,12 +195,26 @@ if (process.argv.includes('--v2')) {
       } else console.log(`reuse ${t.team} chest`)
       gens.push(chestRaw)
     }
+    // boots pass (user ask 2026-07-22 "add some boots"): a real boot read for the
+    // two boot islands — composited by _uniform-bake.py as gens[2] into bootBoxes.
+    const bootsRaw = path.join(TMP, `uniform_v2_${t.team}_boots.png`)
+    if (!fs.existsSync(bootsRaw) || FORCE) {
+      const bbuf = await generateRaw(b64, zonePrompt('boots', t.accent, t.shift), 0.4)
+      fs.writeFileSync(bootsRaw, bbuf)
+      console.log(`gen  ${t.team} boots (${(bbuf.length / 1024).toFixed(0)}KB)`)
+    } else console.log(`reuse ${t.team} boots`)
+    gens.push(bootsRaw)
 
     const bakeCfg = {
       orig: atlasPng, origNormal: normalPng, gens,
       chestBox: CHEST_BOX, bootBoxes: BOOT_BOXES,
-      chestBright: 0.14, bootDark: 0.18,
-      accentHueRange: t.accentHueRange, baseShift: t.team === 'red' ? 'warm' : 'cool',
+      // punch (v2.1): lift garment midtones so the base clears the ~35% luminance
+      // that dark maps eat, and deepen panel-line contrast. bootDark eased (0.10)
+      // so boots stay mid-grey, not black.
+      punchGamma: 0.68, punchContrast: 1.32,
+      chestBright: 0.12, bootDark: 0.10,
+      accentHueRange: t.accentHueRange, accentHue: t.accentHue, chestInject: 0.55,
+      baseShift: t.team === 'red' ? 'warm' : 'cool',
       outAlbedo: finalOut, outNormal: normalOut,
       deepbumpDir: DEEPBUMP_DIR, size: 1024,
     }

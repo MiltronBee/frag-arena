@@ -20,6 +20,17 @@ import { USE_MESH_MAP } from '../../common/mapMesh'
 const TEAM_BODY_GLOW = [new BABYLON.Color3(0.11, 0.050, 0.012), new BABYLON.Color3(0.012, 0.036, 0.11)]
 const TEAM_NAMETAG_CSS = ['#ff5a5a', '#5aa6ff']
 
+// SELF-LIT SUIT (retro/UT99 fix for "reads as flat colour in dark maps"): drive
+// the suit material's emissiveTexture FROM its own team albedo, multiplied by a
+// dim team-tinted colour. Emissive = albedo * this, so the fabric/plating detail
+// stays visible in an unlit corner (~40% of albedo) instead of collapsing to a
+// silhouette — without a white blowout, and the tint keeps the team read warm/cool.
+// SAFE against bloom: the scene GlowLayer is include-only (muzzle/tracer sprites
+// only — see BABYLONRenderer), so the body is never added and never blooms.
+// The red multiplier is warm-biased (orange-safe for protans); floor stays >= the
+// TEAM_BODY_GLOW level the hair/eyes keep.
+const TEAM_SUIT_EMISSIVE = [new BABYLON.Color3(0.50, 0.40, 0.32), new BABYLON.Color3(0.32, 0.40, 0.54)]
+
 // Shared team-uniform textures (one GPU texture per url per scene — every body on
 // a team samples the same texture). invertY=false matches the glTF loader's UV
 // convention (glTF images are top-left origin; a default Babylon Texture would
@@ -316,14 +327,24 @@ export default class CharacterModel {
     // so the +Y/OpenGL convention matches the GLB normal we composited into.
     const normUrl = skinUrl && skinUrl.replace(/\.webp$/, '_n.webp')
     const glow = TEAM_BODY_GLOW[this._teamId]
+    const suitEmis = TEAM_SUIT_EMISSIVE[this._teamId]
     this.meshes.forEach((m) => {
       const mat = m.material
       if (!mat) return
       if (skinUrl && mat.albedoTexture !== undefined && /superhero/i.test(mat.name || '')) {
-        mat.albedoTexture = _teamTexture(this.scene, skinUrl)
+        const tex = _teamTexture(this.scene, skinUrl)
+        mat.albedoTexture = tex
         if (normUrl && 'bumpTexture' in mat) mat.bumpTexture = _teamTexture(this.scene, normUrl)
+        // self-lit: emissive samples the SAME team albedo, dimmed by suitEmis, so
+        // the suit detail survives darkness. (Superhero material only — hair/eyes
+        // keep just the faint flat TEAM_BODY_GLOW wash below.)
+        if ('emissiveTexture' in mat) {
+          mat.emissiveTexture = tex
+          if (mat.emissiveColor && suitEmis) mat.emissiveColor.copyFrom(suitEmis)
+        }
+      } else if (glow && mat.emissiveColor) {
+        mat.emissiveColor.copyFrom(glow)
       }
-      if (glow && mat.emissiveColor) mat.emissiveColor.copyFrom(glow)
     })
   }
 

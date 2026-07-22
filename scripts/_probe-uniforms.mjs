@@ -164,11 +164,11 @@ try {
     if (!scene) return
     if (on) {
       scene.__savedL = scene.lights.map(l => l.intensity)
-      scene.lights.forEach(l => { l.intensity *= 0.1 })
+      scene.lights.forEach(l => { l.intensity *= 0.25 }) // ~25% (10% was too black to read the suit)
       scene.__savedEnv = scene.environmentIntensity
-      scene.environmentIntensity = 0.06
+      scene.environmentIntensity = 0.15
       scene.__savedClear = scene.clearColor && scene.clearColor.clone()
-      if (scene.clearColor) scene.clearColor.set(0.015, 0.015, 0.025)
+      if (scene.clearColor) scene.clearColor.set(0.03, 0.03, 0.045)
       scene.__savedFog = scene.fogEnabled; scene.fogEnabled = false
     } else {
       if (scene.__savedL) scene.lights.forEach((l, i) => { l.intensity = scene.__savedL[i] })
@@ -194,13 +194,39 @@ try {
     } else { console.error('no red+blue pair for 30m shot'); failed = true }
   }
 
-  // CLOSE-UPS: re-sample (bots move), stand ~3.5m off each bot
+  // CLOSE-UPS at NORMAL map lighting (the acceptance bar: fabric/plating detail
+  // visible at 5-10m). dm_gantry162 is on the dark side, so add a temporary
+  // neutral fill (probe-only, restored after) that stands in for a normally-lit
+  // corner — this reads the ALBEDO detail, not the emissive fallback.
+  const setFill = on => page.evaluate((on) => {
+    const s = window.gameClient.simulator
+    const scene = (s.renderer && s.renderer.scene) || s.scene
+    if (!scene) return
+    if (on) {
+      if (!scene.__fill) {
+        const BABYLON = window.BABYLON || (s.renderer && s.renderer.BABYLON)
+        // fall back to any hemispheric light already in the scene if no BABYLON handle
+        scene.__savedEnv2 = scene.environmentIntensity
+        scene.environmentIntensity = Math.max(scene.environmentIntensity || 0, 0.9)
+        scene.__savedLI = scene.lights.map(l => l.intensity)
+        scene.lights.forEach(l => { l.intensity *= 1.6 })
+        scene.__fill = true
+      }
+    } else if (scene.__fill) {
+      if (scene.__savedEnv2 != null) scene.environmentIntensity = scene.__savedEnv2
+      if (scene.__savedLI) scene.lights.forEach((l, i) => { l.intensity = scene.__savedLI[i] })
+      scene.__fill = false
+    }
+  }, on)
+  await setFill(true)
   for (const [teamId, name] of [[0, 'closeup-red'], [1, 'closeup-blue']]) {
     const bs = await bots()
     const b = bs.find(x => x.teamId === teamId)
     if (!b) { console.error(`no live bot for ${name}`); failed = true; continue }
-    await frame({ x: b.x + 2.5, y: b.y + 0.6, z: b.z + 2.5 }, b, name)
+    // stand ~6m off (5-10m band) and a touch above, so the whole torso reads
+    await frame({ x: b.x + 4, y: b.y + 1.0, z: b.z + 4 }, b, name)
   }
+  await setFill(false)
 
   if (errors.length) { console.error('PAGE ERRORS:', errors.slice(0, 5)); failed = true }
   console.log(JSON.stringify({ pageErrors: errors.length, verdict: failed ? 'CHECK' : 'PASS' }))

@@ -63,6 +63,15 @@ if len(cfg['gens']) > 1 and cfg['gens'][1] and chest_box:
     cmask = (box_mask(chest_box, 40) * garment)[..., None]
     albedo = albedo * (1 - cmask) + chest * cmask
     print('[bake] chest zone repaint composited', file=sys.stderr)
+# boots pass (gens[2]): composited into BOTH boot boxes, garment-masked +
+# feathered, so the boot islands get a real boot read (sole line, straps,
+# toe cap) instead of just the darker end of the suit gradient.
+if len(cfg['gens']) > 2 and cfg['gens'][2]:
+    boots = load_rgb(cfg['gens'][2])
+    for bb in cfg.get('bootBoxes', []):
+        bmask = (box_mask(bb, 40) * garment)[..., None]
+        albedo = albedo * (1 - bmask) + boots * bmask
+    print('[bake] boots zone repaint composited', file=sys.stderr)
 
 # ---- HSV helpers (vectorised) ---------------------------------------------
 def rgb_to_hsv(a):
@@ -95,6 +104,18 @@ def hsv_to_rgb(h, s, v):
     b = np.select(cond, [z, z, x, c, c, x])
     return np.stack([(r + m), (g + m), (b + m)], axis=2) * 255
 
+# ---- 2b. punch (v2.1): lift garment midtones + deepen panel contrast ------
+# Flat-colour fix. Dark maps eat anything under ~35% luminance, so gamma-lift the
+# garment into a legible mid-tone, then push contrast around 0.5 so the thick
+# black panel lines stay black while the plates brighten. Garment-only.
+pg = cfg.get('punchGamma')
+if pg:
+    g01 = np.clip(albedo / 255.0, 0, 1)
+    lifted = np.power(g01, pg)                         # gamma<1 brightens midtones
+    contr = np.clip((lifted - 0.5) * cfg.get('punchContrast', 1.3) + 0.5, 0, 1)
+    punched = contr * 255.0
+    albedo = albedo * (1 - gm) + punched * gm
+
 # ---- 3. value gradient (dark feet -> bright chest) ------------------------
 factor = np.ones((SIZE, SIZE), np.float32)
 if chest_box:
@@ -123,6 +144,17 @@ s2 = s2 * (1 - accent * offchest * 0.55)         # quiet legs: -55% sat
 s2 = np.clip(s2, 0, 1)
 v2 = v * (1 + accent * inchest * 0.06)            # tiny chest value lift
 v2 = np.clip(v2, 0, 1)
+# chest accent INJECTION: guarantee a dominant, symmetric chest splash regardless
+# of what the i2i painted. Where the chest-box garment plate is bright but LOW
+# saturation (i.e. Gemini left it grey — the red team's failure mode), hard-tint
+# it to the team accent hue with a saturation floor. Already-saturated chest
+# plates (blue's bold panel) are above the threshold and pass through untouched,
+# so this only rescues the weak team.
+inj = cfg.get('chestInject')
+if inj and chest_box and 'accentHue' in cfg:
+    plate = (inchest > 0.4) & (v > 0.30) & (s < 0.24) & (garment > 0.5)
+    h = np.where(plate, cfg['accentHue'], h)
+    s2 = np.where(plate, np.maximum(s2, inj), s2)
 albedo = np.clip(hsv_to_rgb(h, s2, v2), 0, 255)
 
 # ---- 5. warm/cool base tint (neutral charcoal only) ----------------------
