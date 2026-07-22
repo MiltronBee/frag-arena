@@ -658,18 +658,31 @@ export default class Viewmodel {
     const bobY = Math.sin(this._t * freq) * amp
     const bobX = Math.cos(this._t * freq * 0.5) * amp * 0.6
 
-    // Update position and rotation springs for procedural recoil
-    const dt = Math.min(delta, 0.05) // Cap dt to avoid spring instability on frame drops
-
-    // Position spring: Accel = -Tension * Pos - Damping * Vel
-    const posAcc = this.recoilPos.scale(-this.recoilTension).subtract(this.recoilPosVel.scale(this.recoilDamping))
-    this.recoilPosVel.addInPlace(posAcc.scale(dt))
-    this.recoilPos.addInPlace(this.recoilPosVel.scale(dt))
-
-    // Rotation spring: Accel = -Tension * Rot - Damping * Vel
-    const rotAcc = this.recoilRot.scale(-this.recoilTension).subtract(this.recoilRotVel.scale(this.recoilDamping))
-    this.recoilRotVel.addInPlace(rotAcc.scale(dt))
-    this.recoilRot.addInPlace(this.recoilRotVel.scale(dt))
+    // Update position and rotation springs for procedural recoil. SUBSTEPPED like
+    // Simulator._springCamRecoil and for the same reason: a single Euler step at the
+    // 0.05s dt cap is UNSTABLE for the snappier vmKick profiles (SMG 500/31, pistol
+    // 450/30 → step eigenvalue magnitude > 1, sign-flipping every frame), so one
+    // dropped frame while firing made the arms vibrate and then diverge off-screen.
+    // At <=0.004s substeps dt·ω stays tiny for any sane tension.
+    let remaining = Math.min(delta, 0.05)
+    const SUB = 0.004
+    const k = this.recoilTension, c = this.recoilDamping
+    const p = this.recoilPos, pv = this.recoilPosVel
+    const r = this.recoilRot, rv = this.recoilRotVel
+    while (remaining > 0) {
+      const dt = Math.min(remaining, SUB)
+      // Position spring: Accel = -Tension * Pos - Damping * Vel
+      pv.x += (-k * p.x - c * pv.x) * dt
+      pv.y += (-k * p.y - c * pv.y) * dt
+      pv.z += (-k * p.z - c * pv.z) * dt
+      p.x += pv.x * dt; p.y += pv.y * dt; p.z += pv.z * dt
+      // Rotation spring: same form
+      rv.x += (-k * r.x - c * rv.x) * dt
+      rv.y += (-k * r.y - c * rv.y) * dt
+      rv.z += (-k * r.z - c * rv.z) * dt
+      r.x += rv.x * dt; r.y += rv.y * dt; r.z += rv.z * dt
+      remaining -= dt
+    }
 
     // Blend the holder from the hip mount to the ADS (centered) mount by the aim
     // amount, THEN add bob + spring recoil. For weapons without an adsMount this is a
