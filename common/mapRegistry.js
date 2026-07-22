@@ -801,13 +801,17 @@ export const mapList = () => Object.values(mapRecords)
 // DOM are NOT implemented yet — Visage and Elder run as TDM until they are.
 
 // Human display string per effective mode (menu / /mapinfo `modeName`).
-export const MODE_DISPLAY = { TDM: 'TEAM DEATHMATCH', FFA: 'FREE FOR ALL' }
+export const MODE_DISPLAY = { TDM: 'TEAM DEATHMATCH', FFA: 'FREE FOR ALL', CTF: 'CAPTURE THE FLAG', DOM: 'DOMINATION' }
 
-// Collapse a record's authored mode to an implemented one: FFA stays FFA, everything
-// else (DM / TDM / CTF / DOM / missing) runs as TDM.
+// A record's EFFECTIVE (implemented) mode. FFA/CTF/DOM name real game modes now; DM /
+// TDM / missing collapse to TDM. CTF/DOM were un-coerced from the old TDM fallback
+// once those modes shipped (2026-07-22) — Visage now plays real CTF, Elder real DOM.
 export function effectiveMode(record) {
 	const m = record && typeof record.mode === 'string' ? record.mode.toUpperCase() : ''
-	return m === 'FFA' ? 'FFA' : 'TDM'
+	if (m === 'FFA') return 'FFA'
+	if (m === 'CTF') return 'CTF'
+	if (m === 'DOM') return 'DOM'
+	return 'TDM'
 }
 
 // Human display name for a map (menu / /mapinfo `mapName`): the record's authored
@@ -816,10 +820,11 @@ export function mapDisplayName(record) {
 	return String((record && (record.displayName || record.name || record.id)) || '').toUpperCase()
 }
 
-// The rotation itself: all 5 mesh maps (all import-complete: full spawns/pickups/
-// killY + verified boot via scripts/_verify-map-cycle.mjs; none excluded). Grove
-// first — it is the current live map, so a fresh state file boots the familiar one.
-export const ROTATION = ['grove', 'dm_gantry162', 'dm_somnus', 'dm_baroque', 'visage']
+// The rotation itself: all 6 mesh maps. Grove first — it is the current live map, so
+// a fresh state file boots the familiar one. Visage runs real CTF and dom_elder real
+// DOM now that those modes ship (effectiveMode un-coerces them); the other four stay
+// TDM/FFA. dom_elder re-enters the rotation as its native DOM.
+export const ROTATION = ['grove', 'dm_gantry162', 'dm_somnus', 'dm_baroque', 'visage', 'dom_elder']
 	.map(id => {
 		const rec = mapRecords[id]
 		return {

@@ -2,7 +2,7 @@ import nengi from 'nengi'
 import nengiConfig from '../common/nengiConfig'
 import { SPAWN_POINTS } from '../common/arenaConfig'
 import { setActiveMap } from '../common/mapMesh'
-import { getMapRecord, DEFAULT_MAP_ID } from '../common/mapRegistry'
+import { getMapRecord, DEFAULT_MAP_ID, effectiveMode } from '../common/mapRegistry'
 import PlayerCharacter from '../common/entity/PlayerCharacter'
 import Identity from '../common/message/Identity'
 import WeaponFired from '../common/message/WeaponFired'
@@ -27,8 +27,12 @@ import Grenade from '../common/entity/Grenade'
 import MegaHealthPickup, { MEGA_STATE } from '../common/entity/MegaHealthPickup'
 import MatchState, { MATCH_PHASE, MATCH_WINNER, MATCH_MODE } from '../common/entity/MatchState'
 import setupPickups from './setupPickups'
+import setupObjectives from './setupObjectives'
 import { buildTeleporters, checkTeleport, TELE_COOLDOWN } from './teleporters'
 import Pickup from '../common/entity/Pickup'
+import Flag, { FLAG_STATE } from '../common/entity/Flag'
+import ControlPoint, { CP_OWNER } from '../common/entity/ControlPoint'
+import ObjectiveEvent, { OBJECTIVE_EVENT } from '../common/message/ObjectiveEvent'
 import {
 	PICKUP_TYPE, PICKUP_RADIUS, CHARGE_LEAD_SECONDS, HEALTH_HEAL, HEALTH_CAP,
 	REST_HEIGHT, ARMOR_PICKUP, ARMOR_CAP, ARMOR_ABSORB,
@@ -177,11 +181,36 @@ const FRIENDLY_FIRE = false
 // Resolved per-instance in the constructor from (in order): env MODE=FFA|TDM, the
 // constructor's modeArg (the rotation entry's effective mode — serverMain passes it),
 // the map registry's `mode` field, else TDM.
-const GAME_MODE = { TDM: MATCH_MODE.TDM, FFA: MATCH_MODE.FFA }
+const GAME_MODE = { TDM: MATCH_MODE.TDM, FFA: MATCH_MODE.FFA, CTF: MATCH_MODE.CTF, DOM: MATCH_MODE.DOM }
 // The score cap is the DIFFICULTY dial and ENDS the match early the moment a team
 // (TDM) or a player (FFA) reaches it — at any time, including overtime. Kept at 40 as
-// the tunable starting difficulty (NOT a blowout number).
+// the tunable starting difficulty (NOT a blowout number). CTF/DOM caps are mode-aware
+// (see capFor()): CTF ends at CAPTURE_LIMIT flag captures; DOM at DOM_SCORE_LIMIT
+// accumulated hold-ticks. All three share the 10-min timer fallback + 8:00 tie-check +
+// sudden-death machine (scores still land in teamScore[0|1]).
 const FRAG_LIMIT = 40
+// ---------------------------------------------------------------------------
+// OBJECTIVE MODES (CTF / DOM) v1
+// ---------------------------------------------------------------------------
+// CTF: first team to CAPTURE_LIMIT flag captures wins (each capture = +1 team score).
+const CAPTURE_LIMIT = 3
+// A DROPPED flag auto-returns home after this long (UT99 default ~45s; tuned down for
+// the smaller arena). The active touch-return by a teammate is the faster defense path.
+// FLAG_RETURN_SECONDS env is a DEV/PROBE override only (production leaves it unset).
+const FLAG_RETURN_SECONDS = parseFloat(process.env.FLAG_RETURN_SECONDS) > 0
+	? parseFloat(process.env.FLAG_RETURN_SECONDS) : 20
+// DOM: first team to DOM_SCORE_LIMIT wins. A held point mints scorePerTickPerPoint
+// (registry, =1) every DOM_TICK_MS.
+const DOM_SCORE_LIMIT = 100
+const DOM_TICK_MS = 1000
+// Objective touch geometry (world metres) — teleporter-style: an XZ radius + a vertical
+// band over the marker. Slightly wider than the 1.2m portal radius so a brush past a
+// flag/point still triggers.
+const OBJECTIVE_RADIUS = 1.6
+const OBJECTIVE_Y_BELOW = 1.0
+const OBJECTIVE_Y_ABOVE = 2.2
+// Rest height above the probed floor for a DROPPED flag (mirrors setupObjectives).
+const OBJECTIVE_REST = 0.5
 // Regulation runs to 10:00 — a decided match fills the ~10-minute block window. The
 // score cap can still end it earlier. TIE_CHECK_MS is the 8:00 mark: if the score is
 // EXACTLY tied there we go to SUDDEN DEATH immediately; otherwise play on to 10:00.
@@ -335,15 +364,30 @@ class GameInstance {
 		// GAME MODE resolution (env override → rotation modeArg → map registry `mode`
 		// → default TDM). modeArg is the rotation entry's EFFECTIVE mode string
 		// ('FFA'|'TDM') from serverMain; env MODE stays the dev/probe escape hatch.
+		const resolveMode = (s) => {
+			s = (s || '').toUpperCase()
+			if (s === 'FFA') return GAME_MODE.FFA
+			if (s === 'TDM') return GAME_MODE.TDM
+			if (s === 'CTF') return GAME_MODE.CTF
+			if (s === 'DOM') return GAME_MODE.DOM
+			return null
+		}
 		const envMode = (process.env.MODE || '').toUpperCase()
 		const argMode = (modeArg || '').toUpperCase()
-		this.gameMode = envMode === 'FFA' ? GAME_MODE.FFA
-			: envMode === 'TDM' ? GAME_MODE.TDM
-			: argMode === 'FFA' ? GAME_MODE.FFA
-			: argMode === 'TDM' ? GAME_MODE.TDM
-			: (this.map && typeof this.map.mode === 'string' && this.map.mode.toUpperCase() === 'FFA'
-				? GAME_MODE.FFA : GAME_MODE.TDM)
-		console.log(`[match] mode=${this.gameMode === GAME_MODE.FFA ? 'FFA' : 'TDM'}`)
+		// env override → rotation modeArg → the map record's EFFECTIVE mode → default TDM.
+		this.gameMode = resolveMode(envMode)
+			?? resolveMode(argMode)
+			?? resolveMode(this.map ? effectiveMode(this.map) : '')
+			?? GAME_MODE.TDM
+		const MODE_LABEL = { [GAME_MODE.TDM]: 'TDM', [GAME_MODE.FFA]: 'FFA', [GAME_MODE.CTF]: 'CTF', [GAME_MODE.DOM]: 'DOM' }
+		console.log(`[match] mode=${MODE_LABEL[this.gameMode]}`)
+
+		// OBJECTIVE MODE STATE (CTF/DOM). Filled by _loadMapMesh -> setupObjectives once the
+		// collision mesh is ready (the drop-probes need real geometry). Empty for every other
+		// mode/map, which makes updateObjectives a cheap no-op.
+		this.flags = []          // CTF Flag entities (2)
+		this.controlPoints = []  // DOM ControlPoint entities (3)
+		this._domTickAt = 0      // next DOM hold-scoring tick (wall-clock ms)
 		// Park it HIGH above the play space but INSIDE the nengi view AABB: centred in
 		// x/z, near the top of the box in y. That keeps it replicated to every client
 		// (the AABB culler reads its x/y/z) while putting its bare historian hitbox where
@@ -471,6 +515,13 @@ class GameInstance {
 					&& raw._lastAttacker.rawEntity ? raw._lastAttacker : null
 				this.damagePlayer(client, recent, 9999, 'disconnect', 0)
 			}
+
+			// CTF combat-log: a carrier who leaves must not vanish the flag. The death
+			// above (an alive carrier disconnecting) already DROPPED it via _dropFlagForNid;
+			// this covers the residual case where no death fired (godmode / MATCH_END
+			// ceasefire) — straight-return any flag still held by this handle. No-op in
+			// every other mode (this.flags empty) and when the death path already dropped it.
+			this._returnFlagIfCarrier(client)
 
 			if (client.rawEntity) {
 				client.rawEntity.mesh.dispose()
@@ -1447,6 +1498,13 @@ class GameInstance {
 			// UT99 TELEPORTERS: pair + floor-snap the registry TELEPORTERS. Same
 			// timing rule as pickups — the drop-probes need the loaded mesh.
 			this.portals = buildTeleporters(this.map, (x, y, z) => this._dropProbeY(x, y, z))
+
+			// CTF/DOM OBJECTIVES: drop-probe the registry flags/control points onto the
+			// floor and spawn their entities (no-op for other modes). Same timing rule.
+			const objectives = setupObjectives(this)
+			this.flags = objectives.flags
+			this.controlPoints = objectives.points
+			this._domTickAt = Date.now() + DOM_TICK_MS
 		} catch (e) { console.error('[map] mesh load FAILED:', e) }
 	}
 
@@ -1847,6 +1905,11 @@ class GameInstance {
 			const overkill = Math.min(255, Math.max(0, damage - hpBefore))
 			this.instance.messageAll(new Killed(attackerNid, victimNid, weaponIndex || 0, overkill, isHeadshot))
 
+			// CTF: if this victim was carrying a flag, drop it at the death spot with a
+			// return timer (no-op in every other mode — this.flags is empty). smooth.nid
+			// is the canonical carrier identity (flag.carrierNid is a smooth nid).
+			this._dropFlagForNid(smooth.nid, raw.x, raw.y, raw.z)
+
 			// DROP-ON-DEATH: scatter the victim's owned non-pistol weapons (carrying their
 			// current ammo) at the death location. Armor is lost on death (not dropped).
 			const nDropped = this.dropWeaponsOnDeath(raw, Date.now())
@@ -2045,15 +2108,24 @@ class GameInstance {
 		return Math.max(this.teamScore[0], this.teamScore[1])
 	}
 
+	// The winning score cap for the active mode: CTF flag captures, DOM hold-ticks, else
+	// the frag cap. Drives the ACTIVE early-end in _afterScore.
+	capFor() {
+		if (this.gameMode === GAME_MODE.CTF) return CAPTURE_LIMIT
+		if (this.gameMode === GAME_MODE.DOM) return DOM_SCORE_LIMIT
+		return FRAG_LIMIT
+	}
+
 	// Post-score bookkeeping: in SUDDEN_DEATH the first frag / lead change (any break of
-	// the tie) decides the match; in ACTIVE the frag cap ends it early the moment it's hit.
+	// the tie) decides the match; in ACTIVE the mode-aware cap ends it early the moment
+	// it's hit.
 	_afterScore() {
 		if (this.matchPhase === MATCH_PHASE.SUDDEN_DEATH) {
 			if (!this.scoresTied()) this.endMatch()
 			return
 		}
 		if (this.matchPhase === MATCH_PHASE.ACTIVE) {
-			if (this.leaderScore() >= FRAG_LIMIT) this.endMatch()
+			if (this.leaderScore() >= this.capFor()) this.endMatch()
 		}
 	}
 
@@ -2127,8 +2199,257 @@ class GameInstance {
 		}
 		this.instance.clients.forEach(c => clearScore(c.rawEntity, c.smoothEntity))
 		this.bots.forEach(b => clearScore(b.rawEntity, b.smoothEntity))
+		// CTF/DOM: every flag home, every control point neutral, and clear the per-entity
+		// rising-edge touch sets so a body standing on an objective at reset can re-trigger.
+		this.flags.forEach(f => {
+			f.state = FLAG_STATE.HOME
+			f._carrier = null
+			f.carrierNid = 0
+			f.x = f.homeX; f.y = f.homeY; f.z = f.homeZ
+			f.droppedAt = 0
+		})
+		this.controlPoints.forEach(cp => { cp.owner = CP_OWNER.NEUTRAL })
+		this._domTickAt = now + DOM_TICK_MS
+		const clearTouch = (raw) => { if (raw) { if (raw._flagInside) raw._flagInside.clear(); if (raw._cpInside) raw._cpInside.clear() } }
+		this.instance.clients.forEach(c => clearTouch(c.rawEntity))
+		this.bots.forEach(b => clearTouch(b.rawEntity))
 		this._matchPublishAt = 0 // force an immediate publish of the fresh state
 		console.log('[match] new ACTIVE match started')
+	}
+
+	// ---- Objectives (CTF / DOM) -------------------------------------------------
+
+	// Broadcast an objective killfeed/announcer event to EVERY client. messageAll uses
+	// the same per-client path Killed/HitConfirmed do (NOT addLocalMessage — that is
+	// spatially culled + needs x/y, which ObjectiveEvent has none of).
+	_objEvent(kind, team, playerNid) {
+		this.instance.messageAll(new ObjectiveEvent(kind, team | 0, playerNid | 0))
+		console.log(`[objective] kind=${kind} team=${team} nid=${playerNid | 0}`)
+	}
+
+	// Revoke a grabber's spawn immunity (raw+smooth in lockstep) — grabbing a flag or
+	// converting a point is an ACTION, same anti-exploit rule as a pickup/mega touch.
+	_revokeObjectiveImmunity(handle) {
+		const raw = handle && handle.rawEntity
+		if (raw && raw.spawnImmunity > 0) {
+			raw.spawnImmunity = 0
+			if (handle.smoothEntity) handle.smoothEntity.spawnImmunity = 0
+		}
+	}
+
+	// teleporter-style touch test: an XZ radius + a vertical band over the marker.
+	_objectiveTouch(raw, obj) {
+		const dx = raw.x - obj.x, dz = raw.z - obj.z
+		if (dx * dx + dz * dz > OBJECTIVE_RADIUS * OBJECTIVE_RADIUS) return false
+		return raw.y >= obj.y - OBJECTIVE_Y_BELOW && raw.y <= obj.y + OBJECTIVE_Y_ABOVE
+	}
+
+	// The canonical (smooth) nid for a client/bot handle — the identity every client
+	// shares (bots share one entity, so raw===smooth).
+	_handleNid(handle) {
+		return handle.smoothEntity ? handle.smoothEntity.nid : (handle.rawEntity ? handle.rawEntity.nid : 0)
+	}
+
+	// Return a flag to its home stand (from a timed auto-return or a teammate touch).
+	_returnFlag(flag, byHandle = null) {
+		flag.state = FLAG_STATE.HOME
+		flag._carrier = null
+		flag.carrierNid = 0
+		flag.x = flag.homeX; flag.y = flag.homeY; flag.z = flag.homeZ
+		flag.droppedAt = 0
+		this._objEvent(OBJECTIVE_EVENT.FLAG_RETURNED, flag.team, byHandle ? this._handleNid(byHandle) : 0)
+	}
+
+	// Steal (from HOME) / pick up (a DROPPED enemy flag): the toucher becomes the carrier.
+	_grabFlag(handle, flag) {
+		flag.state = FLAG_STATE.CARRIED
+		flag._carrier = handle
+		flag.carrierNid = this._handleNid(handle)
+		const raw = handle.rawEntity
+		flag.x = raw.x; flag.y = raw.y; flag.z = raw.z
+		flag.droppedAt = 0
+		this._revokeObjectiveImmunity(handle)
+		this._objEvent(OBJECTIVE_EVENT.FLAG_TAKEN, flag.team, flag.carrierNid)
+	}
+
+	// A carrier scored: +1 to their team, the carried flag goes home, run the cap check.
+	_captureFlag(handle, carriedFlag) {
+		const team = handle.rawEntity.teamId
+		this._addTeamScore(team, +1)
+		carriedFlag.state = FLAG_STATE.HOME
+		carriedFlag._carrier = null
+		carriedFlag.carrierNid = 0
+		carriedFlag.x = carriedFlag.homeX; carriedFlag.y = carriedFlag.homeY; carriedFlag.z = carriedFlag.homeZ
+		carriedFlag.droppedAt = 0
+		this._objEvent(OBJECTIVE_EVENT.FLAG_CAPTURED, team, this._handleNid(handle))
+		// PROOF OF BLOOD: a capture is worth more than a frag (100). Mirrors the kill
+		// convention (self-gating via _bloodName), for humans and bots alike.
+		const name = this._bloodName(handle)
+		if (name) this.bloodLedger.recordHash(name, 500, 'capture')
+		this._afterScore()
+	}
+
+	// Drop the flag carried by `smoothNid` (called from the death path + combat-log) at
+	// (x,y,z), drop-probed to the floor, with a return timer. No-op if that nid carries
+	// nothing (and in every non-CTF mode — this.flags is empty).
+	_dropFlagForNid(smoothNid, x, y, z) {
+		for (const flag of this.flags) {
+			if (flag.state !== FLAG_STATE.CARRIED || flag.carrierNid !== smoothNid) continue
+			const floorY = this._dropProbeY(x, y, z)
+			flag.state = FLAG_STATE.DROPPED
+			flag._carrier = null
+			flag.carrierNid = 0
+			flag.x = x
+			flag.y = floorY != null ? floorY + OBJECTIVE_REST : y
+			flag.z = z
+			flag.droppedAt = Date.now()
+			this._objEvent(OBJECTIVE_EVENT.FLAG_DROPPED, flag.team, smoothNid)
+		}
+	}
+
+	// Combat-log safety: straight-return any flag still held by this handle (the death
+	// path drops it first for an alive carrier; this only bites when no death fired).
+	_returnFlagIfCarrier(handle) {
+		for (const flag of this.flags) {
+			if (flag.state === FLAG_STATE.CARRIED && flag._carrier === handle) this._returnFlag(flag)
+		}
+	}
+
+	// UT99 CTF rules, run each tick while scoring is live. Carried flags ride their
+	// carrier (per-tick position copy — keeps the historian honest across teleports);
+	// dropped flags auto-return on the timer; touch resolves steal/pickup/return/capture
+	// on the RISING edge (per-entity _flagInside set, teleporter pattern).
+	_updateFlags(now, targets) {
+		const flags = this.flags
+		// 1) carried-flag position copy + dropped-flag auto-return
+		for (const flag of flags) {
+			if (flag.state === FLAG_STATE.CARRIED) {
+				const raw = flag._carrier && flag._carrier.rawEntity
+				if (!raw || !raw.isAlive) { this._returnFlag(flag); continue } // carrier vanished
+				flag.x = raw.x; flag.y = raw.y; flag.z = raw.z
+			} else if (flag.state === FLAG_STATE.DROPPED) {
+				if (now - flag.droppedAt >= FLAG_RETURN_SECONDS * 1000) this._returnFlag(flag)
+			}
+		}
+		// 2) touch resolution (rising edge per handle per flag, keyed by flag.team)
+		for (const handle of targets) {
+			const raw = handle.rawEntity
+			if (!raw._flagInside) raw._flagInside = new Set()
+			for (const flag of flags) {
+				const inside = this._objectiveTouch(raw, flag)
+				const was = raw._flagInside.has(flag.team)
+				if (!inside) { if (was) raw._flagInside.delete(flag.team); continue }
+				if (was) continue // still standing where we already were — no re-fire
+				raw._flagInside.add(flag.team)
+				this._resolveFlagTouch(handle, flag)
+			}
+		}
+	}
+
+	// Resolve one rising-edge flag touch under UT99 rules.
+	_resolveFlagTouch(handle, flag) {
+		const raw = handle.rawEntity
+		const myTeam = raw.teamId
+		if (flag.state === FLAG_STATE.CARRIED) return // a carried flag isn't on its stand
+		const ownFlag = flag.team === myTeam
+		if (flag.state === FLAG_STATE.HOME) {
+			if (ownFlag) {
+				// touching my OWN home flag: a CAPTURE if I'm carrying the enemy flag (and my
+				// own flag is home — it is, this one is HOME). UT rule: no cap with your flag out.
+				const carried = this.flags.find(f => f._carrier === handle && f.state === FLAG_STATE.CARRIED)
+				if (carried) this._captureFlag(handle, carried)
+			} else {
+				this._grabFlag(handle, flag) // steal the enemy flag from its stand
+			}
+		} else if (flag.state === FLAG_STATE.DROPPED) {
+			if (ownFlag) this._returnFlag(flag, handle) // active-defense return
+			else this._grabFlag(handle, flag)           // pick up the dropped enemy flag
+		}
+	}
+
+	// UT99 Domination: instant capture-on-touch (rising edge) + a central hold-scoring
+	// tick. Run each tick while scoring is live.
+	_updateControlPoints(now, targets) {
+		// 1) convert on touch (rising edge per handle per point)
+		for (const handle of targets) {
+			const raw = handle.rawEntity
+			const myTeam = raw.teamId
+			if (!raw._cpInside) raw._cpInside = new Set()
+			for (const cp of this.controlPoints) {
+				const inside = this._objectiveTouch(raw, cp)
+				const was = raw._cpInside.has(cp.index)
+				if (!inside) { if (was) raw._cpInside.delete(cp.index); continue }
+				if (was) continue
+				raw._cpInside.add(cp.index)
+				if (cp.owner !== myTeam) {
+					cp.owner = myTeam
+					this._revokeObjectiveImmunity(handle)
+					this._objEvent(OBJECTIVE_EVENT.DOM_CAPTURED, myTeam, this._handleNid(handle))
+				}
+			}
+		}
+		// 2) central hold-scoring tick (off wall time, NOT per touch): each owned point
+		// mints scorePerTickPerPoint for its owner every DOM_TICK_MS.
+		if (now >= this._domTickAt) {
+			this._domTickAt = now + DOM_TICK_MS
+			const perTick = (this.map.mode_data && this.map.mode_data.scorePerTickPerPoint) || 1
+			let scored = false
+			for (const cp of this.controlPoints) {
+				if (cp.owner === CP_OWNER.RED || cp.owner === CP_OWNER.BLUE) {
+					this._addTeamScore(cp.owner, perTick); scored = true
+				}
+			}
+			if (scored) this._afterScore()
+		}
+	}
+
+	// Per-tick objective driver. Gated on _scoringLive() so a flag carry / point hold
+	// FREEZES through the MATCH_END intermission (no score minted behind the banner).
+	// A no-op in TDM/FFA (this.flags / this.controlPoints empty).
+	updateObjectives(now) {
+		if (!this._scoringLive()) return
+		const isCTF = this.gameMode === GAME_MODE.CTF && this.flags.length
+		const isDOM = this.gameMode === GAME_MODE.DOM && this.controlPoints.length
+		if (!isCTF && !isDOM) return
+
+		const targets = []
+		this.instance.clients.forEach(c => { if (c.rawEntity && c.rawEntity.isAlive) targets.push(c) })
+		for (const b of this.bots) { if (b.rawEntity && b.rawEntity.isAlive) targets.push(b) }
+
+		if (isCTF) this._updateFlags(now, targets)
+		if (isDOM) this._updateControlPoints(now, targets)
+	}
+
+	// Bots v1: the objective DESTINATION for one bot this tick (world units), or null to
+	// keep the default pickup roam. Only travel is biased — a live visible enemy still
+	// preempts it in BotController (this is fed only into the no-target roam branch).
+	//   CTF: a carrier heads for its own flag's home stand; OFFENSE bots (even nid) chase
+	//        the enemy flag's current position; DEFENSE bots (odd nid) hold near own stand.
+	//   DOM: head for the nearest point NOT owned by the bot's team (own all -> null).
+	_botObjective(handle) {
+		const raw = handle.rawEntity
+		if (!raw) return null
+		const team = raw.teamId
+		if (this.gameMode === GAME_MODE.CTF && this.flags.length) {
+			const ownFlag = this.flags.find(f => f.team === team)
+			const enemyFlag = this.flags.find(f => f.team !== team)
+			if (!ownFlag || !enemyFlag) return null
+			const carrying = this.flags.some(f => f._carrier === handle)
+			if (carrying) return { x: ownFlag.homeX, y: ownFlag.homeY, z: ownFlag.homeZ }
+			const offense = (raw.nid % 2) === 0
+			if (offense) return { x: enemyFlag.x, y: enemyFlag.y, z: enemyFlag.z }
+			return { x: ownFlag.homeX, y: ownFlag.homeY, z: ownFlag.homeZ }
+		}
+		if (this.gameMode === GAME_MODE.DOM && this.controlPoints.length) {
+			let best = null, bestD = Infinity
+			for (const cp of this.controlPoints) {
+				if (cp.owner === team) continue
+				const d = (cp.x - raw.x) ** 2 + (cp.z - raw.z) ** 2
+				if (d < bestD) { bestD = d; best = cp }
+			}
+			return best ? { x: best.x, y: best.y, z: best.z } : null
+		}
+		return null
 	}
 
 	// Drive the match state machine + publish the low-rate MatchState entity. Called once
@@ -2273,6 +2594,13 @@ class GameInstance {
 			}
 			const entity = bot.rawEntity
 			if (!entity.isAlive) return
+			// OBJECTIVE BIAS (CTF/DOM): feed the bot its objective destination for the
+			// no-enemy roam branch (BotController only uses it there — a live visible enemy
+			// still preempts). Cheap; recomputed per tick off current flag/point state.
+			if ((this.gameMode === GAME_MODE.CTF || this.gameMode === GAME_MODE.DOM)
+				&& bot.controller && typeof bot.controller.setObjective === 'function') {
+				bot.controller.setObjective(this._botObjective(bot))
+			}
 			const command = bot.controller.think(delta, wallNow, this.combatants(entity), this.occluderMeshes)
 			// MENU SAFETY: bots obey the same spawn-immunity revocation rule as
 			// humans — first movement/fire intent ends the shield (a bot's raw and
@@ -2635,6 +2963,11 @@ class GameInstance {
 		// per-player overheal decay. Server-authoritative, outside client prediction.
 		this.updateMegaHealth(wallNow)
 		this.updatePickups(wallNow)
+		// CTF/DOM objectives: flag carry/steal/return/capture + point convert/hold-score.
+		// Gated on _scoringLive() inside (frozen through the MATCH_END intermission — spec
+		// risk #5). After movement/teleport this tick so a carried flag rides the carrier's
+		// post-teleport position, and BEFORE updateMatch so a capture/hold win lands this tick.
+		this.updateObjectives(wallNow)
 		this.updateOverhealDecay(delta)
 
 		// TDM: advance the match state machine (win check, intermission, reset) and

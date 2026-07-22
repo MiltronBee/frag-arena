@@ -34,7 +34,12 @@ export const MATCH_WINNER = { TEAM0: 0, TEAM1: 1, DRAW: 2 }
 // MODE encoding carried on the MatchState so the client knows how to read the match:
 //   0 TDM — two team scores, friendly fire off
 //   1 FFA — no teams, individual frag scoring, everyone can damage everyone
-export const MATCH_MODE = { TDM: 0, FFA: 1 }
+//   2 CTF — two team scores fed by flag captures (team scoreboard, like TDM)
+//   3 DOM — two team scores fed by held control points (team scoreboard, like TDM)
+// CTF/DOM read as team modes on the HUD (ffa=false); the objective HUD chips + the
+// mode announcer callout are the only client-side differences. `mode` is already a
+// UInt8 on the protocol — no protocol change.
+export const MATCH_MODE = { TDM: 0, FFA: 1, CTF: 2, DOM: 3 }
 
 class MatchState {
 	constructor(startX = 0, startY = 0, startZ = 0) {

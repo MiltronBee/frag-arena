@@ -310,6 +310,27 @@ export default ({ simulator /* inject depenencies here */ }) => {
 					entity.mesh.dispose()
 				}
 			}
+		},
+		// CTF FLAG (v1). The tinted placeholder box built in the entity constructor IS
+		// the marker (additive-RGB team tint — no bespoke model / no DynamicTexture, the
+		// corona lesson). create() registers it so _updateObjectives can recolor it by
+		// state + drive the flag HUD chips; the box position is server-authored (a
+		// carried flag rides its carrier). delete() only fires on shutdown.
+		'Flag': {
+			create({ data, entity }) { simulator.registerFlag(entity) },
+			delete({ nid, entity }) {
+				simulator.unregisterFlag(nid)
+				if (entity && entity.mesh && typeof entity.mesh.dispose === 'function') entity.mesh.dispose()
+			}
+		},
+		// DOM CONTROL POINT (v1). Same shape as Flag: the tinted box is the marker,
+		// recolored by owner in _updateObjectives; drives the point HUD chips.
+		'ControlPoint': {
+			create({ data, entity }) { simulator.registerControlPoint(entity) },
+			delete({ nid, entity }) {
+				simulator.unregisterControlPoint(nid)
+				if (entity && entity.mesh && typeof entity.mesh.dispose === 'function') entity.mesh.dispose()
+			}
 		}
 	}
 }

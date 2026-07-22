@@ -33,6 +33,9 @@ import preloadAssets from './graphics/assetPreloader'
 import { MEGA_STATE } from '../common/entity/MegaHealthPickup'
 import { MATCH_PHASE, MATCH_WINNER, MATCH_MODE } from '../common/entity/MatchState'
 import { PICKUP_TYPE, PICKUP_RADIUS } from '../common/pickupConfig'
+import { FLAG_STATE } from '../common/entity/Flag'
+import { CP_OWNER } from '../common/entity/ControlPoint'
+import { OBJECTIVE_EVENT } from '../common/message/ObjectiveEvent'
 
 // Aim-safe positional camera pulse on a confirmed LOCAL flesh hit (world units of
 // velocity impulse fed to the existing recoil spring; never rotates aim). Kept small
@@ -78,6 +81,9 @@ class Simulator {
 		this._megaHealth = null          // the Phase 4 mega-health pickup entity (bob/spin/hum tell)
 		this._megaState = -1             // last-seen networked pickup state (drives transitions)
 		this._pickups = new Map()        // nid -> Pickup entity (UT-style map items; bob/spin off state)
+		this._flags = new Map()          // nid -> Flag entity (CTF markers; recolor + HUD chips)
+		this._controlPoints = new Map()  // nid -> ControlPoint entity (DOM markers; recolor + HUD chips)
+		this._objHudSig = null           // last painted objective-HUD signature (skip DOM churn)
 		this._lastOwned = undefined      // last-seen ownedWeapons bitmask (drives the local ammo-refill mirror)
 
 		// procedural weapon audio (WebAudio). Silent until resume() runs from a user
@@ -354,6 +360,11 @@ class Simulator {
 		// victim-only: directional damage arc + scaled red screen wash
 		client.on('message::DamageTaken', message => {
 			this.fragLayer.onDamageTaken(message)
+		})
+
+		// broadcast: CTF/DOM objective event -> killfeed line + announcer callout
+		client.on('message::ObjectiveEvent', message => {
+			this._onObjectiveEvent(message)
 		})
 
 		client.on('message::WeaponFired', message => {
@@ -1026,7 +1037,11 @@ class Simulator {
 				// medals, then "Fight!" + a staggered mode callout (both heard past cooldown).
 				this._resetMedals()
 				this.audio.announce('fight', { gain: 0.9 })
-				if (!ffa) setTimeout(() => { if (this.audio) this.audio.announce('team_deathmatch', { gain: 0.85, minGap: 0 }) }, 1400)
+				// staggered mode callout: CTF/DOM get their own voice; FFA gets none.
+				const modeClip = mode === MATCH_MODE.CTF ? 'capture_the_flag'
+					: mode === MATCH_MODE.DOM ? 'domination'
+					: mode === MATCH_MODE.TDM ? 'team_deathmatch' : null
+				if (modeClip) setTimeout(() => { if (this.audio) this.audio.announce(modeClip, { gain: 0.85, minGap: 0 }) }, 1400)
 			} else if (phase === MATCH_PHASE.SUDDEN_DEATH) {
 				// overtime tension cue (no bespoke sudden-death clip ships — reuse "Fight!").
 				this.audio.announce('fight', { gain: 0.9 })
@@ -1171,6 +1186,108 @@ class Simulator {
 	// state; the client never asserts a pickup.
 	registerPickup(entity) { if (entity) { entity._lastState = -1; this._pickups.set(entity.nid, entity) } }
 	unregisterPickup(nid) { this._pickups.delete(nid) }
+
+	// CTF / DOM objective bookkeeping (called from the Flag / ControlPoint factories).
+	// The entity's tinted box IS the marker; _updateObjectives recolors it off the
+	// networked state/owner and drives the HUD chips. Server-authoritative — read only.
+	registerFlag(entity) { if (entity) this._flags.set(entity.nid, entity) }
+	unregisterFlag(nid) { this._flags.delete(nid) }
+	registerControlPoint(entity) { if (entity) this._controlPoints.set(entity.nid, entity) }
+	unregisterControlPoint(nid) { this._controlPoints.delete(nid) }
+
+	// Recolor the objective markers off their networked state/owner and repaint the
+	// HUD chips. Fail-soft (try/catch, like the map material hooks) — a cosmetic throw
+	// must never break the frame. Cheap: the DOM chips only rebuild on a value change.
+	_updateObjectives() {
+		if (!this._flags.size && !this._controlPoints.size) return
+		try {
+			const now = performance.now()
+			// CTF flag markers: team-tint pulse; brighter while CARRIED, cool white flash
+			// while DROPPED (additive emissive only — no opacity, the corona lesson).
+			this._flags.forEach((f) => {
+				const mat = f.mat
+				if (!mat || !mat.emissiveColor) return
+				const red = f.team === 0
+				const base = red ? [1.0, 0.15, 0.12] : [0.2, 0.45, 1.0]
+				let k = 1
+				if (f.state === FLAG_STATE.CARRIED) k = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(now * 0.012))
+				else if (f.state === FLAG_STATE.DROPPED) k = 0.4 + 0.3 * (0.5 + 0.5 * Math.sin(now * 0.02))
+				mat.emissiveColor.set(base[0] * k, base[1] * k, base[2] * k)
+			})
+			// DOM point markers: owner tint (RED / BLUE / neutral grey).
+			this._controlPoints.forEach((cp) => {
+				const mat = cp.mat
+				if (!mat || !mat.emissiveColor) return
+				if (cp.owner === CP_OWNER.RED) mat.emissiveColor.set(1.0, 0.15, 0.12)
+				else if (cp.owner === CP_OWNER.BLUE) mat.emissiveColor.set(0.2, 0.45, 1.0)
+				else mat.emissiveColor.set(0.6, 0.6, 0.6)
+			})
+			this._paintObjectiveHud()
+		} catch (e) { /* cosmetic-only: never break the frame */ }
+	}
+
+	// Paint the flag / point HUD chips near the scoreboard off the live objective
+	// entities + the networked MatchState mode. Rebuilds the chip row only when a
+	// value changes (signature compare) so it's near-free per frame.
+	_paintObjectiveHud() {
+		const host = document.getElementById('objective-hud')
+		if (!host) return
+		const ms = this._matchState
+		const mode = ms ? (ms.mode | 0) : -1
+		let sig = mode + '|'
+		if (mode === MATCH_MODE.CTF) {
+			const flags = [...this._flags.values()].sort((a, b) => a.team - b.team)
+			sig += flags.map((f) => f.team + ':' + f.state).join(',')
+		} else if (mode === MATCH_MODE.DOM) {
+			const cps = [...this._controlPoints.values()].sort((a, b) => a.index - b.index)
+			sig += cps.map((c) => c.index + ':' + c.owner).join(',')
+		}
+		if (sig === this._objHudSig) return
+		this._objHudSig = sig
+
+		if (mode === MATCH_MODE.CTF && this._flags.size) {
+			const flags = [...this._flags.values()].sort((a, b) => a.team - b.team)
+			const stName = ['HOME', 'HELD', 'DROP']
+			host.innerHTML = flags.map((f) => {
+				const team = f.team === 0 ? 'red' : 'blue'
+				const label = f.team === 0 ? 'RED' : 'BLU'
+				const st = stName[f.state] || 'HOME'
+				return `<span class="obj-chip obj-${team} obj-${st.toLowerCase()}"><b>${label}</b><i>${st}</i></span>`
+			}).join('')
+			host.dataset.mode = 'ctf'
+			host.setAttribute('aria-hidden', 'false')
+		} else if (mode === MATCH_MODE.DOM && this._controlPoints.size) {
+			const cps = [...this._controlPoints.values()].sort((a, b) => a.index - b.index)
+			const letter = ['A', 'B', 'C', 'D', 'E']
+			host.innerHTML = cps.map((c) => {
+				const own = c.owner === CP_OWNER.RED ? 'red' : c.owner === CP_OWNER.BLUE ? 'blue' : 'neutral'
+				return `<span class="obj-chip obj-${own}"><b>${letter[c.index] || (c.index + 1)}</b></span>`
+			}).join('')
+			host.dataset.mode = 'dom'
+			host.setAttribute('aria-hidden', 'false')
+		} else {
+			host.dataset.mode = 'none'
+			host.setAttribute('aria-hidden', 'true')
+			host.innerHTML = ''
+		}
+	}
+
+	// A server ObjectiveEvent (CTF/DOM): a killfeed line + an existing announcer clip
+	// (no new SFX in v1). team/kind are server enums — the text is built client-side
+	// (never from untrusted input). Presentation only; scores flow through MatchState.
+	_onObjectiveEvent(m) {
+		const teamName = (m.team | 0) === 0 ? 'RED' : 'BLUE'
+		let text = null, clip = null
+		switch (m.kind | 0) {
+			case OBJECTIVE_EVENT.FLAG_TAKEN: text = `${teamName} FLAG TAKEN`; clip = 'flag_taken'; break
+			case OBJECTIVE_EVENT.FLAG_DROPPED: text = `${teamName} FLAG DROPPED`; break
+			case OBJECTIVE_EVENT.FLAG_RETURNED: text = `${teamName} FLAG RETURNED`; clip = 'flag_returned'; break
+			case OBJECTIVE_EVENT.FLAG_CAPTURED: text = `${teamName} SCORES`; clip = 'flag_captured'; break
+			case OBJECTIVE_EVENT.DOM_CAPTURED: text = `${teamName} TAKES A POINT`; clip = 'point_captured'; break
+		}
+		if (text && this.fragLayer && this.fragLayer.pushObjectiveFeed) this.fragLayer.pushObjectiveFeed(text)
+		if (clip && this.audio) this.audio.announce(clip, { gain: 0.9, minGap: 0.2 })
+	}
 
 	// Presentation + local-refill mirror for every live pickup. Reacts to the networked
 	// `state` (AVAILABLE→visible+bob+spin, HIDDEN→off). On the AVAILABLE→HIDDEN grab
@@ -1730,6 +1847,7 @@ class Simulator {
 		// (ownedWeapons + pickup transitions), then bob/spin the visible items.
 		this._syncOwnershipRefill()
 		this._updatePickups()
+		this._updateObjectives()
 
 		// advance kill-feedback FX (corpses, gibs, damage arc). Runs after the
 		// character models are driven so a corpse's frozen pose isn't re-overridden.

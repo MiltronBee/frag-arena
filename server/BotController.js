@@ -365,10 +365,19 @@ class BotController {
 		this.pathAt = 0         // next time replanning is allowed
 		this.pickupGoal = -1    // roam-destination pickup node when there is no enemy
 		this.pickupUntil = 0
+		// OBJECTIVE BIAS (CTF/DOM) v1: a {x,y,z} world destination set per tick by
+		// GameInstance. When present it REPLACES the random pickup roam target (only in the
+		// no-enemy branch of navigate — a live visible enemy still preempts). null = roam.
+		this.objectiveDest = null
 		this.wantJump = false   // set by navigate() when the current segment is a jump edge
 		this.brake = false      // set by navigate() when braking into a sharp corner
 		this.tick = 0           // think-tick counter (drives the half-speed brake duty)
 	}
+
+	// OBJECTIVE BIAS (CTF/DOM): GameInstance sets the bot's current objective destination
+	// (world {x,y,z}) each tick, or null to fall back to the random pickup roam. Consumed
+	// only in navigate()'s no-enemy branch.
+	setObjective(dest) { this.objectiveDest = dest || null }
 
 	// One AI tick: returns a MoveCommand-shaped plain object for applyCommand.
 	// `combatants` = alive entities it may fight (never includes itself).
@@ -562,6 +571,13 @@ class BotController {
 		if (target) {
 			destX = target.x; destZ = target.z
 			goalNode = nearestNode(g, target.x, target.y, target.z)
+		} else if (this.objectiveDest) {
+			// OBJECTIVE BIAS (CTF/DOM): roam toward the mode's objective instead of a random
+			// pickup. Everything downstream (A* throttle, carrot pursuit, ledge braking) is
+			// untouched — only the destination node changes.
+			goalNode = nearestNode(g, this.objectiveDest.x, this.objectiveDest.y, this.objectiveDest.z)
+			if (goalNode < 0) return null
+			destX = g.nodes[goalNode].x; destZ = g.nodes[goalNode].z
 		} else {
 			// roam: hold one reachable pickup for a while, then pick another (also when the
 			// current route completes, so the bot doesn't stall on a reached pickup)

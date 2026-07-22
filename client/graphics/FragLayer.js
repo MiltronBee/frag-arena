@@ -251,6 +251,23 @@ export default class FragLayer {
     }, KILL_FEED_LIFE)
   }
 
+  // OBJECTIVE FEED (CTF/DOM): a killfeed-styled line for a flag/point event. Reuses the
+  // kill-feed element + trim/fade. `text` is built client-side from a server enum (never
+  // untrusted input), so setting innerHTML is safe here.
+  pushObjectiveFeed(text) {
+    if (!this.feedEl) return
+    const row = document.createElement('div')
+    row.className = 'kill-feed-row kf-objective'
+    row.innerHTML = `<span class="kf-objective-text">${text}</span>`
+    this.feedEl.insertBefore(row, this.feedEl.firstChild)
+    while (this.feedEl.children.length > KILL_FEED_MAX) this.feedEl.removeChild(this.feedEl.lastChild)
+    requestAnimationFrame(() => row.classList.add('kf-in'))
+    setTimeout(() => {
+      row.classList.add('kf-out')
+      setTimeout(() => { if (row.parentNode) row.parentNode.removeChild(row) }, 400)
+    }, KILL_FEED_LIFE)
+  }
+
   _showFragBanner(victimNid) {
     const el = this.bannerEl
     // gold verb + ink callsign (HUD2030 §B2). textContent-built spans so a hostile

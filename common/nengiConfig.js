@@ -21,6 +21,9 @@ import Grenade from './entity/Grenade'
 import MegaHealthPickup from './entity/MegaHealthPickup'
 import Pickup from './entity/Pickup'
 import MatchState from './entity/MatchState'
+import Flag from './entity/Flag'
+import ControlPoint from './entity/ControlPoint'
+import ObjectiveEvent from './message/ObjectiveEvent'
 
 const config = {
     UPDATE_RATE: 40, // raised 20->40 (2026-07-16): halves per-tick dodge jump (0.57m->0.285m)
@@ -49,7 +52,9 @@ const config = {
             ['Grenade', Grenade],
             ['MegaHealthPickup', MegaHealthPickup],
             ['Pickup', Pickup],
-            ['MatchState', MatchState]
+            ['MatchState', MatchState],
+            ['Flag', Flag],
+            ['ControlPoint', ControlPoint]
         ],
         localMessages: [],
         messages: [
@@ -60,7 +65,8 @@ const config = {
             ['HitConfirmed', HitConfirmed],
             ['Killed', Killed],
             ['DamageTaken', DamageTaken],
-            ['PlayerName', PlayerName]
+            ['PlayerName', PlayerName],
+            ['ObjectiveEvent', ObjectiveEvent]
         ],
         commands: [
             ['MoveCommand', MoveCommand],
