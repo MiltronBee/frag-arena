@@ -23,6 +23,10 @@ export default ({ simulator }) => {
 					entity.z = simulator.spawnPos.z
 				}
 				simulator.myRawEntity = entity
+				// a Teleported message may have arrived before this entity existed
+				// (spawn inside a portal trigger) — apply it now, AFTER spawnPos,
+				// since server-side the teleport happened after the spawn.
+				simulator.flushPendingTeleport()
 				simulator.setArenaReady()
 				return
 			}

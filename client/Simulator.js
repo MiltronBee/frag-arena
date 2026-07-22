@@ -212,6 +212,7 @@ class Simulator {
 		this.mySmoothId = -1
 
 		this.myRawEntity = null
+		this._pendingTeleport = null // Teleported that beat our entity create (see handler)
 		this.mySmoothEntity = null
 
 		client.factory = createFactories({
@@ -297,27 +298,16 @@ class Simulator {
 			// this message is the only way the server moves us). UNLIKE respawn it
 			// carries velocity (horizontal speed redirected along the exit facing)
 			// and touches NOTHING about the loadout — weapons/ammo survive a portal.
-			if (!this.myRawEntity) return
-			this.myRawEntity.x = message.x
-			this.myRawEntity.y = message.y
-			this.myRawEntity.z = message.z
-			this.myRawEntity.velX = message.velX
-			this.myRawEntity.velY = message.velY
-			this.myRawEntity.velZ = message.velZ
-
-			// exit facing: the camera owns look yaw (mouse-look writes camera.rotation.y
-			// and the MoveCommand aim ray derives from it — see onmousemove/update), so
-			// snapping it here IS the authoritative turn. TELEPORT_KEEP_YAW = the
-			// destination had no facing; keep the player's current view.
-			if (message.yaw !== TELEPORT_KEEP_YAW && Number.isFinite(message.yaw)) {
-				this.renderer.camera.rotation.y = message.yaw
-			}
-
-			// FX: brief fullscreen flash + a burst at the camera; sound is the respawn
-			// clip pitched up (no dedicated teleport clip shipped yet — SFX pipeline).
-			this.fragLayer.onTeleported()
-			this.audio.teleport()
-			this.renderer.teleportBurst(new BABYLON.Vector3(message.x, message.y + 0.9, message.z))
+			//
+			// A teleport can BEAT our own entity create (a spawn placed inside a
+			// trigger: DEV_SPAWN_AT probes, or a future map-data mistake — the
+			// server's 0.5s spawn grace can expire before a cold page finishes its
+			// join handshake). Dropping the one-shot message here desynced the
+			// client at the entry forever (probe-teleport-baroque caught it), so
+			// stash it instead; createPlayerFactory flushes it the moment
+			// myRawEntity exists.
+			if (!this.myRawEntity) { this._pendingTeleport = message; return }
+			this._applyTeleported(message)
 		})
 
 		// --- kill-feedback messages: forward straight to the FragLayer, which owns
@@ -612,6 +602,42 @@ class Simulator {
 		// dt·3 bleed drained faster than a burst could accrue → visible sawtooth (Bug C).
 		if (this._visClimb > 0) this._visClimb = this._visClimb * Math.exp(-4.0 * (delta || 0.016))
 		if (this._visClimb < 1e-4) this._visClimb = 0
+	}
+
+	// Apply a server Teleported message to our predicted entity (see the
+	// message::Teleported handler for the contract; split out so a stashed
+	// pre-entity message can be applied late via flushPendingTeleport).
+	_applyTeleported(message) {
+		this.myRawEntity.x = message.x
+		this.myRawEntity.y = message.y
+		this.myRawEntity.z = message.z
+		this.myRawEntity.velX = message.velX
+		this.myRawEntity.velY = message.velY
+		this.myRawEntity.velZ = message.velZ
+
+		// exit facing: the camera owns look yaw (mouse-look writes camera.rotation.y
+		// and the MoveCommand aim ray derives from it — see onmousemove/update), so
+		// snapping it here IS the authoritative turn. TELEPORT_KEEP_YAW = the
+		// destination had no facing; keep the player's current view.
+		if (message.yaw !== TELEPORT_KEEP_YAW && Number.isFinite(message.yaw)) {
+			this.renderer.camera.rotation.y = message.yaw
+		}
+
+		// FX: brief fullscreen flash + a burst at the camera; sound is the respawn
+		// clip pitched up (no dedicated teleport clip shipped yet — SFX pipeline).
+		this.fragLayer.onTeleported()
+		this.audio.teleport()
+		this.renderer.teleportBurst(new BABYLON.Vector3(message.x, message.y + 0.9, message.z))
+	}
+
+	// Deferred Teleported that arrived before our raw entity existed — called by
+	// createPlayerFactory right after it assigns myRawEntity (and applies the
+	// Identity spawnPos, which a stashed teleport must override: server-side the
+	// teleport happened AFTER the spawn).
+	flushPendingTeleport() {
+		if (!this._pendingTeleport || !this.myRawEntity) return
+		this._applyTeleported(this._pendingTeleport)
+		this._pendingTeleport = null
 	}
 
 	// Compose the transient shotgun FOV punch onto the LIVE base fov each frame (never
