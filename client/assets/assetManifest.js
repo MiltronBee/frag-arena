@@ -53,6 +53,16 @@ export const assets = {
     handBone: 'hand_r',
     // bone the helmet prop attaches to (see CharacterModel._headNode / _mountHelmet)
     headBone: 'Head',
+    // TDM TEAM UNIFORMS (index = teamId: 0 red, 1 blue). Gemini image-to-image
+    // repaints of the GLB's own T_Superhero_Male_Dark albedo atlas — detailed
+    // tactical suit with team accent panels, skin islands byte-identical to the
+    // original (mask-composited). Regenerate: scripts/gemini-uniform-texture.mjs.
+    // CharacterModel swaps the body material's albedoTexture per teamId; FFA
+    // (no teamId) keeps the GLB's stock texture.
+    teamSkins: [
+      '/assets/characters/hero_male_uniform_red.webp',
+      '/assets/characters/hero_male_uniform_blue.webp',
+    ],
     // rigid head prop parented to the Head bone (rides head animation).
     // TUNED VISUALLY — see probe-helmet
     helmet: {

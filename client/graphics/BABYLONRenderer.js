@@ -6,6 +6,8 @@ import ArenaDressing from './arenaDressing'
 import { getActiveMap } from '../../common/mapMesh'
 import { pairPortals } from '../../common/teleporterData'
 import { bakeVertexColors } from './mapLights'
+import { applyMapMaterialPop } from './mapMaterialPop'
+import { applyTextureVariants } from './textureVariants'
 
 // Layer the first-person viewmodel lives on: vmCamera renders ONLY this, the world
 // camera renders everything EXCEPT it (see the camera setup below). Viewmodel.js
@@ -97,6 +99,17 @@ class BABYLONRenderer {
 			const cssH = (el && el.clientHeight) || window.innerHeight || 720
 			const level = Math.max(1, Math.sqrt((cssW * cssH) / this._pixelBudget))
 			this.engine.setHardwareScalingLevel(level)
+			// PORTRAIT GUN FRAMING: fov is VERTICAL-fixed by default, so on a tall
+			// phone the horizontal frustum collapses (~±14° at 390x844) and the
+			// viewmodel mounts (x ≈ 0.2-0.3 at z ≈ 0.5-0.9, tuned on 16:9) leave the
+			// frame entirely — "guns appear off screen in vertical mode". Fixing the
+			// HORIZONTAL fov on the vm camera in portrait keeps the authored gun
+			// framing at any aspect; the world camera is left alone (gameplay FOV).
+			if (this.vmCamera) {
+				this.vmCamera.fovMode = cssW < cssH
+					? BABYLON.Camera.FOVMODE_HORIZONTAL_FIXED
+					: BABYLON.Camera.FOVMODE_VERTICAL_FIXED
+			}
 		}
 		this._applyRenderScale()
 		window.addEventListener('resize', this._applyRenderScale)
@@ -133,6 +146,7 @@ class BABYLONRenderer {
 		this.vmCamera.minZ = 0.01 // Prevent close clipping
 		this.vmCamera.maxZ = 10
 		this.vmCamera.layerMask = VM_LAYER_MASK // Renders only viewmodel meshes
+		this._applyRenderScale() // vmCamera exists now — apply the portrait fovMode too
 
 		// Bound once: drawHitscan picks once PER PELLET (the shotgun fires 8), so the
 		// predicate must not allocate a fresh closure on every one.
@@ -550,6 +564,19 @@ class BABYLONRenderer {
 				mapFill.specular = new BABYLON.Color3(0, 0, 0)
 				mapFill.intensity = 0.85
 				mapFill.includedOnlyMeshes = res.meshes.filter(m => m.getTotalVertices && m.getTotalVertices() > 0)
+				// texture pop (hex-tile stochastic diffuse + detail grunge) on the
+				// map materials ONLY — before any freeze; ?flat=1 / touch gated inside.
+				// Both upgrades are STRICTLY COSMETIC: a throw must degrade to the plain
+				// map, never take the whole visual load (and everything after it — bake,
+				// shimmer, coronas) down with it.
+				try { applyMapMaterialPop(this.scene, res.meshes) }
+				catch (e) { console.warn('[map] material pop failed (plain materials kept)', e) }
+				// per-cluster texture VARIANTS — macro-scale repetition break. Runs
+				// AFTER pop so each variant clone inherits the pop upgrades (detail +
+				// hex). Pure mesh split (index-buffer reorder + MultiMaterial): mesh
+				// identity is untouched, so the vertex-light bake below still matches.
+				try { applyTextureVariants(this.scene, res.meshes, this.map) }
+				catch (e) { console.warn('[map] texture variants failed (base textures kept)', e) }
 				console.log('[map] mesh visual loaded:', res.meshes.length)
 				// arena geometry now exists — bake it into the frozen shadow map.
 				this._refreshStaticShadows()

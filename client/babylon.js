@@ -63,9 +63,11 @@ export { Light } from '@babylonjs/core/Lights/light.js'
 export { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js'
 export { DirectionalLight } from '@babylonjs/core/Lights/directionalLight.js'
 export { PointLight } from '@babylonjs/core/Lights/pointLight.js'
+export { Camera } from '@babylonjs/core/Cameras/camera.js' // FOVMODE_* statics (portrait vm framing)
 export { TargetCamera } from '@babylonjs/core/Cameras/targetCamera.js'
 export { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera.js'
 export { AnimationGroup } from '@babylonjs/core/Animations/animationGroup.js'
+export { MaterialPluginBase } from '@babylonjs/core/Materials/materialPluginBase.js' // mapMaterialPop hex-tile plugin (import registers the plugin base runtime)
 
 // ---- window.BABYLON (3 in-page harness scripts read it: probe-anim,
 // verify-fire-attachment, verify-helmet-anims; plus shot-objmap/shot-visage).

@@ -9,6 +9,8 @@
 // bespoke overheal/decay mechanic and a validated hand-placed position; folding it in
 // here would add risk for no gain. This module is the roster of the OTHER item types.
 
+import { weapons } from './weaponsConfig'
+
 // Pickup TYPE enum — networked as the Pickup entity's `type` UInt8 and the switch key
 // the client factory + server grant both read.
 export const PICKUP_TYPE = {
@@ -132,11 +134,14 @@ export function resolvePickup(category, entry, occurrence = 0) {
 		const m = WEAPON_ITEM_MAP[entry.item]
 		if (m === null || m === undefined) return null
 		const weaponIndex = Array.isArray(m) ? m[occurrence % m.length] : m
+		// disabled roster entries (Plasma + Flak, 2026-07-22) never spawn as pickups
+		if (weapons[weaponIndex] && weapons[weaponIndex].disabled) return null
 		return { type: PICKUP_TYPE.WEAPON, weaponIndex }
 	}
 	if (category === 'ammo') {
 		const m = AMMO_ITEM_MAP[entry.item]
 		if (m === null || m === undefined) return null
+		if (weapons[m] && weapons[m].disabled) return null // no ammo for disabled weapons
 		return { type: PICKUP_TYPE.AMMO, weaponIndex: m }
 	}
 	if (category === 'health')  return { type: PICKUP_TYPE.HEALTH,  weaponIndex: 0 }

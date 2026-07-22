@@ -4,11 +4,45 @@ import { USE_MESH_MAP } from '../../common/mapMesh'
 
 // TDM TEAM COLORS. Classic RED (team 0) vs BLUE (team 1): maximum hue separation,
 // universally read as "us vs them" in competitive shooters, and distinguishable for
-// the common red-green color-vision deficiencies (red vs blue, not red vs green). The
-// body tint is a dim emissive wash (keeps the model readable, just team-tinted); the
-// nametag uses the brighter CSS variant for an at-a-glance teammate/enemy call.
-const TEAM_BODY_TINT = [new BABYLON.Color3(0.55, 0.06, 0.06), new BABYLON.Color3(0.06, 0.20, 0.60)]
+// the common red-green color-vision deficiencies (red vs blue, not red vs green).
+//
+// Team identity is carried by DETAILED UNIFORM TEXTURES (spec.teamSkins — full
+// repaints of the body's albedo atlas: tactical suit with team accent panels;
+// see scripts/gemini-uniform-texture.mjs) swapped onto the body material per
+// teamId. The old full-body emissive color-wash is gone; what remains is a
+// SUBTLE team emissive (~12% of the old wash) so the team still reads in one
+// glance at 30m+ / in dark corners, without flattening the suit detail. The
+// nametag keeps the brighter CSS variant for the at-a-glance call.
+// RED glow is biased toward ORANGE (green lifted off pure red) per the banger
+// brief S2: protans see pure red much darker, so an orange-red cue survives on
+// luminance, not just hue. BLUE stays cobalt. Magnitude kept at the ~12-15% the
+// brief calls right for a dark-map read without flattening the suit detail.
+const TEAM_BODY_GLOW = [new BABYLON.Color3(0.11, 0.050, 0.012), new BABYLON.Color3(0.012, 0.036, 0.11)]
 const TEAM_NAMETAG_CSS = ['#ff5a5a', '#5aa6ff']
+
+// Shared team-uniform textures (one GPU texture per url per scene — every body on
+// a team samples the same texture). invertY=false matches the glTF loader's UV
+// convention (glTF images are top-left origin; a default Babylon Texture would
+// load them flipped).
+const _teamTexCache = new Map() // url -> BABYLON.Texture
+function _teamTexture(scene, url) {
+  const cached = _teamTexCache.get(url)
+  // Recreate if the cached texture is dead or belongs to a torn-down scene.
+  // NOTE: isDisposed() is a Node/mesh method — BaseTexture does NOT expose it in
+  // every Babylon build (it throws "isDisposed is not a function" on the babylon9
+  // upgrade), so guard the call and lean on getScene() as the portable staleness
+  // check (a disposed/foreign texture reports a null or different scene).
+  const dead = cached && (
+    (typeof cached.isDisposed === 'function' && cached.isDisposed()) ||
+    (typeof cached.getScene === 'function' && cached.getScene() !== scene)
+  )
+  if (!cached || dead) {
+    const tex = new BABYLON.Texture(url, scene, false, false)
+    _teamTexCache.set(url, tex)
+    return tex
+  }
+  return cached
+}
 
 // A visual character bound to (but not parented to) a host transform — typically
 // another player's replicated collision box. Each frame it copies the host's
@@ -252,25 +286,44 @@ export default class CharacterModel {
     if (this._nameTag) this._nameTag.textContent = name
   }
 
-  // TDM: color this body + nametag by team (0 red / 1 blue). Called from the player
-  // factory's teamId watch (fires on create + on change). The nametag is a DOM node
-  // (color it now); the body tint needs the GLB materials, so if the model has not
-  // finished loading yet we stash the team and _load applies it once meshes exist.
+  // TDM: uniform this body + color the nametag by team (0 red / 1 blue). Called from
+  // the player factory's teamId watch (fires on create + on change). The nametag is a
+  // DOM node (color it now); the uniform needs the GLB materials, so if the model has
+  // not finished loading yet we stash the team and _load applies it once meshes exist.
+  // FFA entities never get a setTeam call -> stock (neutral) body texture, no glow.
   setTeam(teamId) {
     this._teamId = teamId
     if (this._nameTag && TEAM_NAMETAG_CSS[teamId]) this._nameTag.style.color = TEAM_NAMETAG_CSS[teamId]
-    this._applyTeamTint()
+    this._applyTeamUniform()
   }
 
-  // dim emissive team wash over every body material. Idempotent (safe to call again
-  // on a team change or after load). No-op until the model's meshes are in.
-  _applyTeamTint() {
-    if (this._teamId == null) return
-    const tint = TEAM_BODY_TINT[this._teamId]
-    if (!tint || !this.meshes) return
+  // Swap the body material's albedo to the team uniform texture + lay a SUBTLE team
+  // emissive over the body materials (distance/darkness read — see TEAM_BODY_GLOW).
+  // Idempotent (safe to call again on a team change or after load). No-op until the
+  // model's meshes are in. The uniform goes only on the suit material (name carries
+  // 'Superhero'); hair/eyes keep their own textures but share the faint glow so the
+  // silhouette reads as one team-colored unit.
+  _applyTeamUniform() {
+    if (this._teamId == null || !this.meshes) return
+    const skins = this.spec.teamSkins
+    const skinUrl = skins && skins[this._teamId]
+    // team NORMAL map lives beside the albedo: hero_male_uniform_red.webp ->
+    // hero_male_uniform_red_n.webp (DeepBump relief baked from the finished atlas,
+    // composited over the GLB's own face normal). Derived here so the manifest
+    // needs no new field. The hero material is PBR (albedoTexture above), so the
+    // normal map goes on `bumpTexture` (same property name on PBRMaterial and
+    // StandardMaterial); we keep the material's existing invertNormalMap* settings
+    // so the +Y/OpenGL convention matches the GLB normal we composited into.
+    const normUrl = skinUrl && skinUrl.replace(/\.webp$/, '_n.webp')
+    const glow = TEAM_BODY_GLOW[this._teamId]
     this.meshes.forEach((m) => {
       const mat = m.material
-      if (mat && mat.emissiveColor) mat.emissiveColor.copyFrom(tint)
+      if (!mat) return
+      if (skinUrl && mat.albedoTexture !== undefined && /superhero/i.test(mat.name || '')) {
+        mat.albedoTexture = _teamTexture(this.scene, skinUrl)
+        if (normUrl && 'bumpTexture' in mat) mat.bumpTexture = _teamTexture(this.scene, normUrl)
+      }
+      if (glow && mat.emissiveColor) mat.emissiveColor.copyFrom(glow)
     })
   }
 
@@ -300,9 +353,9 @@ export default class CharacterModel {
       m.metadata = Object.assign({}, m.metadata, { fragSurface: 'flesh' })
     })
 
-    // TDM: apply the team body tint now that the materials exist (setTeam may have
+    // TDM: apply the team uniform now that the materials exist (setTeam may have
     // fired before the async load resolved, in which case it only stashed the team).
-    this._applyTeamTint()
+    this._applyTeamUniform()
 
     result.animationGroups.forEach((g) => { g.stop(); this.groups[g.name] = g })
     this.idle = this.groups[this.spec.anims.idle]

@@ -55,10 +55,17 @@ function devSourceEntry(isBuild, root) {
   return {
     name: 'dev-source-entry',
     apply: 'serve',
-    transformIndexHtml(html) {
-      return html.replace(
-        /<script src="js\/app-v[0-9.]+\.js[^"]*"><\/script>/,
-        `<script type="module" src="/@fs/${path.resolve(root, 'client/clientMain.js')}"></script>`)
+    // order:'pre' + optional leading slash: vite's own dev html processing rewrites
+    // relative srcs to absolute BEFORE post-ordered hooks on URLS WITH A QUERY STRING
+    // (?flat=1 served the stale prod bundle while bare / got the dev entry — the
+    // texpop A/B probe found this the hard way). Running pre sees the raw html.
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html) {
+        return html.replace(
+          /<script src="\/?js\/app-v[0-9.]+\.js[^"]*"><\/script>/,
+          `<script type="module" src="/@fs/${path.resolve(root, 'client/clientMain.js')}"></script>`)
+      },
     },
   }
 }

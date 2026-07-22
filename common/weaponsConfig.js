@@ -253,6 +253,11 @@ export const weapons = [
   {
     index: 4,
     name: 'Plasma',              // HUD shows uppercased; keep short
+    // DISABLED (user call, 2026-07-22): all energy weapons are out for now. The
+    // entry STAYS so indices/protocol/weaponsState shapes never shift — consumers
+    // must honor the flag: excluded from ALL_WEAPONS (bots), bot loadout picks,
+    // map weapon/ammo pickups (resolvePickup) and death drops. Flip to re-enable.
+    disabled: true,
     url: '/assets/weapons/retro_rifle_arms.glb',
     ...authoredMount,
     // ADS gameplay: tighter cone (-60% base, -50% bloom) + 35% faster + 0.6x collision
@@ -282,6 +287,9 @@ export const weapons = [
   {
     index: 5,
     name: 'Flak',
+    // DISABLED (user call, 2026-07-22): reads energy-like in play — out with Plasma
+    // for now. Same contract: slot stays, consumers honor the flag. Flip to re-enable.
+    disabled: true,
     url: '/assets/weapons/retro_shotgun_arms.glb',
     ...authoredMount,
     // Shares the Shotgun's 17-clip GLB (bone-family, correctly oriented, hands follow the
@@ -310,4 +318,11 @@ export const weapons = [
   // entity, factory, bolt rendering, plasmaImpact FX) is reused by both; their
   // slow/pellet/bounce mechanics land in Phase 2.
 ]
+
+// Roster indices that are actually IN PLAY (not `disabled`). Disabled entries keep
+// their slot (indices/protocol never shift) but every spawner/loot/loadout consumer
+// draws from this list. Currently excludes Plasma (energy weapons out, 2026-07-22).
+export const ENABLED_WEAPON_INDICES = weapons.reduce(
+	(list, w, i) => (w.disabled ? list : (list.push(i), list)), [])
+
 export default weapons

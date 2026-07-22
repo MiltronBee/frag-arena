@@ -10,9 +10,20 @@
 // tabs rAF-throttle headless clients — the late-joiner "bug" lesson). ONE
 // browser per client if this ever grows a second client.
 import { spawn } from 'child_process'
+import net from 'net'
 import puppeteer from 'puppeteer-core'
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+// vite port is parameterizable (PROBE_VITE_PORT); if something already serves
+// it (a shared vite dev server), REUSE it — don't boot a second one, and never
+// sweep a port the probe didn't open itself.
+const VITE_PORT = process.env.PROBE_VITE_PORT || '8080'
+const portBusy = port => new Promise(res => {
+	const s = net.createConnection({ port: +port, host: '127.0.0.1' })
+	s.once('connect', () => { s.destroy(); res(true) })
+	s.once('error', () => res(false))
+})
 
 // grove portal pair (native units, from common/mapRegistry TELEPORTERS):
 // entry L0_secret1 (-1.757, 23.818) -> exit L3_secret4 (16.898, -16.971), s=0.65
@@ -31,10 +42,13 @@ function boot(cmd, args, env, tag) {
 
 let failed = false
 let browser = null
+let reuseVite = false
 try {
 	boot('npx', ['tsx', 'server/serverMain.js'],
 		{ MAP: 'grove', BOTS: '0', DEV_SPAWN_AT }, 'server')
-	boot('npx', ['vite', '--port', '8080', '--strictPort'], {}, 'vite')
+	reuseVite = await portBusy(VITE_PORT)
+	if (reuseVite) console.log(`[vite] reusing dev server already on :${VITE_PORT}`)
+	else boot('npx', ['vite', '--port', VITE_PORT, '--strictPort'], {}, 'vite')
 	await sleep(7000) // server mesh load + vite ready
 
 	browser = await puppeteer.launch({
@@ -48,7 +62,14 @@ try {
 	await page.setViewport({ width: 1280, height: 720 })
 	const errors = []
 	page.on('pageerror', e => errors.push(e.message))
-	await page.goto('http://localhost:8080/', { waitUntil: 'domcontentloaded' })
+	await page.goto(`http://localhost:${VITE_PORT}/`, { waitUntil: 'domcontentloaded' })
+	// MENU SAFETY (v1): the server no longer spawns an entity on connect — a
+	// spectator socket must send the explicit deploy request (the PLAY click's
+	// server half). Wait for the socket, then deploy programmatically.
+	await page.waitForFunction(
+		'window.gameClient && window.gameClient.simulator && window.gameClient.simulator._connectionState === "connected"',
+		{ timeout: 45000 })
+	await page.evaluate(() => window.gameClient.simulator.requestDeploy())
 	await page.waitForFunction(
 		'window.gameClient && window.gameClient.simulator && window.gameClient.simulator.myRawEntity',
 		{ timeout: 45000 })
@@ -117,7 +138,7 @@ try {
 	for (const p of procs) { try { process.kill(-p.pid) } catch { p.kill('SIGKILL') } }
 	// tsx/vite spawn children; sweep anything still holding the ports
 	await sleep(500)
-	spawn('bash', ['-c', 'fuser -k 8078/tcp 8079/tcp 8080/tcp 2>/dev/null; true'])
+	spawn('bash', ['-c', `fuser -k 8078/tcp 8079/tcp${reuseVite ? '' : ` ${VITE_PORT}/tcp`} 2>/dev/null; true`])
 	await sleep(500)
 }
 process.exit(failed ? 1 : 0)
