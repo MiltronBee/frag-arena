@@ -7,6 +7,7 @@ import PlayerCharacter from '../common/entity/PlayerCharacter'
 import Identity from '../common/message/Identity'
 import WeaponFired from '../common/message/WeaponFired'
 import Respawned from '../common/message/Respawned'
+import Teleported, { TELEPORT_KEEP_YAW } from '../common/message/Teleported'
 import HitConfirmed from '../common/message/HitConfirmed'
 import Killed from '../common/message/Killed'
 import DamageTaken from '../common/message/DamageTaken'
@@ -26,6 +27,7 @@ import Grenade from '../common/entity/Grenade'
 import MegaHealthPickup, { MEGA_STATE } from '../common/entity/MegaHealthPickup'
 import MatchState, { MATCH_PHASE, MATCH_WINNER, MATCH_MODE } from '../common/entity/MatchState'
 import setupPickups from './setupPickups'
+import { buildTeleporters, checkTeleport, TELE_COOLDOWN } from './teleporters'
 import Pickup from '../common/entity/Pickup'
 import {
 	PICKUP_TYPE, PICKUP_RADIUS, CHARGE_LEAD_SECONDS, HEALTH_HEAL, HEALTH_CAP,
@@ -257,6 +259,12 @@ class GameInstance {
 		// maps load async — see _loadMapMesh), so the drop-probe runs against real
 		// geometry. Box arenas carry no PICKUPS block, so this stays empty for them.
 		this.pickups = []
+
+		// UT99 TELEPORTERS: functional portals for this map (paired tag/url actors
+		// snapped to the collision floor). Filled by _loadMapMesh once the mesh is
+		// ready (the drop-probes need real geometry); box arenas / teleporter-less
+		// maps keep an empty list, which makes checkTeleport a cheap no-op.
+		this.portals = []
 
 		// Phase 4: the ONE mega-health pickup, on contested ground at bob height.
 		// Present (AVAILABLE) from boot; update() runs the proximity heal + 60s respawn
@@ -1257,6 +1265,10 @@ class GameInstance {
 			// registry PICKUPS onto the floor and spawn a Pickup entity per surviving item.
 			// Runs AFTER the mesh is ready so every probe tests real geometry.
 			this.pickups = setupPickups(this).created
+
+			// UT99 TELEPORTERS: pair + floor-snap the registry TELEPORTERS. Same
+			// timing rule as pickups — the drop-probes need the loaded mesh.
+			this.portals = buildTeleporters(this.map, (x, y, z) => this._dropProbeY(x, y, z))
 		} catch (e) { console.error('[map] mesh load FAILED:', e) }
 	}
 
@@ -1268,6 +1280,14 @@ class GameInstance {
 		raw._spawnPos = { x: raw.x, y: raw.y, z: raw.z }
 		raw._minY = raw.y
 		raw._everGrounded = false
+		// portal grace period: no teleport in the first 0.5s after a (re)spawn. No
+		// legit spawn point sits on a portal, but a spawn placed INTO a trigger
+		// (DEV_SPAWN_AT probes; future map data mistakes) would otherwise teleport
+		// on the very first tick after connect — and the Teleported message then
+		// rides the SAME first snapshot as the client's own entity create, hitting
+		// Simulator's `!myRawEntity` guard and desyncing the client at the entry.
+		raw._teleCooldown = 0.5
+		raw._teleInside = false
 		if (this.useMeshMap) console.log(`[spawn] nid=${raw.nid} @(${raw.x.toFixed(1)},${raw.y.toFixed(1)},${raw.z.toFixed(1)})`)
 	}
 
@@ -1286,6 +1306,18 @@ class GameInstance {
 	spawnPoint(teamId = null) {
 		if (this.useMeshMap) {
 			const sc = this.map.scale || 1
+			// DEV/PROBE ONLY: DEV_SPAWN_AT="x,y,z" (NATIVE units, like SPAWN_POINTS)
+			// pins every spawn to one point — scripts/_probe-teleport.mjs uses it to
+			// spawn a client on a portal entry. Unset in production, so this branch
+			// costs one env lookup. No jitter (probes want the exact point).
+			if (process.env.DEV_SPAWN_AT) {
+				const [px, py, pz] = process.env.DEV_SPAWN_AT.split(',').map(Number)
+				if ([px, py, pz].every(Number.isFinite)) {
+					const wx = px * sc, wz = pz * sc
+					const floorY = this._dropProbeY(wx, py * sc, wz)
+					return { x: wx, y: floorY != null ? floorY + SPAWN_REST : py * sc, z: wz }
+				}
+			}
 			// Prefer the UT-extracted SPAWN_POINTS (20, team-tagged, yaw, headroom) on the
 			// enriched record; drop low-headroom entries and drop-probe each to the floor.
 			// Fall back to the legacy `spawns` list for any map without SPAWN_POINTS.
@@ -1685,6 +1717,62 @@ class GameInstance {
 		console.log(`${client.bot ? 'Bot' : 'Player'} ${client.rawEntity.nid} respawned at (${spawn.x.toFixed(1)}, ${spawn.z.toFixed(1)})`)
 	}
 
+	// UT99 TELEPORT: move a player (human client or bot handle) through a portal.
+	// Same server-authoritative contract as respawnPlayer: position goes on BOTH the
+	// raw and the smooth entity (remote clients only ever see smooth — the classic
+	// footgun), and a human learns the move via an explicit Teleported message (its
+	// own x/y/z snapshots are ignored client-side). Velocity keeps its horizontal
+	// speed magnitude redirected along the exit facing (UT99 feel); with no exit yaw
+	// the direction is kept too. velY is preserved either way.
+	applyTeleport(handle, portal) {
+		const raw = handle.rawEntity
+		if (!raw) return
+		const hSpeed = Math.hypot(raw.velX, raw.velZ)
+		let velX = raw.velX
+		let velZ = raw.velZ
+		let yawOut = TELEPORT_KEEP_YAW
+		if (portal.exitYaw !== null) {
+			yawOut = portal.exitYaw
+			velX = Math.sin(portal.exitYaw) * hSpeed
+			velZ = Math.cos(portal.exitYaw) * hSpeed
+		}
+		// exit y: portal.exitY is the probed floor — rest the capsule SPAWN_REST
+		// above it, exactly like spawnPoint() does.
+		const x = portal.exitX
+		const y = portal.exitY + SPAWN_REST
+		const z = portal.exitZ
+		for (const entity of [handle.rawEntity, handle.smoothEntity]) {
+			if (!entity) continue
+			entity.x = x
+			entity.y = y
+			entity.z = z
+			entity.velX = velX
+			entity.velZ = velZ // velY untouched — a falling player keeps falling
+			if (portal.exitYaw !== null) entity.rotationY = portal.exitYaw
+			// re-arm the guard on the entity we actually mutated (checkTeleport set it
+			// on raw already; bots share one entity, humans need it only on raw — cheap
+			// to set on both and immune to caller ordering)
+			entity._teleCooldown = TELE_COOLDOWN
+		}
+		if (handle.bot) {
+			// bot pathing: drop the current A* polyline so think() replans from the
+			// exit next tick (the !this.path replan branch bypasses the throttle).
+			// Respawn survives WITHOUT this only because the replan throttle catches
+			// up; a teleport mid-fight deserves the instant repath.
+			const c = handle.controller
+			if (c && 'path' in c) { c.path = null; c.pathDone = false }
+			if (c && typeof c.aimYaw === 'number' && portal.exitYaw !== null) c.aimYaw = portal.exitYaw
+		} else {
+			// the smooth follower replays the raw path queue at capped speed — a
+			// teleport must NOT be walked across the map, so drop the stale queue
+			// (the next MoveCommand pushes the exit-side position).
+			if (handle.positions) handle.positions.length = 0
+			this.instance.message(new Teleported(x, y, z, yawOut, velX, raw.velY, velZ), handle)
+		}
+		console.log(`[teleport] ${handle.bot ? 'Bot' : 'Player'} ${raw.nid} `
+			+ `${portal.tag} -> ${portal.url} @(${x.toFixed(1)},${y.toFixed(1)},${z.toFixed(1)})`)
+	}
+
 	// ---- TDM team/match helpers -------------------------------------------------
 
 	// Head count per team across EVERY player (humans + bots), each counted once.
@@ -1957,6 +2045,21 @@ class GameInstance {
 				this.performShot(bot)
 			}
 		})
+
+		// UT99 TELEPORTERS: after all movement this tick (humans moved in
+		// emitCommands above, bots in the loop above), test every ALIVE combatant
+		// against the portal entries. Dead entities never teleport; the per-entity
+		// cooldown (ticked inside checkTeleport) guards re-triggering.
+		if (this.portals.length) {
+			const teleTest = (handle) => {
+				const raw = handle.rawEntity
+				if (!raw || !raw.isAlive) return
+				const portal = checkTeleport(raw, this.portals, delta)
+				if (portal) this.applyTeleport(handle, portal)
+			}
+			this.instance.clients.forEach(teleTest)
+			this.bots.forEach(teleTest)
+		}
 
 		// Update all active projectiles
 		this.projectiles.forEach(proj => {

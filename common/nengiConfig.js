@@ -3,6 +3,7 @@ import PlayerCharacter from './entity/PlayerCharacter'
 import Identity from './message/Identity'
 import WeaponFired from './message/WeaponFired'
 import Respawned from './message/Respawned'
+import Teleported from './message/Teleported'
 import HitConfirmed from './message/HitConfirmed'
 import Killed from './message/Killed'
 import DamageTaken from './message/DamageTaken'
@@ -53,6 +54,7 @@ const config = {
             ['Identity', Identity],
             ['WeaponFired', WeaponFired],
             ['Respawned', Respawned],
+            ['Teleported', Teleported],
             ['HitConfirmed', HitConfirmed],
             ['Killed', Killed],
             ['DamageTaken', DamageTaken],

@@ -45,6 +45,10 @@ export const REGISTRY_SCHEMA = 'runtime/v1'
 //   -- mode / future fields (inert until the mode layer reads them) --
 //   mode_data  { flags?, controlPoints?, ... } — schema from common/maps + merged/v1
 //   SPAWN_POINTS  team-tagged spawns [{x,y,z,team,yaw}] (merged/v1) — optional
+//   TELEPORTERS   native-unit UT teleporter actors [{x,y,z,class,yaw?,tag,url?}],
+//              tag/url paired (T.url names the destination's tag); consumed
+//              server-side (server/teleporters.js) + client visuals via
+//              common/teleporterData.js — optional
 //   nav        { file } baked ReachSpec graph basename (navGraph derives it from
 //              dir/file, so this is documentation only)
 //
@@ -192,6 +196,22 @@ const visage = mesh({
 			{ x: -12.81, y: -26.249, z: -0.016, item: 'damage_amplifier' },
 		],
 	},
+	// --- UT-EXTRACTED TELEPORTERS (12, native units) — copied verbatim from
+	// _work/ut-actors/CTF-Visage.actors.json (key TELEPORTERS). 6 bidirectional pairs.
+	TELEPORTERS: [
+		{ x: 127.629, z: -15.363, y: -37.374, class: 'Teleporter', yaw: 178.95, tag: 'icihomie2', url: 'icihomie1', nav_id: 78 },
+		{ x: 114.75, z: -3.259, y: -8.532, class: 'Teleporter', yaw: 180.66, tag: 'icihomie1', url: 'icihomie2', nav_id: 79 },
+		{ x: 111.522, z: -3.211, y: -18.038, class: 'Teleporter', yaw: 181.45, tag: 'peepee2', url: 'peepee1', nav_id: 80 },
+		{ x: 119.203, z: -15.37, y: -37.793, class: 'Teleporter', tag: 'peepee1', url: 'peepee2', nav_id: 81 },
+		{ x: -7.805, z: 0.069, y: -18.724, class: 'Teleporter', tag: 'fiona1', url: 'fiona2', nav_id: 82 },
+		{ x: -15.218, z: 12.195, y: -38.003, class: 'Teleporter', yaw: 180.44, tag: 'fiona2', url: 'fiona1', nav_id: 83 },
+		{ x: -23.693, z: 12.091, y: -38.041, class: 'Teleporter', tag: 'apple1', url: 'apple2', nav_id: 84 },
+		{ x: -11.221, z: 0.09, y: -8.856, class: 'Teleporter', tag: 'apple2', url: 'apple1', nav_id: 85 },
+		{ x: -18.949, z: 0.04, y: -38.117, class: 'Teleporter', yaw: 180.4, tag: 'hepburn1', url: 'hepburn2', nav_id: 88 },
+		{ x: -22.59, z: 0.06, y: 18.576, class: 'Teleporter', yaw: 1.19, tag: 'hepburn2', url: 'hepburn1', nav_id: 89 },
+		{ x: 122.517, z: -3.236, y: -37.374, class: 'Teleporter', yaw: 0.88, tag: 'buffybabe1', url: 'buffybabe2', nav_id: 90 },
+		{ x: 125.435, z: -3.079, y: 18.899, class: 'Teleporter', yaw: 180.88, tag: 'buffybabe2', url: 'buffybabe1', nav_id: 91 },
+	],
 })
 
 const grove = mesh({
@@ -212,7 +232,13 @@ const grove = mesh({
 	// Grove's OBJ winding is INVERTED (floors read normal.y = -1.000), which is why the
 	// extraction tests |normal.y|, not normal.y.
 	walkable: { minX: -35.4, minY: -4.9, minZ: -48.8, maxX: 48.8, maxY: 35.1, maxZ: 37.7 },
-	mega: { x: -5.300, y: 17.069, z: 5.269 }
+	mega: { x: -5.300, y: 17.069, z: 5.269 },
+	// --- UT-EXTRACTED TELEPORTERS (2, native units) — copied verbatim from
+	// _work/ut-actors/DM-W-Grove-2025.actors.json. One bidirectional secret pair.
+	TELEPORTERS: [
+		{ x: -1.757, z: 23.818, y: -2.182, class: 'VisibleTeleporter', yaw: 64.07, tag: 'L0_secret1', url: 'L3_secret4' },
+		{ x: 16.898, z: -16.971, y: 15.186, class: 'VisibleTeleporter', tag: 'L3_secret4', url: 'L0_secret1' },
+	],
 })
 
 // ---------------------------------------------------------------------------
@@ -353,7 +379,14 @@ const dm_gantry162 = mesh({
 			powerup: [
 				{ x: 13.432, z: -23.873, y: -11.619, class: 'UDamage', item: 'damage_amplifier', tag: 'UDamage' }
 			]
-		}
+		},
+		// --- UT-EXTRACTED TELEPORTERS (2, native units) — copied verbatim from
+		// _work/ut-actors/DM-Gantry16][.actors.json. nav 152 -> nav 151 is one-way
+		// (151 has no url, so it is a destination-only/inert entry).
+		TELEPORTERS: [
+			{ x: 17.1, z: 37.334, y: -4.951, class: 'Teleporter', yaw: 269.91, tag: 'gotheredammit', nav_id: 151 },
+			{ x: 17.034, z: -31.715, y: -23.468, class: 'Teleporter', yaw: 86.04, tag: 'Teleporter', url: 'gotheredammit', nav_id: 152 },
+		]
 	})
 
 // DOM-Elder (UT original DOM-Olden) — imported DOM. killY nav-gated (margin 10.90 m world);
@@ -478,7 +511,24 @@ const dom_elder = mesh({
 				{ x: -17.927, z: 10.852, y: -1.902, class: 'armor2', item: 'body_armor', yaw: 89.96, tag: 'armor2' },
 				{ x: 24.663, z: 50.159, y: 9.184, class: 'ut_shieldbelt', item: 'shield_belt', yaw: 270.66, tag: 'ut_shieldbelt' }
 			]
-		}
+		},
+		// --- UT-EXTRACTED TELEPORTERS (12, native units) — copied verbatim from
+		// _work/ut-actors/DOM-Elder.actors.json. Six one-way sender->receiver pairs;
+		// the enabled:false actors are destination-only receivers (no url).
+		TELEPORTERS: [
+			{ x: -22.531, z: 54.014, y: 14.175, class: 'Teleporter', tag: 'Teleporter', url: 'ohno1', nav_id: 69 },
+			{ x: -22.519, z: 54.016, y: 11.428, class: 'Teleporter', tag: 'ohno1', enabled: false, nav_id: 70 },
+			{ x: -10.85, z: 41.484, y: 15.966, class: 'Teleporter', tag: 'Teleporter', url: 'ohno2', nav_id: 71 },
+			{ x: -10.856, z: 41.496, y: 13.378, class: 'Teleporter', tag: 'ohno2', enabled: false, nav_id: 72 },
+			{ x: -26.861, z: 41.51, y: 13.378, class: 'Teleporter', tag: 'ohno3', enabled: false, nav_id: 73 },
+			{ x: -26.857, z: 41.523, y: 16.305, class: 'Teleporter', tag: 'Teleporter', url: 'ohno3', nav_id: 74 },
+			{ x: -26.832, z: 19.57, y: 20.029, class: 'Teleporter', tag: 'Teleporter', url: 'ohno4', nav_id: 76 },
+			{ x: -26.832, z: 19.581, y: 15.94, class: 'Teleporter', tag: 'ohno4', enabled: false, nav_id: 77 },
+			{ x: 4.868, z: 41.429, y: 13.378, class: 'Teleporter', tag: 'tele4', enabled: false, nav_id: 90 },
+			{ x: 4.859, z: 41.421, y: 16.026, class: 'Teleporter', tag: 'Teleporter', url: 'tele4', nav_id: 91 },
+			{ x: 20.761, z: 41.467, y: 13.378, class: 'Teleporter', tag: 'tele5', enabled: false, nav_id: 92 },
+			{ x: 20.742, z: 41.466, y: 15.969, class: 'Teleporter', tag: 'Teleporter', url: 'tele5', nav_id: 93 },
+		]
 	})
 
 // DM-Somnus (UT original DM-Morpheus) — imported FFA. killY nav-gated (margin 11.49 m world);

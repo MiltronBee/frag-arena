@@ -394,6 +394,35 @@ export default class FragLayer {
     document.body.classList.add('own-death')
   }
 
+  // Own-teleport flash: a brief cyan-white fullscreen wash so passing through a
+  // portal reads as an EVENT (the world just cut to somewhere else). Same
+  // lazily-created-overlay + snap-peak-then-CSS-fade pattern as _confirmFlash;
+  // cool tint so it can never be mistaken for damage (red) or a hit (gold).
+  // Called from Simulator's Teleported handler. Skipped on the low FX tier.
+  onTeleported() {
+    const r = this.sim && this.sim.renderer
+    if (r && r._fxTier === 'low') return
+    if (!this._teleFlashEl) {
+      const hud = document.getElementById('hud') || document.body
+      this._teleFlashEl = document.createElement('div')
+      this._teleFlashEl.id = 'teleport-flash'
+      this._teleFlashEl.setAttribute('aria-hidden', 'true')
+      Object.assign(this._teleFlashEl.style, {
+        position: 'fixed', top: '0', left: '0', right: '0', bottom: '0',
+        pointerEvents: 'none', opacity: '0', zIndex: '5',
+        background: 'radial-gradient(circle at 50% 50%, rgba(210,245,255,0.85) 0%, rgba(120,220,255,0.45) 55%, rgba(40,120,200,0.15) 100%)',
+        transition: 'opacity 180ms ease-out',
+      })
+      hud.appendChild(this._teleFlashEl)
+    }
+    const el = this._teleFlashEl
+    el.style.transition = 'none'
+    el.style.opacity = '0.55'
+    void el.offsetHeight // commit the peak as its own paint (see _confirmFlash)
+    el.style.transition = 'opacity 180ms ease-out'
+    el.style.opacity = '0'
+  }
+
   // Respawn resets everything the death state touched. Called from Simulator's
   // existing Respawned handler.
   onRespawned() {

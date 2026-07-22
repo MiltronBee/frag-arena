@@ -413,6 +413,13 @@ export default class WeaponAudio {
     this.playClip('respawn', { gain: 0.7 })
   }
 
+  // Local-player portal-teleport cue. PLACEHOLDER: reuses the respawn clip
+  // pitched up (rate 1.3) until a dedicated teleport one-shot ships through the
+  // SFX pipeline (generate-sfx.mjs + trim-sfx.sh). 2D, sample-only.
+  teleport() {
+    this.playClip('respawn', { gain: 0.55, rate: 1.3 })
+  }
+
   // `dest` is the destination node (this.comp for 2D, or a PannerNode for positional).
   _voiceOut(gain, dest = this.comp) {
     const out = this.ctx.createGain()

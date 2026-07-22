@@ -4,6 +4,7 @@ import { OBJFileLoader } from '../babylon.js' // OBJ loader (mesh maps) via cura
 
 import ArenaDressing from './arenaDressing'
 import { getActiveMap } from '../../common/mapMesh'
+import { pairPortals } from '../../common/teleporterData'
 import { bakeVertexColors } from './mapLights'
 
 // Layer the first-person viewmodel lives on: vmCamera renders ONLY this, the world
@@ -553,6 +554,11 @@ class BABYLONRenderer {
 				// arena geometry now exists — bake it into the frozen shadow map.
 				this._refreshStaticShadows()
 				this._bakeMapLights(res.meshes, root)
+				// UT99 teleporter shimmer — AFTER the visual mesh exists so each
+				// marker can drop-probe onto the real floor (Grove's teleporter
+				// actors are authored BELOW their floor; nativeY*scale hovered the
+				// markers inside geometry).
+				this._addTeleporterMarkers(res.meshes)
 			})
 			.catch(err => console.warn('[map] mesh visual load failed', err))
 	}
@@ -718,6 +724,88 @@ class BABYLONRenderer {
 			})
 		}
 		console.log(`[map] coronas: ${picks.length} (${animated.length} animated)`)
+	}
+
+	// UT99 TELEPORTERS — idle portal shimmer. One additive billboard glow disc at
+	// each FUNCTIONAL portal entry (pairing + native->world math shared with the
+	// server via common/teleporterData.js, so client visuals and server triggers
+	// can never disagree). Marker height comes from a ONE-TIME drop-probe against
+	// the freshly loaded visual meshes (`mapMeshes`) — the same query the server
+	// runs on its collider — because the raw actor y is unreliable (Grove authors
+	// its teleporters BELOW the floor; nativeY*scale put markers inside geometry).
+	// Fallback on a probe miss: nativeY*scale + 1.0.
+	//
+	// Material recipe copied from _addLightCoronas — the PROVEN one: a real PNG's
+	// alpha (this._sprites.glow) as opacityTexture shapes the falloff and
+	// emissiveColor carries the tint. Do NOT swap in a DynamicTexture opacity
+	// mask (renders nothing under ALPHA_ADD — the bisected corona bug), and keep
+	// mat.alpha < 1 so Babylon 9 takes the alpha-blend path at all.
+	_addTeleporterMarkers(mapMeshes) {
+		const { portals } = pairPortals(this.map)
+		if (!portals.length) return
+		const s = this.map.scale || 1
+		const meshSet = new Set((mapMeshes || []).filter(m => m.getTotalVertices && m.getTotalVertices() > 0))
+		const floorAt = (x, nativeY, z) => {
+			if (!meshSet.size) return null
+			// mirror GameInstance._dropProbeY: from 3 native units above the actor,
+			// +2m up / 6m down window. Predicate overrides isPickable=false.
+			const origin = new BABYLON.Vector3(x, (nativeY + 3) * s + 2.0, z)
+			const ray = new BABYLON.Ray(origin, new BABYLON.Vector3(0, -1, 0), 8.0)
+			const hit = this.scene.pickWithRay(ray, m => meshSet.has(m))
+			return hit && hit.hit ? hit.pickedPoint.y : null
+		}
+		const animated = []
+		portals.forEach((p, i) => {
+			const floorY = floorAt(p.entry.x, p.entry.nativeY, p.entry.z)
+			const my = floorY != null ? floorY + 1.2 : p.entry.nativeY * s + 1.0
+			const plane = BABYLON.MeshBuilder.CreatePlane(`teleporter${i}`, { size: 1.6 }, this.scene)
+			plane.position.set(p.entry.x, my, p.entry.z)
+			plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL
+			plane.isPickable = false
+			plane.applyFog = false
+			const mat = new BABYLON.StandardMaterial(`teleporterMat${i}`, this.scene)
+			mat.opacityTexture = this._sprites.glow
+			mat.disableLighting = true
+			mat.backFaceCulling = false
+			mat.alpha = 0.9999
+			mat.alphaMode = BABYLON.Engine.ALPHA_ADD
+			mat.disableDepthWrite = true
+			// portal identity color: cool cyan-violet, distinct from every light corona
+			mat.emissiveColor = new BABYLON.Color3(0.25, 0.75, 0.95)
+			plane.material = mat
+			animated.push({ plane, mat, phase: i * 2.1 })
+		})
+		this.scene.registerBeforeRender(() => {
+			const t = performance.now() / 1000
+			for (const a of animated) {
+				// gentle breathing: scale + intensity in phase (reads as energy, not a strobe)
+				const w = 0.85 + 0.15 * Math.sin(t * 1.8 + a.phase)
+				a.plane.scaling.setAll(w)
+				a.mat.emissiveColor.set(0.25 * w, 0.75 * w, 0.95 * w)
+			}
+		})
+		console.log(`[map] teleporter markers: ${portals.length}`)
+	}
+
+	// Teleport burst: a brief additive flash used at both ends of a teleport jump
+	// (own arrival + remote-body discontinuities, which also catches respawns —
+	// acceptable, arguably nice). Two pooled glow sprites (hot core + halo) from
+	// the SAME pool the muzzle flash uses: zero allocation, fades in ~0.4s via the
+	// standard _fx set. Cheap enough to fire every time.
+	teleportBurst(pos) {
+		if (!pos) return
+		const core = this._next('glow')
+		core.layerMask = 0x0FFFFFFF
+		core.position.copyFrom(pos)
+		core.rotation.z = Math.random() * Math.PI * 2
+		this._setColor(core, [0.55, 0.95, 1.0])
+		this._track(core, 260, 'flash', 2, 1.1, 1.1, 1.1)
+		const halo = this._next('glow')
+		halo.layerMask = 0x0FFFFFFF
+		halo.position.copyFrom(pos)
+		halo.rotation.z = Math.random() * Math.PI * 2
+		this._setColor(halo, [0.25, 0.65, 0.95], 0.7)
+		this._track(halo, 420, 'impact', 2, 1.8, 1.8, 1.8)
 	}
 
 	_loadTex(url) {

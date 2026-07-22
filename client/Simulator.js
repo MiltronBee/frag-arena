@@ -7,6 +7,7 @@ import SwitchWeaponCommand from '../common/command/SwitchWeaponCommand'
 import DevUpdateWeaponConfigCommand from '../common/command/DevUpdateWeaponConfigCommand'
 import SetNameCommand from '../common/command/SetNameCommand'
 import { decodeName, sanitizeName } from '../common/playerNames'
+import { TELEPORT_KEEP_YAW } from '../common/message/Teleported'
 import createFactories from './factories/createFactories'
 import reconcilePlayer from './reconcilePlayer'
 import applyCommand, { DODGE_DIRS } from '../common/applyCommand'
@@ -288,6 +289,35 @@ class Simulator {
 
 			// clear own-death camera drop/roll + red wash (FragLayer owns them)
 			this.fragLayer.onRespawned()
+		})
+
+		client.on('message::Teleported', message => {
+			// server portal teleport for our own predicted entity — same explicit-
+			// handover contract as Respawned (own x/y/z snapshots are ignored, so
+			// this message is the only way the server moves us). UNLIKE respawn it
+			// carries velocity (horizontal speed redirected along the exit facing)
+			// and touches NOTHING about the loadout — weapons/ammo survive a portal.
+			if (!this.myRawEntity) return
+			this.myRawEntity.x = message.x
+			this.myRawEntity.y = message.y
+			this.myRawEntity.z = message.z
+			this.myRawEntity.velX = message.velX
+			this.myRawEntity.velY = message.velY
+			this.myRawEntity.velZ = message.velZ
+
+			// exit facing: the camera owns look yaw (mouse-look writes camera.rotation.y
+			// and the MoveCommand aim ray derives from it — see onmousemove/update), so
+			// snapping it here IS the authoritative turn. TELEPORT_KEEP_YAW = the
+			// destination had no facing; keep the player's current view.
+			if (message.yaw !== TELEPORT_KEEP_YAW && Number.isFinite(message.yaw)) {
+				this.renderer.camera.rotation.y = message.yaw
+			}
+
+			// FX: brief fullscreen flash + a burst at the camera; sound is the respawn
+			// clip pitched up (no dedicated teleport clip shipped yet — SFX pipeline).
+			this.fragLayer.onTeleported()
+			this.audio.teleport()
+			this.renderer.teleportBurst(new BABYLON.Vector3(message.x, message.y + 0.9, message.z))
 		})
 
 		// --- kill-feedback messages: forward straight to the FragLayer, which owns
@@ -1585,7 +1615,26 @@ class Simulator {
 		}
 
 		// drive other players' character visuals (position/yaw follow + idle/run anim)
-		this.characterModels.forEach(model => model.update(delta))
+		// + teleport tell: a per-frame position discontinuity > 8m on a remote body
+		// can only be a portal or a respawn (max legit speed is ~11 m/s), so pop a
+		// cheap additive burst at BOTH ends of the jump. Tracked here (not in
+		// CharacterModel) because the burst needs the renderer's pooled FX.
+		this.characterModels.forEach(model => {
+			const host = model.host
+			if (host && model.ready) {
+				const p = host.position
+				const prev = model._telePrev
+				if (prev && host.isAlive !== false) {
+					const jump = Math.hypot(p.x - prev.x, p.y - prev.y, p.z - prev.z)
+					if (jump > 8) {
+						this.renderer.teleportBurst(new BABYLON.Vector3(prev.x, prev.y + 0.9, prev.z))
+						this.renderer.teleportBurst(new BABYLON.Vector3(p.x, p.y + 0.9, p.z))
+					}
+				}
+				model._telePrev = { x: p.x, y: p.y, z: p.z }
+			}
+			model.update(delta)
+		})
 
 		// orient + stretch live plasma bolts into hot travel streaks
 		this._updateProjectiles()
