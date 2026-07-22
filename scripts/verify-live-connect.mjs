@@ -26,14 +26,21 @@ try {
   }
   check('fresh client CONNECTS to live server (protocol matches)', connected, 'state=' + (await page.evaluate(() => window.gameClient.simulator._connectionState)))
 
-  // server should replicate our own entity to us (spawn) within a few seconds
+  // MENU SAFETY: a connected socket is a SPECTATOR — no entity may exist before
+  // the explicit deploy request. Verify the spectator phase, then deploy.
+  await sleep(2000)
+  const preDeploy = await page.evaluate(() => !!window.gameClient.simulator.myRawEntity)
+  check('spectator until explicit deploy (no pre-deploy entity)', !preDeploy, 'preDeployEntity=' + preDeploy)
+  await page.evaluate(() => window.gameClient.simulator.requestDeploy())
+
+  // server should replicate our own entity to us (deploy-spawn) within a few seconds
   let spawned = false
   for (let i = 0; i < 30; i++) {
     const has = await page.evaluate(() => !!window.gameClient.simulator.myRawEntity)
     if (has) { spawned = true; break }
     await sleep(500)
   }
-  check('own entity spawned/replicated', spawned, 'myRawEntity=' + spawned)
+  check('own entity deployed/replicated', spawned, 'myRawEntity=' + spawned)
 
   // drive an aim+fire command locally and confirm aimFactor ramps (gameplay path live)
   if (spawned) {

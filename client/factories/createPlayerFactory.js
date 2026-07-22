@@ -27,6 +27,13 @@ export default ({ simulator }) => {
 				// (spawn inside a portal trigger) — apply it now, AFTER spawnPos,
 				// since server-side the teleport happened after the spawn.
 				simulator.flushPendingTeleport()
+				// A FRESH own entity is also a "respawn" for every death visual: dying
+				// right as the map rotates / auto-rejoin reconnects skips the Respawned
+				// message, which was the ONLY thing clearing the death-cam — its ±23°
+				// roll then survived into the new life ("floor tilted counterclockwise
+				// after respawning"). onRespawned is idempotent (zeroes roll, removes
+				// the tracked pitch offset, clears own-death CSS).
+				if (simulator.fragLayer) simulator.fragLayer.onRespawned()
 				simulator.setArenaReady()
 				return
 			}
@@ -68,6 +75,19 @@ export default ({ simulator }) => {
 			entity.mesh.dispose()
 		},
 		watch: {
+			// MENU SAFETY spawn-immunity GHOSTING (prediction lockstep): the server
+			// makes an immune player's authoritative mesh non-blocking to other
+			// movers for the immunity window; local prediction collides against
+			// REMOTE entity meshes on this scene, so mirror the same rule off the
+			// replicated spawnImmunity or walking through a fresh spawn would
+			// mispredict and snap. Fires on create with the initial value and on
+			// every change (including the revocation/expiry back to 0, which
+			// restores solidity). Own entities excluded: own raw drives prediction
+			// (keeps its collisions), own smooth is hidden and never colliding.
+			spawnImmunity({ entity, value }) {
+				if (entity.nid === simulator.myRawId || entity.nid === simulator.mySmoothId) return
+				entity.mesh.checkCollisions = !(value > 0)
+			},
 			// swap the held weapon prop when the replicated index changes. The watch
 			// also fires on create with the initial value, so a player already holding
 			// a non-default gun shows it correctly to a client that joins later.

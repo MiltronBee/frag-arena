@@ -9,6 +9,8 @@ import Killed from './message/Killed'
 import DamageTaken from './message/DamageTaken'
 import PlayerName from './message/PlayerName'
 import MoveCommand from './command/MoveCommand'
+import DeployCommand from './command/DeployCommand'
+import SpectatorHeartbeatCommand from './command/SpectatorHeartbeatCommand'
 import SetNameCommand from './command/SetNameCommand'
 import FireCommand from './command/FireCommand'
 import SwitchWeaponCommand from './command/SwitchWeaponCommand'
@@ -62,6 +64,8 @@ const config = {
         ],
         commands: [
             ['MoveCommand', MoveCommand],
+            ['DeployCommand', DeployCommand],
+            ['SpectatorHeartbeatCommand', SpectatorHeartbeatCommand],
             ['FireCommand', FireCommand],
             ['SwitchWeaponCommand', SwitchWeaponCommand],
             ['DevUpdateWeaponConfigCommand', DevUpdateWeaponConfigCommand],

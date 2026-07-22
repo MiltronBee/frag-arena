@@ -50,9 +50,18 @@ try {
   page.on('pageerror', (error) => errors.push(error.message))
 
   await page.goto(URL, { waitUntil: 'domcontentloaded' })
+  // MENU SAFETY: connecting no longer spawns an entity — deploy explicitly
+  // (the PLAY click's server half) before waiting on the combatant state.
+  await page.waitForFunction(
+    'window.gameClient && window.gameClient.simulator && ' +
+    "window.gameClient.simulator._connectionState === 'connected'",
+    { timeout: 30000 }
+  )
+  await page.evaluate(() => window.gameClient.simulator.requestDeploy())
   await page.waitForFunction(
     'window.gameClient && window.gameClient.simulator && ' +
     'window.gameClient.simulator.myRawEntity && ' +
+    'window.gameClient.simulator.mySmoothEntity && ' +
     'window.gameClient.simulator.viewmodel && ' +
     'window.gameClient.simulator.viewmodel.ready',
     { timeout: 30000 }

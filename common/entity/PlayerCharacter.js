@@ -19,6 +19,16 @@ class PlayerCharacter {
 		this.hitpoints = 100
 		this.isAlive = true
 
+		// MENU SAFETY (v1) SPAWN IMMUNITY (seconds remaining, server-authoritative).
+		// Set to 1.0 by GameInstance on a deploy-spawn AND on every respawn, ticked
+		// down at 40Hz server-side, and INSTANTLY revoked by the first movement /
+		// fire / throw command or any pickup touch (never by menus or UI state —
+		// opening Settings mid-match grants nothing). While > 0 damagePlayer drops
+		// every hit. Networked (Float32) so the local HUD can show the SPAWN SHIELD
+		// tell and probes can observe it; set on raw+smooth in LOCKSTEP like
+		// hitpoints (the classic footgun). The client never asserts it (down-only).
+		this.spawnImmunity = 0
+
 		// UT-STYLE ARMOR (server-authoritative). 0..ARMOR_CAP(150). Absorbs a fixed
 		// fraction of each incoming hit in damagePlayer (green-armor model) until
 		// depleted. Networked (UInt8) so the local player's HUD can draw an armor bar;
@@ -153,6 +163,7 @@ PlayerCharacter.protocol = {
 	velZ: nengi.Float32,
 	isAlive: nengi.Boolean,
 	hitpoints: nengi.UInt8,
+	spawnImmunity: nengi.Float32,
 	armor: nengi.UInt8,
 	udamageTimer: nengi.Float32,
 	slowTimer: nengi.Float32,
@@ -167,6 +178,10 @@ PlayerCharacter.protocol = {
 
 // Exposed so server code (GameInstance.respawnPlayer) resets to the same spawn loadout.
 PlayerCharacter.PISTOL_ONLY = PISTOL_ONLY
-PlayerCharacter.ALL_WEAPONS = (1 << weapons.length) - 1
+// "ALL" = every ENABLED weapon. Disabled roster entries (weaponsConfig `disabled`,
+// e.g. Plasma since 2026-07-22) keep their index but are excluded here, so bots and
+// full-arsenal grants can never equip or fire them.
+PlayerCharacter.ALL_WEAPONS = weapons.reduce(
+	(mask, w, i) => (w.disabled ? mask : mask | (1 << i)), 0)
 
 export default PlayerCharacter

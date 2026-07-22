@@ -2,6 +2,8 @@ import * as BABYLON from './babylon.js'
 import BABYLONRenderer from './graphics/BABYLONRenderer'
 import InputSystem from './InputSystem'
 import MoveCommand from '../common/command/MoveCommand'
+import DeployCommand from '../common/command/DeployCommand'
+import SpectatorHeartbeatCommand from '../common/command/SpectatorHeartbeatCommand'
 import FireCommand from '../common/command/FireCommand'
 import SwitchWeaponCommand from '../common/command/SwitchWeaponCommand'
 import DevUpdateWeaponConfigCommand from '../common/command/DevUpdateWeaponConfigCommand'
@@ -214,6 +216,13 @@ class Simulator {
 		this.myRawEntity = null
 		this._pendingTeleport = null // Teleported that beat our entity create (see handler)
 		this.mySmoothEntity = null
+
+		// MENU SAFETY (v1): when the last DeployCommand went out (0 = none pending).
+		// The server no longer spawns us on connect — the PLAY click / auto-rejoin
+		// calls requestDeploy() and the Identity + entity-create snapshot is the ack.
+		// update() re-sends while an intent is pending and no entity has arrived
+		// (paced slower than the server's 3s deploy rate limit).
+		this._deployRequestedAt = 0
 
 		client.factory = createFactories({
 			/* dependency injection */
@@ -1422,6 +1431,16 @@ class Simulator {
 		const dodge = input.dodge
 		this.input.releaseKeys()
 
+		// MENU SAFETY deploy retry: a pending deploy intent with no entity yet is
+		// re-sent every 3.5s (just past the server's 3s rate limit) — covers a
+		// request that raced a map-rotation restart or got dropped by the limiter.
+		if (this._deployRequestedAt && !this.myRawEntity
+			&& this._connectionState === 'connected'
+			&& Date.now() - this._deployRequestedAt > 3500) {
+			this._deployRequestedAt = 0
+			this.requestDeploy()
+		}
+
 		/* all of this is just for our own entity */
 		if (this.myRawEntity) {
 			if (!this._initialServerSyncDone) {
@@ -1735,6 +1754,7 @@ class Simulator {
 
 		this._updateCrosshairSpread()
 		this._updateHud()
+		this._updateSpawnShield()
 		// nerdy LED loading readout: ease the shown value toward the blended gate
 		// target and paint the menu header + splash echo (runs every frame regardless
 		// of whether we've entered the arena; no-ops cheaply once READY).
@@ -1744,6 +1764,11 @@ class Simulator {
 
 	setConnectionState(state) {
 		this._connectionState = state
+		// MENU SAFETY: the server no longer creates our entity on connect, so the
+		// old "arena ready" signal (own raw entity created — createPlayerFactory)
+		// can't fire before PLAY anymore. An ACCEPTED SOCKET is the new server-side
+		// gate: the world/assets halves keep their own flags (_assetsReady).
+		if (state === 'connected') this.setArenaReady()
 		const body = document.body
 		body.classList.remove('connection-connecting', 'connection-connected', 'connection-disconnected')
 		body.classList.add(`connection-${state}`)
@@ -1770,6 +1795,7 @@ class Simulator {
 		// continuously rather than only on connection-state changes.
 
 		if (state === 'disconnected') {
+			this._deployRequestedAt = 0 // stale deploy intent dies with the socket
 			const wasInArena = this._arenaEntered
 			this._arenaEntered = false
 			body.classList.remove('arena-entered')
@@ -1798,6 +1824,34 @@ class Simulator {
 		this._arenaReady = true
 		document.body.classList.add('arena-ready')
 		this._syncEntryState()
+	}
+
+	// MENU SAFETY (v1): ask the server to spawn us (SPECTATOR -> DEPLOYED). The
+	// PLAY click calls this in the same gesture that requests pointer lock, so the
+	// player experience stays ONE click — the server round-trip races the lock
+	// animation and the entity is usually in before the overlay finishes fading.
+	// Idempotent: no-ops once our entity exists (the server also hard-ignores
+	// repeats). The ack is the existing Identity message + entity create.
+	requestDeploy() {
+		if (this.myRawEntity) return                       // already deployed
+		if (this._connectionState !== 'connected') return  // socket not up yet
+		this.client.addCommand(new DeployCommand())
+		this._deployRequestedAt = Date.now()
+	}
+
+	// MENU SAFETY: spectator activity heartbeat. Real menu gestures (pointer/key,
+	// wired in _setupGameUI) call this; it tells the server "this menu session is
+	// alive" so the spectator INACTIVITY timeout doesn't reap someone reading the
+	// whitepaper. Throttled client-side (the server rate-limits again — spoofing
+	// buys nothing); no-ops entirely once deployed. `force` skips the throttle
+	// (used by probes to exercise the server contract on short test timeouts).
+	_spectatorActivity(force) {
+		if (this.myRawEntity) return                       // deployed — combat state owns the socket
+		if (this._connectionState !== 'connected') return
+		const now = Date.now()
+		if (!force && now - (this._lastHeartbeatAt || 0) < 30 * 1000) return
+		this._lastHeartbeatAt = now
+		this.client.addCommand(new SpectatorHeartbeatCommand())
 	}
 
 	// Audio-unlock plumbing for the inline splash (Part A). The Solana GATE card
@@ -1887,6 +1941,13 @@ class Simulator {
 				this._openSettings()
 			}
 		})
+
+		// MENU SAFETY: real menu gestures keep the spectator session alive (the
+		// server's AFK timeout is inactivity-based). Capture phase so a handler's
+		// stopPropagation can't hide activity; _spectatorActivity self-throttles
+		// and no-ops once deployed, so this costs nothing in-match.
+		document.addEventListener('pointerdown', () => this._spectatorActivity(), true)
+		document.addEventListener('keydown', () => this._spectatorActivity(), true)
 
 		// Procedural UI SFX (Kimi bit 2): ONE delegated pair covers every menu button
 		// (PLAY / HOW TO / RESUME / settings / sliders) — no per-handler wiring. Uses
@@ -2023,6 +2084,9 @@ class Simulator {
 		} catch (e) {}
 		document.body.classList.remove('fa-rejoin')
 		this._pendingPlay = false
+		// MENU SAFETY: the rotation auto-rejoin must auto-REDEPLOY too — same
+		// server handshake as the PLAY click, no gesture needed for a command.
+		this.requestDeploy()
 		this._arenaEntered = true
 		document.body.classList.add('arena-entered')
 		if (this._intrusionFeed) this._intrusionFeed.stop()
@@ -2091,6 +2155,14 @@ class Simulator {
 
 		this.audio.resume() // WebAudio needs a user gesture — this click is one
 		this.music.unlock() // same gesture unlocks the music player
+
+		// MENU SAFETY: send the deploy request NOW, in the same click — instant
+		// play preserved (server spawn races the overlay fade / pointer lock; the
+		// update() retry covers a dropped request). Until the entity arrives the
+		// sim sends no commands (update() is gated on myRawEntity), so there is no
+		// window where a menu body stands in the arena.
+		this.requestDeploy()
+
 		this._arenaEntered = true
 		document.body.classList.add('arena-entered')
 		// kill the intrusion-feed timers — the overlay is going away, no perpetual work.
@@ -2120,15 +2192,66 @@ class Simulator {
 			if (wasClosed && this.audio) this.audio.menuOpen()
 		}
 		// Context-sensitive chrome: from the MAIN MENU (not yet in a match) the panel
-		// reads "MAIN MENU" / "BACK"; paused mid-match it reads "MATCH PAUSED" /
-		// "RESUME". Same panel, small conditional — the RESUME button's click handler
-		// already branches on isTouch/pointer-lock, which no-ops correctly on the menu.
+		// reads "MAIN MENU" / "BACK". MENU SAFETY: mid-match it now reads "MATCH
+		// LIVE" (never "PAUSED" — the world does not pause and calling it paused is
+		// the lie that gets players killed), backed by the vulnerability banner
+		// below. The RESUME button's click handler already branches on
+		// isTouch/pointer-lock, which no-ops correctly on the menu.
 		const inMatch = this._arenaEntered
 		const kicker = document.getElementById('settings-kicker')
-		if (kicker) kicker.textContent = inMatch ? 'MATCH PAUSED' : 'MAIN MENU'
+		if (kicker) kicker.textContent = inMatch ? 'MATCH LIVE' : 'MAIN MENU'
 		const resumeLabel = document.querySelector('#resume-game .resume-label')
 		if (resumeLabel) resumeLabel.textContent = inMatch ? 'RESUME' : 'BACK'
+
+		// MENU SAFETY truth banner: kept fresh by _updateCombatBanner (also called
+		// on the live<->dead transition, so dying with the panel open updates it).
+		this._updateCombatBanner()
 		document.body.classList.add('menu-open')
+	}
+
+	// MENU SAFETY truth banner (single source of truth): opening Settings/Escape
+	// mid-match leaves the body live and fully damageable on the server (there is
+	// no menu state on the wire at all) — say so, plainly, at the top of the
+	// panel, and keep it TRUE as state changes while the panel stays open:
+	//   deployed + alive  -> "COMBAT ACTIVE — CHARACTER VULNERABLE"
+	//   deployed + dead   -> "YOU DIED — RESPAWNING"
+	//   pre-deploy menu   -> no combat warning at all
+	// Called from _openSettings() AND from the alive/dead transition in
+	// _updateHud, so death/respawn with Settings open refreshes immediately.
+	// Created lazily + styled inline (the panel markup is hand-authored elsewhere).
+	_updateCombatBanner() {
+		const menu = document.getElementById('settings-menu')
+		if (!menu) return
+		let banner = document.getElementById('combat-live-banner')
+		if (!banner) {
+			banner = document.createElement('div')
+			banner.id = 'combat-live-banner'
+			banner.setAttribute('role', 'alert')
+			banner.style.cssText = 'display:none;margin:0 0 10px;padding:7px 12px;'
+				+ 'font:700 13px/1.4 "Barlow Condensed",system-ui,sans-serif;'
+				+ 'letter-spacing:.14em;text-align:center;border-radius:3px;'
+			menu.insertBefore(banner, menu.firstChild)
+		}
+		// SERVER truth, not UI state: deployed = our entity exists (the UI-only
+		// _arenaEntered flag can lag or be bypassed — probes deploy without the
+		// overlay flow, and the banner must never contradict the actual body).
+		const deployed = !!this.myRawEntity
+		if (!deployed) { banner.style.display = 'none'; return }
+		const dead = this.myRawEntity.isAlive === false
+		if (dead) {
+			banner.textContent = 'YOU DIED — RESPAWNING'
+			banner.style.color = '#9fb4c8'
+			banner.style.border = '1px solid rgba(159,180,200,.45)'
+			banner.style.background = 'rgba(20,30,44,.4)'
+			banner.style.textShadow = '0 0 6px rgba(159,180,200,.5)'
+		} else {
+			banner.textContent = '⚠ COMBAT ACTIVE — CHARACTER VULNERABLE'
+			banner.style.color = '#ffb84d'
+			banner.style.border = '1px solid rgba(255,184,77,.55)'
+			banner.style.background = 'rgba(80,40,0,.35)'
+			banner.style.textShadow = '0 0 6px rgba(255,184,77,.6)'
+		}
+		banner.style.display = 'block'
 	}
 
 	_closeSettings() {
@@ -2289,6 +2412,9 @@ class Simulator {
 		if (dead !== this._wasDead) {
 			this._wasDead = dead
 			if (this.viewmodel) this.viewmodel.setActive(!dead)
+			// MENU SAFETY (P3): if Settings is open across a death/respawn, the
+			// truth banner must flip immediately (COMBAT ACTIVE <-> YOU DIED).
+			this._updateCombatBanner()
 			if (!dead) {
 				// we just respawned: mirror the server's respawn ammo reset
 				// (GameInstance.respawnPlayer) so predicted fire/reload state stays
@@ -2367,6 +2493,33 @@ class Simulator {
 			weaponPanel.classList.toggle('is-low-ammo', isLowAmmo)
 			weaponPanel.classList.toggle('is-empty', isEmpty)
 		}
+	}
+
+	// MENU SAFETY: SPAWN SHIELD tell — a small cyan chip under the crosshair while
+	// the networked spawnImmunity (server-authoritative, on our own raw entity) is
+	// live. It vanishes the frame the server revokes/expires it, so the UI never
+	// claims protection the server isn't granting. Element is created lazily and
+	// styled inline (index.html/css are hand-authored — not touched from here).
+	_updateSpawnShield() {
+		const e = this.myRawEntity
+		const active = !!(e && e.isAlive !== false && (e.spawnImmunity || 0) > 0 && this._arenaEntered)
+		if (active === this._spawnShieldShown) return
+		this._spawnShieldShown = active
+		let el = document.getElementById('spawn-shield')
+		if (!el) {
+			if (!active) return
+			el = document.createElement('div')
+			el.id = 'spawn-shield'
+			el.textContent = 'SPAWN SHIELD'
+			el.setAttribute('aria-hidden', 'true')
+			el.style.cssText = 'position:fixed;left:50%;top:60%;transform:translateX(-50%);'
+				+ 'padding:3px 12px;font:600 12px/1.5 "Barlow Condensed",system-ui,sans-serif;'
+				+ 'letter-spacing:.22em;color:#8fdcff;border:1px solid rgba(143,220,255,.5);'
+				+ 'border-radius:3px;background:rgba(8,36,54,.38);'
+				+ 'text-shadow:0 0 8px rgba(143,220,255,.7);pointer-events:none;z-index:40;'
+			document.body.appendChild(el)
+		}
+		el.style.display = active ? 'block' : 'none'
 	}
 
 	_setupSettingsUI() {

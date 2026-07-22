@@ -123,7 +123,10 @@ export default (instance, ray, timeAgo, world = null) => {
 		const realEntity = instance.entities.get(pastEntity.nid)
 
 		// real entity may not still exist. Just b/c it did in the past is no guarantee!
-		if (realEntity) {
+		// MENU SAFETY: spawn-immune bodies are GHOSTS to hitscan — the ray passes
+		// through to whatever is behind (wall or player). Without this an immune
+		// spawn absorbs shots as free cover for 1s (damage was gated, hits weren't).
+		if (realEntity && !(realEntity.spawnImmunity > 0)) {
 			// save position
 			const temp = Object.assign({}, realEntity.mesh.position)
 

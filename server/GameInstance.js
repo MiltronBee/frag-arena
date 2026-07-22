@@ -34,7 +34,7 @@ import {
 	REST_HEIGHT, ARMOR_PICKUP, ARMOR_CAP, ARMOR_ABSORB,
 	UDAMAGE_MULT, UDAMAGE_SECONDS, DROP_DESPAWN_SECONDS, DROP_JITTER,
 } from '../common/pickupConfig'
-import { weapons, DEFAULT_ZONE_MULTIPLIERS, SPAWN_WEAPON_INDEX } from '../common/weaponsConfig'
+import { weapons, DEFAULT_ZONE_MULTIPLIERS, SPAWN_WEAPON_INDEX, ENABLED_WEAPON_INDICES } from '../common/weaponsConfig'
 import { PLAYER_NAMES } from '../common/playerNames'
 import BotController from './BotController'
 import AgentBotController from './AgentBotController'
@@ -199,6 +199,51 @@ const INTERMISSION_MS = 15 * 1000
 // nothing else changed (score/phase/winner changes publish immediately). ~2Hz.
 const MATCH_PUBLISH_MS = 500
 
+// ---------------------------------------------------------------------------
+// MENU SAFETY (v1) — connection is NOT deployment.
+// ---------------------------------------------------------------------------
+// A socket that just connected is a SPECTATOR: it has NO PlayerCharacter pair,
+// counts as zero combatants for bot autofill, and every gameplay command from it
+// is hard-dropped. Only an explicit DeployCommand (sent by the PLAY click /
+// rotation auto-rejoin — still one click, zero added friction) transitions it to
+// DEPLOYED, which is when the entity pair spawns, _humanCount increments and a
+// fill bot retires. DEAD stays a sub-state of DEPLOYED exactly as before
+// (isAlive=false + the 2.5s auto-respawn) — there is no DEPLOYED -> SPECTATOR
+// transition in v1, so a live body can never bail to the menu to dodge a fight.
+const SESSION = { SPECTATOR: 0, DEPLOYED: 1 }
+// DeployCommand rate limit: 1 accepted request per socket per window; the rest
+// are silently dropped (no reject allocation churn — Ren's rule).
+const DEPLOY_COOLDOWN_MS = 3000
+// Server-authoritative first-second spawn protection, granted on deploy-spawn AND
+// on every respawn ("assigned on creation/respawn" — locked design). Revoked
+// INSTANTLY by the first movement/fire/throw command or any pickup touch, and
+// NEVER tied to menus, pointer lock, or any client UI state.
+const SPAWN_IMMUNITY_SECONDS = 1.0
+// Sockets idling in the front menu (SPECTATOR, never deployed) are dropped after
+// this long of INACTIVITY — they hold no combat slot, but they do hold a socket.
+// A rate-limited SpectatorHeartbeatCommand (sent by the client on real menu
+// gestures) refreshes the clock, so reading the whitepaper for five minutes
+// doesn't kill the session; only a truly untouched tab does. Tunable; the env
+// override exists for probes (a 180s test is not a test anyone runs).
+const SPECTATOR_AFK_MS = parseInt(process.env.SPECTATOR_AFK_MS || '', 10) > 0
+	? parseInt(process.env.SPECTATOR_AFK_MS, 10) : 180 * 1000
+// Server-side floor between accepted heartbeat stamps — extra packets are
+// ignored (rate limit), so a spoofed heartbeat flood costs one Date.now().
+const HEARTBEAT_MIN_INTERVAL_MS = 10 * 1000
+// COMBAT-LOGGING NEUTRALIZATION: a live DEPLOYED player who disconnects dies a
+// normal server-authoritative death. The kill is credited to the last enemy who
+// damaged them within this window (else it books as an unattributed suicide/
+// forfeit), and the autofill replacement is DELAYED by the normal respawn delay
+// so quitting mid-fight never swaps a wounded player for a fresh 100HP bot.
+const DISCONNECT_CREDIT_WINDOW_MS = 5000
+// How often the AFK sweep runs (coarse — the timeout is minutes, not ms).
+const SPECTATOR_AFK_SWEEP_MS = 5000
+// Zero-spatial spectating (anti-wallhack): a spectator's nengi view AABB is
+// parked far outside every map's world, so NO entity create/update ever reaches
+// a menu socket — no player coordinates cross the wire until deploy. Global
+// per-client messages (killfeed, PlayerName replay) still arrive.
+const SPECTATOR_VIEW = { x: 0, y: 1e9, z: 0, halfWidth: 0.001, halfHeight: 0.001, halfDepth: 0.001 }
+
 class GameInstance {
 	static RESPAWN_DELAY_MS = 2500
 
@@ -328,7 +373,7 @@ class GameInstance {
 		// 1:1 as humans join/leave (see _rebalanceBots). BOT_FILL=0 disables. Legacy
 		// BOTS=N still means a FIXED bot count with no autofill (probes/harnesses
 		// depend on an exact roster), and takes precedence when set.
-		this._humanCount = 0 // humans past the nengi handshake ('connect' fired)
+		this._humanCount = 0 // DEPLOYED humans (menu spectators do NOT count — see deployPlayer)
 		if (process.env.BOTS !== undefined) {
 			this._botFillTarget = 0 // fixed mode: never rebalance
 			const botCount = parseInt(process.env.BOTS, 10) || 0
@@ -359,84 +404,47 @@ class GameInstance {
 		}
 
 		this.instance.on('connect', ({ client, callback }) => {
-			// PER player-related state, attached to clients
+			// MENU SAFETY (v1): a fresh socket is a SPECTATOR — a stream subscription,
+			// not a body in the arena. NO PlayerCharacter pair is created, _humanCount
+			// is untouched and no fill bot retires until an explicit DeployCommand is
+			// validated (deployPlayer below). A menu browser can therefore never be
+			// shot, never blocks a spawn, and never thins the bot roster.
+			client._session = SESSION.SPECTATOR
+			client._connectedAt = Date.now()
+			client._lastDeployAt = 0
 
-			// create a entity for this client
-			const rawEntity = new PlayerCharacter()
-			rawEntity.mesh.checkCollisions = true
-
-			// TDM: auto-balance onto the team with fewer players (tie -> team 0). Set
-			// BEFORE the spawn so we spawn on the assigned team's spawn points.
-			rawEntity.teamId = this.assignTeam()
-
-			// spread spawns out — spawning everyone at the exact origin puts players
-			// INSIDE each other's collision boxes, and moveWithCollisions can't escape
-			// from inside a collider (you'd be frozen until the other player moves)
-			const spawn = this.spawnPoint(rawEntity.teamId)
-			rawEntity.x = spawn.x
-			rawEntity.y = spawn.y || 0
-			rawEntity.z = spawn.z
-			this._recordSpawn(rawEntity)
-
-			// make the raw entity only visible to this client
-			const channel = this.instance.createChannel()
-			channel.subscribe(client)
-			channel.addEntity(rawEntity)
-			//this.instance.addEntity(rawEntity)
-			client.channel = channel
-
-			// smooth entity is visible to everyone
-			const smoothEntity = new PlayerCharacter()
-			smoothEntity.mesh.checkCollisions = false
-			smoothEntity.x = rawEntity.x
-			smoothEntity.y = rawEntity.y
-			smoothEntity.z = rawEntity.z
-			this.instance.addEntity(smoothEntity)
-
-			// Human players are flagged with HUMAN_NAME_SENTINEL on both entities; their
-			// real callsign (typed at the menu) arrives via SetNameCommand and is
-			// broadcast to everyone as a PlayerName message. Bots still use the round-
-			// robin PLAYER_NAMES index (see addBot). Same lockstep rule as hitpoints —
-			// the victim reads raw (private channel), everyone else reads smooth.
-			rawEntity.nameIndex = HUMAN_NAME_SENTINEL
-			smoothEntity.nameIndex = HUMAN_NAME_SENTINEL
-
-			// mirror the assigned team onto the smooth entity — remote clients read THAT
-			// one for team colors (same lockstep rule as hitpoints / nameIndex).
-			smoothEntity.teamId = rawEntity.teamId
-
-			// tell the client which entities it controls + where it spawned
-			this.instance.message(new Identity(rawEntity.nid, smoothEntity.nid, rawEntity.x, rawEntity.y, rawEntity.z), client)
-
-			// establish a relation between this entity and the client
-			rawEntity.client = client
-			client.rawEntity = rawEntity
-			smoothEntity.client = client
-			client.smoothEntity = smoothEntity
-			client.positions = []
-
-			// The network view is a FIXED box sized to the MAP's walkable floor, so
-			// nothing in the playable world is ever network-culled — players,
-			// projectiles and pickups all stay visible and their meshes never get
-			// disposed. Still deliberately NOT re-centered on the player (there is no
-			// 3D view culler in nengi yet). See deriveViewBox for how it is measured
-			// and why it is per-axis and off-origin. Copied per client because nengi
-			// mutates the view object.
-			client.view = { ...this.viewBox }
+			// Zero-spatial spectating: park the view AABB far outside the world so no
+			// entity create/update (= no player coordinates) reaches a menu socket —
+			// spectator wallhack streams are structurally impossible. Replaced with
+			// the real map-sized box on deploy. Copied because nengi mutates the view.
+			client.view = { ...SPECTATOR_VIEW }
 
 			// accept the connection
 			callback({ accepted: true, text: 'Welcome!' })
 
 			// replay existing human players' names to the new joiner so their nametags
-			// resolve immediately (their SetNameCommand fired before this client existed)
+			// resolve immediately once entities stream in after deploy (per-client
+			// messages are not spatially culled; the client caches them by nid)
 			this._humanNames.forEach((name, nid) => {
 				this.instance.message(new PlayerName(nid, name), client)
 			})
+		})
 
-			// AUTO-FILL: a human took a slot — retire one fill bot to hold the target
-			// headcount (prefers a dead / lowest-scoring one; see _rebalanceBots).
-			this._humanCount++
-			this._rebalanceBots()
+		// MENU SAFETY (v1): the explicit deploy request — the PLAY click's server
+		// half. Everything the old connect-time spawn did now happens here.
+		this.instance.on('command::DeployCommand', ({ command, client, tick }) => {
+			this.deployPlayer(client)
+		})
+
+		// MENU SAFETY (v1): spectator activity heartbeat. Refreshes ONLY the AFK
+		// clock for menu sockets — grants nothing else (no entity, no bot math, no
+		// movement, no deploy bypass). Rate-limited: stamps more frequent than
+		// HEARTBEAT_MIN_INTERVAL_MS are ignored, so a flood costs one Date.now().
+		this.instance.on('command::SpectatorHeartbeatCommand', ({ command, client, tick }) => {
+			if (client._session !== SESSION.SPECTATOR) return
+			const now = Date.now()
+			if (now - (client._lastSpectatorActivityAt || 0) < HEARTBEAT_MIN_INTERVAL_MS) return
+			client._lastSpectatorActivityAt = now
 		})
 
 		this.instance.on('disconnect', client => {
@@ -445,6 +453,25 @@ class GameInstance {
 			// (never reaching the 'connect' handler that assigns these), so everything
 			// here may be undefined. Guard each cleanup — an unguarded throw in this
 			// handler would take down the whole server on any half-open connection.
+
+			// COMBAT-LOGGING NEUTRALIZATION: a LIVE deployed player who vanishes dies
+			// a normal death FIRST — through damagePlayer, so scoring, the Killed
+			// broadcast, weapon drops and Proof-of-Blood credit all fire exactly as
+			// for any frag. Credit goes to the last enemy who damaged them within
+			// DISCONNECT_CREDIT_WINDOW_MS (stamped in damagePlayer; the handle must
+			// still hold a live entity), else it books as an unattributed suicide.
+			// Spawn immunity is cleared first so a deploy-and-instant-quit still
+			// resolves; a dead or spectator disconnect resolves nothing.
+			if (client._session === SESSION.DEPLOYED && client.rawEntity && client.rawEntity.isAlive) {
+				const raw = client.rawEntity
+				raw.spawnImmunity = 0
+				if (client.smoothEntity) client.smoothEntity.spawnImmunity = 0
+				const recent = raw._lastAttacker && raw._lastAttackerAt
+					&& (Date.now() - raw._lastAttackerAt <= DISCONNECT_CREDIT_WINDOW_MS)
+					&& raw._lastAttacker.rawEntity ? raw._lastAttacker : null
+				this.damagePlayer(client, recent, 9999, 'disconnect', 0)
+			}
+
 			if (client.rawEntity) {
 				client.rawEntity.mesh.dispose()
 				this.instance.removeEntity(client.rawEntity)
@@ -457,17 +484,43 @@ class GameInstance {
 			if (client.channel) {
 				client.channel.destroy()
 			}
+			// the death above armed client.respawnAt; the client object is leaving
+			// the collection, so nothing will ever consume it — drop the handle.
+			client.respawnAt = null
 			// AUTO-FILL: only count down clients that counted UP (rawEntity is assigned
-			// in 'connect'; a pre-handshake drop never incremented _humanCount).
+			// in deployPlayer; a menu spectator or pre-handshake drop never incremented
+			// _humanCount, so its disconnect must not spawn a bot either). The refill
+			// is DELAYED by the normal respawn delay (see update()) so a combat logger
+			// is not instantly replaced by a fresh full-health bot; a deploy in the
+			// meantime rebalances immediately, which supersedes the pending refill.
 			if (client.rawEntity) {
 				this._humanCount = Math.max(0, this._humanCount - 1)
-				this._rebalanceBots()
+				this._pendingRebalanceAt = Date.now() + GameInstance.RESPAWN_DELAY_MS
 			}
 		})
 
 		this.instance.on('command::MoveCommand', ({ command, client, tick }) => {
+			// MENU SAFETY: hard-drop gameplay commands from non-deployed sockets. A
+			// forged/early MoveCommand from a menu socket must neither move anything
+			// nor crash the handler (pre-deploy there IS no rawEntity to move).
+			if (client._session !== SESSION.DEPLOYED || !client.rawEntity) return
+
 			// move this client's entity
 			const entity = client.rawEntity
+
+			// SPAWN IMMUNITY revocation: the FIRST real action ends the shield —
+			// any movement/jump/dodge intent, firing, or a grenade throw. Checked
+			// BEFORE applyCommand so the same tick's damage window is already open
+			// (no "move and still be immune for one tick" edge).
+			if (entity.spawnImmunity > 0 && (command.forwards || command.backwards
+				|| command.left || command.right || command.jump || command.dodge
+				|| command.fireInput || command.throwInput)) {
+				entity.spawnImmunity = 0
+				if (client.smoothEntity) client.smoothEntity.spawnImmunity = 0
+				// one line max per human spawn (only when they act inside the 1.0s
+				// window); the probe asserts on it and it's a useful ops breadcrumb.
+				console.log(`[menu-safety] spawn immunity revoked by action nid=${entity.nid}`)
+			}
 
 			applyCommand(entity, command, this.obstacles)
 
@@ -488,6 +541,8 @@ class GameInstance {
 		})
 
 		this.instance.on('command::SwitchWeaponCommand', ({ command, client, tick }) => {
+			// MENU SAFETY: non-deployed sockets have no loadout to switch.
+			if (client._session !== SESSION.DEPLOYED) return
 			const entity = client.rawEntity
 			// UT-STYLE OWNERSHIP GATE (v1): refuse a switch to an unowned weapon (mirrors
 			// the applyCommand gate + weapon.fire()). Server-authoritative.
@@ -538,9 +593,18 @@ class GameInstance {
 		})
 
 		this.instance.on('command::FireCommand', ({ command, client, tick }) => {
+			// MENU SAFETY: hard-drop fire from non-deployed sockets (performShot
+			// would dereference a rawEntity that doesn't exist yet).
+			if (client._session !== SESSION.DEPLOYED || !client.rawEntity) return
 			// CEASEFIRE: no shots resolve during the MATCH_END intermission (bots hold
 			// trigger in the bot loop; damagePlayer is gated too — belt and braces).
 			if (this.matchPhase === MATCH_PHASE.MATCH_END) return
+			// SPAWN IMMUNITY: firing ends the shield (raw+smooth in lockstep).
+			if (client.rawEntity.spawnImmunity > 0) {
+				client.rawEntity.spawnImmunity = 0
+				if (client.smoothEntity) client.smoothEntity.spawnImmunity = 0
+				console.log(`[menu-safety] spawn immunity revoked by action nid=${client.rawEntity.nid}`)
+			}
 			// shoot from the perspective of this client's entity
 			this.performShot(client)
 		})
@@ -554,6 +618,104 @@ class GameInstance {
 			this._humanNames.set(nid, name)
 			this.instance.messageAll(new PlayerName(nid, name))
 		})
+	}
+
+	// MENU SAFETY (v1): validate a DeployCommand and spawn the client into the
+	// arena. This is the old connect-time spawn body moved verbatim behind the
+	// SPECTATOR -> DEPLOYED transition, plus the deploy rate limit and the 1.0s
+	// spawn immunity. The ACK is the existing Identity message + the entity
+	// create snapshot — exactly the contract createPlayerFactory already waits on.
+	deployPlayer(client) {
+		// state gate: only a spectator can deploy. A repeat/spoofed DeployCommand
+		// from an already-DEPLOYED socket is silently ignored (can't double-spawn).
+		if (!client || client._session !== SESSION.SPECTATOR) return
+		const now = Date.now()
+		if (now - client._lastDeployAt < DEPLOY_COOLDOWN_MS) return // rate limit: hard drop
+		client._lastDeployAt = now
+
+		// create a entity for this client
+		const rawEntity = new PlayerCharacter()
+		rawEntity.mesh.checkCollisions = true
+
+		// TDM: auto-balance onto the team with fewer players (tie -> team 0). Set
+		// BEFORE the spawn so we spawn on the assigned team's spawn points.
+		rawEntity.teamId = this.assignTeam()
+
+		// spread spawns out — spawning everyone at the exact origin puts players
+		// INSIDE each other's collision boxes, and moveWithCollisions can't escape
+		// from inside a collider (you'd be frozen until the other player moves)
+		const spawn = this.spawnPoint(rawEntity.teamId)
+		rawEntity.x = spawn.x
+		rawEntity.y = spawn.y || 0
+		rawEntity.z = spawn.z
+		// _recordSpawn also arms the 0.5s portal grace (raw._teleCooldown) — a
+		// deploy-spawn placed inside a trigger gets the same protection a respawn
+		// does, so the Teleported-vs-entity-create race stays covered here too.
+		this._recordSpawn(rawEntity)
+
+		// make the raw entity only visible to this client
+		const channel = this.instance.createChannel()
+		channel.subscribe(client)
+		channel.addEntity(rawEntity)
+		//this.instance.addEntity(rawEntity)
+		client.channel = channel
+
+		// smooth entity is visible to everyone
+		const smoothEntity = new PlayerCharacter()
+		smoothEntity.mesh.checkCollisions = false
+		smoothEntity.x = rawEntity.x
+		smoothEntity.y = rawEntity.y
+		smoothEntity.z = rawEntity.z
+		this.instance.addEntity(smoothEntity)
+
+		// Human players are flagged with HUMAN_NAME_SENTINEL on both entities; their
+		// real callsign (typed at the menu) arrives via SetNameCommand and is
+		// broadcast to everyone as a PlayerName message. Bots still use the round-
+		// robin PLAYER_NAMES index (see addBot). Same lockstep rule as hitpoints —
+		// the victim reads raw (private channel), everyone else reads smooth.
+		rawEntity.nameIndex = HUMAN_NAME_SENTINEL
+		smoothEntity.nameIndex = HUMAN_NAME_SENTINEL
+
+		// mirror the assigned team onto the smooth entity — remote clients read THAT
+		// one for team colors (same lockstep rule as hitpoints / nameIndex).
+		smoothEntity.teamId = rawEntity.teamId
+
+		// SPAWN IMMUNITY: 1.0s of no-damage on the first deploy spawn (see
+		// damagePlayer). Revoked by the first movement/fire command or pickup
+		// touch; raw+smooth in lockstep like every replicated field. While immune
+		// the raw mesh is also NON-BLOCKING to other players (ghost — see the
+		// respawnPlayer note); the per-tick enforcement restores solidity the
+		// moment the immunity ends. World collision is unaffected either way.
+		rawEntity.spawnImmunity = SPAWN_IMMUNITY_SECONDS
+		smoothEntity.spawnImmunity = SPAWN_IMMUNITY_SECONDS
+		rawEntity.mesh.checkCollisions = false
+
+		// tell the client which entities it controls + where it spawned
+		this.instance.message(new Identity(rawEntity.nid, smoothEntity.nid, rawEntity.x, rawEntity.y, rawEntity.z), client)
+
+		// establish a relation between this entity and the client
+		rawEntity.client = client
+		client.rawEntity = rawEntity
+		smoothEntity.client = client
+		client.smoothEntity = smoothEntity
+		client.positions = []
+
+		// The network view is a FIXED box sized to the MAP's walkable floor, so
+		// nothing in the playable world is ever network-culled — players,
+		// projectiles and pickups all stay visible and their meshes never get
+		// disposed. Still deliberately NOT re-centered on the player (there is no
+		// 3D view culler in nengi yet). See deriveViewBox for how it is measured
+		// and why it is per-axis and off-origin. Copied per client because nengi
+		// mutates the view object. (Replaces the tiny SPECTATOR_VIEW set on connect.)
+		client.view = { ...this.viewBox }
+
+		client._session = SESSION.DEPLOYED
+
+		// AUTO-FILL: a human took a combat slot — retire one fill bot to hold the
+		// target headcount (prefers a dead / lowest-scoring one; see _rebalanceBots).
+		this._humanCount++
+		this._rebalanceBots()
+		console.log(`[deploy] client deployed as nid=${rawEntity.nid} (smooth ${smoothEntity.nid})`)
 	}
 
 	// Fire the shooter's current weapon and resolve its effects. `shooter` is a
@@ -810,6 +972,13 @@ class GameInstance {
 				const dx = raw.x - mh.x, dy = raw.y - mh.y, dz = raw.z - mh.z
 				if (Math.hypot(dx, dy, dz) > MEGA.RADIUS) continue
 
+				// MENU SAFETY: grabbing the mega revokes spawn immunity (same
+				// pickup-touch rule as grantPickup — no immune objective squatting).
+				if (raw.spawnImmunity > 0) {
+					raw.spawnImmunity = 0
+					if (smooth) smooth.spawnImmunity = 0
+				}
+
 				// GRAB (first-come, no ownership). Heal to the overheal cap; arm the grace
 				// timer so the >100 portion holds for OVERHEAL_GRACE before decaying.
 				const hp = Math.min(MEGA.MAX, raw.hitpoints + MEGA.HEAL)
@@ -919,6 +1088,7 @@ class GameInstance {
 		let count = 0
 		for (let wi = 0; wi < weapons.length; wi++) {
 			if (wi === SPAWN_WEAPON_INDEX) continue // the spawn pistol never drops
+			if (weapons[wi].disabled) continue // disabled roster entries never drop
 			if (!(raw.ownedWeapons & (1 << wi))) continue
 			const st = raw.weaponsState[wi]
 			const carriedMag = st ? (st.magazineAmmo || 0) : 0
@@ -955,6 +1125,13 @@ class GameInstance {
 	grantPickup(c, pk) {
 		const raw = c.rawEntity
 		const smooth = c.smoothEntity
+		// MENU SAFETY: TOUCHING any pickup revokes spawn immunity (even when there
+		// is nothing to gain) — an immune body can't squat a health pack / weapon
+		// spawn to deny it. Locked-design anti-exploit rule #2.
+		if (raw.spawnImmunity > 0) {
+			raw.spawnImmunity = 0
+			if (smooth) smooth.spawnImmunity = 0
+		}
 		// DROP-ON-DEATH weapon (a corpse's dropped gun; renders as a WEAPON pickup but
 		// carries the victim's exact ammo and never refills to full). Always consumed on
 		// touch (returns true → updatePickups removes it). If the grabber does NOT own the
@@ -1052,8 +1229,9 @@ class GameInstance {
 		entity.x = spawn.x
 		entity.y = spawn.y || 0
 		entity.z = spawn.z
-		// spread the loadouts: rifle / smg / shotgun / pistol
-		entity.currentWeaponIndex = index % weapons.length
+		// spread the loadouts across the ENABLED roster only (disabled entries —
+		// Plasma since 2026-07-22 — keep their index but never spawn in a hand)
+		entity.currentWeaponIndex = ENABLED_WEAPON_INDICES[index % ENABLED_WEAPON_INDICES.length]
 		// UT-STYLE OWNERSHIP (v1): bots own the FULL arsenal (they never pick weapons up)
 		// so they behave exactly as before this feature. Refill the ammo the constructor
 		// zeroed for the non-pistol slots.
@@ -1530,6 +1708,13 @@ class GameInstance {
 		// GODMODE: real players take no damage (bots still do — go frag them)
 		if (this._godmode && !victimClient.bot) return
 
+		// MENU SAFETY SPAWN IMMUNITY: fresh spawns take no damage for up to 1.0s.
+		// PURELY temporal + server-side — never linked to menus/pointer lock — and
+		// already revoked the instant the victim moved, fired or touched a pickup
+		// (see the command handlers / grantPickup), so it cannot be camped behind.
+		// Separate from (and additive to) the MATCH_END ceasefire above.
+		if (raw.spawnImmunity > 0) return
+
 		// TDM FRIENDLY FIRE (off by default): a shot on a TEAMMATE deals 0 damage, no
 		// kill, no score. Self-damage (own grenade splash) is preserved — only a
 		// DISTINCT same-team attacker is blocked (attacker/victim are handles here).
@@ -1580,6 +1765,15 @@ class GameInstance {
 			raw.armor -= absorbed
 			smooth.armor = raw.armor
 			damage -= absorbed
+		}
+
+		// COMBAT-LOGGING NEUTRALIZATION: remember the last DISTINCT attacker whose
+		// hit got through every gate above (team/ceasefire/immunity/godmode) — the
+		// disconnect handler credits them if the victim vanishes within the 5s
+		// window. Handle + wall-clock stamp; cleared on respawn.
+		if (attackerClient && attackerClient !== victimClient) {
+			raw._lastAttacker = attackerClient
+			raw._lastAttackerAt = Date.now()
 		}
 
 		// hp BEFORE this hit — overkill is damage beyond what the kill needed
@@ -1682,7 +1876,25 @@ class GameInstance {
 			entity.armor = 0
 			entity.udamageTimer = 0
 			entity.velX = 0; entity.velY = 0; entity.velZ = 0
-			if (entity === client.rawEntity) this._recordSpawn(entity)
+			// MENU SAFETY: spawn immunity applies to RESPAWNS too ("assigned on
+			// creation/respawn" — locked design). Bots get it as well but cancel it
+			// within a tick or two the moment their controller moves them.
+			entity.spawnImmunity = SPAWN_IMMUNITY_SECONDS
+			if (entity === client.rawEntity) {
+				this._recordSpawn(entity)
+				// IMMUNE = NON-BLOCKING to other players: the authoritative raw mesh
+				// (the one moveWithCollisions tests against) goes ghost for the
+				// immunity window, so a fresh spawn can't plug a doorway. The
+				// player's OWN movement still collides with the world (a mover's
+				// collisions test every OTHER checkCollisions mesh — its own flag
+				// only governs who collides with IT). Restored by the per-tick
+				// enforcement the moment immunity expires or is revoked.
+				if (entity.mesh) entity.mesh.checkCollisions = false
+				// a stale attacker must not be credited if this new life later
+				// disconnects — the stamp belongs to the previous life.
+				entity._lastAttacker = null
+				entity._lastAttackerAt = 0
+			}
 			// Phase 4: clear any pending overheal decay so a respawn is a clean 100
 			entity.overhealDecayTimer = 0
 			// Phase 3: refresh grenades to full on respawn (mirrors the ammo reset)
@@ -1995,6 +2207,35 @@ class GameInstance {
 			}
 		})
 
+		// COMBAT-LOGGING NEUTRALIZATION: the delayed autofill refill armed by a
+		// deployed disconnect (see the disconnect handler). One pending stamp is
+		// enough — _rebalanceBots recomputes the whole desired roster, so several
+		// disconnects inside one window are all filled by this single call.
+		if (this._pendingRebalanceAt && wallNow >= this._pendingRebalanceAt) {
+			this._pendingRebalanceAt = 0
+			this._rebalanceBots()
+		}
+
+		// MENU SAFETY: spectator INACTIVITY timeout. A socket idling untouched in
+		// the front menu (SPECTATOR, never deployed) for SPECTATOR_AFK_MS is
+		// dropped — it holds no combat slot but it does hold a socket. Real menu
+		// activity refreshes the clock via the rate-limited heartbeat command
+		// (client._lastSpectatorActivityAt). Swept coarsely (~5s); collected
+		// first because instance.disconnect mutates the clients collection.
+		if (!this._afkSweepAt || wallNow >= this._afkSweepAt) {
+			this._afkSweepAt = wallNow + SPECTATOR_AFK_SWEEP_MS
+			const stale = []
+			this.instance.clients.forEach(c => {
+				if (c._session !== SESSION.SPECTATOR || !c._connectedAt) return
+				const lastActivity = Math.max(c._connectedAt, c._lastSpectatorActivityAt || 0)
+				if (wallNow - lastActivity > SPECTATOR_AFK_MS) stale.push(c)
+			})
+			stale.forEach(c => {
+				console.log('[menu-safety] spectator idle past AFK limit — disconnecting socket')
+				this.instance.disconnect(c, null)
+			})
+		}
+
 		// Fall-death: anyone who drops below this.killY (walked off a ledge into the void)
 		// dies — unattributed, routed through the same death bookkeeping as a frag.
 		if (this.useMeshMap) {
@@ -2033,6 +2274,14 @@ class GameInstance {
 			const entity = bot.rawEntity
 			if (!entity.isAlive) return
 			const command = bot.controller.think(delta, wallNow, this.combatants(entity), this.occluderMeshes)
+			// MENU SAFETY: bots obey the same spawn-immunity revocation rule as
+			// humans — first movement/fire intent ends the shield (a bot's raw and
+			// smooth are the SAME entity, so one write covers both).
+			if (entity.spawnImmunity > 0 && (command.forwards || command.backwards
+				|| command.left || command.right || command.jump || command.dodge
+				|| command.fireInput || command.throwInput)) {
+				entity.spawnImmunity = 0
+			}
 			applyCommand(entity, command, this.obstacles)
 			// only attempt the shot when the weapon can actually fire — fire()
 			// would reject it anyway, but noisily (WEAPON_FIRE_FAIL log per tick)
@@ -2113,6 +2362,9 @@ class GameInstance {
 			projectileTargets.forEach(c => {
 				const target = c.rawEntity
 				if (!target || !target.isAlive || target.nid === proj.ownerNid) return
+				// MENU SAFETY: spawn-immune bodies are GHOSTS to projectiles too —
+				// the bolt flies through (matches the hitscan rule; no absorb-shield).
+				if (target.spawnImmunity > 0) return
 				// Swept sphere check (radius = proj.radius, default 0.75m; aimed Plasma
 				// bolts spawn with a smaller radius — see spawn).
 				const t = segmentSphereT(p0x, p0y, p0z, sx, sy, sz, target.x, target.y, target.z, proj.radius)
@@ -2334,6 +2586,25 @@ class GameInstance {
 		// networked grenadeCharges stays in lockstep for the HUD.
 		const tickGrenades = (raw, smooth) => {
 			if (!raw) return
+			// MENU SAFETY: tick down the spawn-immunity shield (idle players simply
+			// age out of it after 1.0s; action revokes it earlier in the command
+			// handlers). Same lockstep + outside-prediction shape as the timers below.
+			if (raw.spawnImmunity > 0) {
+				raw.spawnImmunity -= delta
+				if (raw.spawnImmunity < 0) raw.spawnImmunity = 0
+				if (smooth) smooth.spawnImmunity = raw.spawnImmunity
+			}
+			// GHOST ENFORCEMENT: the raw mesh (the only one other movers collide
+			// with — human smooth meshes are permanently non-colliding) is ghost
+			// exactly while immune, solid otherwise. One branch restores solidity
+			// on EVERY path out of immunity (tick expiry, action revocation,
+			// pickup touch) within the same tick.
+			const wantSolid = !(raw.spawnImmunity > 0)
+			if (raw.mesh && raw.mesh.checkCollisions !== wantSolid) {
+				// never resurrect collision on a human SMOOTH entity (raw===smooth
+				// only for bots); this walker only ever receives raw as `raw`.
+				raw.mesh.checkCollisions = wantSolid
+			}
 			// UDamage powerup countdown (server-authoritative; networked for the buff render).
 			// Same decrement shape as the grenade timers — OUTSIDE the reconciled applyCommand
 			// path, so it can never perturb client movement prediction.
@@ -2374,6 +2645,10 @@ class GameInstance {
 		// for each player ...
 		this.instance.clients.forEach(client => {
 			const { rawEntity, smoothEntity } = client
+
+			// MENU SAFETY: spectator sockets have no entity pair (nor a positions
+			// queue) to smooth-follow — followPath would crash on undefined.
+			if (!rawEntity || !smoothEntity || !client.positions) return
 
 			// the network view is a fixed full-arena box (set on connect) and is
 			// intentionally never re-centered — nothing is culled at this scale

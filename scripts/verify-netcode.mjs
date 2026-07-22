@@ -61,10 +61,18 @@ async function openClient() {
   page.on('console', (m) => { if (m.text().includes('onConnect response')) page._connected = true })
   page.on('pageerror', (e) => errors.push(e.message))
   await page.goto(URL, { waitUntil: 'domcontentloaded' })
-  // wait until our own raw entity actually exists (a few ticks after identity),
+  // MENU SAFETY: connecting no longer spawns an entity — a socket is a
+  // spectator until the explicit deploy request (the PLAY click's server half).
+  // Deploy programmatically, exactly like the PLAY button does.
+  await page.waitForFunction(
+    "window.gameClient && window.gameClient.simulator && window.gameClient.simulator._connectionState === 'connected'",
+    { timeout: 15000 }
+  )
+  await page.evaluate(() => window.gameClient.simulator.requestDeploy())
+  // wait until our own entity PAIR actually exists (a few ticks after identity),
   // not merely until connected — otherwise entities read empty.
   await page.waitForFunction(
-    "window.gameClient && window.gameClient.simulator && !!window.gameClient.simulator.myRawEntity && window.gameClient.client.entities.size > 0",
+    "window.gameClient && window.gameClient.simulator && !!window.gameClient.simulator.myRawEntity && !!window.gameClient.simulator.mySmoothEntity && window.gameClient.client.entities.size > 0",
     { timeout: 15000 }
   )
   page._errors = errors
