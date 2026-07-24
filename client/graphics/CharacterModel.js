@@ -31,6 +31,14 @@ const TEAM_NAMETAG_CSS = ['#ff5a5a', '#5aa6ff']
 // TEAM_BODY_GLOW level the hair/eyes keep.
 const TEAM_SUIT_EMISSIVE = [new BABYLON.Color3(0.50, 0.40, 0.32), new BABYLON.Color3(0.32, 0.40, 0.54)]
 
+// FFA NEUTRAL (mode-wide, not a team): everyone wears the same matching BLACK
+// uniform. Glow/emissive follow the same two-layer scheme as the team constants
+// above, just untinted — a whisper of cool gray so the black suit still separates
+// from an unlit corner without reading as any team color. Nametags go neutral too.
+const NEUTRAL_BODY_GLOW = new BABYLON.Color3(0.030, 0.032, 0.038)
+const NEUTRAL_SUIT_EMISSIVE = new BABYLON.Color3(0.34, 0.35, 0.38)
+const NEUTRAL_NAMETAG_CSS = '#d8dbe0'
+
 // Shared team-uniform textures (one GPU texture per url per scene — every body on
 // a team samples the same texture). invertY=false matches the glTF loader's UV
 // convention (glTF images are top-left origin; a default Babylon Texture would
@@ -301,10 +309,23 @@ export default class CharacterModel {
   // the player factory's teamId watch (fires on create + on change). The nametag is a
   // DOM node (color it now); the uniform needs the GLB materials, so if the model has
   // not finished loading yet we stash the team and _load applies it once meshes exist.
-  // FFA entities never get a setTeam call -> stock (neutral) body texture, no glow.
+  // NOTE: the server assigns teamId 0/1 in EVERY mode (balance bookkeeping), so the
+  // factory watch fires in FFA too — it routes FFA to setNeutral() below instead.
   setTeam(teamId) {
+    this._neutral = false
     this._teamId = teamId
     if (this._nameTag && TEAM_NAMETAG_CSS[teamId]) this._nameTag.style.color = TEAM_NAMETAG_CSS[teamId]
+    this._applyTeamUniform()
+  }
+
+  // FFA: no teams, so no red/blue — EVERYONE wears the same matching black uniform
+  // (charcoal repaint of the red atlas, skin islands untouched; see manifest
+  // neutralSkin) with a neutral gray nametag. Same stash-until-loaded contract as
+  // setTeam.
+  setNeutral() {
+    this._neutral = true
+    this._teamId = null
+    if (this._nameTag) this._nameTag.style.color = NEUTRAL_NAMETAG_CSS
     this._applyTeamUniform()
   }
 
@@ -315,9 +336,9 @@ export default class CharacterModel {
   // 'Superhero'); hair/eyes keep their own textures but share the faint glow so the
   // silhouette reads as one team-colored unit.
   _applyTeamUniform() {
-    if (this._teamId == null || !this.meshes) return
+    if ((this._teamId == null && !this._neutral) || !this.meshes) return
     const skins = this.spec.teamSkins
-    const skinUrl = skins && skins[this._teamId]
+    const skinUrl = this._neutral ? this.spec.neutralSkin : (skins && skins[this._teamId])
     // team NORMAL map lives beside the albedo: hero_male_uniform_red.webp ->
     // hero_male_uniform_red_n.webp (DeepBump relief baked from the finished atlas,
     // composited over the GLB's own face normal). Derived here so the manifest
@@ -326,8 +347,8 @@ export default class CharacterModel {
     // StandardMaterial); we keep the material's existing invertNormalMap* settings
     // so the +Y/OpenGL convention matches the GLB normal we composited into.
     const normUrl = skinUrl && skinUrl.replace(/\.webp$/, '_n.webp')
-    const glow = TEAM_BODY_GLOW[this._teamId]
-    const suitEmis = TEAM_SUIT_EMISSIVE[this._teamId]
+    const glow = this._neutral ? NEUTRAL_BODY_GLOW : TEAM_BODY_GLOW[this._teamId]
+    const suitEmis = this._neutral ? NEUTRAL_SUIT_EMISSIVE : TEAM_SUIT_EMISSIVE[this._teamId]
     this.meshes.forEach((m) => {
       const mat = m.material
       if (!mat) return

@@ -947,9 +947,25 @@ class Simulator {
 	// TDM: the low-rate MatchState entity (team scores / timer / phase / winner). Stored
 	// so _updateHud can paint the team scoreboard + banner each frame off its networked
 	// fields. Server-authoritative — the client only reads it, never asserts a score.
-	registerMatchState(entity) { if (entity) this._matchState = entity }
+	registerMatchState(entity) {
+		if (!entity) return
+		this._matchState = entity
+		// FFA UNIFORM RACE GUARD: player creates (and their teamId watch) can land in
+		// the same snapshot BEFORE this MatchState — those models were tinted red/blue
+		// under the default non-FFA read. Now that the mode is known, re-sweep every
+		// existing model to the neutral matching-black uniform. Idempotent; TDM/CTF/DOM
+		// need no sweep (team tint was already the right call).
+		if (this.isFFA()) this.characterModels.forEach((model) => model.setNeutral())
+	}
 	unregisterMatchState(nid) {
 		if (this._matchState && this._matchState.nid === nid) this._matchState = null
+	}
+
+	// FFA has no teams: everyone wears the matching black uniform (see
+	// CharacterModel.setNeutral). False until MatchState arrives — callers that fire
+	// earlier are corrected by the registerMatchState sweep above.
+	isFFA() {
+		return !!this._matchState && (this._matchState.mode | 0) === MATCH_MODE.FFA
 	}
 
 	// ── LOCAL KILL MEDALS (announcer) ────────────────────────────────────────────

@@ -63,6 +63,12 @@ export const assets = {
       '/assets/characters/hero_male_uniform_red.webp',
       '/assets/characters/hero_male_uniform_blue.webp',
     ],
+    // FFA NEUTRAL UNIFORM: matching black for everyone (no teams -> no red/blue).
+    // Charcoal luminance repaint of the red atlas (all plating detail kept), skin
+    // islands byte-identical via the same garment mask recipe as the team skins.
+    // Normal map: red's _n copied beside it (same relief). Bake:
+    // scratchpad bake-black-uniform.py (PIL, no Gemini round-trip needed).
+    neutralSkin: '/assets/characters/hero_male_uniform_black.webp',
     // rigid head prop parented to the Head bone (rides head animation).
     // TUNED VISUALLY — see probe-helmet
     helmet: {

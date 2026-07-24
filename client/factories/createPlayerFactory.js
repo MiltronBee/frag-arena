@@ -109,10 +109,17 @@ export default ({ simulator }) => {
 			// TDM team color: the replicated teamId (also fires on create with the initial
 			// value) drives the remote player's nametag color + body tint so the local
 			// player can tell teammate from enemy at a glance. Server-authoritative — the
-			// client only reads it.
+			// client only reads it. The server assigns teamId 0/1 in EVERY mode (balance
+			// bookkeeping), so in FFA this watch still fires — route it to the neutral
+			// matching-black uniform instead of a team tint. If MatchState hasn't arrived
+			// yet the mode reads as non-FFA here; registerMatchState() re-sweeps existing
+			// models to neutral once it does.
 			teamId({ entity, value }) {
 				const model = simulator.characterModels.get(entity.nid)
-				if (model) model.setTeam(value)
+				if (model) {
+					if (simulator.isFFA()) model.setNeutral()
+					else model.setTeam(value)
+				}
 			},
 			// observers can detect damage on any remote player via replicated hitpoints
 			// decreasing — play a brief hit-react one-shot (RecieveHit). Priority in
