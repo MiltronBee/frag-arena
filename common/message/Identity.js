@@ -1,7 +1,7 @@
 import nengi from 'nengi'
 
 class Identity {
-    constructor(rawId, smoothId, x, y, z) {
+    constructor(rawId, smoothId, x, y, z, yaw) {
         this.rawId = rawId
         this.smoothId = smoothId
         // spawn position: the client predicts its own movement and permanently
@@ -21,6 +21,13 @@ class Identity {
         this.x = x
         this.y = y
         this.z = z
+        // spawn FACING: world yaw (radians, camera.rotation.y convention) the client
+        // snaps to on this initial spawn — the UT PlayerStart's rotation, networked so
+        // players no longer keep their pre-deploy facing (they never rotated on spawn).
+        // TELEPORT_KEEP_YAW (-999, the shared keep-facing sentinel — see Teleported.js)
+        // means the spawn had no authored rotation; the client leaves the current view.
+        // A real yaw is a radian in (-π, π], so the sentinel can never collide with one.
+        this.yaw = yaw
     }
 }
 
@@ -29,7 +36,8 @@ Identity.protocol = {
     smoothId: nengi.UInt16,
     x: nengi.Float32,
     y: nengi.Float32,
-    z: nengi.Float32
+    z: nengi.Float32,
+    yaw: nengi.Float32
 }
 
 export default Identity

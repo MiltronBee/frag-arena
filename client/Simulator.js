@@ -251,6 +251,16 @@ class Simulator {
 			// only x/z — the entity's y already arrives correct on the create-snapshot —
 			// but keeping y here means the two sources can't disagree.
 			this.spawnPos = { x: message.x, y: message.y, z: message.z }
+			// spawn FACING: rotate the camera to the server-picked spawn's world yaw (the
+			// same authoritative-turn contract as the teleport handler — the camera owns
+			// look yaw, so writing camera.rotation.y IS the turn). Identity arrives before
+			// our entity exists, but the camera exists from renderer construction, and
+			// createPlayerFactory's onRespawned (fired on our entity's create) only touches
+			// roll/pitch — never yaw — so this facing survives into the fresh life.
+			// TELEPORT_KEEP_YAW = the spawn had no authored rotation; keep the current view.
+			if (message.yaw !== TELEPORT_KEEP_YAW && Number.isFinite(message.yaw)) {
+				this.renderer.camera.rotation.y = message.yaw
+			}
 			console.log('identified as', message)
 
 			// tell the server our chosen callsign (typed at the menu, saved by
@@ -285,6 +295,14 @@ class Simulator {
 			this.myRawEntity.velX = 0
 			this.myRawEntity.velY = 0
 			this.myRawEntity.velZ = 0
+
+			// respawn FACING: snap the camera to the new spawn's world yaw (authoritative
+			// turn, same contract as the teleport handler). fragLayer.onRespawned() below
+			// resets roll/pitch but never yaw, so this survives. TELEPORT_KEEP_YAW = the
+			// spawn had no authored rotation; keep the player's current view.
+			if (message.yaw !== TELEPORT_KEEP_YAW && Number.isFinite(message.yaw)) {
+				this.renderer.camera.rotation.y = message.yaw
+			}
 
 			// UT-STYLE LOADOUT RESET: a respawn returns us to pistol-only (the server does
 			// the same authoritatively). Reset our predicted inventory + re-equip the pistol

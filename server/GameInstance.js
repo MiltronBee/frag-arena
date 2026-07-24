@@ -29,6 +29,7 @@ import MatchState, { MATCH_PHASE, MATCH_WINNER, MATCH_MODE } from '../common/ent
 import setupPickups from './setupPickups'
 import setupObjectives from './setupObjectives'
 import { buildTeleporters, checkTeleport, TELE_COOLDOWN } from './teleporters'
+import { utYawToWorldYaw } from '../common/teleporterData'
 import { buildJumpPads, checkJumpPad } from './jumpPads'
 import MoverController from './movers'
 import Pickup from '../common/entity/Pickup'
@@ -752,8 +753,11 @@ class GameInstance {
 		smoothEntity.spawnImmunity = SPAWN_IMMUNITY_SECONDS
 		rawEntity.mesh.checkCollisions = false
 
-		// tell the client which entities it controls + where it spawned
-		this.instance.message(new Identity(rawEntity.nid, smoothEntity.nid, rawEntity.x, rawEntity.y, rawEntity.z), client)
+		// tell the client which entities it controls + where it spawned (+ which way to
+		// face). The non-SPAWN_POINTS spawn branches (legacy `spawns`, box arena, DEV_SPAWN_AT)
+		// return no yaw — coalesce those to the KEEP sentinel so 0 is never sent as a facing.
+		const spawnYaw = Number.isFinite(spawn.yaw) ? spawn.yaw : TELEPORT_KEEP_YAW
+		this.instance.message(new Identity(rawEntity.nid, smoothEntity.nid, rawEntity.x, rawEntity.y, rawEntity.z, spawnYaw), client)
 
 		// establish a relation between this entity and the client
 		rawEntity.client = client
@@ -1585,9 +1589,18 @@ class GameInstance {
 			if (Array.isArray(pts) && pts.length) {
 				const usable = pts.filter(p => p.headroom === undefined || p.headroom >= SPAWN_MIN_HEADROOM)
 				let pool = usable.length ? usable : pts
-				// TDM: spawn on the requesting team's own points. If a team has NONE (a map
-				// with untagged spawns), fall back to the full pool rather than failing.
-				if (teamId !== null) {
+				// TEAM-TAG GATE: honour the per-point team ONLY when the MAP's authored mode
+				// is CTF or DOM — there the PlayerStart TeamNumbers are placed deliberately.
+				// DM-sourced maps run as TDM/FFA carry meaningless UT team tags (dm_somnus
+				// splits 4/11, dm_baroque 11/7, dm_gantry162 6/9), so filtering by them just
+				// shrinks one team's spawn pool — use the full pool there instead. Uses the
+				// MAP's effective mode (not the resolved gameMode) so a forced MODE override
+				// can't reinterpret authored tags as junk (or vice-versa).
+				const mapMode = effectiveMode(this.map)
+				const teamTagsAuthored = mapMode === 'CTF' || mapMode === 'DOM'
+				// TDM (objective maps): spawn on the requesting team's own points. If a team
+				// has NONE (a map with untagged spawns), fall back to the full pool.
+				if (teamId !== null && teamTagsAuthored) {
 					const teamPool = pool.filter(p => p.team === teamId)
 					if (teamPool.length) pool = teamPool
 				}
@@ -1598,7 +1611,13 @@ class GameInstance {
 				// on a probe miss, fall back to the native y (never worse than the legacy
 				// behaviour, which used the native y verbatim)
 				const wy = floorY != null ? floorY + SPAWN_REST : p.y * sc
-				return { x: wx, y: wy, z: wz, yaw: p.yaw }
+				// SPAWN FACING: convert the PlayerStart's UT rotation (p.yaw = θ_ut degrees,
+				// or null when the actor had none) to a world yaw (radians, camera.rotation.y
+				// convention) via the SAME formula the teleporter exits use. null/absent ->
+				// TELEPORT_KEEP_YAW so the client leaves the player's current facing. Sent in
+				// Identity/Respawned; wire semantics match Teleported (world radians).
+				const yaw = (p.yaw === null || p.yaw === undefined) ? TELEPORT_KEEP_YAW : utYawToWorldYaw(p.yaw)
+				return { x: wx, y: wy, z: wz, yaw }
 			}
 			// legacy fallback: pick a floor spawn; small XZ jitter; y a hair above the floor.
 			const s = this.map.spawns[Math.floor(Math.random() * this.map.spawns.length)]
@@ -2012,7 +2031,10 @@ class GameInstance {
 		// Bots have no socket to message; the server-side teleport IS their move.
 		// spawn.y goes on the wire now — the client used to assume 0 (box-arena floor)
 		// and fell ~24m out of the sky on every respawn on a mesh map.
-		if (!client.bot) this.instance.message(new Respawned(spawn.x, spawn.y || 0, spawn.z), client)
+		// spawn.yaw is a world radian for a SPAWN_POINTS spawn, or the KEEP sentinel for a
+		// yaw-less one / a non-SPAWN_POINTS branch (coalesced like the Identity send site).
+		const respawnYaw = Number.isFinite(spawn.yaw) ? spawn.yaw : TELEPORT_KEEP_YAW
+		if (!client.bot) this.instance.message(new Respawned(spawn.x, spawn.y || 0, spawn.z, respawnYaw), client)
 		console.log(`${client.bot ? 'Bot' : 'Player'} ${client.rawEntity.nid} respawned at (${spawn.x.toFixed(1)}, ${spawn.z.toFixed(1)})`)
 	}
 

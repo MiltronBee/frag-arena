@@ -1,7 +1,7 @@
 import nengi from 'nengi'
 
 class Respawned {
-    constructor(x, y, z) {
+    constructor(x, y, z, yaw) {
         // respawn teleport: the client predicts its own movement and permanently
         // ignores server x/y/z for its own entity (see Identity), so a respawn's
         // new spawn point must be handed over explicitly, exactly like the
@@ -18,13 +18,20 @@ class Respawned {
         this.x = x
         this.y = y
         this.z = z
+        // respawn FACING: world yaw (radians, camera.rotation.y convention) to snap to
+        // on this respawn — the new spawn point's UT PlayerStart rotation, networked for
+        // the same reason as Identity's (the client never rotated on spawn/respawn).
+        // TELEPORT_KEEP_YAW (-999, the shared keep-facing sentinel — see Teleported.js)
+        // means the spawn had no authored rotation; the client keeps its current view.
+        this.yaw = yaw
     }
 }
 
 Respawned.protocol = {
     x: nengi.Float32,
     y: nengi.Float32,
-    z: nengi.Float32
+    z: nengi.Float32,
+    yaw: nengi.Float32
 }
 
 export default Respawned
