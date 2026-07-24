@@ -119,18 +119,34 @@ class BABYLONRenderer {
 		// sky-tinted clear so any area the skybox dome doesn't cover (corners) blends in
 		this.scene.clearColor = new BABYLON.Color3(0.05, 0.05, 0.08)
 
+		// Touch predicate, hoisted so BOTH the grade (just below) and the desktop-only
+		// post pipeline (further down) key off the SAME heuristic — a phone must never
+		// disagree with itself about which branch it is on.
+		const isTouch = 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0
+
 		// filmic punch: tone mapping + contrast + a dark vignette. Material-level
 		// image processing (no post-process pass), so it costs nothing extra on
 		// mobile and applies uniformly to world + viewmodel cameras.
 		const ip = this.scene.imageProcessingConfiguration
 		ip.toneMappingEnabled = true
-		// STANDARD tonemap. ACES was tried (2026-07-17) and reverted: it crushed the
-		// midtones and the arena read near-black on real displays even with exposure
-		// raised to 1.3. Scene legibility beats highlight rolloff here.
-		ip.contrast = 1.35
-		ip.exposure = 1.05
+		// STANDARD tonemap (KEEP). ACES was tried (2026-07-17) and reverted: it crushed
+		// the midtones and the arena read near-black on real displays even with exposure
+		// raised to 1.3 — legibility beats highlight rolloff here. This is the OTHER lever:
+		// a 2026-07-24 measured retune (scripts/_probe-brightness.mjs) that lifts the whole
+		// grade because the game read FAR too dark on mobile / dark on PC. contrast above
+		// 1.3 was crushing the low end (indoor Deck16 read p95≈25/255, a flat black smear),
+		// so ease it to 1.25; raise exposure 1.05 -> 1.20; and drop the multiply vignette
+		// 1.6 -> 1.0 (it was eating the frame edges). Touch devices go brighter still —
+		// +0.15 exposure and a much lighter vignette — since phone panels + sunlight lose
+		// the low end that a monitor in a dim room keeps. MEASURED (frozen-frame A/B via
+		// gl.readPixels, same spawn frame): desktop grade mean luma +25% on visage (mesh)
+		// and +22% on indoor Deck16, median (p50) lifted, and NO highlight blowout (p95
+		// stayed <=50/255; mobile grade <=54). p5 stays 0 only where the frame is the black
+		// void/space behind the map. Do NOT push exposure past ~1.4 or the sky/coronas clip.
+		ip.contrast = 1.25
+		ip.exposure = isTouch ? 1.35 : 1.20
 		ip.vignetteEnabled = true
-		ip.vignetteWeight = 1.6
+		ip.vignetteWeight = isTouch ? 0.7 : 1.0
 		ip.vignetteColor = new BABYLON.Color4(0, 0, 0, 0)
 		ip.vignetteBlendMode = BABYLON.ImageProcessingConfiguration.VIGNETTEMODE_MULTIPLY
 
@@ -168,7 +184,7 @@ class BABYLONRenderer {
 		// 2026-07-17 renderer reverts taught us to avoid on phones. Threshold is high and
 		// weight low: bloom lifts muzzle flashes, coronas and emissives, never the walls.
 		try {
-			const isTouch = 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0
+			// isTouch is hoisted above (shared with the grade) — same heuristic, one source.
 			if (!isTouch) {
 				const post = new BABYLON.DefaultRenderingPipeline('post2030', false, this.scene, [this.camera, this.vmCamera])
 				post.fxaaEnabled = true
