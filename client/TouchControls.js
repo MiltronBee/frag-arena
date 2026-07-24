@@ -339,9 +339,12 @@ class TouchControls {
 			if (navigator.vibrate) navigator.vibrate(8)
 		})
 
-		// SWITCH — cycle to the next weapon (switchWeapon wraps the index)
+		// SWITCH — cycle to the next SELECTABLE weapon. Uses the shared _cycleWeapon so it
+		// skips BOTH unowned and `disabled` (Plasma/Flak) slots like Q/wheel do; the old
+		// switchWeapon(weaponIndex + 1) stalled dead on the disabled Plasma slot (switchWeapon
+		// refuses it, so the index never advanced and the button did nothing).
 		this._bindTap(this.switchBtn, () => {
-			this.simulator.switchWeapon(this.simulator.weaponIndex + 1)
+			this.simulator._cycleWeapon(1)
 			if (navigator.vibrate) navigator.vibrate(8)
 		})
 

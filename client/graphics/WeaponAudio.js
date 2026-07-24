@@ -928,6 +928,29 @@ export default class WeaponAudio {
     this._teardownWhenDone([n], [out, n, bp, g])
   }
 
+  // weapon PICKUP affirmation ("+ FLAK CANNON"): a quick rising two-note kachunk-ding
+  // so grabbing a NEW gun feels rewarding. Procedural on purpose (fires the instant the
+  // networked ownedWeapons bit flips — never waits on a buffer decode), 2D, self-throttled.
+  // Distinct freqs from megaPickup (660/990) so a gun grab and a mega grab never sound
+  // alike. Peak (~0.28 through the limiter) sits just under megaPickup's reward chime.
+  weaponPickup() {
+    if (!this._uiOk('weapon_pickup', 0.1)) return
+    const t0 = this.ctx.currentTime, out = this._voiceOut(0.7)
+    const a = this._blip('triangle', 500, 760, 0.06, 0.40, t0, out)
+    const b = this._blip('square', 760, 1120, 0.10, 0.28, t0 + 0.06, out)
+    this._teardownWhenDone([a.src, b.src], [out, ...a.nodes, ...b.nodes])
+  }
+
+  // soft AMMO-pickup tick: one muted downward blip — the "you topped up ammo" nudge,
+  // deliberately quieter + plainer than a new-weapon grab (no rise, no ding) so the two
+  // never confuse. Procedural, 2D, self-throttled.
+  ammoPickup() {
+    if (!this._uiOk('ammo_pickup', 0.1)) return
+    const t0 = this.ctx.currentTime, out = this._voiceOut(0.55)
+    const a = this._blip('triangle', 620, 470, 0.06, 0.22, t0, out)
+    this._teardownWhenDone([a.src], [out, ...a.nodes])
+  }
+
   // "PLAY unlocked" ready cue: a C-major rising arpeggio. PROCEDURAL on purpose —
   // it fires the instant the asset pipeline finishes, when clips may not be decoded
   // (and stays silent, harmlessly, if no user gesture has created the ctx yet).

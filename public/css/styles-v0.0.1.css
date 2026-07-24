@@ -1234,6 +1234,37 @@ body.low-health #damage-flash {
     100%  { opacity: 0; }
 }
 
+/* ---- Pickup toast ("+ FLAK CANNON") — the weapon-acquire cue. Low-center so it
+   reads under the crosshair without fighting the top-right vitals or the center frag
+   banner. Accent green owns acquisition (gold is reserved for kills — color law);
+   Inter 600 uppercase to match the killfeed/label voice. FragLayer.showPickupToast
+   drives it (adds .pickup-toast-show). ---- */
+#pickup-toast {
+    position: absolute;
+    top: 62%; left: 50%;
+    z-index: 21;
+    transform: translate(-50%, -50%) scale(0.98);
+    font-family: var(--x30-font-ui);
+    font-weight: 600;
+    font-size: clamp(13px, 1.9vh, 16px);
+    letter-spacing: var(--x30-track-label);
+    text-transform: uppercase;
+    color: var(--x30-ink);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    opacity: 0;
+    pointer-events: none;
+    white-space: nowrap;
+}
+#pickup-toast .pt-plus { color: var(--x30-accent); text-shadow: var(--x30-emit-accent); }
+#pickup-toast .pt-name { color: var(--x30-ink); }
+#pickup-toast.pickup-toast-show { animation: pickup-toast-pop 2000ms linear both; }
+@keyframes pickup-toast-pop {                      /* 2000ms: in ~280 / hold / out ~180 */
+    0%    { opacity: 0; transform: translate(-50%, calc(-50% + 6px)) scale(0.98); }
+    14%   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    91%   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100%  { opacity: 0; }
+}
+
 /* directional damage arc canvas */
 #damage-arc {
     position: fixed;

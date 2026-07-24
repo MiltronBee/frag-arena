@@ -85,6 +85,17 @@ export default class FragLayer {
       hud.appendChild(this.medalEl)
     }
 
+    // pickup toast ("+ FLAK CANNON"): the acquire cue when the local player grabs a
+    // NEW weapon. Low-center, accent-green (gold is reserved for kills — color law).
+    // Simulator drives it via showPickupToast() off the ownedWeapons diff.
+    this.pickupToastEl = document.getElementById('pickup-toast')
+    if (!this.pickupToastEl) {
+      this.pickupToastEl = document.createElement('div')
+      this.pickupToastEl.id = 'pickup-toast'
+      this.pickupToastEl.setAttribute('aria-hidden', 'true')
+      hud.appendChild(this.pickupToastEl)
+    }
+
     this.arcEl = document.getElementById('damage-arc')
     if (!this.arcEl) {
       this.arcEl = document.createElement('canvas')
@@ -301,6 +312,29 @@ export default class FragLayer {
     el.classList.add('medal-show')
     clearTimeout(this._medalTimer)
     this._medalTimer = setTimeout(() => el.classList.remove('medal-show'), 1800)
+  }
+
+  // PICKUP TOAST ("+ FLAK CANNON") — the acquire cue for grabbing a NEW weapon. Same
+  // transient-element discipline as showMedal(): one reused node, restart the pop,
+  // auto-dismiss (~2s). `name` is a weaponsConfig display name (trusted), but built with
+  // textContent spans anyway per the banner convention. Accent (not gold) per color law.
+  showPickupToast(name) {
+    const el = this.pickupToastEl
+    if (!el) return
+    el.textContent = ''
+    const plus = document.createElement('span')
+    plus.className = 'pt-plus'
+    plus.textContent = '+ '
+    const nm = document.createElement('span')
+    nm.className = 'pt-name'
+    nm.textContent = String(name || '').toUpperCase()
+    el.appendChild(plus)
+    el.appendChild(nm)
+    el.classList.remove('pickup-toast-show')
+    void el.offsetWidth // restart the animation (rapid grabs must not drop the toast)
+    el.classList.add('pickup-toast-show')
+    clearTimeout(this._pickupToastTimer)
+    this._pickupToastTimer = setTimeout(() => el.classList.remove('pickup-toast-show'), 2000)
   }
 
   // =========================================================================

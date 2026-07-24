@@ -1417,6 +1417,9 @@ class Simulator {
 						const owns = me.ownedWeapons === undefined || (me.ownedWeapons & (1 << wi))
 						if (owns && me.weaponsState && me.weaponsState[wi]) {
 							me.weaponsState[wi].reserveAmmo = weapons[wi].maxReserveAmmo
+							// ammo grab: SOFT cue only — no toast, no auto-switch (those are for NEW
+							// weapons, handled by _syncOwnershipRefill off the ownedWeapons diff).
+							this.audio.ammoPickup()
 						}
 					}
 				}
@@ -1452,14 +1455,48 @@ class Simulator {
 		if (this._lastOwned === undefined) { this._lastOwned = e.ownedWeapons; return }
 		const gained = e.ownedWeapons & ~this._lastOwned
 		if (gained && e.weaponsState) {
+			// Feedback for EVERY newly-gained weapon (map pickups AND drop-on-death grabs —
+			// both arrive as the same ownedWeapons diff, so both are covered here). Track the
+			// highest-priority new weapon for the UT-style auto-switch below. Ammo-only grabs
+			// never flip a bit, so they get NEITHER the toast nor the auto-switch (their soft
+			// cue lives in _updatePickups' AMMO branch).
+			let bestGained = -1
 			for (let i = 0; i < weapons.length; i++) {
 				if ((gained & (1 << i)) && e.weaponsState[i]) {
 					e.weaponsState[i].magazineAmmo = weapons[i].magazineCapacity
 					e.weaponsState[i].reserveAmmo = weapons[i].maxReserveAmmo
+					this.audio.weaponPickup()                       // soft procedural acquire blip
+					if (this.fragLayer) this.fragLayer.showPickupToast(weapons[i].name) // "+ RIFLE" toast
+					if (bestGained < 0 || this._weaponPriority(i) > this._weaponPriority(bestGained)) bestGained = i
 				}
+			}
+			// UT-STYLE AUTO-SWITCH: hop to the newly-gained weapon iff it OUT-RANKS what we
+			// currently hold AND the fire trigger is NOT held (never yank the gun mid-burst).
+			// Routes through switchWeapon() — the SAME prediction + SwitchWeaponCommand path a
+			// manual 1-5 / wheel switch uses (no local-only hack). switchWeapon() itself no-ops
+			// if we somehow don't own it, so this can never equip a greyed slot.
+			if (bestGained >= 0 && !this._fireHeld() &&
+				this._weaponPriority(bestGained) > this._weaponPriority(this.weaponIndex)) {
+				this.switchWeapon(bestGained)
 			}
 		}
 		this._lastOwned = e.ownedWeapons
+	}
+
+	// Roster priority for the pickup auto-switch. weaponsConfig carries no explicit
+	// priority field, so INDEX ORDER is the ranking (bigger index = bigger gun) — EXCEPT
+	// the spawn pistol, which is always LOWEST so you upgrade off it onto anything. Disabled
+	// slots never get granted, so they never reach this.
+	_weaponPriority(i) {
+		return i === SPAWN_WEAPON_INDEX ? -1 : i
+	}
+
+	// Is the local fire trigger held THIS frame? Reads the same flag the per-frame
+	// MoveCommand reads (frameState.mouseDown — mirrored from the held pointer state by
+	// InputSystem.releaseKeys each frame; TouchControls sets it too), so auto-switch and
+	// the fire command always agree on "trigger down".
+	_fireHeld() {
+		return !!(this.input && this.input.frameState && this.input.frameState.mouseDown)
 	}
 
 	// Does the local player own weapon `i`? Undefined mask (pre-Identity) = own all, so
@@ -1469,13 +1506,22 @@ class Simulator {
 		return ow === undefined || (ow & (1 << i)) !== 0
 	}
 
-	// Cycle to the next OWNED weapon in `dir` (+1 / -1), skipping unowned slots. Used by
-	// Q / mouse-wheel so an unowned weapon is simply passed over (its "greyed" state).
+	// Can the local player cycle-select weapon `i`? It must be OWNED and NOT `disabled`
+	// (a disabled roster entry — Plasma/Flak — keeps its slot for protocol stability but
+	// is never a valid swap target). Single source of truth for every cycle path (Q,
+	// mouse-wheel, mobile swap button) so they all skip the same slots.
+	_selectableWeapon(i) {
+		return this._ownsWeapon(i) && !(weapons[i] && weapons[i].disabled)
+	}
+
+	// Cycle to the next SELECTABLE weapon in `dir` (+1 / -1), skipping BOTH unowned and
+	// disabled slots. Used by Q / mouse-wheel / the mobile swap button so a greyed or
+	// disabled weapon is simply passed over instead of stalling the cycle on it.
 	_cycleWeapon(dir) {
 		const n = weapons.length
 		for (let step = 1; step <= n; step++) {
 			const idx = (((this.weaponIndex + dir * step) % n) + n) % n
-			if (this._ownsWeapon(idx)) { this.switchWeapon(idx); return }
+			if (this._selectableWeapon(idx)) { this.switchWeapon(idx); return }
 		}
 	}
 
