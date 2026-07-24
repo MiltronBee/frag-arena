@@ -2641,6 +2641,17 @@ class Simulator {
 			// truth banner must flip immediately (COMBAT ACTIVE <-> YOU DIED).
 			this._updateCombatBanner()
 			if (!dead) {
+				// AUTHORITATIVE death-cam reset: clear the death-cam drop/roll off the
+				// replicated isAlive false->true edge, NOT only off the Respawned message.
+				// The message-driven onRespawned (see the Respawned handler) is the normal
+				// path, but if that message is lost/raced (packet loss, or the documented
+				// map-rotation/auto-rejoin reconnect that skips it) while the isAlive FIELD
+				// still flips true, _deathCam.active stays set and applyDeathCamera keeps
+				// writing the ~23deg roll into the new life — and mouse-look only writes
+				// rotation.x/y, so the leaked z persists until the next death ("respawned
+				// with a skewed/CCW-tilted horizon"). onRespawned is idempotent, so calling
+				// it here too makes the reset final regardless of message delivery.
+				this.fragLayer.onRespawned()
 				// we just respawned: mirror the server's respawn ammo reset
 				// (GameInstance.respawnPlayer) so predicted fire/reload state stays
 				// in lockstep — ammo isn't networked, it's predicted deterministically
