@@ -198,6 +198,73 @@ async function attachPickupModel(entity, spec) {
 	entity._pickupModel = clone
 }
 
+// Real UT99 CTF flag model (extracted glTF): a pole + morph-animated cloth that
+// waves via the ONE `flag_wave` animation group. Ships with the BLUE skin as the
+// material albedo; RED is a same-UV WebP swap. See attachFlagModel below.
+const FLAG_MODEL_URL = '/assets/props/Prop_Flag.glb'
+const FLAG_RED_SKIN_URL = '/assets/props/Prop_Flag_red.webp'
+
+// Attach the real flag model to `entity.mesh` (the positioned placeholder box).
+// MIRRORS attachPickupModel (async warm import, async-delete guard, hide the box)
+// with ONE deliberate difference: a FRESH SceneLoader.ImportMeshAsync per flag
+// instead of loadPropTemplate + clone. mesh.clone() shares the source's
+// morphTargetManager AND material with the template, so the two CTF flags would (a)
+// wave in LOCKSTEP off one influence set — in fact NO animation group would target a
+// clone at all, since ImportMesh anim groups bind to the TEMPLATE's morph influences
+// — and (b) repaint each other on the RED albedo swap (shared material). Two flags
+// per map × 147 KB and the browser caches the fetch, so a per-flag import is cheap.
+async function attachFlagModel(entity) {
+	const scene = BABYLON.Engine.LastCreatedScene
+	if (!scene || scene.getEngine().name === 'NullEngine') return
+
+	const slash = FLAG_MODEL_URL.lastIndexOf('/') + 1
+	const result = await BABYLON.SceneLoader.ImportMeshAsync(
+		'', FLAG_MODEL_URL.slice(0, slash), FLAG_MODEL_URL.slice(slash), scene)
+
+	// async-delete guard (exactly like attachPickupModel): the flag could be removed
+	// during the await. Dispose EVERYTHING we imported (meshes recursively + their
+	// materials/textures AND the animation groups) and bail — never touch a dead mesh.
+	if (!entity || entity._disposed || !entity.mesh || entity.mesh.isDisposed()) {
+		result.meshes.forEach((m) => m.dispose(false, true))
+		result.animationGroups.forEach((g) => g.dispose())
+		;(result.skeletons || []).forEach((s) => s.dispose())
+		return
+	}
+
+	const root = result.meshes.find((m) => m.name === '__root__') || result.meshes[0]
+	root.parent = entity.mesh
+	root.isPickable = false
+	result.meshes.forEach((m) => { m.isPickable = false }) // historian/raycast safety — the box opts out; the model must too
+
+	// The model base sits at its own origin; the entity origin is the CENTER of the
+	// old 2.0-tall placeholder box, so the flag's floor contact is at entity.y − 1.0.
+	// Leave the imported rotationQuaternion alone (cloth direction is cosmetic).
+	root.position.y = -1.0
+
+	// Team skin: the GLB ships BLUE. For RED, swap the PBR material's albedoTexture to
+	// the same-UV WebP, built with the SAME (noMipmap=false, invertY=false) convention
+	// CharacterModel._teamTexture uses for the same-pipeline uniform atlases.
+	if (entity.team === 0) {
+		result.meshes.forEach((m) => {
+			const mat = m.material
+			if (mat && mat.albedoTexture !== undefined) {
+				mat.albedoTexture = new BABYLON.Texture(FLAG_RED_SKIN_URL, scene, false, false)
+			}
+		})
+	}
+
+	// Drive the seamless cloth wave (the ONE `flag_wave` group of morph animations).
+	const anim = result.animationGroups.find((g) => g.name === 'flag_wave') || result.animationGroups[0]
+	if (anim) anim.start(true)
+
+	// hide the placeholder box but KEEP it as the positioned holder (a CARRIED flag is
+	// server-snapped to its carrier via entity.mesh.position). _updateObjectives keeps
+	// pulsing f.mat invisibly — harmless. No opacityTexture/DynamicTexture (corona rule).
+	if (entity.mesh.material) entity.mesh.material.alpha = 0
+	entity._flagModel = root
+	entity._flagAnim = anim
+}
+
 export default ({ simulator /* inject depenencies here */ }) => {
 	return {
 		'PlayerCharacter': createPlayerFactory({ simulator, /* inject depenencies here */ }),
@@ -317,10 +384,22 @@ export default ({ simulator /* inject depenencies here */ }) => {
 		// state + drive the flag HUD chips; the box position is server-authored (a
 		// carried flag rides its carrier). delete() only fires on shutdown.
 		'Flag': {
-			create({ data, entity }) { simulator.registerFlag(entity) },
+			create({ data, entity }) {
+				simulator.registerFlag(entity)
+				// swap the tinted placeholder box for the real UT99 flag model (async;
+				// guarded against the entity being removed before the import resolves).
+				attachFlagModel(entity)
+			},
 			delete({ nid, entity }) {
 				simulator.unregisterFlag(nid)
-				if (entity && entity.mesh && typeof entity.mesh.dispose === 'function') entity.mesh.dispose()
+				// async-delete guard: flag the entity so a still-pending attachFlagModel()
+				// bails instead of mounting onto a disposed mesh.
+				if (entity) entity._disposed = true
+				// stop + free the per-flag wave animation group (own import, not warm-cache).
+				if (entity && entity._flagAnim) { entity._flagAnim.stop(); entity._flagAnim.dispose() }
+				// dispose recursively + free materials/textures so the parented imported
+				// model (+ its RED albedo swap) frees with the box, same as the Projectile factory.
+				if (entity && entity.mesh && typeof entity.mesh.dispose === 'function') entity.mesh.dispose(false, true)
 			}
 		},
 		// DOM CONTROL POINT (v1). Same shape as Flag: the tinted box is the marker,

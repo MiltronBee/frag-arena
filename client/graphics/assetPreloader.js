@@ -121,6 +121,13 @@ export default function preloadAssets(renderer, arenaReadyPromise, onProgress) {
   // via loadPropTemplate) hits the warm browser cache + compiled shader with no hitch.
   items.push({ w: 0.5, stage: 'EFFECTS', run: () => warmProp(scene, '/assets/props/Prop_HealthPack.gltf') })
 
+  // EFFECTS — the CTF flag prop. Warmed behind the gate like the grenade/health so
+  // CTF maps don't hitch on the first flag import. NOTE: the Flag factory does its own
+  // fresh ImportMeshAsync per flag (NOT loadPropTemplate + clone — see attachFlagModel:
+  // clones would share one morphTargetManager + material), so this warm only primes the
+  // browser fetch cache + compiled shader; the in-match import still parses its own copy.
+  items.push({ w: 0.5, stage: 'EFFECTS', run: () => warmProp(scene, '/assets/props/Prop_Flag.glb') })
+
   // EFFECTS — UT-STYLE PICKUP models. The on-floor weapon pickups (tp_*.glb) and the
   // ammo box (Prop_Ammo) previously popped in on first sight — they weren't in any warm
   // pass. Warm each UNIQUE weapon-pickup model (Plasma/Flak reuse Rifle/Shotgun, so the
