@@ -2193,21 +2193,26 @@ class GameInstance {
 		if (this.gameMode === GAME_MODE.FFA) {
 			// FFA score == kills (already applied). No suicide penalty in v1, so the server's
 			// winner (max kills) matches the client leaderboard exactly.
-		} else {
+		} else if (this.gameMode === GAME_MODE.TDM) {
 			const raw = victimClient.rawEntity
 			const enemyKill = attackerClient && attackerClient !== victimClient
 				&& attackerClient.rawEntity && attackerClient.rawEntity.teamId !== raw.teamId
 			if (enemyKill) this._addTeamScore(attackerClient.rawEntity.teamId, +1)
 			else this._addTeamScore(raw.teamId, -1)
 		}
+		// CTF/DOM: frags NEVER move the team score — only captures (_captureFlag) and
+		// held-point ticks do. CTF's cap is CAPTURE_LIMIT (3), so letting kills in here
+		// ended a CTF match after 3 frags (the shipped bug). Kills still count on the
+		// personal scoreboard via the networked per-player `kills`.
 		this._afterScore()
 	}
 
 	// An unattributed / self death (void fall, own grenade). TDM: -1 to the victim's own
-	// team. FFA: no score change (kills is untouched). May decide a TDM sudden-death lead.
+	// team. FFA/CTF/DOM: no team-score change (CTF/DOM scores are captures/point ticks
+	// only — same rule as scoreKill). May decide a TDM sudden-death lead.
 	scoreSelfKill(raw) {
 		if (!this._scoringLive()) return
-		if (this.gameMode !== GAME_MODE.FFA) this._addTeamScore(raw.teamId, -1)
+		if (this.gameMode === GAME_MODE.TDM) this._addTeamScore(raw.teamId, -1)
 		this._afterScore()
 	}
 
