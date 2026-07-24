@@ -23,6 +23,7 @@ import Pickup from './entity/Pickup'
 import MatchState from './entity/MatchState'
 import Flag from './entity/Flag'
 import ControlPoint from './entity/ControlPoint'
+import Mover from './entity/Mover'
 import ObjectiveEvent from './message/ObjectiveEvent'
 
 const config = {
@@ -54,7 +55,8 @@ const config = {
             ['Pickup', Pickup],
             ['MatchState', MatchState],
             ['Flag', Flag],
-            ['ControlPoint', ControlPoint]
+            ['ControlPoint', ControlPoint],
+            ['Mover', Mover]
         ],
         localMessages: [],
         messages: [

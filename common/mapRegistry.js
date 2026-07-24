@@ -386,6 +386,19 @@ const dm_gantry162 = mesh({
 		TELEPORTERS: [
 			{ x: 17.1, z: 37.334, y: -4.951, class: 'Teleporter', yaw: 269.91, tag: 'gotheredammit', nav_id: 151 },
 			{ x: 17.034, z: -31.715, y: -23.468, class: 'Teleporter', yaw: 86.04, tag: 'Teleporter', url: 'gotheredammit', nav_id: 152 },
+		],
+		// --- UT-EXTRACTED MOVERS (2 lifts, native units) — the ONLY gameplay movers in
+		// rotation. Derived from _work/ut-actors/movers/DM-Deck16][.movers.json (base key +
+		// bbox). Per lift: x/z = platform centre; restY/topY = the standable SURFACE-TOP
+		// native y at the bottom/top keyframes (= base-key y + bbox.max.y 0.076); half =
+		// footprint half-extent (bbox 2.743, so 5.49 m native / 3.57 m world platform);
+		// travel 10.52 native (6.84 m world) over moveTime 1.75 s. Consumed by
+		// server/movers.js (state machine + carry) which spawns a replicated Mover box per
+		// lift; StayOpenTime/crush are runtime constants (native y is authoritative — the
+		// Deck16 shafts are baked HOLES, so NO drop-probe).
+		MOVERS: [
+			{ kind: 'lift', x: 24.079, z: 36.271, restY: -23.927, topY: -13.411, half: 2.743, moveTime: 1.75 },
+			{ kind: 'lift', x: 10.058, z: 36.271, restY: -24.003, topY: -13.487, half: 2.743, moveTime: 1.75 },
 		]
 	})
 
@@ -620,7 +633,22 @@ const dm_somnus = mesh({
 			powerup: [
 				{ x: 19.525, z: -6.886, y: 49.15, class: 'UT_invisibility', item: 'invisibility', tag: 'UT_invisibility' }
 			]
-		}
+		},
+		// --- UT-EXTRACTED JUMP PADS (7 Kickers, native units) — copied verbatim from
+		// _work/ut-actors/registry/dm_somnus.json (key JUMP_PADS). Morpheus tower kickers.
+		// Consumed server-side by server/jumpPads.js: floor-snapped, then a rising-edge
+		// trigger launches the toucher (velY + a horizontal component along `yaw` when the
+		// actor has one). UT KickVelocity was NOT captured — launch strength is tuned in
+		// server/jumpPads.js (env JUMPPAD_VY / JUMPPAD_HFRAC).
+		JUMP_PADS: [
+			{ x: 2.749, z: -5.16, y: 20.576, class: 'Kicker', tag: 'Kicker' },
+			{ x: -8.324, z: -4.368, y: 30.241, class: 'Kicker', yaw: 91.36, tag: 'Kicker' },
+			{ x: -6.333, z: -6.164, y: 30.241, class: 'Kicker', yaw: 91.36, tag: 'Kicker' },
+			{ x: 11.407, z: -0.033, y: 25.765, class: 'Kicker', yaw: 177.19, tag: 'Kicker' },
+			{ x: 13.343, z: 1.823, y: 25.765, class: 'Kicker', yaw: 177.19, tag: 'Kicker' },
+			{ x: 8.585, z: 10.186, y: 28.317, class: 'Kicker', yaw: 177.19, tag: 'Kicker' },
+			{ x: 10.521, z: 12.041, y: 28.317, class: 'Kicker', yaw: 177.19, tag: 'Kicker' },
+		]
 	})
 
 // DM-Baroque (UT original DM-Gothic) — imported TDM. killY nav-gated (margin 11.41 m world);

@@ -29,6 +29,8 @@ import MatchState, { MATCH_PHASE, MATCH_WINNER, MATCH_MODE } from '../common/ent
 import setupPickups from './setupPickups'
 import setupObjectives from './setupObjectives'
 import { buildTeleporters, checkTeleport, TELE_COOLDOWN } from './teleporters'
+import { buildJumpPads, checkJumpPad } from './jumpPads'
+import MoverController from './movers'
 import Pickup from '../common/entity/Pickup'
 import Flag, { FLAG_STATE } from '../common/entity/Flag'
 import ControlPoint, { CP_OWNER } from '../common/entity/ControlPoint'
@@ -339,6 +341,15 @@ class GameInstance {
 		// ready (the drop-probes need real geometry); box arenas / teleporter-less
 		// maps keep an empty list, which makes checkTeleport a cheap no-op.
 		this.portals = []
+
+		// UT99 JUMP PADS (Kickers): world-space launch pads for this map, floor-snapped.
+		// Filled by _loadMapMesh once the mesh is ready (drop-probes need real geometry);
+		// pad-less maps keep an empty list (checkJumpPad is a cheap no-op).
+		this.jumpPads = []
+
+		// UT99 LIFTS: the mover controller (state machine + carry clamp + replicated Mover
+		// boxes). Built in _loadMapMesh after the mesh is ready; null on mover-less maps.
+		this.moverController = null
 
 		// Phase 4: the ONE mega-health pickup, on contested ground at bob height.
 		// Present (AVAILABLE) from boot; update() runs the proximity heal + 60s respawn
@@ -1499,6 +1510,15 @@ class GameInstance {
 			// timing rule as pickups — the drop-probes need the loaded mesh.
 			this.portals = buildTeleporters(this.map, (x, y, z) => this._dropProbeY(x, y, z))
 
+			// UT99 JUMP PADS: floor-snap the registry Kickers (same timing rule as pickups
+			// / teleporters — the drop-probes need the loaded mesh).
+			this.jumpPads = buildJumpPads(this.map, (x, y, z) => this._dropProbeY(x, y, z))
+
+			// UT99 LIFTS: build the mover controller (spawns a replicated Mover box per
+			// lift). Uses the authored native keyframes (Deck16 shafts are baked holes —
+			// no drop-probe), so it needs no floor query, only the scene for the box mesh.
+			this.moverController = new MoverController(this)
+
 			// CTF/DOM OBJECTIVES: drop-probe the registry flags/control points onto the
 			// floor and spawn their entities (no-op for other modes). Same timing rule.
 			const objectives = setupObjectives(this)
@@ -1524,6 +1544,10 @@ class GameInstance {
 		// Simulator's `!myRawEntity` guard and desyncing the client at the entry.
 		raw._teleCooldown = 0.5
 		raw._teleInside = false
+		// jump-pad edge state (mirror of the teleporter guard): a fresh grace so a spawn
+		// placed on a pad (DEV_SPAWN_AT probes) doesn't launch on the first tick.
+		raw._padCooldown = 0.5
+		raw._padInside = false
 		if (this.useMeshMap) console.log(`[spawn] nid=${raw.nid} @(${raw.x.toFixed(1)},${raw.y.toFixed(1)},${raw.z.toFixed(1)})`)
 	}
 
@@ -2048,6 +2072,37 @@ class GameInstance {
 			+ `${portal.tag} -> ${portal.url} @(${x.toFixed(1)},${y.toFixed(1)},${z.toFixed(1)})`)
 	}
 
+	// UT99 JUMP PAD (Kicker) launch. Same server-authoritative contract as applyTeleport,
+	// but position is UNCHANGED — only velocity changes (UT KickVelocity): velY (+ a
+	// horizontal component along the pad's yaw). Set on BOTH raw and smooth (remote clients
+	// see smooth), grounded=false so the launch survives the next tick's applyCommand
+	// (its walking-ground rule zeroes velY). A human learns the new velocity via a
+	// Teleported message with the SAME x/y/z (its own position snapshots are ignored, so
+	// the velocity is the only thing that must be handed over); a bot has no socket, so the
+	// server-side velocity IS its launch.
+	applyJumpPad(handle, pad) {
+		const raw = handle.rawEntity
+		if (!raw) return
+		const { launchX: velX, launchY: velY, launchZ: velZ } = pad
+		for (const entity of [handle.rawEntity, handle.smoothEntity]) {
+			if (!entity) continue
+			entity.velX = velX
+			entity.velY = velY
+			entity.velZ = velZ
+			entity.grounded = false
+		}
+		if (handle.bot) {
+			// bot pathing: drop the current polyline so think() replans from the arc
+			// (teleporter precedent — the !path branch bypasses the replan throttle).
+			const c = handle.controller
+			if (c && 'path' in c) { c.path = null; c.pathDone = false }
+		} else {
+			this.instance.message(new Teleported(raw.x, raw.y, raw.z, TELEPORT_KEEP_YAW, velX, velY, velZ), handle)
+		}
+		console.log(`[jumppad] ${handle.bot ? 'Bot' : 'Player'} ${raw.nid} launched `
+			+ `vel(${velX.toFixed(1)},${velY.toFixed(1)},${velZ.toFixed(1)})`)
+	}
+
 	// ---- TDM team/match helpers -------------------------------------------------
 
 	// Head count per team across EVERY player (humans + bots), each counted once.
@@ -2514,6 +2569,19 @@ class GameInstance {
 		// these commands) sees a constant active map — deterministic, and multi-instance
 		// safe even when one process hosts instances with different maps.
 		setActiveMap(this.map)
+
+		// UT99 LIFTS: advance the mover state machine + reposition the platform boxes
+		// BEFORE this tick's movement, so the shared floor probe (humans move inside
+		// emitCommands below; bots further down) collides against each platform where it
+		// now is. Rider detection reads last-tick positions (one-tick latency to start a
+		// rise — imperceptible).
+		if (this.moverController) {
+			const riders = []
+			this.instance.clients.forEach(c => { if (c.rawEntity && c.rawEntity.isAlive) riders.push(c.rawEntity) })
+			this.bots.forEach(b => { if (b.rawEntity && b.rawEntity.isAlive) riders.push(b.rawEntity) })
+			this.moverController.tick(delta, riders)
+		}
+
 		this.instance.emitCommands()
 
 		// respawn any players whose death timer has run out
@@ -2622,6 +2690,40 @@ class GameInstance {
 				this.performShot(bot)
 			}
 		})
+
+		// UT99 LIFTS: post-sim platform clamp. After all movement this tick, pin every
+		// rider standing on a lift to the platform (raw), mirroring y/velY/grounded to
+		// smooth — remote clients only ever see smooth (the raw/smooth footgun). Bots ride
+		// for free (raw === smooth). Idempotent ("y := platform rest height"), so it
+		// converges with the owner client's own interp-based clamp without any handover.
+		if (this.moverController && this.moverController.movers.length) {
+			const clampRide = (handle) => {
+				const raw = handle.rawEntity
+				if (!raw || !raw.isAlive) return
+				if (this.moverController.carry(raw) && handle.smoothEntity && handle.smoothEntity !== raw) {
+					handle.smoothEntity.y = raw.y
+					handle.smoothEntity.velY = raw.velY
+					handle.smoothEntity.grounded = raw.grounded
+				}
+			}
+			this.instance.clients.forEach(clampRide)
+			this.bots.forEach(clampRide)
+		}
+
+		// UT99 JUMP PADS: after all movement, test every ALIVE combatant against the pads.
+		// A launch sets velocity on raw+smooth in lockstep and grounds them airborne, then
+		// hands humans the new velocity via Teleported (unchanged position). Rising-edge +
+		// short cooldown guard re-triggering; a bot's server-side velocity IS its launch.
+		if (this.jumpPads.length) {
+			const padTest = (handle) => {
+				const raw = handle.rawEntity
+				if (!raw || !raw.isAlive) return
+				const pad = checkJumpPad(raw, this.jumpPads, delta)
+				if (pad) this.applyJumpPad(handle, pad)
+			}
+			this.instance.clients.forEach(padTest)
+			this.bots.forEach(padTest)
+		}
 
 		// UT99 TELEPORTERS: after all movement this tick (humans moved in
 		// emitCommands above, bots in the loop above), test every ALIVE combatant

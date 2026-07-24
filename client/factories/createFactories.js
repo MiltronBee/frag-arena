@@ -331,6 +331,29 @@ export default ({ simulator /* inject depenencies here */ }) => {
 				simulator.unregisterControlPoint(nid)
 				if (entity && entity.mesh && typeof entity.mesh.dispose === 'function') entity.mesh.dispose()
 			}
+		},
+		// UT99 LIFT PLATFORM. The shaded box built in the Mover constructor IS the v1
+		// visual; create() tracks it in simulator.movers so the client-side carry clamp
+		// (Simulator._carryClampSelf) can pin the owner's predicted entity to the
+		// INTERPOLATED platform (nengi updates its y each frame). The box is NON-colliding
+		// client-side (see below); the platform y (box centre) rides the server state
+		// machine. delete() only fires on shutdown (movers persist all match).
+		'Mover': {
+			create({ data, entity }) {
+				// checkCollisions is FORCED OFF client-side (the Mover constructor defaults it
+				// on for the server floor). A moving checkCollisions box + nengi's ~100 ms
+				// interp lag ejects the rider out of the carry band mid-rise (DESIGN option a's
+				// documented failure — verified in _probe-lifts). The client carry is PURELY
+				// the idempotent clamp in Simulator._carryClampSelf (DESIGN option b): it holds
+				// a rider at rest AND carries them through the ride with no collision mesh.
+				entity.mesh.checkCollisions = false
+				entity.mesh.isPickable = false
+				simulator.movers.set(entity.nid, entity)
+			},
+			delete({ nid, entity }) {
+				simulator.movers.delete(nid)
+				if (entity && entity.mesh && typeof entity.mesh.dispose === 'function') entity.mesh.dispose()
+			}
 		}
 	}
 }

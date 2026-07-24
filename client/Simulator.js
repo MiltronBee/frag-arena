@@ -74,6 +74,7 @@ class Simulator {
 		this.renderer = new BABYLONRenderer(this.map)
 		this.input = new InputSystem()
 		this.obstacles = new Map()
+		this.movers = new Map()          // nid -> Mover entity (UT lifts; client-side carry clamp reads these)
 		this.characterModels = new Map() // nid -> CharacterModel (other players' visuals)
 		this._nameRegistry = new Map()   // nid -> callsign string (overhead nametags + kill feed)
 		this._projectiles = new Map()    // nid -> {entity, prev pos} for the plasma streak
@@ -418,6 +419,10 @@ class Simulator {
 			// against yet, so skip until it exists (avoids a null deref on startup).
 			if (!this.myRawEntity) { return }
 			reconcilePlayer(predictionErrorFrame, this.client, this.myRawEntity)
+			// UT LIFT CARRY: re-pin to the platform after the reconcile replay converges
+			// our predicted entity (same idempotent clamp as the per-frame prediction),
+			// so a mid-ride correction lands us back on the platform, not inside it.
+			this._carryClampSelf()
 		})
 
 		this.input.onmousemove = (e) => {
@@ -634,6 +639,13 @@ class Simulator {
 		this.myRawEntity.velX = message.velX
 		this.myRawEntity.velY = message.velY
 		this.myRawEntity.velZ = message.velZ
+		// A teleport (and a jump-pad launch, which is a Teleported with unchanged position
+		// and an upward velocity) is a spatial discontinuity — re-derive grounded from the
+		// new location by going airborne for this tick. CRITICAL for jump pads: if we stayed
+		// grounded, the next predicted applyCommand would zero velY (its walking-ground rule)
+		// and kill the launch. grounded is NOT reconciled (only x/y/z/vel are), so the
+		// airborne vertical sweep simply re-grounds us next tick on a normal floor teleport.
+		this.myRawEntity.grounded = false
 
 		// exit facing: the camera owns look yaw (mouse-look writes camera.rotation.y
 		// and the MoveCommand aim ray derives from it — see onmousemove/update), so
@@ -658,6 +670,77 @@ class Simulator {
 		if (!this._pendingTeleport || !this.myRawEntity) return
 		this._applyTeleported(this._pendingTeleport)
 		this._pendingTeleport = null
+	}
+
+	// UT LIFT CARRY (client half). Post-sim platform clamp on our own predicted entity
+	// against the INTERPOLATED Mover entities. Pins a rider to the platform rest height
+	// (RIDE_REST above the box's standable top) and grounds it, mirroring the server's
+	// authoritative carry (server/movers.js) so both converge with no handover message.
+	//
+	// STICKY RIDE LATCH: boarding uses a tight vertical band, but once boarded we latch to
+	// that mover (`_ridingMoverNid`) and keep carrying it — ignoring the band-below — until
+	// the rider JUMPS (velY spike) or leaves the footprint. Without the latch a low frame
+	// rate (headless probes hit ~8 fps) lets the interp platform + the airborne gravity drop
+	// exceed the band in a single frame and the clamp loses the rider mid-rise; the latch is
+	// the DESIGN's client-local "MoverRide" — robust to any FPS / interp jump. Constants are
+	// duplicated from server/movers.js (importing the server module into the client bundle
+	// would pull in babylon.node + node deps). Fail-soft: never throw inside prediction.
+	_carryClampSelf() {
+		const e = this.myRawEntity
+		if (!e || !this.movers || this.movers.size === 0) return
+		try {
+			const RIDE_REST = 0.5316, SKIN = 0.2, BAND_ABOVE = 1.2, JUMP_EPS = 0.1
+			// BOARD_BELOW is intentionally generous: a rider in the footprint whose feet are up
+			// to this far BELOW the (interp) platform still boards — this catches a rider the
+			// rising lift left behind before the client's first clamp ran (a Mover-snapshot /
+			// low-FPS race), then the sticky latch keeps them glued. Kept < the lift travel
+			// (6.84 m) so it never grabs someone standing in the shaft under a fully-raised lift.
+			const BOARD_BELOW = 4.0
+			// STATE-GATED COLLISION: make the client platform box SOLID only at rest
+			// (AT_BOTTOM 0 / AT_TOP 2) so a rider gets real floor traction to walk on/off it;
+			// keep it NON-colliding while MOVING (RISING 1 / DESCENDING 3) — a moving
+			// checkCollisions box penetrates the predicted capsule and moveWithCollisions
+			// ejects the rider out of the carry band (DESIGN option a's failure). At rest the
+			// box is stationary, so there is nothing to eject; during motion the idempotent
+			// clamp below does the carrying. This is what lets a rider both RIDE cleanly and
+			// WALK OFF at the top.
+			for (const m of this.movers.values()) {
+				const wantSolid = (m.state === 0 || m.state === 2)
+				if (m.mesh.checkCollisions !== wantSolid) m.mesh.checkCollisions = wantSolid
+			}
+			const onboard = (m) => {
+				e.y = m.y + m.height * 0.5 + RIDE_REST // box centre -> surface -> ride height
+				e.velY = 0
+				e.grounded = true
+				this._ridingMoverNid = m.nid
+			}
+			// still riding the latched mover?
+			if (this._ridingMoverNid != null) {
+				const m = this.movers.get(this._ridingMoverNid)
+				if (m && e.velY <= JUMP_EPS) {
+					const halfW = m.width * 0.5, halfD = m.depth * 0.5
+					const dx = e.x - m.x, dz = e.z - m.z
+					if (!(dx < -halfW - SKIN || dx > halfW + SKIN || dz < -halfD - SKIN || dz > halfD + SKIN)) {
+						onboard(m) // stay glued regardless of vertical distance (carry up/down)
+						return
+					}
+				}
+				this._ridingMoverNid = null // jumped off / walked off / mover gone
+			}
+			// not riding: BOARD only within the tight grab band (on / just above the platform)
+			for (const m of this.movers.values()) {
+				const halfW = m.width * 0.5, halfD = m.depth * 0.5
+				const top = m.y + m.height * 0.5
+				const rideY = top + RIDE_REST
+				const dx = e.x - m.x, dz = e.z - m.z
+				if (dx < -halfW - SKIN || dx > halfW + SKIN) continue
+				if (dz < -halfD - SKIN || dz > halfD + SKIN) continue
+				if (e.y < rideY - BOARD_BELOW || e.y > rideY + BAND_ABOVE) continue
+				if (e.velY > JUMP_EPS) continue
+				onboard(m)
+				return
+			}
+		} catch (err) { /* fail-soft — never break prediction over a mover glitch */ }
 	}
 
 	// Compose the transient shotgun FOV punch onto the LIVE base fov each frame (never
@@ -1637,6 +1720,14 @@ class Simulator {
 				// layered reload SFX sequenced to this weapon's reloadTime
 				this.audio.reload(this.weaponIndex, weapons[this.weaponIndex].reloadTime)
 			}
+
+			// UT LIFT CARRY: post-sim platform clamp on our OWN predicted entity, against
+			// the INTERPOLATED mover position (server runs the identical idempotent clamp
+			// in GameInstance). Runs BEFORE the prediction snapshot so a rest-state ride
+			// predicts byte-for-byte with the server (no spurious reconcile); during the
+			// ~1.75 s ride the interp platform lags the server ~one window, so the ride
+			// reconciles — the documented, accepted desync tradeoff. Fail-soft.
+			this._carryClampSelf()
 
 			// store state for reconciliation (in case the server disagrees later)
 			const prediction = {
