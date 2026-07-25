@@ -23,7 +23,7 @@
          Preload so the digits never flash fallback-sans on first paint. -->
     <link rel="preload" href="assets/fonts/DSEG7Classic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-eb5367102b">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-e86ffde846">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -828,8 +828,62 @@
                 .splash-studio.is-solo .splash-studio-name { font-size: 15px; }
                 .splash-studio.is-solo::after { inset: -14px -34px; }
             }
+            /* ── IDENT CHOREOGRAPHY ───────────────────────────────────────────
+               Ported from our BonkGames StartScene ident
+               (src/js/scenes/StartScene.js:74-111): a 222ms beat, then alpha 0->1
+               while the mark GROWS with a Back.easeOut overshoot, handing off to an
+               endless Sine.easeInOut yoyo pulse; the card leaves on a Power2 fade.
+               Phaser eases -> CSS:
+                 Back.easeOut     cubic-bezier(.34, 1.56, .64, 1)  (the >1 control
+                                  point IS the overshoot — the rubber-band settle is
+                                  the whole character of the original)
+                 Sine.easeInOut   cubic-bezier(.37, 0, .63, 1)
+                 Power2 (quad)    cubic-bezier(.25, .46, .45, .94)
+               The grow-in is 1500ms rather than the original 1800ms so the pulse
+               still gets a full cycle inside GATE_HOLD_MS before the card advances. */
+            .splash-card[data-card="ssstudio"] .splash-studio { opacity: 0; }
+            .splash-card[data-card="ssstudio"].is-active .splash-studio {
+                animation:
+                    ss-ident-in 1500ms cubic-bezier(.34, 1.56, .64, 1) 222ms both,
+                    ss-ident-pulse 800ms cubic-bezier(.37, 0, .63, 1) 1722ms infinite alternate;
+            }
+            @keyframes ss-ident-in {
+                from { opacity: 0; transform: scale(0.62); }
+                to   { opacity: 1; transform: scale(1); }
+            }
+            /* BonkGames pulsed scale x2 -> x2.1, i.e. +5% */
+            @keyframes ss-ident-pulse {
+                from { transform: scale(1); }
+                to   { transform: scale(1.05); }
+            }
+            /* the gate prompt arrives AFTER the mark has landed (original: delay 2000
+               on the prompt vs 222+1800 on the logo) */
+            .splash-card[data-card="ssstudio"] .splash-gate { opacity: 0; }
+            .splash-card[data-card="ssstudio"].is-active .splash-gate {
+                animation: ss-gate-in 700ms cubic-bezier(.25, .46, .45, .94) 1500ms both;
+            }
+            @keyframes ss-gate-in { from { opacity: 0; } to { opacity: 1; } }
+            /* EXIT: the original leaves on a 500ms Power2 fade — slower than the
+               stock inter-card crossfade, so the ident lingers rather than snapping. */
+            .splash-card[data-card="ssstudio"] {
+                transition: opacity 500ms cubic-bezier(.25, .46, .45, .94),
+                            transform 500ms cubic-bezier(.25, .46, .45, .94),
+                            visibility 0s 500ms;
+            }
+            .splash-card[data-card="ssstudio"].is-active {
+                transition: opacity 500ms cubic-bezier(.25, .46, .45, .94),
+                            transform 500ms cubic-bezier(.25, .46, .45, .94);
+            }
             @media (prefers-reduced-motion: reduce) {
                 .splash-studio-name { animation: none !important; opacity: 1 !important; }
+                /* no grow, no overshoot, no pulse — but the ident must still be VISIBLE
+                   (the base rule sets opacity:0 and the animation is what reveals it) */
+                .splash-card[data-card="ssstudio"] .splash-studio,
+                .splash-card[data-card="ssstudio"] .splash-gate {
+                    animation: none !important;
+                    opacity: 1 !important;
+                    transform: none !important;
+                }
             }
         </style>
         <section id="splash" aria-hidden="true">
@@ -855,12 +909,13 @@
                 </div>
                 <!-- 2 · SOLANA (a card to itself now, so it carries the Toly mark) -->
                 <div class="splash-card" data-card="solana">
-                    <div class="splash-kicker">POWERED BY</div>
-                    <div class="splash-logos"><img class="splash-logo" src="assets/brand/partners/solana.svg" alt="Solana"></div>
-                    <!-- alt="" — decorative: the Solana wordmark above already names the
-                         card, and this is a stylised mark rather than information. -->
+                    <!-- Toly LEADS the card: he is the thing you look at, and the
+                         wordmark below him is the caption. alt="" — decorative; the
+                         Solana wordmark underneath already names the card. -->
                     <img class="splash-toly" src="assets/brand/toly.png" alt=""
                          width="384" height="407" decoding="async" loading="lazy">
+                    <div class="splash-kicker">POWERED BY</div>
+                    <div class="splash-logos"><img class="splash-logo" src="assets/brand/partners/solana.svg" alt="Solana"></div>
                 </div>
                 <!-- 3 · METAPLEX + HELIUS (merged onto one card; stack on narrow screens) -->
                 <div class="splash-card" data-card="infra">
@@ -941,7 +996,9 @@
         var cards = splash.querySelectorAll('.splash-card')
         var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
         var AUTO_MS = reduced ? 900 : 1200
-        var GATE_HOLD_MS = 2600 // card 1 lingers longer, then auto-advances too
+        // 222ms beat + 1500ms grow-in = 1722ms before the ident even settles; hold
+        // long enough for a full 800ms pulse cycle after that, then advance.
+        var GATE_HOLD_MS = 3200 // card 1 lingers longer, then auto-advances too
         var idx = 0
         var dismissed = false
         var autoTimer = null
@@ -1048,7 +1105,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-eb5367102b";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-eb5367102b"></script>
+    <script>window.__BUILD_ID__="0.0.1-e86ffde846";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-e86ffde846"></script>
 </body>
 </html>

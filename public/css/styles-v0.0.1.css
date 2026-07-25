@@ -3053,8 +3053,9 @@ body.player-dead #touch-controls {
     /* fixed height so the crossfade never reflows the card around it. Raised
        340->392 when the Solana card gained the Toly mark and the ident moved onto a
        card of its own: cards are absolutely positioned and centred, so a taller
-       stage only ADDS clearance — it cannot shift the shorter cards' composition. */
-    height: 392px;
+       stage only ADDS clearance — it cannot shift the shorter cards' composition.
+       392->432 when Toly moved to the head of the Solana card and grew. */
+    height: 432px;
     display: grid;
     place-items: center;
 }
@@ -3143,14 +3144,20 @@ body.player-dead #touch-controls {
    without growing the stage again. */
 .splash-toly {
     width: auto;
-    height: clamp(120px, 24vh, 196px);
-    max-width: 68vw;
+    /* LEADS the card now, so he carries it: ~33% taller than when he sat under the
+       wordmark. Still height-driven, not width-driven — the stage's VERTICAL budget
+       is the one that runs out (432px, less on phones), and a width-driven mark
+       blows through it on a narrow tall viewport. */
+    height: clamp(158px, 32vh, 262px);
+    max-width: 72vw;
     display: block;
     object-fit: contain;
     filter: drop-shadow(0 10px 26px rgba(0, 0, 0, 0.6));
 }
-.splash-card[data-card="solana"] { gap: 16px; }
-.splash-card[data-card="solana"] .splash-logo { max-height: 76px; }
+/* tighter gap + a smaller wordmark than the other cards, so the taller mark and its
+   caption both fit without growing the stage again */
+.splash-card[data-card="solana"] { gap: 12px; }
+.splash-card[data-card="solana"] .splash-logo { max-height: 68px; }
 
 /* GATE card prompt + sub-caption */
 .splash-gate {
@@ -3250,15 +3257,15 @@ body.player-dead #touch-controls {
 }
 
 @media (max-width: 767px) {
-    .splash-stage { width: 92vw; height: 344px; }
+    .splash-stage { width: 92vw; height: 372px; }
     .splash-logo { width: min(62vw, 280px); max-height: 96px; }
     .splash-logos-pair { flex-direction: column; gap: 28px; }
     .splash-logo-mark { height: clamp(40px, 12vw, 64px); }
     /* stacked pair: each wordmark may use the width again, but the two of them
        plus the kicker share the shorter stage — so cap their height */
     .splash-logos-pair .splash-logo { width: min(56vw, 230px); max-height: 62px; }
-    .splash-card[data-card="solana"] .splash-logo { max-height: 62px; }
-    .splash-toly { height: clamp(104px, 21vh, 168px); max-width: 76vw; }
+    .splash-card[data-card="solana"] .splash-logo { max-height: 56px; }
+    .splash-toly { height: clamp(132px, 27vh, 210px); max-width: 82vw; }
     /* mark + wordmark pairs must be allowed to WRAP and shrink. "PUMP.FUN" sets
        wider than "TENSOR" at the same size, and at 390px the pill + wordmark row
        ran ~48px past the 92vw stage (measured) — it bled out of the card rather
@@ -3277,8 +3284,8 @@ body.player-dead #touch-controls {
     .splash-logos-pair { flex-direction: row; gap: clamp(18px, 5vw, 40px); }
     .splash-logos-pair .splash-logo { width: min(34vw, 190px); max-height: 46px; }
     .splash-card[data-card="solana"] { gap: 10px; }
-    .splash-card[data-card="solana"] .splash-logo { max-height: 44px; }
-    .splash-toly { height: clamp(78px, 34vh, 138px); max-width: 52vw; }
+    .splash-card[data-card="solana"] .splash-logo { max-height: 40px; }
+    .splash-toly { height: clamp(92px, 40vh, 156px); max-width: 56vw; }
     .splash-pair-item { flex-wrap: nowrap; gap: 10px; max-width: 100%; }
     .splash-wordmark-txt { font-size: clamp(18px, 3.4vw, 26px); }
 }
