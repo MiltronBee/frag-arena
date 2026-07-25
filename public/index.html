@@ -23,7 +23,7 @@
          Preload so the digits never flash fallback-sans on first paint. -->
     <link rel="preload" href="assets/fonts/DSEG7Classic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-88f5864c95">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-eb5367102b">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -205,6 +205,137 @@
         <div id="low-hp-vignette" aria-hidden="true"></div>
 
         <div id="damage-flash" aria-hidden="true"></div>
+
+        <!-- GIT GUD — the death-screen taunt, ported from BonkGames (same studio, same
+             assets). A 333ms full-black takeover with a blown-signal sting that lands in
+             the QUIET GAP at the end of the death window: the death-cam gets its drop +
+             roll first, then this hits as the punctuation immediately before you respawn.
+             Two variants, rolled per death (see GITGUD_IMAGE_CHANCE in FragLayer):
+             the taunt plate (VHS/RGB-split/dropout treatment) or the giant word.
+             Everything below is inert markup — FragLayer.js owns the whole lifecycle
+             (#gitgud.gg-on + data-variant) exactly like #frag-banner's show/teardown.
+             Inline beside its markup, matching the splash convention.
+
+             The BonkGames original was Phaser: a 78-line WebGL luma shader, stroked
+             Graphics scanlines, per-tick fillRect noise and spawned/destroyed sprite
+             copies. None of that survives the port — grayscale is a filter, the
+             scanlines are one gradient, the RGB split is two blend-mode layers that
+             are toggled rather than allocated, and the dropout is one 160x104 canvas
+             upscaled by the compositor. -->
+        <style>
+            #gitgud {
+                position: fixed;
+                inset: 0;
+                /* above the HUD (z20/z21) and the damage wash, below the modals (z50),
+                   the splash (z60) and the map-change interstitial (z70) — a death
+                   taunt must never paint over a dialog the player opened. */
+                z-index: 45;
+                display: none;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+                background: #000;
+                pointer-events: none;
+                /* the tick loop rewrites transforms ~11x in 333ms; containment keeps
+                   that off the HUD's layout/paint entirely */
+                contain: layout paint;
+            }
+            #gitgud.gg-on { display: flex; }
+            /* one node per variant, selected by the roll; the loser never lays out */
+            #gitgud[data-variant="word"] .gg-taunt { display: none; }
+            #gitgud[data-variant="taunt"] .gg-word { display: none; }
+
+            /* ---- variant A: the taunt plate ---------------------------------- */
+            /* landscape = 60% of screen HEIGHT, portrait = 80% of screen WIDTH (the
+               original's two-branch fit, expressed as one aspect-ratio box). */
+            .gg-taunt {
+                position: relative;
+                height: 60vh;
+                aspect-ratio: 1101 / 708;
+                max-width: 92vw;
+                /* per-tick glitch channels, driven from JS as CSS vars */
+                transform: translate(var(--gg-dx, 0px), var(--gg-dy, 0px)) scale(var(--gg-scale, 1));
+                opacity: var(--gg-alpha, 1);
+                will-change: transform, opacity;
+            }
+            @media (orientation: portrait) {
+                .gg-taunt { height: auto; width: 80vw; max-width: 80vw; }
+            }
+            .gg-taunt > * { position: absolute; inset: 0; width: 100%; height: 100%; }
+            /* the 78-line luma shader, in one declaration */
+            .gg-plate { object-fit: fill; filter: grayscale(1) contrast(1.08); }
+            /* RGB split: the plate again, multiplied to a single channel by its own
+               background colour, then screened back over the original — i.e. tint +
+               additive, without allocating and destroying sprites every tick. */
+            .gg-ghost {
+                background-image: url('assets/taunt/taunt.webp');
+                background-size: 100% 100%;
+                background-blend-mode: multiply;
+                mix-blend-mode: screen;
+                opacity: 0;
+                transform: translateX(var(--gg-split, 0px));
+            }
+            .gg-ghost-r { background-color: #f00; }
+            .gg-ghost-b { background-color: #00f; }
+            #gitgud.gg-rgb .gg-ghost { opacity: 0.2; }
+            /* video dropout: a coarse canvas the compositor upscales. Chunky by
+               design — that IS the tape artefact. */
+            .gg-noise { image-rendering: pixelated; mix-blend-mode: screen; opacity: 0; }
+            #gitgud.gg-noise-on .gg-noise { opacity: 1; }
+            /* VHS scanlines over the plate: 2px dark line every 4px */
+            .gg-scan {
+                background: repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, 0.5) 0px, rgba(0, 0, 0, 0.5) 2px,
+                    rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0) 4px);
+            }
+            /* single tracking-error band, parked at a random scanline per tick */
+            .gg-taunt > .gg-track {
+                inset: var(--gg-track-y, 40%) 0 auto 0;
+                height: 8px;
+                background: rgba(255, 255, 255, 0.12);
+                opacity: 0;
+            }
+            #gitgud.gg-track-on .gg-track { opacity: 1; }
+
+            /* ---- variant B: the word ----------------------------------------- */
+            /* --gg-word-size is measured in JS to ~90% of the viewport width (the
+               original's auto-fit); the vw value is only the pre-measure fallback. */
+            .gg-word {
+                font-family: 'Arial Black', 'Arial Bold', var(--x30-font-display), Impact, system-ui, sans-serif;
+                font-weight: 900;
+                font-size: var(--gg-word-size, 13vw);
+                line-height: 1;
+                letter-spacing: 0.01em;
+                white-space: nowrap;
+                color: #fff;
+                transform: translate(var(--gg-dx, 0px), var(--gg-dy, 0px));
+                will-change: transform;
+            }
+            /* the black tint from the original: on the black takeover the word simply
+               blinks out of existence for a frame or two */
+            #gitgud.gg-ink .gg-word { color: #000; }
+
+            /* Reduced motion: keep the CARD (it is the joke), drop the strobe. No
+               jitter, no channel split, no dropout, no tracking band — the JS tick
+               loop is skipped too, so this is belt and braces. */
+            @media (prefers-reduced-motion: reduce) {
+                .gg-taunt, .gg-word { transform: none !important; opacity: 1 !important; }
+                .gg-ghost, .gg-noise, .gg-track { display: none !important; }
+                #gitgud.gg-ink .gg-word { color: #fff; }
+            }
+        </style>
+        <section id="gitgud" aria-hidden="true" data-variant="word">
+            <div class="gg-word">GIT GUD</div>
+            <div class="gg-taunt">
+                <img class="gg-plate" src="assets/taunt/taunt.webp" alt=""
+                     width="1101" height="708" decoding="async" loading="lazy">
+                <div class="gg-ghost gg-ghost-r"></div>
+                <div class="gg-ghost gg-ghost-b"></div>
+                <canvas class="gg-noise" width="160" height="104"></canvas>
+                <div class="gg-scan"></div>
+                <div class="gg-track"></div>
+            </div>
+        </section>
 
         <!-- ENTRY / MAIN MENU — a place, not a progress dialog. Connection + asset
              preload run silently behind this screen; the PLAY plate (#enter-arena)
@@ -668,9 +799,23 @@
                 color: rgba(57, 255, 20, 0.52);
                 text-shadow: 0 0 8px rgba(57, 255, 20, 0.25);
             }
+            /* STANDALONE IDENT: on its own card the mark IS the composition, so it
+               scales up and the scanline pass widens to match. */
+            .splash-studio.is-solo { gap: 14px; }
+            .splash-studio.is-solo .splash-studio-mark {
+                height: clamp(120px, 22vw, 190px);
+                max-height: 190px;
+            }
+            .splash-studio.is-solo .splash-studio-name { font-size: clamp(18px, 3.4vw, 30px); }
+            .splash-studio.is-solo::after { inset: -30px -74px; }
             @media (max-width: 767px) {
                 .splash-studio-mark { height: clamp(64px, 17vw, 96px); }
                 .splash-studio-name { font-size: clamp(11px, 3.1vw, 15px); }
+                /* phones: the ident still leads, but leave clearance for the gate
+                   prompt + subcap underneath inside the shorter stage */
+                .splash-studio.is-solo .splash-studio-mark { height: clamp(96px, 30vw, 140px); }
+                .splash-studio.is-solo .splash-studio-name { font-size: clamp(14px, 4.6vw, 20px); }
+                .splash-studio.is-solo::after { inset: -20px -40px; }
             }
             /* landscape phones: the stage, foot and seg readout all share a short
                viewport, so trade mark size for clearance */
@@ -678,6 +823,10 @@
                 .splash-studio { gap: 6px; }
                 .splash-studio-mark { height: clamp(52px, 13vh, 88px); }
                 .splash-studio-name { font-size: 12px; letter-spacing: 0.06em; }
+                .splash-studio.is-solo { gap: 8px; }
+                .splash-studio.is-solo .splash-studio-mark { height: clamp(64px, 26vh, 110px); }
+                .splash-studio.is-solo .splash-studio-name { font-size: 15px; }
+                .splash-studio.is-solo::after { inset: -14px -34px; }
             }
             @media (prefers-reduced-motion: reduce) {
                 .splash-studio-name { animation: none !important; opacity: 1 !important; }
@@ -686,34 +835,44 @@
         <section id="splash" aria-hidden="true">
             <!-- one card element; the controller swaps which .splash-card is active -->
             <div class="splash-stage">
-                <!-- 1 · SOLANA — GATE CARD (holds until tap; tap = audio unlock) -->
-                <div class="splash-card is-active" data-card="solana">
-                    <!-- SSSTUDIO presenting mark: first thing on screen, above the
-                         POWERED BY block and the tap prompt. alt="" because the
-                         wordmark beside it carries the name (same pattern as the
-                         tensor mark on card 4). -->
-                    <div class="splash-studio">
+                <!-- 1 · SSSTUDIO — GATE CARD (holds until tap; tap = audio unlock).
+                     The studio ident owns a card of its own: it is the PUBLISHER mark,
+                     not a partner credit, so it no longer shares a frame with POWERED
+                     BY. It must stay FIRST — the controller binds the gate (and with it
+                     the audio-unlock gesture) to card INDEX 0, not to a data-card name,
+                     so whichever card is first inherits GATE_HOLD_MS and the prompt. -->
+                <div class="splash-card is-active" data-card="ssstudio">
+                    <div class="splash-studio is-solo">
                         <img class="splash-studio-mark" src="assets/brand/ssstudio-logo.png" alt=""
                              width="491" height="472" decoding="async" fetchpriority="high">
                         <div class="splash-studio-name">SSStudio</div>
                         <div class="splash-kicker splash-studio-kicker">PRESENTS</div>
                     </div>
-                    <div class="splash-kicker">POWERED BY</div>
-                    <div class="splash-logos"><img class="splash-logo" src="assets/brand/partners/solana.svg" alt="Solana"></div>
                     <div class="splash-gate">
                         <div class="splash-prompt">TAP TO INITIALIZE</div>
                         <div class="splash-subcap">AUDIO ENABLED ON TAP</div>
                     </div>
                 </div>
-                <!-- 2 · METAPLEX -->
-                <div class="splash-card" data-card="metaplex">
+                <!-- 2 · SOLANA (a card to itself now, so it carries the Toly mark) -->
+                <div class="splash-card" data-card="solana">
                     <div class="splash-kicker">POWERED BY</div>
-                    <div class="splash-logos"><img class="splash-logo" src="assets/brand/partners/metaplex.svg" alt="Metaplex"></div>
+                    <div class="splash-logos"><img class="splash-logo" src="assets/brand/partners/solana.svg" alt="Solana"></div>
+                    <!-- alt="" — decorative: the Solana wordmark above already names the
+                         card, and this is a stylised mark rather than information. -->
+                    <img class="splash-toly" src="assets/brand/toly.png" alt=""
+                         width="384" height="407" decoding="async" loading="lazy">
                 </div>
-                <!-- 3 · HELIUS -->
-                <div class="splash-card" data-card="helius">
+                <!-- 3 · METAPLEX + HELIUS (merged onto one card; stack on narrow screens) -->
+                <div class="splash-card" data-card="infra">
                     <div class="splash-kicker">POWERED BY</div>
-                    <div class="splash-logos"><img class="splash-logo" src="assets/brand/partners/helius.svg" alt="Helius"></div>
+                    <div class="splash-logos splash-logos-pair">
+                        <div class="splash-pair-item">
+                            <img class="splash-logo" src="assets/brand/partners/metaplex.svg" alt="Metaplex">
+                        </div>
+                        <div class="splash-pair-item">
+                            <img class="splash-logo" src="assets/brand/partners/helius.svg" alt="Helius">
+                        </div>
+                    </div>
                 </div>
                 <!-- 4 · TENSOR + MAGIC EDEN (paired; stack on narrow screens) -->
                 <div class="splash-card" data-card="markets">
@@ -752,7 +911,7 @@
 
     <script>
       // Splash controller (0 JS deps, inline so it runs before the bundle). Advances a
-      // sequence of partner "boot cards". Card 1 (SOLANA) is the GATE: it holds until a
+      // sequence of partner "boot cards". Card 1 (SSSTUDIO) is the GATE: it holds until a
       // user gesture, and THAT gesture is the audio unlock — the inline handler calls
       // window.__onSplashGesture (installed by Simulator when the bundle boots) which
       // resumes WebAudio + starts ARENA SIGNAL. If the bundle isn't up yet, the tap
@@ -794,7 +953,7 @@
         }
         function scheduleAuto() {
           clearTimeout(autoTimer)
-          // card 0 (Solana) holds longest but DOES auto-advance now — a user who
+          // card 0 (SSStudio ident) holds longest but DOES auto-advance now — a user who
           // never taps still reaches the menu (audio unlocks on their next gesture).
           autoTimer = setTimeout(next, idx === 0 ? GATE_HOLD_MS : AUTO_MS)
         }
@@ -889,7 +1048,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-88f5864c95";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-88f5864c95"></script>
+    <script>window.__BUILD_ID__="0.0.1-eb5367102b";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-eb5367102b"></script>
 </body>
 </html>

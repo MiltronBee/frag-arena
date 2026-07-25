@@ -3050,8 +3050,11 @@ body.player-dead #touch-controls {
 .splash-stage {
     position: relative;
     width: min(92vw, 560px);
-    /* fixed height so the crossfade never reflows the card around it */
-    height: 340px;
+    /* fixed height so the crossfade never reflows the card around it. Raised
+       340->392 when the Solana card gained the Toly mark and the ident moved onto a
+       card of its own: cards are absolutely positioned and centred, so a taller
+       stage only ADDS clearance — it cannot shift the shorter cards' composition. */
+    height: 392px;
     display: grid;
     place-items: center;
 }
@@ -3116,7 +3119,8 @@ body.player-dead #touch-controls {
     text-transform: uppercase;
     color: var(--x30-ink);
 }
-/* card 4: Tensor + Magic Eden side by side; stack on narrow screens */
+/* paired cards: Metaplex + Helius, and Tensor + Magic Eden. Side by side; stack
+   on narrow screens. */
 .splash-logos-pair {
     display: flex;
     align-items: center;
@@ -3124,6 +3128,29 @@ body.player-dead #touch-controls {
     gap: clamp(28px, 6vw, 72px);
     flex-wrap: wrap;
 }
+/* Two FULL wordmarks on one card (Metaplex + Helius) — a bare .splash-logo is
+   min(40vw, 320px), so two-up would want 80vw and overflow the stage. Constrained
+   only in the paired context; the single-logo cards are untouched. */
+.splash-logos-pair .splash-logo {
+    width: min(30vw, 236px);
+    max-height: 84px;
+}
+
+/* TOLY rides the Solana card. Height-driven, not width-driven: the stage's
+   VERTICAL budget is what actually runs out (hard 392px, less on phones), and a
+   width-driven mark blows through it on a narrow tall viewport. The Solana
+   wordmark above him is capped tighter here than elsewhere so the pair fits
+   without growing the stage again. */
+.splash-toly {
+    width: auto;
+    height: clamp(120px, 24vh, 196px);
+    max-width: 68vw;
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 26px rgba(0, 0, 0, 0.6));
+}
+.splash-card[data-card="solana"] { gap: 16px; }
+.splash-card[data-card="solana"] .splash-logo { max-height: 76px; }
 
 /* GATE card prompt + sub-caption */
 .splash-gate {
@@ -3223,10 +3250,37 @@ body.player-dead #touch-controls {
 }
 
 @media (max-width: 767px) {
-    .splash-stage { width: 92vw; height: 300px; }
+    .splash-stage { width: 92vw; height: 344px; }
     .splash-logo { width: min(62vw, 280px); max-height: 96px; }
     .splash-logos-pair { flex-direction: column; gap: 28px; }
     .splash-logo-mark { height: clamp(40px, 12vw, 64px); }
+    /* stacked pair: each wordmark may use the width again, but the two of them
+       plus the kicker share the shorter stage — so cap their height */
+    .splash-logos-pair .splash-logo { width: min(56vw, 230px); max-height: 62px; }
+    .splash-card[data-card="solana"] .splash-logo { max-height: 62px; }
+    .splash-toly { height: clamp(104px, 21vh, 168px); max-width: 76vw; }
+    /* mark + wordmark pairs must be allowed to WRAP and shrink. "PUMP.FUN" sets
+       wider than "TENSOR" at the same size, and at 390px the pill + wordmark row
+       ran ~48px past the 92vw stage (measured) — it bled out of the card rather
+       than scrolling the page, so it never showed up as an overflow. */
+    .splash-pair-item { flex-wrap: wrap; gap: 10px; max-width: 100%; }
+    .splash-wordmark-txt { font-size: clamp(20px, 6.4vw, 30px); }
+}
+
+/* LANDSCAPE PHONES — the stage, the foot and the seg readout share a very short
+   viewport. Everything trades size for clearance: without this the Toly card and
+   the stacked Metaplex/Helius pair both overflow a ~360px-tall window. The pair
+   goes back to a ROW here, because height is the scarce axis, not width. */
+@media (max-height: 560px) {
+    .splash-stage { height: min(300px, 74vh); }
+    .splash-logo { max-height: 56px; }
+    .splash-logos-pair { flex-direction: row; gap: clamp(18px, 5vw, 40px); }
+    .splash-logos-pair .splash-logo { width: min(34vw, 190px); max-height: 46px; }
+    .splash-card[data-card="solana"] { gap: 10px; }
+    .splash-card[data-card="solana"] .splash-logo { max-height: 44px; }
+    .splash-toly { height: clamp(78px, 34vh, 138px); max-width: 52vw; }
+    .splash-pair-item { flex-wrap: nowrap; gap: 10px; max-width: 100%; }
+    .splash-wordmark-txt { font-size: clamp(18px, 3.4vw, 26px); }
 }
 
 /* ============================================================================

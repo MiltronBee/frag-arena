@@ -29,6 +29,10 @@ const SFX_NAMES = [
   'plasma_fire', 'flak_fire', 'plasma_reload', 'flak_reload',
   'grenade_explosion', 'weapon_swap', 'death', 'respawn',
   'impact_flesh', 'pain_grunt', 'kill_confirm',
+  // 'interference': the dead-air TV-static sting under the GIT GUD death screen
+  // (FragLayer's _gitGud*). Ported from BonkGames with the art; the clip is ~1.07s
+  // but we only ever play its first ~333ms (see interference()).
+  'interference',
 ]
 // ── SFX VARIETY (2026-07-24) ─────────────────────────────────────────────────────
 // TOTAL number of interchangeable takes per high-repetition event, INCLUDING the
@@ -265,7 +269,12 @@ export default class WeaponAudio {
   playClip(name, opts = {}) {
     const buf = this._buf[name]
     if (!buf || !this.ctx) return false
-    const { gain = 1, delay = 0, rate = 1 } = opts
+    // stopAfter (seconds, 0 = play to the end): hard-cuts the voice mid-buffer. Used
+    // by cues whose clip is LONGER than the moment they score (the GIT GUD sting is a
+    // ~1.07s bed under a 333ms takeover), so the sound ends with the picture instead
+    // of trailing into the next second of play. Scheduled on the source itself, so it
+    // still fires when the tab is throttled and still self-teardowns.
+    const { gain = 1, delay = 0, rate = 1, stopAfter = 0 } = opts
     // opts.pos => route through a PannerNode (positional/remote); else 2D.
     // opts.bus === 'voice' => the narrator bus, which BYPASSES the gunfire limiter so
     // shots can't duck the callout (see resume()). A positional voice still wins,
@@ -280,7 +289,9 @@ export default class WeaponAudio {
     g.gain.value = Math.max(0, Math.min(1.5, gain))
     src.connect(g); g.connect(dest)
     this._teardownWhenDone([src], panner ? [src, g, panner] : [src, g])
-    src.start(this.ctx.currentTime + Math.max(0, delay))
+    const at = this.ctx.currentTime + Math.max(0, delay)
+    src.start(at)
+    if (stopAfter > 0) src.stop(at + stopAfter)
     return true
   }
 
@@ -518,6 +529,16 @@ export default class WeaponAudio {
   // Local-player death sting (a big first-person event). 2D, sample-only.
   death() {
     this.playClip(this._pickVariant('death'), { gain: 0.9 })
+  }
+
+  // GIT GUD sting — the blown-signal / TV-static hit that scores FragLayer's death
+  // screen. Full level on purpose: for its 333ms it IS the mix (the picture is a
+  // black takeover), which is exactly the BonkGames moment this is ported from.
+  // `durationMs` hard-cuts the (longer) clip so audio and picture end together.
+  // 2D, sample-only — no procedural fallback: if the clip never loaded, the death
+  // screen simply plays silent rather than inventing a substitute noise.
+  interference(durationMs = 333) {
+    this.playClip('interference', { gain: 1.0, stopAfter: Math.max(0, durationMs) / 1000 })
   }
 
   // Local-player respawn/re-enter cue. 2D, sample-only.

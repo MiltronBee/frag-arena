@@ -29,6 +29,36 @@ const GIB_OVERKILL = 40        // overkill damage that upgrades a death to gibs
 const GIB_LIFE = 2000          // ms gib chunks live
 const DAMAGE_ARC_LIFE = 500    // ms the directional damage arc holds
 
+// ── GIT GUD DEATH SCREEN ────────────────────────────────────────────────────
+// Ported from BonkGames (same studio, same assets): a black takeover that either
+// slaps the taunt plate up with a VHS/RGB-split treatment or just screams the word.
+// Markup + CSS live inline in public/index.html (#gitgud); this owns the lifecycle.
+//
+// PLACEMENT IN THE DEATH WINDOW is the whole design. In BonkGames this was a
+// once-per-run game-over card; here you die every ~30s and the instant of death is
+// already spoken for by _startDeathCam's drop + roll. So it does NOT fire on the
+// death frame — it is scheduled into the QUIET GAP at the END of the death window:
+// cam falls, world holds, then the taunt lands as punctuation and tears down as the
+// player comes back. Every knob below is one line to retune.
+const GITGUD_ENABLED = true          // master switch (false = never fires)
+const GITGUD_LIFE = 333              // ms the takeover holds (BonkGames: exactly 333)
+const GITGUD_IMAGE_CHANCE = 0.3      // P(taunt plate); otherwise the giant "GIT GUD"
+const GITGUD_EVERY_N_DEATHS = 1      // fire on every Nth own death (1 = every death)
+// Total death->respawn window, in ms. Only a SEED: the real number is the server's
+// GameInstance.RESPAWN_DELAY_MS, which the client cannot import (server-side module),
+// so _gitGudLearnWindow() measures the actual death->respawn interval and keeps the
+// SMALLEST one it has seen this session. Smallest is the safe direction: an
+// underestimate just lands the taunt slightly early in the gap, an overestimate
+// would let the respawn cut it off.
+const GITGUD_RESPAWN_WINDOW = 2500
+const GITGUD_PRE_RESPAWN_GAP = 140   // ms of clear air between the taunt ending and respawn
+const GITGUD_MIN_DELAY = 400         // ms floor after death — never start on top of the
+                                     // death-cam (its drop+roll completes in 200ms)
+const GITGUD_TAUNT_TICK = 30         // ms per glitch tick, taunt-plate variant
+const GITGUD_TAUNT_TICKS = 11        // BonkGames: repeat:10 => 11 ticks
+const GITGUD_WORD_TICK = 50          // ms per glitch tick, word variant
+const GITGUD_WORD_TICKS = 6          // BonkGames: repeat:5 => 6 ticks
+
 export default class FragLayer {
   constructor(simulator) {
     this.sim = simulator
@@ -46,6 +76,13 @@ export default class FragLayer {
 
     // directional damage arc canvas state
     this._damageArc = null // { t0, yaw }
+
+    // GIT GUD death screen. `window` is the learned death->respawn interval (see
+    // GITGUD_RESPAWN_WINDOW); `timer`/`raf` are the two things a respawn must kill.
+    this._gitGud = {
+      active: false, timer: null, raf: null, t0: 0,
+      deathAt: 0, deaths: 0, window: GITGUD_RESPAWN_WINDOW, tick: -1,
+    }
 
     this._buildDom()
   }
@@ -121,6 +158,18 @@ export default class FragLayer {
         transition: 'opacity 80ms ease-out',
       })
       hud.appendChild(this.confirmEl)
+    }
+
+    // GIT GUD overlay: authored inline in public/index.html (it needs a real <img>
+    // and a stylesheet, not procedural DOM), so here we only bind. Every reference is
+    // optional — a missing node simply disables the effect rather than throwing on
+    // the death path.
+    this.ggEl = document.getElementById('gitgud')
+    if (this.ggEl) {
+      this.ggPlateEl = this.ggEl.querySelector('.gg-taunt')
+      this.ggWordEl = this.ggEl.querySelector('.gg-word')
+      this.ggNoiseEl = this.ggEl.querySelector('.gg-noise')
+      this.ggGhostEls = this.ggEl.querySelectorAll('.gg-ghost')
     }
   }
 
@@ -219,7 +268,11 @@ export default class FragLayer {
     }
 
     // own death: camera drop/roll + strong wash, held until Respawned
-    if (iDied) this._startDeathCam(killerNid)
+    if (iDied) {
+      this._startDeathCam(killerNid)
+      // ...and, ~2s later (after the cam has landed), the GIT GUD taunt.
+      this._gitGudSchedule()
+    }
   }
 
   _pushKillFeed({ killerNid, victimNid, weaponIndex, suicide, iKilled, iDied, headshot }) {
@@ -474,9 +527,226 @@ export default class FragLayer {
     el.style.opacity = '0'
   }
 
+  // =========================================================================
+  // GIT GUD DEATH SCREEN — see the constant block at the top of this file.
+  //
+  // Lifecycle mirrors _showFragBanner(): one reused node, a class that turns it on,
+  // a timer that turns it off. The differences are that this one is SCHEDULED
+  // (it fires late in the death window, not on the death frame) and it drives a
+  // per-tick glitch off requestAnimationFrame while it holds.
+  // =========================================================================
+
+  // Arm the taunt for THIS death. Cancels anything still in flight first, so dying
+  // again mid-effect (or a death that races a respawn) can never stack overlays or
+  // leak a second rAF loop.
+  _gitGudSchedule() {
+    if (!GITGUD_ENABLED || !this.ggEl) return
+    this._gitGudCancel()
+    this._gitGud.deathAt = performance.now()
+    this._gitGud.deaths++
+    if (GITGUD_EVERY_N_DEATHS > 1 && this._gitGud.deaths % GITGUD_EVERY_N_DEATHS !== 0) return
+    // land the 333ms so its LAST frame is GITGUD_PRE_RESPAWN_GAP short of the respawn,
+    // and never before the death-cam has finished falling.
+    const delay = Math.max(
+      GITGUD_MIN_DELAY,
+      this._gitGud.window - GITGUD_LIFE - GITGUD_PRE_RESPAWN_GAP
+    )
+    this._gitGud.timer = setTimeout(() => {
+      this._gitGud.timer = null
+      // Still dead? A respawn normally cancels us through onRespawned, but that is an
+      // edge and edges get missed (dropped packet, map-rotation rejoin) — so re-check
+      // the replicated truth before taking the screen away from a live player.
+      const me = this.sim && this.sim.myRawEntity
+      if (me && me.isAlive !== false) return
+      this._gitGudShow()
+    }, delay)
+  }
+
+  // Learn the real death->respawn window from what the server actually did (the client
+  // can't import GameInstance.RESPAWN_DELAY_MS). Keep the smallest sane interval seen:
+  // observed values carry latency on top of the true delay, and erring small only
+  // moves the taunt earlier into the gap.
+  _gitGudLearnWindow() {
+    const t = this._gitGud.deathAt
+    if (!t) return
+    const dt = performance.now() - t
+    this._gitGud.deathAt = 0
+    if (dt < 800 || dt > 30000) return // spectate / intermission / tab-throttle: not a sample
+    this._gitGud.window = Math.min(this._gitGud.window, dt)
+  }
+
+  _gitGudShow() {
+    const el = this.ggEl
+    if (!el) return
+    const gg = this._gitGud
+    gg.active = true
+    gg.t0 = performance.now()
+    gg.tick = -1
+
+    // roll the variant (BonkGames: Math.random() < 0.3 => the meme)
+    const taunt = Math.random() < GITGUD_IMAGE_CHANCE
+    el.dataset.variant = taunt ? 'taunt' : 'word'
+    el.classList.remove('gg-rgb', 'gg-noise-on', 'gg-track-on', 'gg-ink')
+    el.style.setProperty('--gg-dx', '0px')
+    el.style.setProperty('--gg-dy', '0px')
+    el.style.setProperty('--gg-scale', '1')
+    el.style.setProperty('--gg-alpha', '1')
+    el.classList.add('gg-on')
+    if (!taunt) this._gitGudFitWord()
+
+    // the sting, hard-cut to the same 333ms so audio and picture end together
+    if (this.sim.audio && typeof this.sim.audio.interference === 'function') {
+      this.sim.audio.interference(GITGUD_LIFE)
+    }
+
+    // HARD CAP, independent of the rAF loop below. requestAnimationFrame is only
+    // serviced while the page produces frames — a backgrounded/occluded tab (or an
+    // engine stall) starves it, and a starved loop would leave a full-screen black
+    // takeover parked on the player's screen until the next respawn. A timer keeps
+    // firing when rAF does not, so this is the guarantee that the effect ENDS.
+    gg.timer = setTimeout(() => this._gitGudCancel(), GITGUD_LIFE + 60)
+
+    // reduced motion: the card is the joke, the strobe is not. Hold it, skip the loop.
+    const calm = typeof window !== 'undefined' && window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (calm) return
+
+    const period = taunt ? GITGUD_TAUNT_TICK : GITGUD_WORD_TICK
+    const ticks = taunt ? GITGUD_TAUNT_TICKS : GITGUD_WORD_TICKS
+    const loop = () => {
+      if (!gg.active) return
+      const age = performance.now() - gg.t0
+      if (age >= GITGUD_LIFE) { this._gitGudCancel(); return }
+      // One rAF loop drives everything. The original nested a delayedCall inside every
+      // roll to snap the jitter/tint/split back; here each effect just carries an
+      // expiry that the next frame retires — no timer per glitch.
+      const i = Math.min(ticks - 1, Math.floor(age / period))
+      if (i !== gg.tick) { gg.tick = i; this._gitGudTick(taunt, age, period) }
+      this._gitGudRetire(age)
+      gg.raf = requestAnimationFrame(loop)
+    }
+    gg.raf = requestAnimationFrame(loop)
+  }
+
+  // One glitch tick. Every roll below is the BonkGames threshold, unchanged.
+  _gitGudTick(taunt, age, period) {
+    const el = this.ggEl
+    const gg = this._gitGud
+    const R = (a, b) => a + Math.random() * (b - a)
+
+    if (!taunt) {
+      if (Math.random() > 0.5) {                       // position jitter, 30ms
+        el.style.setProperty('--gg-dx', ((R(-10, 10)) | 0) + 'px')
+        el.style.setProperty('--gg-dy', ((R(-8, 8)) | 0) + 'px')
+        gg.jitterUntil = age + 30
+      }
+      if (Math.random() > 0.7) {                       // white/black tint, 40ms.
+        el.classList.toggle('gg-ink', Math.random() > 0.5) // black-on-black = blink out
+        gg.tintUntil = age + 40
+      }
+      return
+    }
+
+    if (Math.random() > 0.4) {                          // position jitter, 20ms
+      el.style.setProperty('--gg-dx', ((R(-15, 15)) | 0) + 'px')
+      el.style.setProperty('--gg-dy', ((R(-12, 12)) | 0) + 'px')
+      gg.jitterUntil = age + 20
+    }
+    if (Math.random() > 0.7) el.style.setProperty('--gg-scale', R(0.95, 1.05).toFixed(3))
+    if (Math.random() > 0.8) el.style.setProperty('--gg-alpha', R(0.7, 1).toFixed(3))
+    if (Math.random() > 0.8) {                          // RGB split, 50ms
+      if (this.ggGhostEls) {
+        this.ggGhostEls.forEach((g) => g.style.setProperty('--gg-split', ((R(-5, 5)) | 0) + 'px'))
+      }
+      el.classList.add('gg-rgb')
+      gg.splitUntil = age + 50
+    }
+    // video dropout: one coarse canvas the compositor upscales, instead of the
+    // original's 50 fillRects into a full-screen Graphics every tick.
+    if (Math.random() > 0.9) { this._gitGudNoise(); gg.noiseUntil = age + period }
+    else el.classList.remove('gg-noise-on')
+    // scanlines are a static gradient; only the tracking band is rolled (30%/tick)
+    if (Math.random() > 0.7) {
+      el.style.setProperty('--gg-track-y', (Math.random() * 96).toFixed(1) + '%')
+      el.classList.add('gg-track-on')
+      gg.trackUntil = age + period
+    } else el.classList.remove('gg-track-on')
+  }
+
+  // Retire whatever the tick armed, once its (very short) window has passed.
+  _gitGudRetire(age) {
+    const el = this.ggEl
+    const gg = this._gitGud
+    if (gg.jitterUntil && age >= gg.jitterUntil) {
+      gg.jitterUntil = 0
+      el.style.setProperty('--gg-dx', '0px')
+      el.style.setProperty('--gg-dy', '0px')
+    }
+    if (gg.splitUntil && age >= gg.splitUntil) { gg.splitUntil = 0; el.classList.remove('gg-rgb') }
+    if (gg.tintUntil && age >= gg.tintUntil) { gg.tintUntil = 0; el.classList.remove('gg-ink') }
+    if (gg.noiseUntil && age >= gg.noiseUntil) { gg.noiseUntil = 0; el.classList.remove('gg-noise-on') }
+    if (gg.trackUntil && age >= gg.trackUntil) { gg.trackUntil = 0; el.classList.remove('gg-track-on') }
+  }
+
+  // Repaint the 160x104 dropout canvas. Cheap by construction: ~1/10 ticks, ~160 px
+  // ops, then the GPU stretches it over the plate (image-rendering: pixelated).
+  _gitGudNoise() {
+    const c = this.ggNoiseEl
+    if (!c) return
+    const ctx = c.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, c.width, c.height)
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'
+    for (let i = 0; i < 160; i++) {
+      const s = 1 + ((Math.random() * 3) | 0)
+      ctx.fillRect((Math.random() * c.width) | 0, (Math.random() * c.height) | 0, s, 1)
+    }
+    this.ggEl.classList.add('gg-noise-on')
+  }
+
+  // Auto-fit "GIT GUD" to ~90% of the viewport width (85% + a height cap in portrait,
+  // as in the original). Measured by laying the real element out at 100px and scaling
+  // — exact for whatever face actually resolved. Both writes happen in ONE task, so
+  // the browser only ever paints the final size; cached per viewport.
+  _gitGudFitWord() {
+    const el = this.ggWordEl
+    if (!el) return
+    const w = window.innerWidth, h = window.innerHeight
+    const fit = this._ggWordFit
+    if (!fit || fit.w !== w || fit.h !== h) {
+      const portrait = w < h
+      this.ggEl.style.setProperty('--gg-word-size', '100px')
+      const measured = el.offsetWidth || 420 // sync layout, once per viewport
+      let size = Math.floor(100 * (w * (portrait ? 0.85 : 0.9)) / measured)
+      if (portrait) size = Math.min(size, Math.floor(h * 0.15))
+      this._ggWordFit = { w, h, size }
+    }
+    this.ggEl.style.setProperty('--gg-word-size', this._ggWordFit.size + 'px')
+  }
+
+  // Tear down: idempotent, and the ONLY way the overlay ever goes away. Safe to call
+  // when nothing is armed (respawn calls it on every path).
+  _gitGudCancel() {
+    const gg = this._gitGud
+    if (gg.timer) { clearTimeout(gg.timer); gg.timer = null }
+    if (gg.raf) { cancelAnimationFrame(gg.raf); gg.raf = null }
+    gg.active = false
+    gg.jitterUntil = gg.splitUntil = gg.tintUntil = gg.noiseUntil = gg.trackUntil = 0
+    const el = this.ggEl
+    if (!el) return
+    el.classList.remove('gg-on', 'gg-rgb', 'gg-noise-on', 'gg-track-on', 'gg-ink')
+  }
+
   // Respawn resets everything the death state touched. Called from Simulator's
   // existing Respawned handler.
   onRespawned() {
+    // GIT GUD: measure the window we just lived through, then kill anything still
+    // pending or on screen. A respawn that arrives EARLY (forced respawn, map
+    // rotation, match end) cuts the taunt mid-flight; one that arrives LATE finds
+    // nothing to cancel, because the effect capped itself at GITGUD_LIFE.
+    this._gitGudLearnWindow()
+    this._gitGudCancel()
+
     this._deathCam.active = false
     const cam = this.sim.renderer.camera
     cam.rotation.x -= this._deathCam.appliedPitch || 0
