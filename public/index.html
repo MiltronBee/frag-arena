@@ -23,7 +23,7 @@
          Preload so the digits never flash fallback-sans on first paint. -->
     <link rel="preload" href="assets/fonts/DSEG7Classic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-e86ffde846">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-ff1b1c323e">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -937,8 +937,11 @@
                     <div class="splash-kicker">TRADING ON</div>
                     <div class="splash-logos splash-logos-pair">
                         <div class="splash-pair-item">
-                            <img class="splash-logo splash-logo-mark" src="assets/brand/partners/tensor.svg" alt="">
-                            <span class="splash-wordmark-txt">TENSOR</span>
+                            <!-- mark only: the T stands alone, no wordmark beside it.
+                                 alt is the NAME now, not empty — with the text gone this
+                                 img is the only thing identifying the partner, so it has
+                                 to carry the label for anyone not seeing the image. -->
+                            <img class="splash-logo splash-logo-mark" src="assets/brand/partners/tensor.svg" alt="Tensor">
                         </div>
                         <div class="splash-pair-item">
                             <img class="splash-logo" src="assets/brand/partners/magic-eden.svg" alt="Magic Eden">
@@ -1125,7 +1128,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-e86ffde846";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-e86ffde846"></script>
+    <script>window.__BUILD_ID__="0.0.1-ff1b1c323e";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-ff1b1c323e"></script>
 </body>
 </html>
