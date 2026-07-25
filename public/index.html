@@ -705,10 +705,13 @@
         </section>
 
         <!-- SPLASH: console-style partner boot cards (Part A). A sequence of "POWERED
-             BY" publisher-logo cards over near-black. Card 1 (SOLANA) holds ~2.6s with a
-             blinking "TAP TO INITIALIZE" prompt — a tap is the AUDIO UNLOCK (resumes
-             WebAudio + starts ARENA SIGNAL, the queued 'menu' theme) AND skips straight
-             to the menu. Untapped, cards 2–5 self-advance (~1.2s each). After
+             BY" publisher-logo cards over near-black. Card 1 (SSSTUDIO) is a HARD GATE:
+             it waits indefinitely behind a blinking "TAP TO INITIALIZE" prompt, because
+             that tap is the AUDIO UNLOCK (resumes WebAudio + starts ARENA SIGNAL, the
+             queued 'menu' theme) and a user gesture is the only thing a browser will
+             accept to start sound. The tap STARTS the reel; cards 2–5 then self-advance
+             (~1.2s each) with music already playing, and a tap on any of THOSE skips to
+             the menu. After
              the last card the splash dismisses like before (fade out, remove node, set
              body.menu-reveal so the menu's staggered rise-in plays). Loading runs behind
              the whole time — the splash never blocks on it. Inline so it paints before
@@ -996,9 +999,9 @@
         var cards = splash.querySelectorAll('.splash-card')
         var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
         var AUTO_MS = reduced ? 900 : 1200
-        // 222ms beat + 1500ms grow-in = 1722ms before the ident even settles; hold
-        // long enough for a full 800ms pulse cycle after that, then advance.
-        var GATE_HOLD_MS = 3200 // card 1 lingers longer, then auto-advances too
+        // (the gate card no longer runs on a timer — it waits for the tap. The ident's
+        // 222ms beat + 1500ms grow-in then pulses under the prompt for as long as it
+        // takes.)
         var idx = 0
         var dismissed = false
         var autoTimer = null
@@ -1010,9 +1013,14 @@
         }
         function scheduleAuto() {
           clearTimeout(autoTimer)
-          // card 0 (SSStudio ident) holds longest but DOES auto-advance now — a user who
-          // never taps still reaches the menu (audio unlocks on their next gesture).
-          autoTimer = setTimeout(next, idx === 0 ? GATE_HOLD_MS : AUTO_MS)
+          // CARD 0 IS A HARD GATE: it does NOT auto-advance. Nothing moves until the
+          // player taps, because that tap is the only guaranteed user gesture we get,
+          // and a user gesture is the ONLY thing browsers accept to start audio. Let
+          // it time out and a silent player reaches the menu with no music and a
+          // suspended AudioContext. The blinking TAP TO INITIALIZE prompt is the
+          // affordance; keydown counts too, so this is not pointer-only.
+          if (idx === 0) return
+          autoTimer = setTimeout(next, AUTO_MS)
         }
         function next() {
           if (dismissed) return
@@ -1032,11 +1040,19 @@
 
         function onGesture() {
           if (dismissed) return
-          // ONE gesture = menu ("click play and boom you're in"): the tap unlocks
-          // audio (startMenuAudio — also re-attempted on click/touchend below;
-          // Android Chrome rejects an <audio> play() from pointerdown but allows it
-          // from click/touchend on the same tap) AND skips every remaining card.
+          // The tap ALWAYS unlocks audio (startMenuAudio — also re-attempted on
+          // click/touchend below; Android Chrome rejects an <audio> play() from
+          // pointerdown but allows it from click/touchend on the same tap).
           startMenuAudio()
+          // ON THE GATE CARD the tap STARTS the reel rather than skipping it: the
+          // partner cards then roll on their own, with the music already running.
+          // Dismissing here instead would mean anyone who taps never sees a single
+          // partner card — only the players who sat and waited would, which is
+          // backwards. From card 1 on, a tap is an impatience signal: skip to the menu.
+          if (idx === 0) {
+            next()
+            return
+          }
           dismiss()
         }
         // Start (or retry) the inline #bg-menu track off a live gesture — works even
@@ -1094,7 +1110,7 @@
         })
 
         show(0)
-        scheduleAuto() // card 0 now auto-advances too (GATE_HOLD_MS)
+        scheduleAuto() // no-op on card 0: the gate waits for a real gesture
 
         // stamp the build id into the splash/menu version tags once the bundle sets it
         setTimeout(function () {
