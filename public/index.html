@@ -23,7 +23,7 @@
          Preload so the digits never flash fallback-sans on first paint. -->
     <link rel="preload" href="assets/fonts/DSEG7Classic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-45b74946b7">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-88f5864c95">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -582,11 +582,122 @@
              body.menu-reveal so the menu's staggered rise-in plays). Loading runs behind
              the whole time — the splash never blocks on it. Inline so it paints before
              the JS bundle runs. -->
+        <!-- Gate-card studio mark. Kept inline beside the markup it styles, in the
+             same inline unit as the splash controller below, so the first card the
+             player sees carries its own presentation with no extra round trip. -->
+        <style>
+            /* Pixel face for the studio ident. Self-hosted (12 KB latin subset, SIL
+               OFL — see assets/fonts/PressStart2P-LICENSE.txt); nothing is fetched
+               from Google at runtime. font-display:block, not swap: the gate card is
+               the first paint and a Chakra->pixel swap mid-card reads as a glitch. */
+            @font-face {
+                font-family: 'Press Start 2P';
+                src: url('assets/fonts/PressStart2P-Regular.woff2') format('woff2');
+                font-weight: 400;
+                font-style: normal;
+                font-display: block;
+            }
+
+            /* SSSTUDIO presenting mark (gate card only). Reading order on card 1 is
+               studio -> platform -> prompt, so this block sits above the POWERED BY
+               kicker and the TAP TO INITIALIZE gate. The ident is deliberately its
+               own 80s phosphor-CRT register, not part of the card's white type
+               system: pixel face, #39FF14 phosphor, and its own scanline pass. */
+            .splash-studio {
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+                /* phosphor bloom pooling behind the ident */
+                background: radial-gradient(ellipse at 50% 62%, rgba(57, 255, 20, 0.09) 0%, transparent 72%);
+            }
+            /* CRT scanlines over the ident. Same 3px period as --crt-scanlines (the
+               full-surface #splash::after pass) so the two rhythms reinforce instead
+               of beating into moire; this one is just darker and green-tinted. */
+            .splash-studio::after {
+                content: "";
+                position: absolute;
+                inset: -22px -56px;
+                z-index: 1;
+                pointer-events: none;
+                background: repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, 0.34) 0px, rgba(0, 0, 0, 0.34) 1px,
+                    rgba(57, 255, 20, 0.035) 1px, rgba(57, 255, 20, 0.035) 3px);
+                /* feather the pass out at its edges — an unmasked rect reads as a
+                   pasted-on box against the splash's edge-to-edge void */
+                -webkit-mask-image: radial-gradient(ellipse at 50% 50%, #000 46%, transparent 92%);
+                mask-image: radial-gradient(ellipse at 50% 50%, #000 46%, transparent 92%);
+            }
+            .splash-studio-mark {
+                width: auto;
+                /* downscaled pixel art: let the browser filter it (no `pixelated`,
+                   which aliases the fur when scaled DOWN) */
+                height: clamp(88px, 15vw, 128px);
+                max-height: 128px;
+                display: block;
+                object-fit: contain;
+                /* the keyed PNG stays untinted — this is a shadow + a phosphor
+                   spill around the silhouette, not a colour filter on the art */
+                filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.55))
+                        drop-shadow(0 0 14px rgba(57, 255, 20, 0.22));
+            }
+            .splash-studio-name {
+                font-family: 'Press Start 2P', var(--font-display), monospace;
+                font-weight: 400;
+                /* the pixel face runs ~1em per glyph, so it sets much larger than
+                   the display face at the same size — hence the smaller ramp */
+                font-size: clamp(14px, 2.6vw, 22px);
+                letter-spacing: 0.08em;
+                /* brand capitalisation: no text-transform, so it reads "SSStudio" */
+                line-height: 1.35;
+                color: #39FF14;
+                text-shadow:
+                    0 0 2px rgba(57, 255, 20, 0.95),
+                    0 0 9px rgba(57, 255, 20, 0.55),
+                    0 0 24px rgba(57, 255, 20, 0.32);
+                animation: splash-phosphor 3.2s ease-in-out infinite;
+            }
+            /* sanctioned loop: a slow phosphor breath on the glow, not a strobe */
+            @keyframes splash-phosphor {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.88; }
+            }
+            /* PRESENTS rides the same phosphor register, one tier down */
+            .splash-studio-kicker {
+                color: rgba(57, 255, 20, 0.52);
+                text-shadow: 0 0 8px rgba(57, 255, 20, 0.25);
+            }
+            @media (max-width: 767px) {
+                .splash-studio-mark { height: clamp(64px, 17vw, 96px); }
+                .splash-studio-name { font-size: clamp(11px, 3.1vw, 15px); }
+            }
+            /* landscape phones: the stage, foot and seg readout all share a short
+               viewport, so trade mark size for clearance */
+            @media (max-height: 560px) {
+                .splash-studio { gap: 6px; }
+                .splash-studio-mark { height: clamp(52px, 13vh, 88px); }
+                .splash-studio-name { font-size: 12px; letter-spacing: 0.06em; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                .splash-studio-name { animation: none !important; opacity: 1 !important; }
+            }
+        </style>
         <section id="splash" aria-hidden="true">
             <!-- one card element; the controller swaps which .splash-card is active -->
             <div class="splash-stage">
                 <!-- 1 · SOLANA — GATE CARD (holds until tap; tap = audio unlock) -->
                 <div class="splash-card is-active" data-card="solana">
+                    <!-- SSSTUDIO presenting mark: first thing on screen, above the
+                         POWERED BY block and the tap prompt. alt="" because the
+                         wordmark beside it carries the name (same pattern as the
+                         tensor mark on card 4). -->
+                    <div class="splash-studio">
+                        <img class="splash-studio-mark" src="assets/brand/ssstudio-logo.png" alt=""
+                             width="491" height="472" decoding="async" fetchpriority="high">
+                        <div class="splash-studio-name">SSStudio</div>
+                        <div class="splash-kicker splash-studio-kicker">PRESENTS</div>
+                    </div>
                     <div class="splash-kicker">POWERED BY</div>
                     <div class="splash-logos"><img class="splash-logo" src="assets/brand/partners/solana.svg" alt="Solana"></div>
                     <div class="splash-gate">
@@ -778,7 +889,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-45b74946b7";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-45b74946b7"></script>
+    <script>window.__BUILD_ID__="0.0.1-88f5864c95";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-88f5864c95"></script>
 </body>
 </html>

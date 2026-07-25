@@ -168,7 +168,27 @@ const VIEW_MARGIN = 16
 // applyCommand gravity settles them cleanly (same intent as the legacy "y a hair above
 // the floor" note) — this is what makes the re-extracted UT y-values (~1m off the old
 // hand-tuned spawns) land on the deck instead of inside/below it.
-const SPAWN_MIN_HEADROOM = 4
+// Minimum ceiling clearance (metres) a SPAWN_POINT needs to be usable.
+//
+// This was 4, which was silently gutting the spawn pool on every imported map. It
+// was tuned against CTF-Visage, whose 20 points all carry headroom 15 — a sentinel
+// ("no ceiling found"), not a measurement — so nothing dropped there and the value
+// looked safe. Every map imported since carries REAL measured clearances of 2-3m
+// (ordinary UT indoor rooms), and 4 threw most of them away:
+//   dm_hex2 11->2   dm_somnus 15->3   dm_gantry162 15->6   dm_baroque 18->11
+//   dom_elder 16->12   visage 20->20
+// On DM-Hex][ that left TWO live spawns for the whole match — and because a
+// DM-sourced map's team tags are ignored (see the TEAM-TAG GATE below) both teams
+// shared them, so players routinely materialised inside each other 18m apart.
+//
+// The gate should ask "does a player FIT", not "is this a tall room". A player is
+// 1.05m tall (hero_male.glb at scale 0.577) and the hittable capsule tops out at
+// +0.66 above the entity centre, which itself rests SPAWN_REST above the floor —
+// so ~1.2m is the true requirement. 2.0 keeps a real margin for the drop-probe and
+// still rejects genuine crawlspaces (dm_somnus authored six 1.33m points).
+// Verified by scripts/audit-map-runtime.ts, which measures the ACTUAL clearance by
+// raycast: the authored headroom field tracks it to ~0.2m on every point.
+const SPAWN_MIN_HEADROOM = 2.0
 const SPAWN_REST = 0.5
 const SPAWN_PROBE_UP = 2.0
 const SPAWN_PROBE_DOWN = 6.0
@@ -296,6 +316,19 @@ const SPECTATOR_AFK_SWEEP_MS = 5000
 // a menu socket — no player coordinates cross the wire until deploy. Global
 // per-client messages (killfeed, PlayerName replay) still arrive.
 const SPECTATOR_VIEW = { x: 0, y: 1e9, z: 0, halfWidth: 0.001, halfHeight: 0.001, halfDepth: 0.001 }
+
+// The client's interpolation delay (ms). MUST match the second argument to
+// `new nengi.Client(nengiConfig, 100)` in client/GameClient.js — the rewind below is
+// only correct while these agree.
+const INTERP_DELAY_MS = 100
+
+// Hard ceiling on lag-compensated rewind (ms). The historian only keeps
+// HISTORIAN_TICKS / UPDATE_RATE = 80/40 = 2000ms of snapshots, and asking it for
+// anything older returns an EMPTY set rather than an error — every shot silently
+// whiffs. Stay well clear of that edge, and refuse to rewind so far that a victim can
+// be killed metres past cover no matter how bad (or how forged) the shooter's
+// reported ping is. 400ms fully serves everyone up to ~300ms RTT.
+const MAX_REWIND_MS = 400
 
 class GameInstance {
 	static RESPAWN_DELAY_MS = 2500
@@ -827,7 +860,34 @@ class GameInstance {
 		const ray = fire(entity)
 		if (!ray) return
 		const config = ray.config
-		const timeAgo = (shooter.latency || 0) + 100
+		// REWIND BUDGET. `latency` is the full ROUND TRIP and the full RTT is CORRECT
+		// here — do not "fix" it to latency/2. nengi's clock sync is biased by exactly one
+		// downlink trip: Chronus.register stamps packet ARRIVAL against the server's SEND
+		// timestamp, so averageTimeDifference = clockOffset + D_down, and the client's
+		// interp target (core/client/Client.js) is
+		//     Date.now() - interpDelay - averageTimeDifference  ==  serverNow - D_down - 100
+		// The FireCommand then costs D_up to reach us, so the world the shooter actually
+		// had on screen is (D_down + 100 + D_up) = (RTT + INTERP_DELAY_MS) old. Halving it
+		// would under-rewind every high-ping shot and place the ray BEHIND a moving target.
+		//
+		// The 100 must equal the client's interpolation delay — the second argument to
+		// `new nengi.Client(nengiConfig, 100)` in client/GameClient.js. They are two
+		// unrelated literals in two files; change one and every hitscan silently
+		// mis-rewinds by the difference.
+		//
+		// The CAP is the real fix. Uncapped, this had two failure modes:
+		//   * past 2000ms (HISTORIAN_TICKS/UPDATE_RATE) the historian no longer holds the
+		//     snapshot, and getLagCompensatedArea returns an EMPTY set rather than an
+		//     error — a >=1900ms player's every hitscan shot silently misses everyone,
+		//     with nothing logged anywhere to say why;
+		//   * the pong is client-timed and unvalidated (nengi LatencyRecord.receivePong
+		//     accepts any outstanding key at face value), so a client that echoed pongs
+		//     ~1.8s late could rewind the whole world 2 seconds and kill people rooms
+		//     behind cover while looking like an ordinary lagger.
+		// Capping bounds both, and bounds how far past cover a victim can be killed
+		// (MAX_REWIND_MS at dodge speed 11.4 m/s ~= 4.6m) regardless of the shooter's
+		// connection. Cost: players above ~300ms RTT must lead their targets slightly.
+		const timeAgo = Math.min((shooter.latency || 0) + INTERP_DELAY_MS, MAX_REWIND_MS)
 
 		if (config.type === 'hitscan') {
 			// Deterministic per-weapon spread (common/firePattern.js): the SAME
@@ -2005,6 +2065,26 @@ class GameInstance {
 		// (never reset here), so a respawn keeps the same team.
 		const teamId = client.rawEntity ? client.rawEntity.teamId : null
 		const spawn = this.spawnPoint(teamId)
+		// A respawn TELEPORTS both entities, so it must drop the smooth follower's path
+		// queue for exactly the reason the portal path does (see checkTeleport) — that
+		// clear was there and this one was missing.
+		//
+		// followPath replays this queue at a capped 1.1x MAX_SPEED. The queue still holds
+		// the DEATH position: the MoveCommand handler pushes unconditionally, and the
+		// client keeps sending MoveCommands while dead (applyCommand's isAlive gate stops
+		// the MOVEMENT, not the push), so a stale entry is always in flight when respawn
+		// runs later in the same tick. Without this clear the smooth entity — which is
+		// BOTH what every other client renders AND the only body the historian records for
+		// hitscan — is dragged from the spawn point back toward the corpse and then walks
+		// the whole way back at 12.54 m/s, while the player is already fighting somewhere
+		// else. Measured on dm_hex2: a 10m respawn excurses 10.35m even standing still,
+		// and a moving player stays desynced for tens of seconds because the queue only
+		// drains at (12.54 - 11.4) = 1.14 m/s. For that whole window the player has NO
+		// hitbox where they actually are, so they cannot be shot at all — and the ghost
+		// that does carry their hitbox glides through walls, where nearestWorldHit then
+		// correctly occludes shots at it. That is the "I emptied a clip into him and got
+		// nothing" report.
+		if (client.positions) client.positions.length = 0
 		for (const entity of [client.rawEntity, client.smoothEntity]) {
 			if (!entity) continue
 			entity.x = spawn.x

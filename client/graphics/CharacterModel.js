@@ -182,6 +182,70 @@ export function _makeArmorMetal(mat, scene) {
   mat.emissiveTexture = null // no flat wash: the reflection is the whole point
 }
 
+// ---- TEAM SILVER (BLUE fields the same set in silver, RED keeps the gold) ---------
+// The plates are ONE material per prop, SHARED by every player (a mesh clone keeps its
+// template's material), so a per-team look cannot be a property tweak on the mounted
+// piece — it has to be a second material. `_armorSilverMaterial` clones the FINISHED
+// gold material once per source and caches the twin on it, so the whole session pays
+// +1 material per armour prop, not per player, and the reflection cube is still the
+// single shared cube (Material.clone copies texture handles by reference).
+//
+// Which team: RED is 0, BLUE is 1 — same indexing as TEAM_NAMETAG_CSS / TEAM_BODY_GLOW
+// at the top of this file. FFA (neutral) keeps gold: with no teams there is nothing to
+// tell apart, and gold is the authored look.
+const ARMOR_SILVER_TEAM = 1
+// A metal has no diffuse: albedoColor IS its reflectance (F0), so "silver" is not a
+// paint job, it is a NEUTRAL and much HIGHER-value reflectance where gold's is warm and
+// dark. Derived from each source colour instead of hardcoded, so the dark recess trim
+// (ArmorTrim, a deliberately read-dark warm brown) stays proportionally dark rather
+// than being promoted into a second bright plate: take the source's strongest channel
+// as its value, lift it, and hang a barely-cool neutral on it.
+const SILVER_LIFT = 1.15        // gold's 0.82 -> 0.94: silver reflects broadband where
+                                // gold eats blue, so it has to sit materially higher or
+                                // it reads as "dirty gold" rather than a different metal.
+// The cool lean is NOT stylistic licence, it is the correction for the environment. The
+// armour's only light is armor_env.png, whose dominant feature is a hot AMBER horizon
+// band, so a dead-neutral reflectance comes back champagne — i.e. pale gold, which is the
+// one thing this must not read as (A/B'd at (0.96,0.98,1.0) vs this vs (0.80,0.90,1.0):
+// the first is visibly warm, the third starts tinting the plates blue and stops looking
+// like bare metal). This lands on polished-steel neutral in the finished frame.
+const SILVER_TINT = new BABYLON.Color3(0.88, 0.94, 1.00)
+// Silver returns ~1.5x gold's luminance, so re-using the gold environmentIntensity would
+// push the amber band AND both windows past clipping in all three channels at once — a
+// white blob, i.e. exactly the "shiny plastic bead" failure the PEAK budget in
+// scripts/make-armor-env.py exists to avoid. Scale the intensity back by that factor so
+// silver samples the same env over the same on-screen value range gold does.
+const SILVER_ENV_INTENSITY = 1.75
+
+const _armorSilverCache = new WeakMap() // gold armour material -> its silver twin
+
+// The silver twin of one FINISHED armour material (i.e. after _makeArmorMetal). Anything
+// that did not take the armour-metal path is returned unchanged — that is the chest gem,
+// which ships a violet KHR_materials_emissive_strength glow and stays violet on both
+// teams.
+function _armorSilverMaterial(mat) {
+  if (!mat || !mat._armorMetal) return mat
+  const cached = _armorSilverCache.get(mat)
+  if (cached) return cached
+  const silver = mat.clone(mat.name + '_silver')
+  if (!silver) return mat
+  // Carry the markers across so a later _fixUnlitMetal / _makeArmorMetal on the twin is
+  // a no-op and can never de-metalize the plates behind our back.
+  silver._metalFixed = true
+  silver._armorMetal = true
+  const c = mat.albedoColor
+  const v = c ? Math.min(1, Math.max(c.r, c.g, c.b) * SILVER_LIFT) : 0.9
+  // Fresh Color3s, never a copyFrom: the clone may still be holding the GOLD material's
+  // own colour objects, and mutating those would turn every red player silver too.
+  silver.albedoColor = new BABYLON.Color3(v * SILVER_TINT.r, v * SILVER_TINT.g, v * SILVER_TINT.b)
+  silver.environmentIntensity = SILVER_ENV_INTENSITY
+  // same whisper of self-light as the gold, recomputed off the NEW base colour
+  silver.emissiveColor = silver.albedoColor.scale(ARMOR_SELF_LIT)
+  silver.emissiveTexture = null
+  _armorSilverCache.set(mat, silver)
+  return silver
+}
+
 // Apply the gunmetal skin uniformly to a mounted helmet's meshes. Idempotent via a
 // per-material marker (materials are shared across all helmet clones, so this runs at
 // most twice for the whole session). One Texture instance is shared by both materials.
@@ -540,6 +604,9 @@ export default class CharacterModel {
   // 'Superhero'); hair/eyes keep their own textures but share the faint glow so the
   // silhouette reads as one team-colored unit.
   _applyTeamUniform() {
+    // The armour is a separate prop tree with its own materials and its own async mount,
+    // so it repaints on its own path and does NOT wait on this.meshes.
+    this._applyArmorTeam()
     if ((this._teamId == null && !this._neutral) || !this.meshes) return
     const skins = this.spec.teamSkins
     const skinUrl = this._neutral ? this.spec.neutralSkin : (skins && skins[this._teamId])
@@ -754,8 +821,28 @@ export default class CharacterModel {
       // de-metalize them — see _makeArmorMetal. The gem is routed back to the old path by
       // the already-glows guard inside it.
       ;[root, ...root.getChildMeshes()].forEach((m) => _makeArmorMetal(m.material, this.scene))
+      // Remember each plate's GOLD material before any team re-tint, so _applyArmorTeam
+      // can swap both ways (a player CAN change team mid-match) without re-reading the
+      // prop template.
+      ;[clone, ...clone.getChildMeshes()].forEach((m) => { m._armorGoldMat = m.material })
       this._armorRoots.push(clone)
     }
+    // The team almost always lands long before this async mount finishes, so paint now.
+    this._applyArmorTeam()
+  }
+
+  // Point the mounted plates at the gold or the silver material for the current team.
+  // Idempotent, and a no-op before the mount resolves (_mountArmor calls it at the end),
+  // so it can be driven straight off the team path as well.
+  _applyArmorTeam() {
+    if (!this._armorRoots) return
+    const silver = !this._neutral && this._teamId === ARMOR_SILVER_TEAM
+    this._armorRoots.forEach((root) => {
+      ;[root, ...root.getChildMeshes()].forEach((m) => {
+        const gold = m._armorGoldMat
+        if (gold) m.material = silver ? _armorSilverMaterial(gold) : gold
+      })
+    })
   }
 
   // ---- HELD WEAPON --------------------------------------------------------
