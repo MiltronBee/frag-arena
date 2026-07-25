@@ -483,6 +483,16 @@ export default class FragLayer {
     this._deathCam.appliedPitch = 0
     cam.rotation.z = 0
     document.body.classList.remove('own-death')
+    // HARD CAMERA-TRANSFORM RESET on respawn (playtest 2026-07-25: "sometimes you
+    // respawn and the camera is still tilted the way it tilts when you die").
+    // Clearing the death-cam's own roll/pitch above is not sufficient: ANY other
+    // channel that writes camera rotation and is mid-flight at the moment of death
+    // (the recoil spring, the sustained-fire climb lean, a queued pump-dip) carries
+    // its offset into the new life. Ask the Simulator to zero every one of them so a
+    // fresh life always starts from a level camera, whatever was happening when we
+    // died. Idempotent — this runs on every respawn path (message, isAlive edge, and
+    // the level-triggered backstop).
+    if (this.sim && typeof this.sim.resetCameraTransform === 'function') this.sim.resetCameraTransform()
   }
 
   // apply the death camera tilt AFTER Simulator has rebased the camera from the

@@ -526,6 +526,57 @@ body:not(.arena-entered) #top-hud { visibility: hidden; }
 /* CHROME DIET (HUD-REWORK-SPEC): flat --hud-scrim plate + ONE cyan accent border.
    No outer glow, no inset glow, no gradient wash, no corner brackets, no clip-path
    — only the DATA (numbers, icon) emits light. Flows inside #hud-right-group. */
+/* ---- CARRIED-WEAPON STRIP (playtest 2026-07-25: players picked weapons up without
+   noticing and kept firing the pistol). Sits directly above the ammo panel: one cell
+   per in-play roster slot, NOT-owned reads as a dim ghost, owned reads in ink, and the
+   equipped one takes the brand green + its select key. Cells are built by
+   Simulator._buildWeaponStrip(); this is presentation only. ---- */
+#weapon-strip {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    pointer-events: none; /* vertical spacing comes from #hud-right-group's own gap */
+}
+#weapon-strip .wslot {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: var(--x30-r-1, 4px);
+    background: var(--x30-surface-0);
+    box-shadow: var(--x30-el-1);
+    border-left: 2px solid transparent;
+    /* not owned: present but clearly unavailable, so the strip doubles as a map of
+       what there is to find rather than hiding it */
+    opacity: 0.34;
+    transition: opacity var(--x30-t-fast) ease, border-left-color var(--x30-t-fast) ease,
+                background var(--x30-t-fast) ease;
+}
+#weapon-strip .wslot.owned { opacity: 1; }
+#weapon-strip .wslot.active {
+    border-left-color: var(--x30-accent);
+    background: var(--x30-surface-1, var(--x30-surface-0));
+}
+#weapon-strip .wslot-key {
+    font-family: var(--font-hud, inherit);
+    font-size: 11px;
+    line-height: 1;
+    color: var(--x30-ink-low);
+}
+#weapon-strip .wslot-name {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    color: var(--x30-ink);
+}
+#weapon-strip .wslot.active .wslot-key,
+#weapon-strip .wslot.active .wslot-name { color: var(--x30-accent); }
+/* phones: the name text is what costs width — keep the keys, drop the words */
+@media (max-width: 560px) {
+    #weapon-strip .wslot-name { display: none; }
+    #weapon-strip .wslot { padding: 3px 7px; }
+}
+
 #weapon-panel {
     position: relative;
     display: flex;

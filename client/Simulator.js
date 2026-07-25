@@ -176,6 +176,7 @@ class Simulator {
 		this.fov = parseInt(localStorage.getItem('fov') || '95', 10)
 		this.renderer.camera.fov = (this.fov * Math.PI) / 180
 		this._setupSettingsUI()
+		this._buildWeaponStrip()
 
 		// phones/tablets get the joystick + drag-look overlay instead of
 		// pointer lock (which doesn't exist on mobile browsers)
@@ -2553,6 +2554,9 @@ class Simulator {
 			menu.scrollTop = 0
 			if (wasClosed && this.audio) this.audio.menuOpen()
 		}
+		// repaint the slider fills on open — a value changed elsewhere (dev command,
+		// menu music slider) would otherwise show a stale filled track.
+		this._paintAllSliderFills()
 		// Context-sensitive chrome: from the MAIN MENU (not yet in a match) the panel
 		// reads "MAIN MENU" / "BACK". MENU SAFETY: mid-match it now reads "MATCH
 		// LIVE" (never "PAUSED" — the world does not pause and calling it paused is
@@ -2638,6 +2642,8 @@ class Simulator {
 	}
 
 	_updateHud() {
+		// carried-weapon strip (self-skips when the loadout+selection are unchanged)
+		this._updateWeaponStrip()
 		let playerCount = 0
 		for (const entity of this.client.entities.values()) {
 			if (entity.protocol && entity.protocol.name === 'PlayerCharacter' &&
@@ -2978,6 +2984,118 @@ class Simulator {
 				localStorage.setItem('touchInvertY', e.target.checked ? 'true' : 'false')
 			})
 		}
+
+		// SLIDER FILL (playtest 2026-07-25: "the green bar sits at 50% the whole time no
+		// matter how far I drag the value"). The track paints its filled portion from a
+		// `--fill` custom property whose CSS default is 50% (styles-v0.0.1.css,
+		// `.settings-row input[type="range"]`) — the comment there says "JS sets --fill =
+		// value%", but nothing ever did, so every slider rendered a permanently half-full
+		// bar while the numeric readout beside it moved correctly.
+		//
+		// Bound generically over every range in the panel, AFTER the per-slider handlers
+		// above have written their initial `.value`, so this covers current and future
+		// rows without each one having to remember to repaint. WebKit/Blink only —
+		// Firefox fills via ::-moz-range-progress natively and ignores --fill.
+		if (menu) {
+			menu.querySelectorAll('input[type="range"]').forEach(el => {
+				this._paintSliderFill(el)
+				el.addEventListener('input', () => this._paintSliderFill(el))
+			})
+		}
+	}
+
+	// Paint one range input's filled-track fraction into its `--fill` property.
+	// Guards a zero/NaN span (a malformed min/max) so a bad row can never produce
+	// `--fill: NaN%` and blank the whole track.
+	_paintSliderFill(el) {
+		if (!el) return
+		const min = parseFloat(el.min)
+		const max = parseFloat(el.max)
+		const lo = Number.isFinite(min) ? min : 0
+		const span = (Number.isFinite(max) ? max : 100) - lo
+		const val = parseFloat(el.value)
+		if (!(span > 0) || !Number.isFinite(val)) return
+		const pct = Math.max(0, Math.min(100, ((val - lo) / span) * 100))
+		el.style.setProperty('--fill', pct.toFixed(1) + '%')
+	}
+
+	// Repaint every settings slider (values can change outside the panel — e.g. FOV via
+	// a dev command, music volume from the menu — and a stale fill would lie).
+	_paintAllSliderFills() {
+		const menu = document.getElementById('settings-menu')
+		if (menu) menu.querySelectorAll('input[type="range"]').forEach(el => this._paintSliderFill(el))
+	}
+
+	// CARRIED-WEAPON STRIP — build the cells once (roster shape never changes at
+	// runtime; `disabled` slots keep their protocol index but are never carryable, so
+	// they are skipped). Each cell shows the select key (index + 1) and the weapon's
+	// short name; _updateWeaponStrip() then only toggles classes, so the per-frame cost
+	// is a bitmask compare and nothing touches the DOM unless the loadout changed.
+	_buildWeaponStrip() {
+		const host = document.getElementById('weapon-strip')
+		if (!host) return
+		host.innerHTML = ''
+		this._weaponStripCells = []
+		weapons.forEach((w, i) => {
+			if (w && w.disabled) return
+			const cell = document.createElement('div')
+			cell.className = 'wslot'
+			cell.dataset.idx = String(i)
+			const key = document.createElement('span')
+			key.className = 'wslot-key'
+			key.textContent = String(i + 1)
+			const name = document.createElement('span')
+			name.className = 'wslot-name'
+			name.textContent = (w && w.name ? w.name : '?').toUpperCase()
+			cell.appendChild(key)
+			cell.appendChild(name)
+			host.appendChild(cell)
+			this._weaponStripCells.push({ i, cell })
+		})
+		this._weaponStripSig = null
+	}
+
+	// Paint owned/equipped state onto the strip. Driven from _updateHud off the
+	// NETWORKED ownedWeapons bitmask (the same source the pickup refill and the cycle
+	// gate read), so it can never disagree with what you can actually select.
+	_updateWeaponStrip() {
+		if (!this._weaponStripCells || !this._weaponStripCells.length) return
+		const owned = this.myRawEntity ? this.myRawEntity.ownedWeapons : undefined
+		const sig = `${owned}|${this.weaponIndex}`
+		if (sig === this._weaponStripSig) return // nothing changed — skip the DOM entirely
+		this._weaponStripSig = sig
+		for (const { i, cell } of this._weaponStripCells) {
+			const has = owned === undefined || (owned & (1 << i)) !== 0
+			cell.classList.toggle('owned', has)
+			cell.classList.toggle('active', i === this.weaponIndex)
+		}
+	}
+
+	// FULL CAMERA-TRANSFORM RESET for a fresh life. Called from FragLayer.onRespawned
+	// (which fires on every respawn path: the Respawned message, the replicated isAlive
+	// false→true edge, and the level-triggered backstop).
+	//
+	// The death-cam clears its OWN roll/pitch, but every other channel that writes camera
+	// rotation keeps its state across the death: the recoil spring (_recoil/_recoilVel)
+	// can be mid-oscillation, _visClimb holds the sustained-fire lean, a _pumpDip can be
+	// counting down to inject a nod, and _recoilApplied records an offset that the next
+	// frame's top-of-frame remove would subtract from a camera that no longer has it.
+	// Any of those lands as a tilted / off-level view on spawn. Zero the lot.
+	//
+	// Deliberately does NOT touch yaw (rotation.y): the server owns spawn FACING and
+	// writes it in the Respawned/Identity handlers — resetting yaw here would undo the
+	// authoritative turn and spin every respawn back to whatever we last looked at.
+	// Pitch is levelled because a fresh life should look at the horizon.
+	resetCameraTransform() {
+		const cam = this.renderer && this.renderer.camera
+		if (!cam) return
+		cam.rotation.x = 0   // level pitch (yaw is the server's spawn facing — leave it)
+		cam.rotation.z = 0   // no roll
+		if (this._recoil) this._recoil.set(0, 0, 0)
+		if (this._recoilVel) this._recoilVel.set(0, 0, 0)
+		if (this._recoilApplied) this._recoilApplied.set(0, 0, 0)
+		this._visClimb = 0
+		this._pumpDip = null
 	}
 
 	_syncWeaponsConfigToServer() {
