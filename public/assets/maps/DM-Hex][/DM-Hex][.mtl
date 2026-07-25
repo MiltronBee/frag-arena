@@ -1,0 +1,168 @@
+# DM-Hex][ play mesh (skybox stripped) - web textures
+
+newmtl Indus6_Woods_DeckSm1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/Indus6_Woods_DeckSm1.webp
+
+
+newmtl NaliCast_Base_metal4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/NaliCast_Base_metal4.webp
+
+
+newmtl NaliCast_Deco_FANCY1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/NaliCast_Deco_FANCY1.webp
+
+
+newmtl NaliCast_Panel_wood1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/NaliCast_Panel_wood1.webp
+
+
+newmtl NaliCast_Trim_METTRIM1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/NaliCast_Trim_METTRIM1.webp
+
+
+newmtl NaliCast_Trim_rivits
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/NaliCast_Trim_rivits.webp
+
+
+newmtl NaliCast_Trim_ttrm2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/NaliCast_Trim_ttrm2.webp
+
+
+newmtl NaliCast_Window_orn2
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/NaliCast_Window_orn2.webp
+
+
+newmtl NaliCast_pillar_nsuport4
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/NaliCast_pillar_nsuport4.webp
+
+
+newmtl NaliFX_TORCHES3
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/NaliFX_TORCHES3.webp
+
+
+newmtl UTtech1_Floor_floor3b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech1_Floor_floor3b.webp
+
+
+newmtl UTtech1_Misc_UTdirt1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/UTtech1_Misc_UTdirt1.webp
+
+
+newmtl _untextured
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/_untextured.webp
+
+
+newmtl utcrypt_Arch_Utgreydoor
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/utcrypt_Arch_Utgreydoor.webp
+
+
+newmtl utcrypt_Base_nucryptmetl1
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/utcrypt_Base_nucryptmetl1.webp
+
+
+newmtl utcrypt_Base_nxnxbase
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/utcrypt_Base_nxnxbase.webp
+
+
+newmtl utcrypt_Base_rClfFlr0base
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/utcrypt_Base_rClfFlr0base.webp
+
+
+newmtl utcrypt_Floor_rClfFlr0
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/utcrypt_Floor_rClfFlr0.webp
+
+
+newmtl utcrypt_Wall_distex4A
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/utcrypt_Wall_distex4A.webp
+
+
+newmtl utcrypt_Wall_utAlanWal2b
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/utcrypt_Wall_utAlanWal2b.webp
+
+
+newmtl utcrypt_pillar_nuwood
+Kd 0.8 0.8 0.8
+Ka 0.1 0.1 0.1
+Ks 0.0 0.0 0.0
+illum 1
+map_Kd textures/utcrypt_pillar_nuwood.webp

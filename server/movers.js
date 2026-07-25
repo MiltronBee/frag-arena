@@ -49,11 +49,14 @@ function surfaceTopY(m) {
 }
 
 // Is this alive entity a rider (XZ inside footprint+skin, feet within the grab band)?
+// halfX/halfZ are per-axis: Deck16's platforms are square, but DM-Hex][ (Curse][) ships
+// two RECTANGULAR ones (6.10x2.44 and 4.88x3.05 native), and the footprint test has to
+// match the collider or a rider is carried while standing off the visible platform.
 function isRider(entity, m, top) {
 	const dx = entity.x - m.cx
 	const dz = entity.z - m.cz
-	if (dx < -m.half - CARRY_SKIN || dx > m.half + CARRY_SKIN) return false
-	if (dz < -m.half - CARRY_SKIN || dz > m.half + CARRY_SKIN) return false
+	if (dx < -m.halfX - CARRY_SKIN || dx > m.halfX + CARRY_SKIN) return false
+	if (dz < -m.halfZ - CARRY_SKIN || dz > m.halfZ + CARRY_SKIN) return false
 	const rideY = top + RIDE_REST
 	return entity.y >= rideY - CARRY_BAND_BELOW && entity.y <= rideY + CARRY_BAND_ABOVE
 }
@@ -68,12 +71,17 @@ export default class MoverController {
 		const list = Array.isArray(map && map.MOVERS) ? map.MOVERS : []
 		const s = (map && map.scale) || 1
 		for (const raw of list) {
-			const halfW = raw.half * s
+			// Footprint half-extents. A row may give a single square `half` (Deck16) or
+			// per-axis halfX/halfZ (DM-Hex]['s rectangular platforms); each falls back to
+			// the other so both registry shapes build the same way.
+			const halfX = (raw.halfX != null ? raw.halfX : raw.half) * s
+			const halfZ = (raw.halfZ != null ? raw.halfZ : raw.half) * s
 			const m = {
 				kind: raw.kind || 'lift',
 				cx: raw.x * s,
 				cz: raw.z * s,
-				half: halfW,
+				halfX,
+				halfZ,
 				restTopW: raw.restY * s, // world y of the standable face at the bottom key
 				topTopW: raw.topY * s,   // ...and at the top key
 				moveTime: raw.moveTime || 1.0,
@@ -83,9 +91,9 @@ export default class MoverController {
 			}
 			// replicated box: entity.y is the box CENTRE, so its top face = surfaceTop.
 			const ent = new Mover()
-			ent.width = halfW * 2
+			ent.width = halfX * 2
 			ent.height = BOX_HEIGHT
-			ent.depth = halfW * 2
+			ent.depth = halfZ * 2
 			ent.x = m.cx
 			ent.z = m.cz
 			ent.y = m.restTopW - BOX_HEIGHT / 2
@@ -157,8 +165,8 @@ export default class MoverController {
 			const rideY = top + RIDE_REST
 			const dx = entity.x - m.cx
 			const dz = entity.z - m.cz
-			if (dx < -m.half - CARRY_SKIN || dx > m.half + CARRY_SKIN) continue
-			if (dz < -m.half - CARRY_SKIN || dz > m.half + CARRY_SKIN) continue
+			if (dx < -m.halfX - CARRY_SKIN || dx > m.halfX + CARRY_SKIN) continue
+			if (dz < -m.halfZ - CARRY_SKIN || dz > m.halfZ + CARRY_SKIN) continue
 			if (entity.y < rideY - CARRY_BAND_BELOW || entity.y > rideY + CARRY_BAND_ABOVE) continue
 			if (entity.velY > JUMP_EPS) continue // jumping off disengages
 			entity.y = rideY

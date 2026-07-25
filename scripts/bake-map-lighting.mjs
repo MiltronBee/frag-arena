@@ -42,7 +42,11 @@ const AO_FLOOR = 0.55        // ao remaps [0..1] -> [AO_FLOOR..1]
 // offline path needs a higher ambient than the runtime default (0.25) or combat
 // legibility dies (the ACES-revert lesson: readable beats moody). Shadow CONTRAST
 // still comes from occluded direct light; ambient just keeps floors visible.
-const BAKE_AMBIENT = 0.34
+// Ambient floor for the bake. Overridable per map via BAKE_AMBIENT=<n> so a map whose
+// own textures are very dark (DM-Hex][ / UT's Curse][ measured a median pixel of 2/255,
+// dark gothic stone under an aggressive occlusion bake) can be lifted at BAKE time
+// without moving every other map's calibrated look.
+const BAKE_AMBIENT = Number(process.env.BAKE_AMBIENT || 0.34)
 const RAY_EPS = 0.05         // ray-origin lift off the surface
 const LIGHT_EPS = 0.1        // stop shadow rays this short of the light (self/coplanar guard)
 

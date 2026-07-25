@@ -96,6 +96,14 @@ export const assets = {
     //   clavicle_l +X anterior +Y outboard  +Z up         shoulder joint at y=0.197
     //   lowerarm_l +X down     +Y to wrist  +Z anterior   elbow at y=0, r~0.06
     //   calf_l     +X left     +Y to ankle  +Z posterior  knee at y=0, patella z=-0.062
+    //   foot_l     +X lateral  +Y to toe    +Z to sole    ankle at y=0, ball at y=0.159,
+    //              toe tip y=0.225, foot half-width 0.030 (heel) .. 0.058 (ball), instep
+    //              surface z=-0.028; the foot bone tilts 26.6deg nose-down, so model-up in
+    //              foot-local is (0,-0.448,-0.894) and the boot's dome axis is the
+    //              perpendicular one, -Z. Measured with scratch/probe-foot.mjs, which is
+    //              probe-bonelocal's method redone strictly from BIND matrices
+    //              (invert(getInvertedAbsoluteTransform())) -- reading getAbsoluteTransform()
+    //              mixes the live pose in and gives garbage. foot_r == mirror(foot_l) to 0.00000.
     // The rotations are therefore exact axis mappings ("point the dome at the joint"),
     // not hand-guessed radians. Right-side rows are the EXACT mirror of their left twin
     // (px, ry, rz negated) — the rig is mirror-symmetric about x=0 at rest, verified to
@@ -112,6 +120,8 @@ export const assets = {
       { name: 'elbowR',    url: '/assets/props/armor_elbow.glb',    bone: 'lowerarm_r', scale: 0.95, position: { x: -0.013, y: 0.01, z: -0.012 }, rotation: { x: -1.571, y: 0, z: 0 }, mirror: true },
       { name: 'kneeL',     url: '/assets/props/armor_knee.glb',     bone: 'calf_l',     scale: 0.80, position: { x: 0.009, y: 0.012, z: -0.012 }, rotation: { x: -1.571, y: 0, z: 0 }, mirror: false },
       { name: 'kneeR',     url: '/assets/props/armor_knee.glb',     bone: 'calf_r',     scale: 0.80, position: { x: -0.009, y: 0.012, z: -0.012 }, rotation: { x: -1.571, y: 0, z: 0 }, mirror: true },
+      { name: 'bootL',     url: '/assets/props/armor_boot.glb',     bone: 'foot_l',     scale: 1.0, position: { x: 0.012, y: 0, z: 0 }, rotation: { x: -1.571, y: 0, z: 0 }, mirror: false },
+      { name: 'bootR',     url: '/assets/props/armor_boot.glb',     bone: 'foot_r',     scale: 1.0, position: { x: -0.012, y: 0, z: 0 }, rotation: { x: -1.571, y: 0, z: 0 }, mirror: true },
     ],
   },
 

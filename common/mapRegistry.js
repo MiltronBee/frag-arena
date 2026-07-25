@@ -258,6 +258,9 @@ const dm_gantry162 = mesh({
 		id: 'dm_gantry162',
 		name: 'DM-Gantry16][',
 		mode: 'TDM',
+		// SKY VARIANT: Deck16 gets Mars (no moon) — a different world through the same
+		// industrial frame. See SKY_VARIANTS in client/graphics/BABYLONRenderer.js.
+		sky: 'mars',
 		dir: '/assets/maps/DM-Gantry16][/',
 		file: 'DM-Gantry16][.obj',
 		lights: 'DM-Gantry16][.lights.json',
@@ -541,6 +544,36 @@ const dom_elder = mesh({
 			{ x: 4.859, z: 41.421, y: 16.026, class: 'Teleporter', tag: 'Teleporter', url: 'tele4', nav_id: 91 },
 			{ x: 20.761, z: 41.467, y: 13.378, class: 'Teleporter', tag: 'tele5', enabled: false, nav_id: 92 },
 			{ x: 20.742, z: 41.466, y: 15.969, class: 'Teleporter', tag: 'Teleporter', url: 'tele5', nav_id: 93 },
+		],
+		// --- UT-EXTRACTED MOVERS — DOM-Elder lifts (native units), from
+		// _work/ut-actors/movers/DOM-Elder.movers.json (9 movers: 5 tagged 'lift',
+		// 4 'door'). Same derivation as the other maps: x/z = platform centre,
+		// restY/topY = the standable SURFACE-TOP native y (= key y + bbox.max.y) at the
+		// low/high keyframes, halfX/halfZ = footprint half-extents.
+		//
+		// FOUR of the five 'lift' rows are wired. Two judgement calls, both from the
+		// extraction's `kind` being a pure vertical-motion heuristic:
+		//
+		//  1. The mover at (20.726, 13.411) is EXCLUDED. It is tagged 'lift' because it
+		//     moves straight up, but its box is 3.66 x 2.44 wide and 19.5 m TALL, and its
+		//     surface top would sit at native y 17.1->26.5 — far above this map's walkable
+		//     ceiling. That is a rising GATE/portcullis, not a platform. Wiring it would
+		//     hang a phantom 0.6 m collider in the ceiling (MoverController builds a solid
+		//     box for every row it is given), so it stays out, exactly like DM-Hex]['s
+		//     UDamage cage door.
+		//  2. The (-10.973, 35.966) and (4.877, 35.662) pair rest at the TOP in UT and
+		//     descend when triggered; our state machine only models rest-at-bottom, so
+		//     they are wired low-key-first and start DOWN instead of up. They ride
+		//     correctly either way — only the idle position differs from UT99.
+		//
+		// The three floor-level platforms rest flush with the deck (surface top ~-2.1 to
+		// -2.4 native, i.e. spawn-floor height) and rise ~8.2 m; the (24.689, 48.463) one
+		// is a small high ledge lift with its own 3 s move time.
+		MOVERS: [
+			{ kind: 'lift', x: 24.689, z: 48.463, restY: 11.582, topY: 13.944, halfX: 1.219, halfZ: 0.610, moveTime: 3.0 },
+			{ kind: 'lift', x: -10.973, z: 35.966, restY: -2.134, topY: 6.096, halfX: 1.829, halfZ: 1.829, moveTime: 1.5 },
+			{ kind: 'lift', x: 4.877, z: 35.662, restY: -2.134, topY: 6.096, halfX: 1.829, halfZ: 1.829, moveTime: 1.5 },
+			{ kind: 'lift', x: -22.555, z: 53.950, restY: -2.439, topY: 5.791, halfX: 1.829, halfZ: 1.829, moveTime: 1.5 },
 		]
 	})
 
@@ -551,6 +584,10 @@ const dm_somnus = mesh({
 		id: 'dm_somnus',
 		name: 'DM-Somnus',
 		mode: 'FFA',
+		// SKY VARIANT (client/graphics/BABYLONRenderer.js SKY_VARIANTS): Morpheus' open
+		// tower tops show more sky than anything else in the rotation, so it gets the
+		// oversized Jupiter (no moon). ?sky=<name> overrides per-session for a compare.
+		sky: 'jupiter',
 		dir: '/assets/maps/DM-Somnus/',
 		file: 'DM-Somnus.obj',
 		lights: 'DM-Somnus.lights.json',
@@ -813,7 +850,134 @@ const dm_baroque = mesh({
 
 // The runtime registry. Add mesh maps here (or via registerMap at boot); the DEFAULT is
 // CTF-Visage so a no-argument GameInstance / client behaves exactly as the live game.
-export const mapRecords = { visage, grove, dm_gantry162, dom_elder, dm_somnus, dm_baroque }
+// DM-Hex][ (UT original DM-Curse][) — imported DM. killY nav-gated (margin 11.02 m world);
+// winding sign 1; longest sightline 0.0 m (default fog OK — no per-map fogDensity).
+// Isolation: kept 3365 faces, dropped 31 detached (margin 32 m).
+const dm_hex2 = mesh({
+		id: 'dm_hex2',
+		name: 'DM-Hex][',
+		mode: 'DM',
+		dir: '/assets/maps/DM-Hex][/',
+		file: 'DM-Hex][.obj',
+		lights: 'DM-Hex][.lights.json',
+		killY: -20,
+		spawns: [
+			{ x: 10.842, y: 3.048, z: -8.763 },
+			{ x: 27.728, y: 7.315, z: -9.783 },
+			{ x: 5.952, y: 7.925, z: -25.484 },
+			{ x: -7.327, y: 3.048, z: -16.416 },
+			{ x: -5.767, y: -1.829, z: 6.147 },
+			{ x: 11.746, y: 3.048, z: -24.416 },
+			{ x: 21.488, y: -2.438, z: -7.667 },
+			{ x: -7.408, y: 7.925, z: 1.604 },
+			{ x: -35.974, y: 0, z: -8.538 },
+			{ x: -19.162, y: -3.048, z: 2.083 },
+			{ x: 19.257, y: 10.973, z: -22.499 }
+		],
+		walkable: { minX: -39.7, maxX: 30.5, minY: -20, maxY: 16.5, minZ: -36.6, maxZ: 6.8 },
+		mega: { x: -31.258, y: 1.829, z: -18.589 },
+		mode_data: { teams: 2 },
+		SPAWN_POINTS: [
+			{ x: 10.842, y: 3.048, z: -8.763, yaw: 269.34, team: 0, team_source: 'derived_2means', headroom: 2.13 },
+			{ x: 27.728, y: 7.315, z: -9.783, yaw: 181.32, team: 0, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: 5.952, y: 7.925, z: -25.484, yaw: 138.43, team: 0, team_source: 'derived_2means', headroom: 2.52 },
+			{ x: -7.327, y: 3.048, z: -16.416, yaw: 270.09, team: 1, team_source: 'derived_2means', headroom: 6.49 },
+			{ x: -5.767, y: -1.829, z: 6.147, yaw: 270.44, team: 1, team_source: 'derived_2means', headroom: 2.13 },
+			{ x: 11.746, y: 3.048, z: -24.416, yaw: 180.35, team: 0, team_source: 'derived_2means', headroom: 2.13 },
+			{ x: 21.488, y: -2.438, z: -7.667, yaw: 179.87, team: 0, team_source: 'derived_2means', headroom: 2.25 },
+			{ x: -7.408, y: 7.925, z: 1.604, yaw: 325.72, team: 1, team_source: 'derived_2means', headroom: 2.52 },
+			{ x: -35.974, y: 0, z: -8.538, yaw: 312.01, team: 1, team_source: 'derived_2means', headroom: 2.92 },
+			{ x: -19.162, y: -3.048, z: 2.083, yaw: 303.05, team: 1, team_source: 'derived_2means', headroom: 3.32 },
+			{ x: 19.257, y: 10.973, z: -22.499, yaw: 177.76, team: 0, team_source: 'derived_2means', headroom: 15 }
+		],
+		PICKUPS: {
+			weapon: [
+				{ x: 22.51, z: 0.551, y: 3.336, class: 'minigun2', item: 'minigun', tag: 'minigun2' },
+				{ x: -2.175, z: -16.817, y: 8.422, class: 'ShockRifle', item: 'shock_rifle', tag: 'ShockRifle' },
+				{ x: -11.625, z: -26.189, y: 1.05, class: 'UT_FlakCannon', item: 'flak_cannon', tag: 'UT_FlakCannon' },
+				{ x: 5.488, z: 3.903, y: 3.278, class: 'UT_Eightball', item: 'rocket_launcher', tag: 'UT_Eightball' },
+				{ x: -5.814, z: -4.391, y: -1.979, class: 'ripper', tag: 'ripper' },
+				{ x: -17.085, z: -12.218, y: 3.336, class: 'SniperRifle', item: 'sniper_rifle', yaw: 0, tag: 'SniperRifle' },
+				{ x: -3.547, z: -34.867, y: 3.412, class: 'ut_biorifle', item: 'bio_rifle', tag: 'ut_biorifle' },
+				{ x: 12.968, z: -7.66, y: -1.77, class: 'PulseGun', item: 'pulse_gun', tag: 'PulseGun' }
+			],
+			ammo: [
+				{ x: 11.674, z: -19.824, y: 3.221, class: 'bioammo', item: 'bio_ammo', yaw: 69.08, tag: 'bioammo' },
+				{ x: 11.749, z: -19.203, y: 3.221, class: 'bioammo', item: 'bio_ammo', yaw: 317.02, tag: 'bioammo' },
+				{ x: 22.579, z: -8.09, y: 3.346, class: 'Miniammo', item: 'minigun_ammo', yaw: 202.15, tag: 'Miniammo' },
+				{ x: 22.495, z: -7.147, y: 3.346, class: 'Miniammo', item: 'minigun_ammo', tag: 'Miniammo' },
+				{ x: -10.685, z: -16.475, y: 8.384, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: -11.205, z: -16.464, y: 8.384, class: 'ShockCore', item: 'shock_core', tag: 'ShockCore' },
+				{ x: -3.951, z: 6.043, y: -1.617, class: 'flakammo', item: 'flak_shells', tag: 'flakammo' },
+				{ x: -7.673, z: 6.086, y: -1.598, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: 9.404, z: -0.018, y: 3.374, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: -3.928, z: -6.075, y: -1.884, class: 'BladeHopper', item: 'ripper_blades', yaw: 264.29, tag: 'BladeHopper' },
+				{ x: -7.695, z: -6.069, y: -1.884, class: 'BladeHopper', item: 'ripper_blades', tag: 'BladeHopper' },
+				{ x: -21.912, z: -15.899, y: 0.707, class: 'BulletBox', item: 'bullets', tag: 'BulletBox' },
+				{ x: -21.867, z: -8.579, y: 0.707, class: 'BulletBox', item: 'bullets', yaw: 65.43, tag: 'BulletBox' },
+				{ x: -2.247, z: -5.629, y: 15.47, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: -2.247, z: -27.736, y: 15.47, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: -11.988, z: -16.541, y: 15.432, class: 'BulletBox', item: 'bullets', tag: 'BulletBox' },
+				{ x: 7.665, z: -16.536, y: 15.433, class: 'BulletBox', item: 'bullets', tag: 'BulletBox' },
+				{ x: -12.19, z: -20.181, y: 0.821, class: 'flakammo', item: 'flak_shells', yaw: 267.76, tag: 'flakammo' },
+				{ x: -12.251, z: -21.053, y: 0.821, class: 'flakammo', item: 'flak_shells', yaw: 304.19, tag: 'flakammo' },
+				{ x: -22.599, z: -30.336, y: 2.669, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' },
+				{ x: -21.37, z: -30.419, y: 2.65, class: 'flakammo', item: 'flak_shells', tag: 'flakammo' },
+				{ x: -21.496, z: -29.536, y: 2.631, class: 'BulletBox', item: 'bullets', yaw: 304.32, tag: 'BulletBox' },
+				{ x: -22.559, z: -29.345, y: 2.65, class: 'Miniammo', item: 'minigun_ammo', yaw: 33.62, tag: 'Miniammo' },
+				{ x: 6.966, z: -16.379, y: 8.155, class: 'PAmmo', item: 'pulse_ammo', tag: 'PAmmo' },
+				{ x: 6.455, z: -16.43, y: 8.155, class: 'PAmmo', item: 'pulse_ammo', tag: 'PAmmo' },
+				{ x: -11.382, z: -1.227, y: 9.965, class: 'flakammo', item: 'flak_shells', tag: 'flakammo' },
+				{ x: -10.391, z: -1.169, y: 10.041, class: 'RocketPack', item: 'rockets', tag: 'RocketPack' }
+			],
+			health: [
+				{ x: -8.922, z: 1.09, y: 9.908, class: 'MedBox', item: 'health_pack', yaw: 269.34, tag: 'MedBox' },
+				{ x: -8.921, z: -0.064, y: 9.908, class: 'MedBox', item: 'health_pack', yaw: 269.34, tag: 'MedBox' },
+				{ x: 11.808, z: -29.638, y: 3.202, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: 11.814, z: -28.781, y: 3.202, class: 'MedBox', item: 'health_pack', tag: 'MedBox' },
+				{ x: -14.744, z: -28.09, y: 2.593, class: 'MedBox', item: 'health_pack', yaw: 269.91, tag: 'MedBox' },
+				{ x: -15.614, z: -28.101, y: 2.593, class: 'MedBox', item: 'health_pack', yaw: 269.47, tag: 'MedBox' },
+				{ x: -2.082, z: -26.201, y: 8.403, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: -1.905, z: -25.603, y: 8.403, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 7.316, z: -33.503, y: 3.602, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 6.718, z: -33.512, y: 3.602, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 2.586, z: -33.508, y: 3.602, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' },
+				{ x: 1.989, z: -33.517, y: 3.602, class: 'HealthVial', item: 'health_vial', tag: 'HealthVial' }
+			],
+			armor: [
+				{ x: 17.155, z: 5.578, y: 7.546, class: 'ut_shieldbelt', item: 'shield_belt', yaw: 319.31, tag: 'ut_shieldbelt' },
+				{ x: -3.556, z: -19.249, y: 1.012, class: 'ThighPads', item: 'thigh_pads', tag: 'ThighPads' }
+			],
+			powerup: [
+				{ x: -31.258, z: -18.589, y: 0.612, class: 'UDamage', item: 'damage_amplifier', tag: 'UDamage' }
+			]
+		},
+		// --- UT-EXTRACTED TELEPORTERS: none. DM-Curse][ ships no Teleporter and no
+		// JumpPad actors (TELEPORTERS 0 / JUMP_PADS 0 in its actors.json) — the map's
+		// vertical traffic is the two lifts below, which is why they matter here.
+		TELEPORTERS: [],
+		// --- UT-EXTRACTED MOVERS (2 lifts, native units) — from
+		// _work/ut-actors/movers/DM-Hex][.movers.json (base key + bbox). Per lift:
+		// x/z = platform centre; restY/topY = the standable SURFACE-TOP native y at the
+		// bottom/top keyframes (= key y + bbox.max.y 0.305); halfX/halfZ = footprint
+		// half-extents. BOTH Curse][ platforms are RECTANGULAR (6.10x2.44 and 4.88x3.05
+		// native), unlike Deck16's square pair — hence halfX/halfZ instead of a single
+		// `half` (server/movers.js falls back to `half` when they are absent, so the
+		// Deck16 rows are untouched). The mover box IS the platform collider, so the
+		// extents have to be the real ones or players walk off a visually-solid edge.
+		// The third mover in the source is the UDamage cage DOOR (kind 'other', a
+		// swing+rise): we do not model doors, and MoverController builds a solid box for
+		// every row it is given, so including it would put a phantom collider next to the
+		// mega. Deliberately omitted — the UDamage is simply reachable.
+		// moveTime: lift 1 carries the source's 1.75 s; lift 2's move_time is null in the
+		// extraction, so it takes UE1's 1.0 s Mover default.
+		MOVERS: [
+			{ kind: 'lift', x: 17.069, z: -18.288, restY: -2.133, topY: 7.621, halfX: 3.048, halfZ: 1.219, moveTime: 1.75 },
+			{ kind: 'lift', x: -8.534, z: -35.052, restY: 3.048, topY: 7.925, halfX: 2.438, halfZ: 1.524, moveTime: 1.0 },
+		]
+	})
+
+export const mapRecords = { visage, grove, dm_gantry162, dom_elder, dm_somnus, dm_baroque, dm_hex2 }
 export const DEFAULT_MAP_ID = 'visage'
 export const mapList = () => Object.values(mapRecords)
 
@@ -848,11 +1012,13 @@ export function mapDisplayName(record) {
 	return String((record && (record.displayName || record.name || record.id)) || '').toUpperCase()
 }
 
-// The rotation itself: all 6 mesh maps. Grove first — it is the current live map, so
-// a fresh state file boots the familiar one. Visage runs real CTF and dom_elder real
+// The rotation itself: all 6 mesh maps. DM-Hex][ (UT's DM-Curse][) leads: it replaced
+// DM-W-Grove, a 2025 community map, with the most iconic stock UT deathmatch map not
+// already in the set (Deck16 -> Gantry16][ and Morpheus -> Somnus were already here).
+// Grove's record + assets stay registered so a direct /map grove still resolves. Visage runs real CTF and dom_elder real
 // DOM now that those modes ship (effectiveMode un-coerces them); the other four stay
 // TDM/FFA. dom_elder re-enters the rotation as its native DOM.
-export const ROTATION = ['grove', 'dm_gantry162', 'dm_somnus', 'dm_baroque', 'visage', 'dom_elder']
+export const ROTATION = ['dm_hex2', 'dm_gantry162', 'dm_somnus', 'dm_baroque', 'visage', 'dom_elder']
 	.map(id => {
 		const rec = mapRecords[id]
 		return {

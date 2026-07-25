@@ -16,6 +16,86 @@ import { applyTextureVariants } from './textureVariants'
 // impact FX off it.
 const VM_LAYER_MASK = 0x10000000
 
+// ---------------------------------------------------------------------------
+// SKY VARIANTS — which world hangs in the void behind the arena. A map picks one
+// with `sky: '<name>'` on its registry record (common/mapRegistry.js); ?sky=<name>
+// in the URL overrides it for a side-by-side. 'earth' is the default and is the
+// original Facing-Worlds vista, unchanged.
+//
+// HARD CONSTRAINT: the world camera's maxZ is 2000, so |pos| + radius must stay
+// under it or the planet gets sliced by the far plane. Each entry below is sized
+// against that budget (the number after each `diameter` is its far-limb distance).
+//
+// Texture note: every map here is EQUIRECTANGULAR, and Babylon's sphere V runs the
+// opposite way, so _buildSkyVariant flips V on all of them (see the Earth fix).
+// Sources: earth/moon from the three.js MIT repo (public-domain NASA imagery);
+// mars = Viking MDIM21 colour mosaic, jupiter = Cassini Dec-2000 cylindrical map
+// (both NASA/JPL/USGS, public domain, downscaled to 2048x1024).
+const SKY_VARIANTS = {
+	// The original: Earth low beyond the west end, its upper limb above the horizon,
+	// day/night terminator from the arena sun, city lights on the dark side.
+	earth: {
+		planet: {
+			name: 'earth', diameter: 1200, pos: [-360, -320, 820], // far limb ~1550
+			yaw: 2.1, tilt: 0.409,                                  // 23.4deg obliquity
+			diffuse: 'earth_day.jpg',
+			specular: 'earth_spec.jpg', specularColor: [0.42, 0.47, 0.58], specularPower: 96,
+			emissive: 'earth_lights.png', emissiveColor: [0.5, 0.45, 0.33],
+		},
+		moon: true,
+	},
+	// MARS, no moon. Smaller and further than Earth so it reads as another world
+	// rather than a re-skin: rust-red, matte (no ocean glint, so no specular map),
+	// no night-side lights — the dark limb genuinely goes black, which is the point.
+	// 25.2deg obliquity. Diffuse is lifted slightly because the Viking mosaic is a
+	// dim albedo map and the arena sun alone leaves it muddy.
+	mars: {
+		planet: {
+			name: 'mars', diameter: 1050, pos: [-380, -300, 860], // far limb ~1500
+			yaw: 2.6, tilt: 0.44,
+			diffuse: 'mars.jpg', diffuseColor: [1.25, 1.15, 1.08],
+			specularColor: [0.06, 0.04, 0.03], specularPower: 24,
+		},
+		moon: false,
+	},
+	// JUPITER, notably larger — it fills a large arc of the sky instead of sitting in
+	// it. Radius 900 at ~1000 away subtends ~42deg vs Earth's ~32deg, and the far limb
+	// lands at ~1900, just inside maxZ. No moon. Gas giant: no specular at all, 3.1deg
+	// obliquity (nearly upright), and a low self-emissive of its own map so the unlit
+	// limb reads as a dim banded edge rather than a hole cut out of the starfield.
+	jupiter: {
+		planet: {
+			name: 'jupiter', diameter: 1800, pos: [-330, -290, 900], // far limb ~1900
+			yaw: 1.2, tilt: 0.055,
+			diffuse: 'jupiter.jpg', diffuseColor: [1.15, 1.1, 1.02],
+			specularColor: [0, 0, 0],
+			emissive: 'jupiter.jpg', emissiveColor: [0.12, 0.1, 0.085],
+		},
+		moon: false,
+	},
+}
+const SKY_DEFAULT = 'earth'
+
+// MOBILE SHADOW LIFT (2026-07-24) — "it's too dark on mobile", after the grade retune
+// had already taken exposure to its ceiling (1.35 on touch; past ~1.4 the sky and light
+// coronas clip). Exposure is a MULTIPLY, so it scales bright and dark together and can
+// never rescue a vertex that baked to near-zero — and the offline bake is aggressive
+// (DM-Hex][: 93% of shadow rays occluded), so interiors carry a lot of near-black verts.
+//
+// This lifts the FLOOR instead: c' = c*(1-k) + k, a lerp toward white that raises the
+// darkest verts by k while barely moving the highlights (1.0 stays 1.0). Applied once at
+// load to the vertex-colour buffer, so it costs nothing per frame. Touch only — a monitor
+// in a dim room keeps the low end that a phone panel in daylight loses, and lifting the
+// desktop grade would flatten the contrast the 1999 light actors are there to provide.
+//
+// Real per-light-actor PointLights are NOT the alternative: StandardMaterial supports ~4
+// simultaneous lights against 61-340 actors per map, which is the whole reason the light
+// actors are baked to vertex colours in the first place (see mapLights.js).
+const MOBILE_SHADOW_LIFT = 0.18
+// ...and the flat map fill goes up in step (it is the constant base the bake modulates).
+const MAP_FILL_INTENSITY = 0.85
+const MAP_FILL_INTENSITY_TOUCH = 1.05
+
 // VIEWMODEL FRAMING (see BABYLONRenderer._applyRenderScale's PORTRAIT FIX v2).
 // VM_FOV_BASE is the authored viewmodel fov — every hand-tuned weapon mount in
 // assetManifest was framed against it at landscape aspect.
@@ -170,6 +250,13 @@ class BABYLONRenderer {
 		// post pipeline (further down) key off the SAME heuristic — a phone must never
 		// disagree with itself about which branch it is on.
 		const isTouch = 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0
+		// Kept on the instance so the map-load path (which runs long after this) applies
+		// the SAME touch branch — see MOBILE_SHADOW_LIFT / MAP_FILL_INTENSITY_TOUCH.
+		// ?mobilelight=1 forces the mobile lighting branch on a desktop browser so the
+		// lift can be compared side-by-side (and measured headlessly) without a phone.
+		let forceMobileLight = false
+		try { forceMobileLight = new URLSearchParams(location.search).get('mobilelight') === '1' } catch (e) {}
+		this._isTouch = isTouch || forceMobileLight
 
 		// filmic punch: tone mapping + contrast + a dark vignette. Material-level
 		// image processing (no post-process pass), so it costs nothing extra on
@@ -339,43 +426,11 @@ class BABYLONRenderer {
 		const skyMesh = this.skydome && this.skydome.mesh
 		if (skyMesh) skyMesh.applyFog = false
 
-		// EARTH — big, low, beyond the west end; its upper limb looms above the horizon.
-		// Day side lit by the sun (real terminator from the directional light); night
-		// city-lights glow via a toned emissive map (bright day diffuse keeps them subtle
-		// on the lit side — cheap-but-convincing until Kimi's terminator shader lands).
-		const earth = BABYLON.MeshBuilder.CreateSphere('earth', { diameter: 1200, segments: 64 }, this.scene)
-		earth.position.set(-360, -320, 820)
-		earth.rotation.y = 2.1
-		earth.applyFog = false
-		earth.isPickable = false
-		const earthMat = new BABYLON.StandardMaterial('earthMat', this.scene)
-		// real NASA-derived satellite day map (three.js MIT repo, public-domain imagery)
-		earthMat.diffuseTexture = new BABYLON.Texture('/assets/space/earth_day.jpg', this.scene)
-		// specular mask: oceans glint, landmasses stay matte
-		earthMat.specularTexture = new BABYLON.Texture('/assets/space/earth_spec.jpg', this.scene)
-		earthMat.specularColor = new BABYLON.Color3(0.42, 0.47, 0.58)
-		earthMat.specularPower = 96
-		// night-side city lights
-		earthMat.emissiveTexture = new BABYLON.Texture('/assets/space/earth_lights.png', this.scene)
-		earthMat.emissiveColor = new BABYLON.Color3(0.5, 0.45, 0.33)
-		earth.material = earthMat
-
-		// MOON — big and high in the black so it's caught from many sightlines, lit by
-		// the same sun as the Earth + arena.
-		const moon = BABYLON.MeshBuilder.CreateSphere('moon', { diameter: 420, segments: 32 }, this.scene)
-		moon.position.set(300, 700, -250)
-		moon.applyFog = false
-		moon.isPickable = false
-		const moonMat = new BABYLON.StandardMaterial('moonMat', this.scene)
-		moonMat.diffuseTexture = new BABYLON.Texture('/assets/space/moon.jpg', this.scene)
-		moonMat.diffuseColor = new BABYLON.Color3(1.6, 1.6, 1.65) // overbright the sunlit face
-		// self-illuminate: the raw lunar albedo map is very dark, so drive the texture
-		// through emissive too — the Moon reads as a bright disc against the black void
-		// instead of a dim smudge, while the emissive texture keeps the crater detail.
-		moonMat.emissiveTexture = new BABYLON.Texture('/assets/space/moon.jpg', this.scene)
-		moonMat.emissiveColor = new BABYLON.Color3(0.9, 0.9, 0.95)
-		moonMat.specularColor = new BABYLON.Color3(0, 0, 0)
-		moon.material = moonMat
+		// PLANET + MOON come from a SKY VARIANT (see SKY_VARIANTS at the bottom of this
+		// file). Which one a map flies over is the `sky` field on its registry record
+		// (common/mapRegistry.js); ?sky=<name> in the URL overrides it for a side-by-side,
+		// same convention as ?armor=0. Unknown/absent -> 'earth', the original vista.
+		this._buildSkyVariant(map)
 
 		// --- distance fog: dark slate, subtle. LINEAR fogStart 22 / fogEnd 78 was
 		// tried (2026-07-17) and reverted — in a ~60u arena it buried most of the view
@@ -588,6 +643,85 @@ class BABYLONRenderer {
 	// Load the artist OBJ map as the level visual (mesh maps): textured via the MTL
 	// (web-optimized WebP set in this.map.dir/textures/), lit by the original 1999
 	// light actors baked into vertex colors. Server owns collision.
+	// Build the space vista for this map's SKY VARIANT (see SKY_VARIANTS). Resolution
+	// order: ?sky=<name> in the URL (side-by-side override) -> the map record's `sky`
+	// field -> 'earth'. An unknown name falls back to 'earth' rather than rendering an
+	// empty void, so a typo in a registry record can never ship a black sky.
+	// Everything built here is fog-off, shadow-off, non-pickable sky dressing.
+	_buildSkyVariant(map) {
+		let want = null
+		try {
+			want = new URLSearchParams(location.search).get('sky')
+		} catch (e) { /* no location (tests/headless) — fall through to the record */ }
+		if (!want) want = (map && map.sky) || null
+		const key = (want && SKY_VARIANTS[want]) ? want : SKY_DEFAULT
+		if (want && !SKY_VARIANTS[want]) console.warn(`[sky] unknown variant '${want}' — using ${SKY_DEFAULT}`)
+		const variant = SKY_VARIANTS[key]
+		this.skyVariant = key
+
+		const p = variant.planet
+		const planet = BABYLON.MeshBuilder.CreateSphere(p.name, { diameter: p.diameter, segments: 64 }, this.scene)
+		planet.position.set(p.pos[0], p.pos[1], p.pos[2])
+		// rotation.y spins the globe to choose which face we see; rotation.z is the AXIAL
+		// TILT. A world standing bolt upright reads as a prop — the real obliquity is what
+		// sells it as a planet. We look at it roughly along +Z, so a Z rotation tilts the
+		// poles within the screen plane, where the tilt is actually visible.
+		planet.rotation.y = p.yaw
+		planet.rotation.z = p.tilt
+		planet.applyFog = false
+		planet.isPickable = false
+
+		const mat = new BABYLON.StandardMaterial(p.name + 'Mat', this.scene)
+		const maps = []
+		mat.diffuseTexture = new BABYLON.Texture('/assets/space/' + p.diffuse, this.scene)
+		maps.push(mat.diffuseTexture)
+		if (p.diffuseColor) mat.diffuseColor = new BABYLON.Color3(...p.diffuseColor)
+		if (p.specular) {
+			mat.specularTexture = new BABYLON.Texture('/assets/space/' + p.specular, this.scene)
+			maps.push(mat.specularTexture)
+		}
+		if (p.specularColor) mat.specularColor = new BABYLON.Color3(...p.specularColor)
+		if (p.specularPower != null) mat.specularPower = p.specularPower
+		if (p.emissive) {
+			mat.emissiveTexture = new BABYLON.Texture('/assets/space/' + p.emissive, this.scene)
+			maps.push(mat.emissiveTexture)
+			mat.emissiveColor = new BABYLON.Color3(...(p.emissiveColor || [1, 1, 1]))
+		}
+		// UPSIDE-DOWN FIX (2026-07-24): Babylon's sphere V runs the opposite way to an
+		// equirectangular map's, so the raw texture rendered the planet flipped
+		// north-for-south — Africa's Sahara at the BOTTOM, the Cape at the TOP (verified in
+		// scripts/shot-earth.mjs renders). Flip V rather than rolling the mesh 180deg: a
+		// mesh roll would spin the visible face in the screen plane and leave the poles
+		// swapped, while the V flip fixes the actual mapping. EVERY map on the material
+		// must be flipped identically or the city lights and the ocean specular mask land
+		// on the wrong hemisphere — hence the collected `maps` list.
+		for (const t of maps) { t.vScale = -1; t.vOffset = 1 }
+		planet.material = mat
+		this.skyPlanet = planet
+
+		if (!variant.moon) return
+		// MOON — big and high in the black so it's caught from many sightlines, lit by
+		// the same sun as the planet + arena.
+		const moon = BABYLON.MeshBuilder.CreateSphere('moon', { diameter: 420, segments: 32 }, this.scene)
+		moon.position.set(300, 700, -250)
+		moon.applyFog = false
+		moon.isPickable = false
+		const moonMat = new BABYLON.StandardMaterial('moonMat', this.scene)
+		moonMat.diffuseTexture = new BABYLON.Texture('/assets/space/moon.jpg', this.scene)
+		moonMat.diffuseColor = new BABYLON.Color3(1.6, 1.6, 1.65) // overbright the sunlit face
+		// self-illuminate: the raw lunar albedo map is very dark, so drive the texture
+		// through emissive too — the Moon reads as a bright disc against the black void
+		// instead of a dim smudge, while the emissive texture keeps the crater detail.
+		moonMat.emissiveTexture = new BABYLON.Texture('/assets/space/moon.jpg', this.scene)
+		moonMat.emissiveColor = new BABYLON.Color3(0.9, 0.9, 0.95)
+		moonMat.specularColor = new BABYLON.Color3(0, 0, 0)
+		// same sphere-V flip as the planet above — the Moon map is equirectangular too, so
+		// without it the near side renders inverted (Mare Imbrium down instead of up).
+		for (const t of [moonMat.diffuseTexture, moonMat.emissiveTexture]) { t.vScale = -1; t.vOffset = 1 }
+		moon.material = moonMat
+		this.skyMoon = moon
+	}
+
 	_loadMeshMap() {
 		// Babylon 9's OBJ loader default-mirrors X vs 4.0.3 (USE_LEGACY_BEHAVIOR now
 		// defaults false); spawns/killY/lights are calibrated on the legacy orientation,
@@ -625,7 +759,9 @@ class BABYLONRenderer {
 				mapFill.diffuse = new BABYLON.Color3(1, 1, 1)
 				mapFill.groundColor = new BABYLON.Color3(1, 1, 1)
 				mapFill.specular = new BABYLON.Color3(0, 0, 0)
-				mapFill.intensity = 0.85
+				// touch panels lose the low end that a monitor keeps — the fill is the
+				// constant base the vertex bake modulates, so it moves with the shadow lift.
+				mapFill.intensity = this._isTouch ? MAP_FILL_INTENSITY_TOUCH : MAP_FILL_INTENSITY
 				mapFill.includedOnlyMeshes = res.meshes.filter(m => m.getTotalVertices && m.getTotalVertices() > 0)
 				// texture pop (hex-tile stochastic diffuse + detail grunge) on the
 				// map materials ONLY — before any freeze; ?flat=1 / touch gated inside.
@@ -651,6 +787,21 @@ class BABYLONRenderer {
 				this._addTeleporterMarkers(res.meshes)
 			})
 			.catch(err => console.warn('[map] mesh visual load failed', err))
+	}
+
+	// Raise the FLOOR of a baked vertex-colour buffer on touch devices (see
+	// MOBILE_SHADOW_LIFT): c' = c*(1-k) + k, in place, alpha untouched. Applied to BOTH
+	// bake paths (offline sidecar and the runtime fallback) so a phone gets the same
+	// readable low end either way. No-op on desktop, so this is one branch per map load.
+	_liftShadows(cols) {
+		if (!this._isTouch || !cols) return cols
+		const k = MOBILE_SHADOW_LIFT, inv = 1 - k
+		for (let i = 0; i < cols.length; i += 4) {
+			cols[i] = cols[i] * inv + k
+			cols[i + 1] = cols[i + 1] * inv + k
+			cols[i + 2] = cols[i + 2] * inv + k
+		}
+		return cols
 	}
 
 	// Fetch the map's light-actor sidecar and bake it into vertex colors. Vertex
@@ -689,7 +840,7 @@ class BABYLONRenderer {
 							cols[v * 4 + 2] = bytes[v * 3 + 2] / 255
 							cols[v * 4 + 3] = 1
 						}
-						lit[i].setVerticesData(BABYLON.VertexBuffer.ColorKind, cols)
+						lit[i].setVerticesData(BABYLON.VertexBuffer.ColorKind, this._liftShadows(cols))
 					})
 					usedBaked = true
 					this._vertexlightApplied = true // headless verify hook (_verify-map-cycle.mjs)
@@ -703,7 +854,7 @@ class BABYLONRenderer {
 					const pos = m.getVerticesData(BABYLON.VertexBuffer.PositionKind)
 					const nor = m.getVerticesData(BABYLON.VertexBuffer.NormalKind)
 					if (!pos || !nor) return
-					m.setVerticesData(BABYLON.VertexBuffer.ColorKind, bakeVertexColors(pos, nor, data.lights))
+					m.setVerticesData(BABYLON.VertexBuffer.ColorKind, this._liftShadows(bakeVertexColors(pos, nor, data.lights)))
 					baked++
 				})
 				console.log(`[map] baked ${data.lights.length} light actors into ${baked} meshes`)

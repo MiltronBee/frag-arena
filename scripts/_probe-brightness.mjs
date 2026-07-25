@@ -111,7 +111,7 @@ try {
 		const bakeLogs = []
 		page.on('pageerror', e => errors.push(e.message))
 		page.on('console', m => { const t = m.text(); if (/\[map\].*(bake|vertex-light)/i.test(t)) bakeLogs.push(t) })
-		await page.goto(`http://localhost:${VITE_PORT}/`, { waitUntil: 'domcontentloaded' })
+		await page.goto(`http://localhost:${VITE_PORT}/` + (process.env.MOBILELIGHT === '1' ? '?mobilelight=1' : ''), { waitUntil: 'domcontentloaded' })
 		await page.waitForFunction(
 			'window.gameClient && window.gameClient.simulator && window.gameClient.simulator._connectionState === "connected"',
 			{ timeout: 45000 })
