@@ -547,10 +547,30 @@
              The tiny inline script below (zero-dep, pre-bundle) re-shows it on the
              rejoin boot so the whole cycle reads as one continuous loading screen.
              The spinner is pure CSS: three staggered-pulse "8" segment cells. -->
+        <!-- MAP-ROTATION INTERSTITIAL. Two states, both driven by Simulator:
+             .mc-visible          = LOADING — "CHANGING MAP", shown across the reload.
+             .mc-visible.mc-ready = READY   — names the incoming map/mode and waits for
+                                    a click on #mc-drop.
+             The READY state exists because the rotation restarts the server, so the
+             client has to reload the page — which drops BOTH browser fullscreen and
+             pointer lock, neither of which can be restored without a fresh user
+             gesture. Auto-entering therefore dropped the player into a live match,
+             windowed, with a mouse that didn't turn the view. #mc-drop IS that
+             gesture: one click re-enters fullscreen (if we were in it before the
+             rotation), takes pointer lock, and deploys. -->
         <section id="map-change" aria-hidden="true">
             <div class="mc-title">CHANGING MAP</div>
             <div class="mc-seg" aria-hidden="true"><span>8</span><span>8</span><span>8</span></div>
             <div class="mc-sub">REJOINING ARENA…</div>
+            <div class="mc-next" aria-hidden="true">
+                <div class="mc-next-label">NEXT MAP</div>
+                <div id="mc-map-name" class="mc-map-name">—</div>
+                <div id="mc-mode-name" class="mc-mode-name">—</div>
+            </div>
+            <button id="mc-drop" type="button" class="mc-drop">
+                <span class="mc-drop-label">DROP IN</span>
+                <span id="mc-drop-hint" class="mc-drop-hint">CLICK TO DEPLOY</span>
+            </button>
         </section>
 
         <!-- SPLASH: console-style partner boot cards (Part A). A sequence of "POWERED

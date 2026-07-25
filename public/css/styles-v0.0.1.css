@@ -3660,6 +3660,64 @@ body.arena-entered #arena-hud::before {
     background: radial-gradient(circle at 50% 46%, #090C10 0%, var(--x30-void) 70%);
 }
 #map-change.mc-visible { display: flex; }
+
+/* ---- rotation interstitial: LOADING vs READY (see #map-change in index.html) ----
+   The next-map block and the DROP IN plate exist only in the READY state; the
+   loading spinner/segments only in LOADING. One overlay, two honest states, instead
+   of a loading screen that silently turned into a live match. ---- */
+#map-change .mc-next,
+#map-change .mc-drop { display: none; }
+#map-change.mc-ready .mc-next { display: block; text-align: center; }
+#map-change.mc-ready .mc-drop { display: inline-flex; }
+#map-change.mc-ready .mc-seg,
+#map-change.mc-ready .mc-sub { display: none; }
+#map-change.mc-ready .mc-title { opacity: 0.6; font-size: 0.8em; letter-spacing: 0.28em; }
+
+#map-change .mc-next-label {
+    font-size: 12px;
+    letter-spacing: 0.3em;
+    color: var(--x30-ink-low);
+    margin-bottom: 6px;
+}
+#map-change .mc-map-name {
+    font-family: var(--font-display, inherit);
+    font-size: clamp(28px, 6vw, 54px);
+    line-height: 1.05;
+    letter-spacing: 0.04em;
+    color: var(--x30-ink);
+}
+#map-change .mc-mode-name {
+    margin-top: 4px;
+    font-size: 14px;
+    letter-spacing: 0.22em;
+    color: var(--x30-accent);
+}
+#map-change .mc-drop {
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin-top: 8px;
+    padding: 16px 44px;
+    border: none;
+    border-radius: var(--x30-r-2, 6px);
+    background: var(--x30-accent);
+    color: var(--x30-void, #05070A);
+    cursor: pointer;
+    font-family: var(--font-display, inherit);
+    box-shadow: var(--x30-el-2, 0 6px 24px rgba(0, 0, 0, 0.5));
+    transition: transform 120ms var(--ease-snap, ease), filter 120ms ease;
+    /* the card sits over a live scene — make sure the plate is the click target */
+    pointer-events: auto;
+    z-index: 4;
+}
+#map-change .mc-drop:hover { filter: brightness(1.08); }
+#map-change .mc-drop:active { transform: scale(0.97); }
+#map-change .mc-drop:focus-visible { outline: 3px solid var(--x30-ink); outline-offset: 3px; }
+#map-change .mc-drop-label { font-size: 26px; letter-spacing: 0.1em; }
+#map-change .mc-drop-hint { font-size: 11px; letter-spacing: 0.2em; opacity: 0.72; }
+@media (prefers-reduced-motion: reduce) {
+    #map-change .mc-drop { transition: none; }
+}
 .mc-title {
     font-family: var(--x30-font-display);
     font-weight: 700;

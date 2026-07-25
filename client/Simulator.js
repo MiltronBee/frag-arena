@@ -2426,41 +2426,27 @@ class Simulator {
 			if (status.textContent !== text) status.textContent = text
 		}
 
-		// REJOIN AUTO-ENTER: gates just opened on a map-rotation reload — go straight
-		// in (the CHANGING MAP interstitial has covered the whole boot). Deferred a
-		// tick so entry state changes never re-enter this method mid-run.
+		// REJOIN READY: gates just opened on a map-rotation reload. This used to call
+		// _autoEnterArena() and drop the player straight into the live match — but the
+		// reload has already cost us browser fullscreen AND pointer lock, and neither
+		// can be taken back without a user gesture, so "instant play" actually meant
+		// "spawned into combat, windowed, mouse not turning the view". Show the READY
+		// card and let one click do all three (fullscreen, lock, deploy) instead.
+		// Deferred a tick so entry state changes never re-enter this method mid-run.
 		if (ready && this._rejoin && !this._arenaEntered) {
 			this._rejoin = false
-			setTimeout(() => this._autoEnterArena(), 0)
+			setTimeout(() => this._showMapChangeReady(), 0)
 		}
 	}
 
-	// Programmatic arena entry for the map-rotation rejoin path. No user gesture is
-	// available here, so desktop CANNOT requestPointerLock — instead we flip the
-	// arena state directly (the touch branch of _enterArena already works this way)
-	// and InputSystem's document pointerdown auto-locks on the first click, because
-	// body.arena-entered is set. Clears the rejoin flag + retry counter (a success).
-	_autoEnterArena() {
-		try {
-			sessionStorage.removeItem('fa-rejoin')
-			sessionStorage.removeItem('fa-rejoin-tries')
-		} catch (e) {}
-		document.body.classList.remove('fa-rejoin')
-		this._pendingPlay = false
-		// MENU SAFETY: the rotation auto-rejoin must auto-REDEPLOY too — same
-		// server handshake as the PLAY click, no gesture needed for a command.
-		this.requestDeploy()
-		this._arenaEntered = true
-		document.body.classList.add('arena-entered')
-		if (this._intrusionFeed) this._intrusionFeed.stop()
-		this._closeSettings()
-		const overlay = document.getElementById('entry-overlay')
-		if (overlay) overlay.classList.remove('is-visible')
-		const mc = document.getElementById('map-change')
-		if (mc) mc.classList.remove('mc-visible')
-		// silent until the next gesture unlocks audio (standard autoplay rules)
-		this.music.play('match')
-	}
+	// REMOVED (2026-07-25): _autoEnterArena() — the gesture-less rotation entry.
+	// It deployed the player into the live match programmatically, which meant no
+	// pointer lock on desktop (its own comment admitted this) and no way back into
+	// fullscreen, so a rotation handed you a windowed screen and a mouse that didn't
+	// turn the view while you were already being shot at. The rotation now ends on the
+	// READY card (_showMapChangeReady) and entry goes through the SAME _enterArena()
+	// path as a PLAY click, from a real gesture. If a future caller needs programmatic
+	// entry, resist re-adding this: the missing pointer lock is not a detail.
 
 	// Socket dropped AFTER the player entered the arena: treat it as a map rotation.
 	// Show the fullscreen CHANGING MAP interstitial, flag the reload for rejoin, and
@@ -2477,9 +2463,99 @@ class Simulator {
 			sessionStorage.setItem('fa-rejoin-tries', String(tries + 1))
 		} catch (e) { return } // no sessionStorage → plain menu fallback
 		this._rejoinPending = true
+		// Remember whether we were in BROWSER FULLSCREEN so the post-reload drop-in
+		// click can put us back. The Fullscreen API is dropped by the navigation and
+		// can only be re-entered from a user gesture, so this flag is the only way the
+		// next page load knows it owes the player a fullscreen restore.
+		try {
+			const wasFs = !!(document.fullscreenElement || document.webkitFullscreenElement)
+			sessionStorage.setItem('fa-was-fullscreen', wasFs ? '1' : '0')
+		} catch (e) {}
 		const mc = document.getElementById('map-change')
-		if (mc) mc.classList.add('mc-visible')
+		if (mc) {
+			mc.classList.remove('mc-ready') // LOADING state across the reload
+			mc.classList.add('mc-visible')
+		}
 		setTimeout(() => location.reload(), 2500)
+	}
+
+	// Rotation reload has finished loading and the gates are open: switch the
+	// interstitial from LOADING to READY and wait for a real click instead of
+	// auto-entering. See the #map-change comment in index.html for why the gesture is
+	// mandatory rather than merely nicer (fullscreen + pointer lock both need one).
+	_showMapChangeReady() {
+		if (this._mcReadyShown) return
+		this._mcReadyShown = true
+		const mc = document.getElementById('map-change')
+		if (!mc) { this._dropInFromRotation(); return } // no overlay → don't strand the player
+		mc.classList.add('mc-visible', 'mc-ready')
+
+		// Name the map we just loaded. /mapinfo is the same endpoint the menu's NOW
+		// PLAYING readout polls; a failure just leaves the placeholder dashes.
+		const url = location.protocol === 'https:'
+			? `https://${location.host}/mapinfo`
+			: `http://${location.hostname}:8078/mapinfo`
+		fetch(url, { cache: 'no-store' })
+			.then(r => (r.ok ? r.json() : null))
+			.then(info => {
+				if (!info) return
+				const n = document.getElementById('mc-map-name')
+				const m = document.getElementById('mc-mode-name')
+				if (n && info.mapName) n.textContent = info.mapName
+				if (m && info.modeName) m.textContent = info.modeName
+			})
+			.catch(() => {})
+
+		// Touch devices have no pointer lock and usually no fullscreen affordance —
+		// keep the wording honest per platform.
+		const hint = document.getElementById('mc-drop-hint')
+		if (hint) hint.textContent = this.isTouch ? 'TAP TO DEPLOY' : 'CLICK TO DEPLOY'
+
+		const drop = document.getElementById('mc-drop')
+		if (drop) {
+			drop.addEventListener('click', () => this._dropInFromRotation(), { once: true })
+			try { drop.focus({ preventScroll: true }) } catch (e) {}
+		}
+		// Enter/Space anywhere also drops in — a keypress is just as valid a gesture as
+		// a click for fullscreen + pointer lock, and it keeps hands-on-keyboard players
+		// from having to reach for the mouse mid-rotation.
+		this._mcKeyHandler = (e) => {
+			if (e.key !== 'Enter' && e.key !== ' ' && e.code !== 'Space') return
+			e.preventDefault()
+			this._dropInFromRotation()
+		}
+		window.addEventListener('keydown', this._mcKeyHandler)
+	}
+
+	// THE drop-in gesture. Restores fullscreen if the rotation took it away, then runs
+	// the normal manual entry path (_enterArena → pointer lock + deploy), so a rotation
+	// entry is byte-identical to a PLAY click instead of a special half-state.
+	_dropInFromRotation() {
+		if (this._arenaEntered) return
+		if (this._mcKeyHandler) {
+			window.removeEventListener('keydown', this._mcKeyHandler)
+			this._mcKeyHandler = null
+		}
+		// fullscreen FIRST, inside the gesture — requestFullscreen must be called
+		// synchronously from the user event or the browser rejects it.
+		let wantFs = false
+		try { wantFs = sessionStorage.getItem('fa-was-fullscreen') === '1' } catch (e) {}
+		if (wantFs && !document.fullscreenElement) {
+			const el = document.documentElement
+			const req = el.requestFullscreen || el.webkitRequestFullscreen
+			// Never let a rejected fullscreen promise stop the player from entering.
+			if (req) { try { const p = req.call(el); if (p && p.catch) p.catch(() => {}) } catch (e) {} }
+		}
+		try {
+			sessionStorage.removeItem('fa-was-fullscreen')
+			sessionStorage.removeItem('fa-rejoin')
+			sessionStorage.removeItem('fa-rejoin-tries')
+		} catch (e) {}
+		this._rejoin = false
+		document.body.classList.remove('fa-rejoin')
+		const mc = document.getElementById('map-change')
+		if (mc) mc.classList.remove('mc-visible', 'mc-ready')
+		this._enterArena()
 	}
 
 	// Abandon the rejoin auto-path: clear the flag/counter and let the normal menu
