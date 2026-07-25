@@ -710,7 +710,7 @@
              that tap is the AUDIO UNLOCK (resumes WebAudio + starts ARENA SIGNAL, the
              queued 'menu' theme) and a user gesture is the only thing a browser will
              accept to start sound. The tap STARTS the reel; cards 2–5 then self-advance
-             (~1.2s each) with music already playing, and a tap on any of THOSE skips to
+             (~1.8s each) with music already playing, and a tap on any of THOSE skips to
              the menu. After
              the last card the splash dismisses like before (fade out, remove node, set
              body.menu-reveal so the menu's staggered rise-in plays). Loading runs behind
@@ -998,7 +998,11 @@
 
         var cards = splash.querySelectorAll('.splash-card')
         var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        var AUTO_MS = reduced ? 900 : 1200
+        // Dwell per partner card. 1200 was too quick to actually READ a logo before it
+        // crossfaded — each card now gets most of two seconds. Reduced-motion keeps a
+        // shorter dwell but still over a second: that preference is about MOTION, not
+        // about being rushed, and the crossfade is what it suppresses.
+        var AUTO_MS = reduced ? 1200 : 1800
         // (the gate card no longer runs on a timer — it waits for the tap. The ident's
         // 222ms beat + 1500ms grow-in then pulses under the prompt for as long as it
         // takes.)
