@@ -1,11 +1,11 @@
 import nengi from 'nengi'
-import nengiConfig from '../common/nengiConfig'
+import nengiConfig, { INTERP_DELAY_MS } from '../common/nengiConfig'
 import Simulator from './Simulator'
 import niceClientExtension from './niceClientExtension'
 
 class GameClient {
 	constructor() {
-		this.client = new nengi.Client(nengiConfig, 100)
+		this.client = new nengi.Client(nengiConfig, INTERP_DELAY_MS)
 		this.client.factory = {}
 		niceClientExtension(this.client)// API EXTENSION
 		this.simulator = new Simulator(this.client)

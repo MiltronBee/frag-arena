@@ -27,6 +27,22 @@ import Mover from './entity/Mover'
 import ObjectiveEvent from './message/ObjectiveEvent'
 import QueueStatus from './message/QueueStatus'
 
+// CLIENT INTERPOLATION DELAY (ms). How far in the past remote entities are drawn,
+// so a late/lost snapshot has buffer to be covered by.
+//
+// THIS IS A LATENCY BUDGET: every ms here is a ms of visible lag on every enemy,
+// AND a ms the server must rewind to judge a shot (GameInstance.performShot adds it
+// to the RTT). It was 100 — four whole snapshots at 40Hz, far more buffer than a
+// 40Hz feed needs. 50 is two snapshots, the usual competitive floor: it removes
+// 50ms of enemy lag AND 50ms of "he shot me behind cover" in one move.
+//
+// It lived as a bare literal in TWO files (client/GameClient.js and
+// server/GameInstance.js) with nothing tying them together — change one and every
+// hitscan in the game silently mis-rewinds by the difference. Both now read this.
+// TRADEOFF: less buffer to absorb jitter/loss, so remote motion can micro-stutter on
+// a bad link where 100ms would have smoothed it. Raise it back if that shows up.
+export const INTERP_DELAY_MS = 50
+
 const config = {
     UPDATE_RATE: 40, // raised 20->40 (2026-07-16): halves per-tick dodge jump (0.57m->0.285m)
                      // for target trackability. MAX_DELTA in applyCommand derives from this.

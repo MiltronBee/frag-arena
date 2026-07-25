@@ -1,5 +1,5 @@
 import nengi from 'nengi'
-import nengiConfig from '../common/nengiConfig'
+import nengiConfig, { INTERP_DELAY_MS } from '../common/nengiConfig'
 import { SPAWN_POINTS } from '../common/arenaConfig'
 import { setActiveMap } from '../common/mapMesh'
 import { getMapRecord, DEFAULT_MAP_ID, effectiveMode } from '../common/mapRegistry'
@@ -323,11 +323,6 @@ const SPECTATOR_AFK_SWEEP_MS = 5000
 // a menu socket — no player coordinates cross the wire until deploy. Global
 // per-client messages (killfeed, PlayerName replay) still arrive.
 const SPECTATOR_VIEW = { x: 0, y: 1e9, z: 0, halfWidth: 0.001, halfHeight: 0.001, halfDepth: 0.001 }
-
-// The client's interpolation delay (ms). MUST match the second argument to
-// `new nengi.Client(nengiConfig, 100)` in client/GameClient.js — the rewind below is
-// only correct while these agree.
-const INTERP_DELAY_MS = 100
 
 // Hard ceiling on lag-compensated rewind (ms). The historian only keeps
 // HISTORIAN_TICKS / UPDATE_RATE = 80/40 = 2000ms of snapshots, and asking it for
