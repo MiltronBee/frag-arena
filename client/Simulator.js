@@ -239,6 +239,12 @@ class Simulator {
 		// (paced slower than the server's 3s deploy rate limit).
 		this._deployRequestedAt = 0
 
+		// SPECTATOR QUEUE (server QueueStatus). null = not waiting; otherwise
+		// { position, size, capacity }. While this is set the arena is full and our
+		// deploy intent is PARKED server-side — the retry below stays harmless
+		// (the server just re-queues us at the same spot, it does not jump the line).
+		this._queue = null
+
 		client.factory = createFactories({
 			/* dependency injection */
 			simulator: this,
@@ -285,6 +291,17 @@ class Simulator {
 			this._nameRegistry.set(message.smoothNid, name)
 			const model = this.characterModels.get(message.smoothNid)
 			if (model) model.setName(name)
+		})
+
+		// ARENA FULL: we asked to deploy and the server put us in the line. position 0
+		// is the exit signal (we're being spawned now); anything else is a live wait.
+		client.on('message::QueueStatus', message => {
+			if (message.position === 0) {
+				this._queue = null
+			} else {
+				this._queue = { position: message.position, size: message.size, capacity: message.capacity }
+			}
+			this._syncEntryState()
 		})
 
 		client.on('message::Respawned', message => {
@@ -2159,6 +2176,7 @@ class Simulator {
 
 		if (state === 'disconnected') {
 			this._deployRequestedAt = 0 // stale deploy intent dies with the socket
+			this._queue = null          // ...and so does our place in the line
 			const wasInArena = this._arenaEntered
 			this._arenaEntered = false
 			body.classList.remove('arena-entered')
@@ -2386,7 +2404,20 @@ class Simulator {
 		if (button) {
 			const labelEl = button.querySelector('.enter-label') || button
 			let label = 'PLAY'
-			if (!ready) {
+			if (this._queue) {
+				// Waiting for a seat: the button must NOT read PLAY (it would look like
+				// the click did nothing). Show the live position instead; the server
+				// promotes us automatically, so there is nothing left to click.
+				button.disabled = true
+				button.setAttribute('data-loading', 'true')
+				button.setAttribute('aria-disabled', 'true')
+				button.classList.remove('is-arming', 'is-ready-cta')
+				label = this._queue.position === 1
+					? 'ARENA FULL — NEXT IN LINE'
+					: `ARENA FULL — #${this._queue.position} IN LINE`
+				const labelQ = button.querySelector('.enter-label') || button
+				if (labelQ.textContent !== label) labelQ.textContent = label
+			} else if (!ready) {
 				// gate still closed — no % on the plate. If a play intent is pending,
 				// show the arming micro-state instead of the neutral label.
 				button.disabled = true

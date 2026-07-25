@@ -36,6 +36,7 @@ import Pickup from '../common/entity/Pickup'
 import Flag, { FLAG_STATE } from '../common/entity/Flag'
 import ControlPoint, { CP_OWNER } from '../common/entity/ControlPoint'
 import ObjectiveEvent, { OBJECTIVE_EVENT } from '../common/message/ObjectiveEvent'
+import QueueStatus from '../common/message/QueueStatus'
 import {
 	PICKUP_TYPE, PICKUP_RADIUS, CHARGE_LEAD_SECONDS, HEALTH_HEAL, HEALTH_CAP,
 	REST_HEIGHT, ARMOR_PICKUP, ARMOR_CAP, ARMOR_ABSORB,
@@ -284,6 +285,12 @@ const MATCH_PUBLISH_MS = 500
 // (isAlive=false + the 2.5s auto-respawn) — there is no DEPLOYED -> SPECTATOR
 // transition in v1, so a live body can never bail to the menu to dodge a fight.
 const SESSION = { SPECTATOR: 0, DEPLOYED: 1 }
+// ARENA CAPACITY (4v4). A hard ceiling on DEPLOYED humans; humans past it stay
+// SPECTATOR in a FIFO queue and are promoted the moment a slot frees. Bots are NOT
+// counted here — they are filler and always yield to a human (see _rebalanceBots,
+// whose target is this same number), so total bodies is max(humans, botTarget) = 8
+// and the arena is always a full 4v4.
+const MAX_COMBATANTS = Math.max(1, parseInt(process.env.MAX_PLAYERS, 10) || 8)
 // DeployCommand rate limit: 1 accepted request per socket per window; the rest
 // are silently dropped (no reject allocation churn — Ren's rule).
 const DEPLOY_COOLDOWN_MS = 3000
@@ -484,13 +491,18 @@ class GameInstance {
 		// BOTS=N still means a FIXED bot count with no autofill (probes/harnesses
 		// depend on an exact roster), and takes precedence when set.
 		this._humanCount = 0 // DEPLOYED humans (menu spectators do NOT count — see deployPlayer)
+		// FIFO of SPECTATOR clients waiting for a seat. Order IS the promise: first
+		// to ask is first in. Never holds a deployed client.
+		this._queue = []
 		if (process.env.BOTS !== undefined) {
 			this._botFillTarget = 0 // fixed mode: never rebalance
 			const botCount = parseInt(process.env.BOTS, 10) || 0
 			for (let i = 0; i < botCount; i++) this.addBot(i)
 		} else {
+			// default = MAX_COMBATANTS so the arena is ALWAYS a full 4v4: bots hold the
+			// empty seats and retire 1:1 as humans take them.
 			const fill = parseInt(process.env.BOT_FILL, 10)
-			this._botFillTarget = Number.isNaN(fill) ? 6 : Math.max(0, fill)
+			this._botFillTarget = Number.isNaN(fill) ? MAX_COMBATANTS : Math.max(0, fill)
 			this._rebalanceBots()
 		}
 
@@ -621,9 +633,16 @@ class GameInstance {
 			// is DELAYED by the normal respawn delay (see update()) so a combat logger
 			// is not instantly replaced by a fresh full-health bot; a deploy in the
 			// meantime rebalances immediately, which supersedes the pending refill.
+			// a waiting spectator can drop too — take them out of the line either way,
+			// which also restates the position of everyone behind them.
+			this._dequeue(client)
 			if (client.rawEntity) {
 				this._humanCount = Math.max(0, this._humanCount - 1)
 				this._pendingRebalanceAt = Date.now() + GameInstance.RESPAWN_DELAY_MS
+				// a seat just opened — hand it to whoever has been waiting longest.
+				// Immediate, unlike the DELAYED bot refill above: a human who has been
+				// staring at a queue position should not wait another respawn delay.
+				this._promoteQueue()
 			}
 		})
 
@@ -753,13 +772,73 @@ class GameInstance {
 	// SPECTATOR -> DEPLOYED transition, plus the deploy rate limit and the 1.0s
 	// spawn immunity. The ACK is the existing Identity message + the entity
 	// create snapshot — exactly the contract createPlayerFactory already waits on.
-	deployPlayer(client) {
+	// read-only surface for /mapinfo (server/serverMain.js) so the menu can show
+	// "5/8 IN ARENA · 2 WAITING" without reaching into private state.
+	get capacity() { return MAX_COMBATANTS }
+	get queueLength() { return this._queue.length }
+
+	// ── SPECTATOR QUEUE ────────────────────────────────────────────────────────
+	// Everyone past MAX_COMBATANTS waits here. The client is told its position so the
+	// menu can say something truthful instead of hanging on "DEPLOYING…".
+	_enqueue(client) {
+		if (!client || this._queue.indexOf(client) !== -1) return
+		this._queue.push(client)
+		console.log(`[queue] client queued at #${this._queue.length} (${this._humanCount}/${MAX_COMBATANTS} deployed)`)
+		this._publishQueue()
+	}
+
+	_dequeue(client) {
+		const i = this._queue.indexOf(client)
+		if (i === -1) return false
+		this._queue.splice(i, 1)
+		this._publishQueue()
+		return true
+	}
+
+	// Re-state every waiting client's position. Cheap (the queue is short) and it is
+	// the only thing keeping a displayed position honest as the line moves.
+	_publishQueue() {
+		for (let i = 0; i < this._queue.length; i++) {
+			const c = this._queue[i]
+			try { this.instance.message(new QueueStatus(i + 1, this._queue.length, MAX_COMBATANTS), c) } catch (e) {}
+		}
+	}
+
+	// Fill every free seat from the front of the line. Called whenever a seat can
+	// have opened: a deployed human disconnecting, or a match reset.
+	// Skips clients whose socket died while waiting (disconnect dequeues them, but
+	// this is the belt to that braces).
+	_promoteQueue() {
+		while (this._humanCount < MAX_COMBATANTS && this._queue.length) {
+			const client = this._queue.shift()
+			if (!client || client._session !== SESSION.SPECTATOR) continue
+			// position 0 = "you're in" — the entity-create snapshot follows.
+			try { this.instance.message(new QueueStatus(0, 0, MAX_COMBATANTS), client) } catch (e) {}
+			console.log(`[queue] promoting a spectator (${this._humanCount + 1}/${MAX_COMBATANTS})`)
+			this.deployPlayer(client, true)
+		}
+		this._publishQueue()
+	}
+
+	deployPlayer(client, promoted = false) {
 		// state gate: only a spectator can deploy. A repeat/spoofed DeployCommand
 		// from an already-DEPLOYED socket is silently ignored (can't double-spawn).
 		if (!client || client._session !== SESSION.SPECTATOR) return
 		const now = Date.now()
-		if (now - client._lastDeployAt < DEPLOY_COOLDOWN_MS) return // rate limit: hard drop
+		// `promoted` is the queue letting someone in — it has already waited its turn,
+		// so it bypasses the anti-spam rate limit (which would otherwise reject a
+		// promotion landing within 3s of the client's own last request).
+		if (!promoted && now - client._lastDeployAt < DEPLOY_COOLDOWN_MS) return // rate limit: hard drop
 		client._lastDeployAt = now
+
+		// CAPACITY: the arena is 4v4. A human past that does not spawn — they stay a
+		// SPECTATOR in the FIFO and get promoted when a seat frees (see _promoteQueue).
+		// Checked AFTER the session gate so an already-deployed socket can never
+		// enqueue itself, and before anything is allocated.
+		if (!promoted && this._humanCount >= MAX_COMBATANTS) {
+			this._enqueue(client)
+			return
+		}
 
 		// create a entity for this client
 		const rawEntity = new PlayerCharacter()
@@ -767,7 +846,7 @@ class GameInstance {
 
 		// TDM: auto-balance onto the team with fewer players (tie -> team 0). Set
 		// BEFORE the spawn so we spawn on the assigned team's spawn points.
-		rawEntity.teamId = this.assignTeam()
+		rawEntity.teamId = this.assignTeam(true) // human: balance against humans
 
 		// spread spawns out — spawning everyone at the exact origin puts players
 		// INSIDE each other's collision boxes, and moveWithCollisions can't escape
@@ -841,6 +920,9 @@ class GameInstance {
 		client.view = { ...this.viewBox }
 
 		client._session = SESSION.DEPLOYED
+		// they hold a seat now — drop them from the FIFO and restate everyone else's
+		// position (a promotion shifts every remaining wait by one).
+		this._dequeue(client)
 
 		// AUTO-FILL: a human took a combat slot — retire one fill bot to hold the
 		// target headcount (prefers a dead / lowest-scoring one; see _rebalanceBots).
@@ -1439,11 +1521,26 @@ class GameInstance {
 		const desired = Math.max(0, this._botFillTarget - nonFill)
 		for (let i = fillBots.length; i < desired; i++) this.addBot(i)
 		for (let i = fillBots.length; i > desired; i--) {
-			// prefer retiring a DEAD bot (invisible exit — nobody sees a fighter vanish
-			// mid-duel), else the lowest-scoring one (least disturbance to the match).
+			// WHICH bot leaves decides the team split. assignTeam() balances the joining
+			// human against the roster as it stands, but the bot that then makes way is
+			// what actually sets the final shape: retire off the wrong side and every
+			// human/bot swap drifts it. Measured before this: 8 humans arriving into a
+			// bot-filled arena came out 5v3, not 4v4.
+			// So: retire from the OVERWEIGHT team first, and only then fall back to the
+			// old preference (a DEAD bot — an invisible exit, nobody watches a fighter
+			// vanish mid-duel — then the lowest scorer, least disturbance to the match).
+			const n = this.countTeams()
+			const heavy = n[0] > n[1] ? 0 : (n[1] > n[0] ? 1 : -1)
 			const pick = fillBots
-				.sort((a, b) => (a.rawEntity.isAlive - b.rawEntity.isAlive)
-					|| ((a.rawEntity.kills | 0) - (b.rawEntity.kills | 0)))
+				.sort((a, b) => {
+					if (heavy !== -1) {
+						const ah = a.rawEntity.teamId === heavy ? 0 : 1
+						const bh = b.rawEntity.teamId === heavy ? 0 : 1
+						if (ah !== bh) return ah - bh
+					}
+					return (a.rawEntity.isAlive - b.rawEntity.isAlive)
+						|| ((a.rawEntity.kills | 0) - (b.rawEntity.kills | 0))
+				})
 				.shift()
 			this.removeBot(pick)
 		}
@@ -2251,9 +2348,38 @@ class GameInstance {
 
 	// Auto-balance: the team with fewer players; a tie goes to team 0. Counts the
 	// EXISTING roster (the new player is assigned this result, then added).
-	assignTeam() {
-		const n = this.countTeams()
-		return n[0] <= n[1] ? 0 : 1
+	// Which side a joining combatant lands on. "Smaller team wins, tie -> 0" is not
+	// enough on its own: a tie resolves to 0 EVERY time, and because a fill bot is
+	// retired from the heavier side immediately afterwards the count returns to a tie
+	// before the next join — so team 0 monopolises the arena. Measured: 8 humans
+	// joining a bot-filled arena came out 5v3.
+	// So the split is also HARD-CAPPED at half the arena. With MAX_COMBATANTS 8 that
+	// is 4 a side, which is what makes "4v4" true rather than aspirational.
+	assignTeam(forHuman = false) {
+		const half = Math.ceil(MAX_COMBATANTS / 2)
+		const pick = (n) => {
+			if (n[0] >= half && n[1] < half) return 1
+			if (n[1] >= half && n[0] < half) return 0
+			return n[0] <= n[1] ? 0 : 1
+		}
+		// A HUMAN balances against the other HUMANS, not against the whole roster.
+		// Balancing on the total is what produced 5v3: bots pad both sides to `half`,
+		// so every join saw a tie, every tie resolved to team 0, and the bot retired
+		// afterwards restored the tie in time for the next join — team 0 monopolised
+		// the arena. Bots are fungible filler; they are re-sorted around the humans
+		// (they fill by TOTAL, below, and _rebalanceBots retires off the heavy side),
+		// so the humans are the thing that has to come out even.
+		return pick(forHuman ? this.countHumanTeams() : this.countTeams())
+	}
+
+	// Deployed HUMANS per team. A queued spectator has no rawEntity and so is not
+	// counted — they are not in the arena yet.
+	countHumanTeams() {
+		const n = [0, 0]
+		this.instance.clients.forEach(c => {
+			if (c.rawEntity && (c.rawEntity.teamId === 0 || c.rawEntity.teamId === 1)) n[c.rawEntity.teamId]++
+		})
+		return n
 	}
 
 	// ---- Scoring (mode-aware) ---------------------------------------------------

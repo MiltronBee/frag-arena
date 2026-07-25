@@ -62,6 +62,8 @@ http.createServer((req, res) => {
         modeName: MODE_DISPLAY[mode],
         players: gameInstance._humanCount,
         bots: gameInstance.bots.length,
+        capacity: gameInstance.capacity,
+        queued: gameInstance.queueLength,
         next: { mapId: nextEntry.mapId, mapName: nextEntry.mapName, modeName: nextEntry.modeName },
     }))
 }).listen(MAPINFO_PORT, () => console.log(`[map] /mapinfo on :${MAPINFO_PORT} -> ${gameInstance.map.id}`))

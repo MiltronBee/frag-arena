@@ -25,6 +25,7 @@ import Flag from './entity/Flag'
 import ControlPoint from './entity/ControlPoint'
 import Mover from './entity/Mover'
 import ObjectiveEvent from './message/ObjectiveEvent'
+import QueueStatus from './message/QueueStatus'
 
 const config = {
     UPDATE_RATE: 40, // raised 20->40 (2026-07-16): halves per-tick dodge jump (0.57m->0.285m)
@@ -68,7 +69,8 @@ const config = {
             ['Killed', Killed],
             ['DamageTaken', DamageTaken],
             ['PlayerName', PlayerName],
-            ['ObjectiveEvent', ObjectiveEvent]
+            ['ObjectiveEvent', ObjectiveEvent],
+            ['QueueStatus', QueueStatus]
         ],
         commands: [
             ['MoveCommand', MoveCommand],
