@@ -30,6 +30,29 @@ const SFX_NAMES = [
   'grenade_explosion', 'weapon_swap', 'death', 'respawn',
   'impact_flesh', 'pain_grunt', 'kill_confirm',
 ]
+// ── SFX VARIETY (2026-07-24) ─────────────────────────────────────────────────────
+// TOTAL number of interchangeable takes per high-repetition event, INCLUDING the
+// original clip. Take 1 is `<base>.mp3` (the audition-approved shipping sound); takes
+// 2..N are `<base>_v2.mp3` .. `<base>_v<N>.mp3`, authored by
+// scripts/generate-sfx-variants.mjs. _pickVariant() chooses uniformly per trigger.
+//
+// This is what kills the "machine-cloned" tell: ±6% playbackRate jitter alone still
+// replays ONE waveform, which the ear locks onto within a few shots. Distinct takes
+// break that. Only the events that fire constantly get variants — a once-a-match
+// sound gains nothing and would just be dead bytes.
+//
+// SAFE BY CONSTRUCTION: a missing/failed variant simply never enters this._buf, and
+// _pickVariant only returns names it has actually loaded, so an incomplete
+// generation run degrades to the base clip instead of going silent.
+const SFX_VARIANTS = {
+  rifle_fire: 3, smg_fire: 3, shotgun_fire: 3, pistol_fire: 3, plasma_fire: 3, flak_fire: 3,
+  impact_flesh: 4, pain_grunt: 4, death: 3, kill_confirm: 2, weapon_swap: 3, grenade_explosion: 3,
+}
+// expand SFX_VARIANTS into the extra file basenames to fetch (base itself is already
+// in SFX_NAMES, so start at _v2).
+const SFX_VARIANT_NAMES = Object.entries(SFX_VARIANTS).flatMap(([base, n]) =>
+  Array.from({ length: Math.max(0, n - 1) }, (_, i) => `${base}_v${i + 2}`))
+
 // ANNOUNCER voice clips (public/assets/sfx/announcer/<name>.mp3 — authored OFFLINE by
 // scripts/generate-announcer.mjs; index.json is the manifest). Loaded into the SAME
 // this._buf pool as the weapon SFX and played 2D through the master bus by announce().
@@ -41,6 +64,27 @@ const ANNOUNCER_NAMES = [
   'team_deathmatch', 'capture_the_flag', 'domination',
   'flag_taken', 'flag_captured', 'flag_returned', 'point_captured',
 ]
+// ── MIX (2026-07-24 retune) ──────────────────────────────────────────────────────
+// Three complaints, three levers, all in ONE place so the mix is tunable as data:
+//   "music is too loud"        -> MusicManager.DEFAULT_VOLUME (that file) + VOICE_DUCK below
+//   "narrator not loud enough" -> VOICE_BUS_GAIN + the dedicated voice bus (see resume())
+//   "shots should be a tad louder" -> SHOT_GAIN
+//
+// VOICE_BUS_GAIN is the narrator bus trim. It can exceed 1 because the voice bus is
+// parallel to the gun limiter (see resume()) and has its own gentle 2:1 catch, so
+// headroom here is real rather than being eaten by gunfire ducking.
+const VOICE_BUS_GAIN = 1.6
+// How far the MUSIC bed is ducked (multiplier) while a callout plays, and the
+// hold/release around it. A callout is information; the bed steps out of its way
+// instead of the voice having to shout over it. Applied via the ducking hook the
+// Simulator wires to MusicManager (setDuck).
+const VOICE_DUCK = 0.35
+const VOICE_DUCK_HOLD_S = 1.4
+// Master trim on the gunshot layers. 1.15 is the "a tad louder" ask — deliberately
+// small: the shot bus already runs into a 5:1 limiter, so a big number would only
+// buy more compression, not more loudness.
+const SHOT_GAIN = 1.15
+
 // weapon index -> clip prefix (0=rifle,1=smg,2=shotgun,3=pistol,4=plasma,5=flak).
 // Any other index has no prefix -> procedural path. Plasma/Flak reloads were
 // previously SILENT (no prefix) and their fire was procedural-only; adding them
@@ -87,6 +131,8 @@ export default class WeaponAudio {
     this._lastShotAt = -1
     this._lastSwapAt = -1        // throttle weaponSwap() so scroll-cycling can't machine-gun it
     this._lastUI = {}           // per-cue last-play time (s) for the procedural UI layer's throttle
+    this._lastTake = {}         // base event name -> take that played last (variety anti-repeat)
+    this._musicDuck = null      // injected by Simulator (see setMusicDuck) — ducks music under callouts
     this._buf = {}              // name -> decoded AudioBuffer (absent = not loaded)
     this._samplesLoading = false
     this._samplesLoaded = false
@@ -122,6 +168,31 @@ export default class WeaponAudio {
       this.master.gain.value = this._volume
       this.comp.connect(this.master)
       this.master.connect(this.ctx.destination)
+
+      // ── VOICE BUS (narrator) — deliberately NOT on this.comp ────────────────
+      // MIX FIX (2026-07-24, "narrator is not loud enough"): the announcer used to
+      // play through this.comp, the SAME DynamicsCompressor tuned for gunfire
+      // ("slam": -16dB threshold, 5:1, 3ms attack). Every gunshot slammed that
+      // compressor, and because a compressor ducks EVERYTHING routed through it,
+      // the voice was gain-reduced by the player's own weapon — so the callouts
+      // vanished at exactly the moment they matter (a firefight). Raising the clip
+      // gain could not fix that: it fed the same squash harder.
+      //
+      // So the voice gets its OWN bus straight to master, in parallel with the gun
+      // limiter, plus a GENTLE limiter of its own (high threshold, 2:1) purely to
+      // stop two stacked callouts clipping. Result: the narrator now sits ON TOP of
+      // the mix at a constant level, independent of how much lead is in the air.
+      this.voiceComp = this.ctx.createDynamicsCompressor()
+      this.voiceComp.threshold.value = -6   // only catches genuine stacking, not normal speech
+      this.voiceComp.knee.value = 6
+      this.voiceComp.ratio.value = 2        // gentle — preserves the performance's dynamics
+      this.voiceComp.attack.value = 0.01
+      this.voiceComp.release.value = 0.15
+      this.voiceBus = this.ctx.createGain()
+      this.voiceBus.gain.value = VOICE_BUS_GAIN
+      this.voiceBus.connect(this.voiceComp)
+      this.voiceComp.connect(this.master)
+
       this._noise = this._makeNoiseBuffer(0.5)
       // Self-heal: whenever the browser/OS moves the context off 'running' (mobile
       // screen dim, notification, app switch, or iOS's non-standard 'interrupted'
@@ -151,9 +222,43 @@ export default class WeaponAudio {
     // weapon SFX (sfx/<name>.mp3) + announcer voice (sfx/announcer/<name>.mp3), all into
     // the one this._buf pool keyed by name (announcer names never collide with SFX_NAMES).
     const jobs = SFX_NAMES.map((name) => load(name, name))
+      // extra takes for the high-repetition events (see SFX_VARIANTS). allSettled, so
+      // a variant that 404s or fails to decode just stays out of this._buf and
+      // _pickVariant never offers it — the base clip keeps playing.
+      .concat(SFX_VARIANT_NAMES.map((name) => load(name, name)))
       .concat(ANNOUNCER_NAMES.map((name) => load('announcer/' + name, name)))
     Promise.allSettled(jobs).then(() => { this._samplesLoaded = true; this._samplesLoading = false })
   }
+
+  // Pick one of the interchangeable takes for `base` (see SFX_VARIANTS): the base
+  // clip or any loaded `<base>_v<N>`. Returns a name guaranteed present in this._buf,
+  // or `base` when nothing else is loaded yet (callers already handle a missing base).
+  //
+  // Avoids repeating the take that played LAST for this base, so a 2-take event can
+  // never sound like it has no variety at all (a uniform pick would repeat ~50% of
+  // the time, which the ear reads as "no variation"). With N>2 this just removes the
+  // immediate repeat and leaves the rest uniform.
+  _pickVariant(base) {
+    const total = SFX_VARIANTS[base]
+    if (!total || total < 2) return base
+    const pool = [base]
+    for (let i = 2; i <= total; i++) {
+      const n = `${base}_v${i}`
+      if (this._buf[n]) pool.push(n)
+    }
+    if (pool.length < 2) return pool[0] || base
+    const last = this._lastTake[base]
+    let pick = pool[(Math.random() * pool.length) | 0]
+    if (pick === last) pick = pool[(pool.indexOf(pick) + 1) % pool.length] // rotate off a repeat
+    this._lastTake[base] = pick
+    return pick
+  }
+
+  // MUSIC DUCK hook. The Simulator injects MusicManager here (setMusicDuck) so the
+  // announcer can push the music bed down while a callout plays WITHOUT this module
+  // importing MusicManager (music lives on HTMLAudio, deliberately off this graph —
+  // see MusicManager's header). No-op until wired, so headless/tests are unaffected.
+  setMusicDuck(fn) { this._musicDuck = typeof fn === 'function' ? fn : null }
 
   // Play a loaded sample clip through the master (limiter) bus. Fire-and-forget:
   // the node GCs when it ends. Returns false (no-op) if the buffer isn't loaded.
@@ -161,9 +266,13 @@ export default class WeaponAudio {
     const buf = this._buf[name]
     if (!buf || !this.ctx) return false
     const { gain = 1, delay = 0, rate = 1 } = opts
-    // opts.pos => route through a PannerNode (positional/remote); else 2D to this.comp.
+    // opts.pos => route through a PannerNode (positional/remote); else 2D.
+    // opts.bus === 'voice' => the narrator bus, which BYPASSES the gunfire limiter so
+    // shots can't duck the callout (see resume()). A positional voice still wins,
+    // since a panner must feed the spatialized path to attenuate at all.
     const panner = this._makePanner(opts.pos)
-    const dest = panner || this.comp
+    const bus = (opts.bus === 'voice' && this.voiceBus) ? this.voiceBus : this.comp
+    const dest = panner || bus
     const src = this.ctx.createBufferSource()
     src.buffer = buf
     src.playbackRate.value = rate
@@ -289,10 +398,13 @@ export default class WeaponAudio {
     const g = panner ? 1 : distanceGain(opts.distance || 0)
     if (g <= 0.001) { this._lastShotAt = now; return }
     // sample path — the AI clip is the mid "body"; synth adds the punch it lacks.
-    if (prefix && this._buf[prefix + '_fire']) {
+    // VARIETY: pick one of the interchangeable fire takes (see SFX_VARIANTS). Falls
+    // back to the base name, so the loaded-check below still gates the sample path.
+    const take = this._pickVariant(prefix + '_fire')
+    if (prefix && this._buf[take]) {
       this._lastShotAt = now
-      const rate = 1 + (Math.random() - 0.5) * 0.12 // ±6% pitch jitter so repeats don't clone
-      this._fireLayers(prefix, g, rate, now, panner || this.comp, panner)
+      const rate = 1 + (Math.random() - 0.5) * 0.12 // ±6% pitch jitter ON TOP of the take variety
+      this._fireLayers(prefix, g, rate, now, panner || this.comp, panner, take)
       return
     }
     // fallback: procedural voice (shoot() re-checks + advances the floor itself, and
@@ -312,17 +424,17 @@ export default class WeaponAudio {
   // `dest` is the node the layers feed (this.comp for 2D shots, or a PannerNode for a
   // positional remote shot). `panner` (when present) is torn down with the layer that
   // outlives the others (the AI body buffer) so the panner disconnects with no leak.
-  _fireLayers(prefix, g, rate, t0, dest = this.comp, panner = null) {
+  _fireLayers(prefix, g, rate, t0, dest = this.comp, panner = null, take = null) {
     const ctx = this.ctx
 
     // A) AI body through a subtle saturation "glue"
     const body = ctx.createBufferSource()
-    body.buffer = this._buf[prefix + '_fire']
+    body.buffer = this._buf[take || prefix + '_fire']
     body.playbackRate.value = rate
     const bodyGain = ctx.createGain()
     // clip at full weight — it IS the gunshot (audition 2026-07-17: at 0.9 under a
     // 0.7 crack the AI clip was masked and shots read as synthetic)
-    bodyGain.gain.value = Math.min(1.5, 1.0 * g)
+    bodyGain.gain.value = Math.min(1.5, SHOT_GAIN * g)
     const sat = this._saturator()
     body.connect(sat); sat.connect(bodyGain); bodyGain.connect(dest)
     // the panner (if any) tears down with the body — the longest-lived layer.
@@ -336,7 +448,7 @@ export default class WeaponAudio {
     const hp = ctx.createBiquadFilter()
     hp.type = 'highpass'; hp.frequency.value = 1200
     const cg = ctx.createGain()
-    cg.gain.setValueAtTime(0.45 * g, t0) // support, not mask (was 0.7 — buried the clip)
+    cg.gain.setValueAtTime(0.45 * SHOT_GAIN * g, t0) // support, not mask (was 0.7 — buried the clip)
     cg.gain.exponentialRampToValueAtTime(0.001, t0 + 0.015)
     crack.connect(hp); hp.connect(cg); cg.connect(dest)
     this._teardownWhenDone([crack], [crack, hp, cg])
@@ -349,7 +461,7 @@ export default class WeaponAudio {
     sub.frequency.setValueAtTime(s.f0, t0)
     sub.frequency.exponentialRampToValueAtTime(s.f1, t0 + 0.08)
     const sg = ctx.createGain()
-    sg.gain.setValueAtTime(Math.min(1.2, 0.55 * g * s.gain), t0)
+    sg.gain.setValueAtTime(Math.min(1.2, 0.55 * SHOT_GAIN * g * s.gain), t0)
     sg.gain.exponentialRampToValueAtTime(0.001, t0 + s.dur)
     sub.connect(sg); sg.connect(dest)
     this._teardownWhenDone([sub], [sub, sg])
@@ -390,7 +502,7 @@ export default class WeaponAudio {
     // attenuation); 2D fallback keeps the manual distanceGain.
     const g = opts.pos ? 0.55 : 0.55 * distanceGain(opts.distance || 0)
     if (g <= 0.02) return
-    this.playClip('pain_grunt', { gain: g, rate: 0.9 + Math.random() * 0.2, pos: opts.pos })
+    this.playClip(this._pickVariant('pain_grunt'), { gain: g, rate: 0.9 + Math.random() * 0.2, pos: opts.pos })
   }
 
   // Local weapon-swap clack (the player changed guns). 2D, sample-only. Throttled so
@@ -400,12 +512,12 @@ export default class WeaponAudio {
     const now = this.ctx.currentTime
     if (now - this._lastSwapAt < 0.09) return // 90ms guard
     this._lastSwapAt = now
-    this.playClip('weapon_swap', { gain: 0.7, rate: 1 + (Math.random() - 0.5) * 0.12 })
+    this.playClip(this._pickVariant('weapon_swap'), { gain: 0.7, rate: 1 + (Math.random() - 0.5) * 0.12 })
   }
 
   // Local-player death sting (a big first-person event). 2D, sample-only.
   death() {
-    this.playClip('death', { gain: 0.9 })
+    this.playClip(this._pickVariant('death'), { gain: 0.9 })
   }
 
   // Local-player respawn/re-enter cue. 2D, sample-only.
@@ -563,7 +675,7 @@ export default class WeaponAudio {
     // tick — the top "did it land?" cue). Other surfaces stay procedural.
     if (surfaceKey === 'flesh' && this._buf.impact_flesh) {
       const fg = positional ? 0.9 : 0.9 * distanceGain(opts.distance || 0)
-      if (fg > 0.02) this.playClip('impact_flesh', { gain: fg, rate: 0.92 + Math.random() * 0.16, pos: opts.pos })
+      if (fg > 0.02) this.playClip(this._pickVariant('impact_flesh'), { gain: fg, rate: 0.92 + Math.random() * 0.16, pos: opts.pos })
       return
     }
     const ctx = this.ctx, t0 = ctx.currentTime
@@ -624,7 +736,8 @@ export default class WeaponAudio {
       // clip through its own gain (playClip does this too, but we route to the shared
       // panner here so both layers pan together and tear down as one graph)
       const clip = ctx.createBufferSource()
-      clip.buffer = this._buf.grenade_explosion
+      // VARIETY: one of the interchangeable blast takes (see SFX_VARIANTS)
+      clip.buffer = this._buf[this._pickVariant('grenade_explosion')]
       clip.playbackRate.value = 0.94 + Math.random() * 0.12
       const cg = ctx.createGain()
       cg.gain.value = Math.max(0, Math.min(1.5, g))
@@ -771,7 +884,7 @@ export default class WeaponAudio {
     if (!this.ctx) return
     // kill: prefer the generated confirm blip. The non-kill tick stays procedural
     // (it's a snappy synthetic UI beep by design).
-    if (kill && this._buf.kill_confirm) { this.playClip('kill_confirm', { gain: 0.6 }); return }
+    if (kill && this._buf.kill_confirm) { this.playClip(this._pickVariant('kill_confirm'), { gain: 0.6 }); return }
     const ctx = this.ctx, t0 = ctx.currentTime
     const out = this._voiceOut(0.5)
     const osc = ctx.createOscillator()
@@ -797,7 +910,20 @@ export default class WeaponAudio {
     const minGap = opts.minGap != null ? opts.minGap : 0.6
     if (now - (this._lastAnnounceAt == null ? -9 : this._lastAnnounceAt) < minGap) return false
     this._lastAnnounceAt = now
-    return this.playClip(name, { gain: opts.gain != null ? opts.gain : 0.85 })
+    // MIX FIX: route to the VOICE bus (parallel to the gun limiter — see resume()) at
+    // unity, not to this.comp at 0.85. The old path let every gunshot compress the
+    // voice down; this one keeps the callout at a constant level over any amount of
+    // gunfire, which is the actual "narrator not loud enough" complaint.
+    const played = this.playClip(name, {
+      gain: opts.gain != null ? opts.gain : 1.0,
+      bus: 'voice',
+    })
+    // and step the music bed out of the way for the length of the callout
+    if (played && this._musicDuck) {
+      const hold = opts.duckHold != null ? opts.duckHold : VOICE_DUCK_HOLD_S
+      try { this._musicDuck(VOICE_DUCK, hold) } catch (e) { /* never let the mix break audio */ }
+    }
+    return played
   }
 
   // Headshot ANNOUNCER hook (authoritative-only; called from FragLayer.onHitConfirmed when
@@ -805,7 +931,7 @@ export default class WeaponAudio {
   // and is loaded by loadSamples, so this plays it; a shorter cooldown keeps rapid headshots
   // punchy without machine-gunning the voice.
   announceHeadshot() {
-    return this.announce('headshot', { gain: 0.75, minGap: 0.35 })
+    return this.announce('headshot', { gain: 1.0, minGap: 0.35 })
   }
 
   // ==== Procedural UI / feedback layer (Kimi K3 SFX spec, bit 1) =============

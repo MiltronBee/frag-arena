@@ -97,6 +97,13 @@ class Simulator {
 		// same pointerdown/touchstart/enter handlers below drive both.
 		this.music = new MusicManager()
 
+		// MIX: let the narrator duck the music bed. WeaponAudio owns the WebAudio SFX
+		// graph and MusicManager owns the HTMLAudio bed — two deliberately separate
+		// systems (see MusicManager's header) — so the Simulator is the one place that
+		// knows about both and is where they get introduced. Without this a callout has
+		// to shout over the bed instead of the bed making room for it.
+		this.audio.setMusicDuck((amount, hold) => this.music.setDuck(amount, hold))
+
 		// kill-feedback / "juice" layer (kill feed, frag banner, hitmarker upgrade,
 		// corpses, gibs, directional damage arc, own-death camera). Isolated from the
 		// sim: the message handlers below just forward events to it. See FragLayer.js.
@@ -1340,7 +1347,45 @@ class Simulator {
 				else mat.emissiveColor.set(0.6, 0.6, 0.6)
 			})
 			this._paintObjectiveHud()
+			this._updateCaptureHint()
 		} catch (e) { /* cosmetic-only: never break the frame */ }
+	}
+
+	// CTF capture hint: when I'm carrying the enemy flag but my OWN flag is not HOME, I
+	// can't score (UT rule) — show WHY so a blocked capture never feels like a silent bug.
+	// Lazily creates its own overlay element (no index.html markup needed). Cheap: toggles
+	// one class + text only when the condition flips.
+	_updateCaptureHint() {
+		const me = this.myRawEntity
+		let show = false
+		if (me && me.isAlive !== false && this._matchState && (this._matchState.mode | 0) === MATCH_MODE.CTF) {
+			let carryingEnemy = false, ownHome = true
+			this._flags.forEach((f) => {
+				if (f.carrierNid === this.mySmoothId && f.team !== me.teamId) carryingEnemy = true
+				if (f.team === me.teamId) ownHome = f.state === FLAG_STATE.HOME
+			})
+			show = carryingEnemy && !ownHome
+		}
+		if (show === this._capHintShown) return
+		this._capHintShown = show
+		if (!this._capHintEl) {
+			const hud = document.getElementById('hud') || document.body
+			const el = document.createElement('div')
+			el.id = 'capture-hint'
+			el.setAttribute('aria-hidden', 'true')
+			el.textContent = 'RETURN YOUR FLAG TO SCORE'
+			Object.assign(el.style, {
+				position: 'fixed', left: '50%', top: '22%', transform: 'translateX(-50%)',
+				font: '700 18px/1.2 system-ui, sans-serif', letterSpacing: '0.08em',
+				color: '#ffd34d', textShadow: '0 2px 8px rgba(0,0,0,0.9)', padding: '8px 16px',
+				background: 'rgba(20,20,24,0.55)', border: '1px solid rgba(255,211,77,0.5)',
+				borderRadius: '6px', pointerEvents: 'none', zIndex: '6', opacity: '0',
+				transition: 'opacity 160ms ease-out', whiteSpace: 'nowrap',
+			})
+			hud.appendChild(el)
+			this._capHintEl = el
+		}
+		this._capHintEl.style.opacity = show ? '1' : '0'
 	}
 
 	// Paint the flag / point HUD chips near the scoreboard off the live objective
@@ -2023,6 +2068,34 @@ class Simulator {
 		// advance kill-feedback FX (corpses, gibs, damage arc). Runs after the
 		// character models are driven so a corpse's frozen pose isn't re-overridden.
 		this.fragLayer.update(delta)
+
+		// RESPAWN-SKEW BACKSTOP (2026-07-24) — the intermittent CCW-tilted horizon.
+		// The death-cam roll (~23°, fixed sign) is reset EDGE-triggered: on the Respawned
+		// message, and on the isAlive false→true edge (commit 713839c). Both are edges, so
+		// if BOTH are missed on a given respawn — a dropped/raced Respawned packet AND a
+		// frame where the isAlive edge didn't latch (map-rotation rejoin, a 1-frame dead
+		// window, packet timing) — `_deathCam.active` stays TRUE into the new life and
+		// applyDeathCamera keeps writing the roll every frame. Mouse-look only writes
+		// pitch/yaw, so the tilt never clears: a persistent, intermittent CCW skew.
+		//
+		// This is a LEVEL-triggered guard that subsumes both edges: if we are demonstrably
+		// ALIVE yet the death-cam is still active, that state is illegal (the cam is only
+		// meant to run from death until respawn), so end it now. onRespawned is idempotent,
+		// so this is a no-op on every normal frame and only ever fires to clean up a missed
+		// edge — closing the leak regardless of HOW the edge was lost.
+		//
+		// AGE GATE (>1s): on the ACTUAL death frame the Killed message (which starts the
+		// death-cam) and the replicated isAlive=false field can, in principle, land in an
+		// order where isAlive still reads true for one frame — without this gate the backstop
+		// would nuke a legitimately-just-started death-cam and suppress the death animation.
+		// A STUCK roll always has an OLD t0 (you were dead through the full ~2.5s respawn
+		// delay before coming back alive), so a 1s floor never touches a real death-cam yet
+		// always catches the leak.
+		const dc = this.fragLayer._deathCam
+		if (this.myRawEntity && this.myRawEntity.isAlive !== false
+			&& dc && dc.active && (performance.now() - dc.t0) > 1000) {
+			this.fragLayer.onRespawned()
+		}
 
 		// apply the own-death camera drop/roll LAST — after all aim + fire logic has
 		// read the camera this frame — so the cosmetic roll never rotates the shot

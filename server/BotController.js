@@ -369,6 +369,13 @@ class BotController {
 		// GameInstance. When present it REPLACES the random pickup roam target (only in the
 		// no-enemy branch of navigate — a live visible enemy still preempts). null = roam.
 		this.objectiveDest = null
+		// PRIORITY objective: this destination outranks fighting. A bot carrying the enemy
+		// flag (or an offense bot going to get it) must keep TRAVELLING while it shoots,
+		// instead of stopping to orbit-duel the first enemy it sees. Without this the CTF
+		// objective was only ever consulted in the no-enemy branch — and on a map where an
+		// enemy is almost always visible, that branch effectively never ran, so no bot ever
+		// touched a flag (measured: 0 flag events in a 3-minute 6-bot match).
+		this.objectivePriority = false
 		this.wantJump = false   // set by navigate() when the current segment is a jump edge
 		this.brake = false      // set by navigate() when braking into a sharp corner
 		this.tick = 0           // think-tick counter (drives the half-speed brake duty)
@@ -377,7 +384,28 @@ class BotController {
 	// OBJECTIVE BIAS (CTF/DOM): GameInstance sets the bot's current objective destination
 	// (world {x,y,z}) each tick, or null to fall back to the random pickup roam. Consumed
 	// only in navigate()'s no-enemy branch.
-	setObjective(dest) { this.objectiveDest = dest || null }
+	setObjective(dest) {
+		this.objectiveDest = dest || null
+		this.objectivePriority = !!(dest && dest.priority)
+	}
+
+	// Convert a desired WORLD movement heading into the aim-relative WASD booleans the
+	// command carries (applyCommand resolves them against camRay, i.e. against aimYaw).
+	// This is what lets a bot travel one way while shooting another — the flag carrier
+	// that keeps running for home with its gun pointed at whoever is chasing it.
+	_moveTowardYaw(moveYaw) {
+		let rel = moveYaw - this.aimYaw
+		while (rel > Math.PI) rel -= Math.PI * 2
+		while (rel < -Math.PI) rel += Math.PI * 2
+		const fb = Math.cos(rel)
+		const lr = Math.sin(rel)
+		return {
+			forwards: fb > 0.35,
+			backwards: fb < -0.35,
+			right: lr > 0.35,
+			left: lr < -0.35,
+		}
+	}
 
 	// One AI tick: returns a MoveCommand-shaped plain object for applyCommand.
 	// `combatants` = alive entities it may fight (never includes itself).
@@ -464,6 +492,20 @@ class BotController {
 			wantsFire = dist < (spec.range || 50) * 0.9 && now < this.burstUntil
 			// a new wander target is chosen fresh next time it loses sight
 			this.wander = null
+
+			// PRIORITY OBJECTIVE OVERRIDE (CTF): aim/fire stay locked on the enemy above, but
+			// the FEET follow the nav path to the objective instead of orbiting. This is the
+			// UT flag-carrier behaviour — run it home, shooting over your shoulder. Falls
+			// straight through to the orbit movement when there is no graph or no path.
+			if (this.objectiveDest && this.objectivePriority) {
+				const owp = this.navigate(now, null)
+				if (owp) {
+					const mv = this._moveTowardYaw(Math.atan2(owp.x - me.x, owp.z - me.z))
+					forwards = mv.forwards; backwards = mv.backwards
+					left = mv.left; right = mv.right
+					if (this.wantJump) jump = true
+				}
+			}
 
 			// LEDGE SENSE. Orbit strafing has no floor awareness, so a fight on a catwalk or
 			// tower top would walk the bot off the edge (Visage is all edges). Probe the floor
@@ -568,6 +610,9 @@ class BotController {
 
 		// Destination world point + its goal node.
 		let goalNode, destX, destZ
+		// A PRIORITY objective outranks chasing an enemy we cannot currently see: the
+		// carrier's job is the stand, not the duel.
+		if (target && this.objectiveDest && this.objectivePriority) target = null
 		if (target) {
 			destX = target.x; destZ = target.z
 			goalNode = nearestNode(g, target.x, target.y, target.z)

@@ -212,6 +212,19 @@ const DOM_TICK_MS = 1000
 const OBJECTIVE_RADIUS = 1.6
 const OBJECTIVE_Y_BELOW = 1.0
 const OBJECTIVE_Y_ABOVE = 2.2
+// CAPTURE gets a MORE FORGIVING radius than steal/return/touch. Stealing naturally runs
+// you INTO the enemy flag, but bringing it home you stop "at your base" — often a few
+// units short of the exact pole — and the tight 1.6 zone silently refused the score
+// ("can't capture the enemy flag", reproduced: capture fires at dist ≤1.6 and fails at
+// 2.2). A wider home-stand zone means returning to your base area scores. Steal stays
+// tight (you must reach the flag). Measured against CTF-Visage's stand geometry.
+const CAPTURE_RADIUS = 3.2
+// DEV-ONLY capture tracing (CAPDIAG=1). Prints, on change, why a carrier is/isn't scoring.
+const CAPDIAG = process.env.CAPDIAG === '1'
+// DEV-ONLY deterministic capture test (DEV_CAP_TEST=1): hands the first live human the
+// enemy flag and teleports them onto their own home stand, so the CAPTURE RULE is exercised
+// without depending on a headless client walking the length of the map.
+const DEV_CAP_TEST = process.env.DEV_CAP_TEST === '1'
 // Rest height above the probed floor for a DROPPED flag (mirrors setupObjectives).
 const OBJECTIVE_REST = 0.5
 // Regulation runs to 10:00 — a decided match fills the ~10-minute block window. The
@@ -227,6 +240,14 @@ const TIE_CHECK_MS = Math.round(TIME_LIMIT_MS * 0.8)                            
 // MATCH_END intermission (winner banner + final scores) before the scores/kills
 // reset and a fresh ACTIVE match begins.
 const INTERMISSION_MS = 15 * 1000
+// SUDDEN_DEATH must terminate. Its only organic exit is a tie break, which is
+// mode-dependent (TDM: any frag; CTF: a capture; DOM: a point tick) — so a mode whose
+// scoring rules can't break a tie would hang the match forever, stop the map rotation
+// and pin one server process for hours (2026-07-24 incident: a CTF match sat in
+// overtime 7+ hours, the process never rotated, CPU saturated and the tick collapsed
+// to ~17 Hz — read as "unplayable lag" client-side). A hard ceiling makes "the match
+// ends" independent of any mode's scoring rules.
+const SUDDEN_DEATH_MAX_MS = 3 * 60 * 1000   // 3:00 of overtime, then it's decided
 // How often the low-rate MatchState entity re-publishes the ticking countdown while
 // nothing else changed (score/phase/winner changes publish immediately). ~2Hz.
 const MATCH_PUBLISH_MS = 500
@@ -535,14 +556,25 @@ class GameInstance {
 			// every other mode (this.flags empty) and when the death path already dropped it.
 			this._returnFlagIfCarrier(client)
 
+			// A socket can close after an entity was already torn down (death cleanup,
+			// bot rebalance, or a duplicate close event). nengi's removeEntity throws a
+			// TypeError on an already-unregistered id (seen once in prod), and an
+			// uncaught throw here takes the whole server down — so removal is guarded,
+			// not assumed.
+			const _safeRemove = (e) => {
+				if (!e) return
+				try { this.instance.removeEntity(e) } catch (err) {
+					console.warn('[disconnect] removeEntity ignored:', err.message)
+				}
+			}
 			if (client.rawEntity) {
 				client.rawEntity.mesh.dispose()
-				this.instance.removeEntity(client.rawEntity)
+				_safeRemove(client.rawEntity)
 			}
 			if (client.smoothEntity) {
 				this._humanNames.delete(client.smoothEntity.nid)
 				client.smoothEntity.mesh.dispose()
-				this.instance.removeEntity(client.smoothEntity)
+				_safeRemove(client.smoothEntity)
 			}
 			if (client.channel) {
 				client.channel.destroy()
@@ -1883,7 +1915,9 @@ class GameInstance {
 		raw.hitpoints = hp
 		smooth.hitpoints = hp
 		const wasKill = hp <= 0
-		console.log(`Player ${raw.nid} hit by ${sourceName}! HP: ${hp}`)
+		// Per-hit logging is pure hot-path overhead (~75k lines per long boot on a
+		// CPU-starved 2-core box) — opt in with COMBAT_LOG=1 when debugging combat.
+		if (process.env.COMBAT_LOG === '1') console.log(`Player ${raw.nid} hit by ${sourceName}! HP: ${hp}`)
 
 		// combat events use SMOOTH nids — the canonical identity every client shares
 		// (each client learns its own raw+smooth pair via Identity; bots share one
@@ -2222,10 +2256,23 @@ class GameInstance {
 			if (enemyKill) this._addTeamScore(attackerClient.rawEntity.teamId, +1)
 			else this._addTeamScore(raw.teamId, -1)
 		}
-		// CTF/DOM: frags NEVER move the team score — only captures (_captureFlag) and
-		// held-point ticks do. CTF's cap is CAPTURE_LIMIT (3), so letting kills in here
-		// ended a CTF match after 3 frags (the shipped bug). Kills still count on the
-		// personal scoreboard via the networked per-player `kills`.
+		// CTF/DOM REGULATION: frags NEVER move the team score — only captures
+		// (_captureFlag) and held-point ticks do. CTF's cap is CAPTURE_LIMIT (3), so
+		// letting kills in here ended a CTF match after 3 frags (the shipped bug).
+		// Kills still count on the personal scoreboard via the networked per-player
+		// `kills`.
+		//
+		// CTF/DOM OVERTIME is the exception: SUDDEN_DEATH is announced as "next frag
+		// wins", and with frags scoreless it had NO organic exit in these modes (the
+		// 2026-07-24 stuck-match incident). An enemy frag in overtime moves the score,
+		// which breaks the tie and ends the match via _afterScore below.
+		else if (this.matchPhase === MATCH_PHASE.SUDDEN_DEATH) {
+			const raw = victimClient.rawEntity
+			const enemyKill = attackerClient && attackerClient !== victimClient
+				&& attackerClient.rawEntity && raw
+				&& attackerClient.rawEntity.teamId !== raw.teamId
+			if (enemyKill) this._addTeamScore(attackerClient.rawEntity.teamId, +1)
+		}
 		this._afterScore()
 	}
 
@@ -2261,6 +2308,7 @@ class GameInstance {
 	enterSuddenDeath() {
 		if (this.matchPhase !== MATCH_PHASE.ACTIVE) return
 		this.matchPhase = MATCH_PHASE.SUDDEN_DEATH
+		this.suddenDeathAt = Date.now() // arms the SUDDEN_DEATH_MAX_MS ceiling in updateMatch
 		this._matchPublishAt = 0 // force an immediate publish of the overtime state
 		console.log('[match] SUDDEN_DEATH — next frag wins')
 	}
@@ -2324,6 +2372,16 @@ class GameInstance {
 		const dx = raw.x - obj.x, dz = raw.z - obj.z
 		if (dx * dx + dz * dz > OBJECTIVE_RADIUS * OBJECTIVE_RADIUS) return false
 		return raw.y >= obj.y - OBJECTIVE_Y_BELOW && raw.y <= obj.y + OBJECTIVE_Y_ABOVE
+	}
+
+	// Proximity to a flag's HOME STAND (homeX/Y/Z) with the forgiving CAPTURE_RADIUS. Used
+	// only for scoring a capture — keyed on the stand LOCATION (not the flag entity) so it
+	// reads correctly, and wider than _objectiveTouch so bringing the flag to your base
+	// area scores without having to touch the exact pole. Same Y band as _objectiveTouch.
+	_atHomeStand(raw, flag) {
+		const dx = raw.x - flag.homeX, dz = raw.z - flag.homeZ
+		if (dx * dx + dz * dz > CAPTURE_RADIUS * CAPTURE_RADIUS) return false
+		return raw.y >= flag.homeY - OBJECTIVE_Y_BELOW && raw.y <= flag.homeY + OBJECTIVE_Y_ABOVE
 	}
 
 	// The canonical (smooth) nid for a client/bot handle — the identity every client
@@ -2403,6 +2461,7 @@ class GameInstance {
 	// on the RISING edge (per-entity _flagInside set, teleporter pattern).
 	_updateFlags(now, targets) {
 		const flags = this.flags
+		if (DEV_CAP_TEST) this._devCapTest(now, targets)
 		// 1) carried-flag position copy + dropped-flag auto-return
 		for (const flag of flags) {
 			if (flag.state === FLAG_STATE.CARRIED) {
@@ -2426,6 +2485,56 @@ class GameInstance {
 				this._resolveFlagTouch(handle, flag)
 			}
 		}
+		// 3) CAPTURE at your OWN home stand (wider CAPTURE_RADIUS). UT rule kept: your own
+		// flag must be HOME to score (the HUD shows HELD/DROP when it's out). Rising edge via
+		// a per-handle latch so one carry scores exactly once; the latch clears when you stop
+		// carrying, leave the stand, or your own flag isn't home.
+		for (const handle of targets) {
+			const raw = handle.rawEntity
+			const carried = flags.find(f => f._carrier === handle && f.state === FLAG_STATE.CARRIED)
+			const ownFlag = carried && flags.find(f => f.team === raw.teamId)
+			const canCap = ownFlag && ownFlag.state === FLAG_STATE.HOME && this._atHomeStand(raw, ownFlag)
+			if (CAPDIAG && carried) {
+				const d = ownFlag ? Math.hypot(raw.x - ownFlag.homeX, raw.z - ownFlag.homeZ).toFixed(2) : 'n/a'
+				const dy = ownFlag ? (raw.y - ownFlag.homeY).toFixed(2) : 'n/a'
+				const key = `${raw.nid}|${!!ownFlag}|${ownFlag && ownFlag.state}|${canCap}|${d}`
+				if (key !== raw._capdiagKey) {
+					raw._capdiagKey = key
+					const of = ownFlag ? `team${ownFlag.team} state=${ownFlag.state}` : 'MISSING'
+					console.log(`[capdiag] nid=${raw.nid} team=${raw.teamId} carryTeam=${carried.team} ownFlag=${of} distXZ=${d} (need<=${CAPTURE_RADIUS}) dy=${dy} canCap=${canCap}`)
+				}
+			}
+			if (canCap) {
+				if (!raw._atOwnStand) { raw._atOwnStand = true; this._captureFlag(handle, carried) }
+			} else {
+				raw._atOwnStand = false
+			}
+		}
+	}
+
+	// DEV-ONLY (DEV_CAP_TEST=1). Once, a few seconds after a human is live: grant them the
+	// ENEMY flag and teleport them onto their OWN home stand. Runs at the top of
+	// _updateFlags so step 3 of the SAME tick sees the new position — a capture must land
+	// immediately or the rule itself is broken.
+	_devCapTest(now, targets) {
+		if (this._capTestDone) return
+		if (!this._capTestAt) { this._capTestAt = now + 6000; return }
+		if (now < this._capTestAt) return
+		const handle = targets.find(h => !h.bot && h.rawEntity && h.rawEntity.isAlive)
+		if (!handle) return
+		const raw = handle.rawEntity
+		const enemyFlag = this.flags.find(f => f.team !== raw.teamId)
+		const ownFlag = this.flags.find(f => f.team === raw.teamId)
+		if (!enemyFlag || !ownFlag) return
+		this._capTestDone = true
+		this._grabFlag(handle, enemyFlag)
+		this.applyTeleport(handle, {
+			exitX: ownFlag.homeX, exitY: ownFlag.homeY - OBJECTIVE_REST, exitZ: ownFlag.homeZ,
+			exitYaw: null, tag: 'captest', url: 'ownstand',
+		})
+		console.log(`[captest] nid=${raw.nid} team=${raw.teamId} granted team${enemyFlag.team} flag; `
+			+ `teleported to own stand @(${ownFlag.homeX.toFixed(2)},${ownFlag.homeY.toFixed(2)},${ownFlag.homeZ.toFixed(2)}) `
+			+ `ownFlagState=${ownFlag.state}`)
 	}
 
 	// Resolve one rising-edge flag touch under UT99 rules.
@@ -2436,10 +2545,9 @@ class GameInstance {
 		const ownFlag = flag.team === myTeam
 		if (flag.state === FLAG_STATE.HOME) {
 			if (ownFlag) {
-				// touching my OWN home flag: a CAPTURE if I'm carrying the enemy flag (and my
-				// own flag is home — it is, this one is HOME). UT rule: no cap with your flag out.
-				const carried = this.flags.find(f => f._carrier === handle && f.state === FLAG_STATE.CARRIED)
-				if (carried) this._captureFlag(handle, carried)
+				// touching my OWN home flag: nothing here. CAPTURE is resolved in _updateFlags
+				// against the home STAND with the wider CAPTURE_RADIUS (the tight touch radius
+				// silently refused caps when you stopped a few units short of the pole).
 			} else {
 				this._grabFlag(handle, flag) // steal the enemy flag from its stand
 			}
@@ -2517,10 +2625,16 @@ class GameInstance {
 			const enemyFlag = this.flags.find(f => f.team !== team)
 			if (!ownFlag || !enemyFlag) return null
 			const carrying = this.flags.some(f => f._carrier === handle)
-			if (carrying) return { x: ownFlag.homeX, y: ownFlag.homeY, z: ownFlag.homeZ }
-			const offense = (raw.nid % 2) === 0
-			if (offense) return { x: enemyFlag.x, y: enemyFlag.y, z: enemyFlag.z }
-			return { x: ownFlag.homeX, y: ownFlag.homeY, z: ownFlag.homeZ }
+			// `priority` = this destination outranks fighting (BotController.setObjective).
+			// A CARRIER must run the flag home and an OFFENSE bot must actually go and take
+			// it; both were previously abandoned the moment an enemy came into view, which
+			// on Visage is nearly always — so no bot ever completed (or even started) a flag
+			// run. DEFENSE keeps the normal behaviour: standing and fighting near your own
+			// stand IS defending it.
+			if (carrying) return { x: ownFlag.homeX, y: ownFlag.homeY, z: ownFlag.homeZ, priority: true }
+			const offense = this._botCtfRole(handle, team) === 'off'
+			if (offense) return { x: enemyFlag.x, y: enemyFlag.y, z: enemyFlag.z, priority: true }
+			return { x: ownFlag.homeX, y: ownFlag.homeY, z: ownFlag.homeZ, priority: false }
 		}
 		if (this.gameMode === GAME_MODE.DOM && this.controlPoints.length) {
 			let best = null, bestD = Infinity
@@ -2532,6 +2646,27 @@ class GameInstance {
 			return best ? { x: best.x, y: best.y, z: best.z } : null
 		}
 		return null
+	}
+
+	// Stable CTF role ('off' | 'def') for one bot, balanced WITHIN its own team.
+	//
+	// This replaced `(raw.nid % 2) === 0`, which looked like a coin flip but was not: bots
+	// are created in one sweep, so their nids step by a FIXED amount while assignTeam()
+	// alternates teams — making nid parity perfectly correlated with teamId. Every bot on
+	// one team drew offense and every bot on the other drew defense, so one flag was never
+	// attacked at all (measured: flag0 taken 0 times in 3 minutes while flag1 was taken 5).
+	// Deciding once, per team, from the roles already handed out keeps each team's split
+	// even and stable for the bot's lifetime.
+	_botCtfRole(handle, team) {
+		if (handle._ctfRole) return handle._ctfRole
+		let off = 0, def = 0
+		for (const b of this.bots) {
+			if (b === handle || !b._ctfRole) continue
+			if (b.rawEntity && b.rawEntity.teamId !== team) continue
+			if (b._ctfRole === 'off') off++; else def++
+		}
+		handle._ctfRole = off <= def ? 'off' : 'def'
+		return handle._ctfRole
 	}
 
 	// Drive the match state machine + publish the low-rate MatchState entity. Called once
@@ -2551,6 +2686,14 @@ class GameInstance {
 				if (this.scoresTied()) this.enterSuddenDeath()
 				else this.endMatch()
 			}
+		}
+		// Overtime ceiling: if sudden death has run its course, end it now. endMatch()
+		// already tolerates a still-tied score (winner = DRAW), so this needs no
+		// mode-specific knowledge — it is the backstop that guarantees rotation.
+		if (this.matchPhase === MATCH_PHASE.SUDDEN_DEATH
+			&& this.suddenDeathAt && now - this.suddenDeathAt >= SUDDEN_DEATH_MAX_MS) {
+			console.log('[match] SUDDEN_DEATH ceiling reached — ending match')
+			this.endMatch()
 		}
 		if (this.matchPhase === MATCH_PHASE.MATCH_END) {
 			if (now - this.matchEndAt >= INTERMISSION_MS) {

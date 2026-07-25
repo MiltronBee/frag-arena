@@ -500,6 +500,16 @@ export default class Viewmodel {
 
   get isReloading() { return this._state === S.RELOADING }
 
+  // Portrait mount-framing factor published by BABYLONRenderer._applyRenderScale
+  // (see its PORTRAIT FIX v2). 1 = authored landscape framing. Read through the scene
+  // so the viewmodel needs no renderer reference — the same channel scene.metadata
+  // already carries the viewmodel light on.
+  _framing() {
+    const md = this.scene && this.scene.metadata
+    const f = md && md.vmFraming
+    return (typeof f === 'number' && f > 0 && f <= 1) ? f : 1
+  }
+
   _cameraLocalToHolder(camLocal) {
     const r = this.spec.rotation || {}
     const q = BABYLON.Quaternion.FromEulerAngles(r.x || 0, r.y || 0, r.z || 0)
@@ -767,7 +777,17 @@ export default class Viewmodel {
     const rX = this._baseRotX + (this._adsRot.x - this._baseRotX) * a
     const rY = baseRotY + (this._adsRot.y - baseRotY) * a
     const rZ = baseRotZ + (this._adsRot.z - baseRotZ) * a
-    this.holder.position.set(mx + bobX + this.recoilPos.x, my + bobY + this.recoilPos.y, mz + this.recoilPos.z)
+    // PORTRAIT FRAMING (see BABYLONRenderer PORTRAIT FIX v2): on a tall screen the vm
+    // camera's vertical fov is CLAMPED, which also narrows the horizontal frustum below
+    // what these hand-tuned mounts were authored against. Scaling the lateral + vertical
+    // mount offset by the same ratio keeps the gun at the SAME fraction of the frame it
+    // occupies in landscape, so clamping the fov never pushes it off-screen. 1 (landscape,
+    // or before the renderer publishes it) leaves the authored mount untouched.
+    const f = this._framing()
+    this.holder.position.set(
+      mx * f + bobX + this.recoilPos.x,
+      my * f + bobY + this.recoilPos.y,
+      mz + this.recoilPos.z)
     this.holder.rotation.set(rX + this.recoilRot.x, rY + this.recoilRot.y, rZ + this.recoilRot.z)
 
     if (this.muzzle) {

@@ -43,6 +43,179 @@ const NEUTRAL_NAMETAG_CSS = '#d8dbe0'
 // a team samples the same texture). invertY=false matches the glTF loader's UV
 // convention (glTF images are top-left origin; a default Babylon Texture would
 // load them flipped).
+// HELMET SKIN (helmets rendered GREY — helmet_0.glb ships two flat near-black
+// materials with no textures). scripts/make-helmet-texture.py paints a UV-AGNOSTIC
+// allover gunmetal skin; _skinHelmet applies it to the shared template materials ONCE.
+// The helmet is TWO materials (shell + a large jaw-pod) on a PACKED faceplate unwrap,
+// so a placed feature (a brow band) scatters and a per-material teal accent reads as a
+// glowing chin (both verified in Blender). So EVERY helmet material gets the SAME
+// gunmetal skin — dark machined armour that reads as equipment from any angle. Neutral,
+// like the FFA black uniform (the helmet is one shared prop for all players).
+const HELMET_SKIN_URL = '/assets/props/helmet_skin.webp'
+const HELMET_NORM_URL = '/assets/props/helmet_skin_n.webp'
+
+// ---- "IT'S JUST GREY" — why metal props needed this ---------------------------
+// This scene has NO environmentTexture (no IBL): grep BABYLONRenderer, there is a
+// PhotoDome starfield for the sky but nothing is ever assigned to
+// scene.environmentTexture. A glTF PBR material with a high `metallic` gets almost no
+// diffuse contribution — a metal's look comes from what it REFLECTS — so with nothing
+// to reflect it renders as a flat grey/near-black blob NO MATTER WHAT its albedo map
+// says. The helmet shipped at metallic 0.6 and the third-person guns at metallic 1.0,
+// which is exactly why both read as untextured grey while their albedo textures were
+// bound and fully loaded (verified in-game: albedo ready:true, still grey).
+//
+// Every other prop in this project already works around the same hole the same way —
+// the uniforms, the floor pickups, even the Moon drive their own albedo through
+// `emissiveTexture` so the art survives the darkness. So rather than introduce IBL
+// (new assets + a whole-scene relight), metal props are brought back the established
+// way: pull `metallic` down so the albedo contributes real diffuse, push `roughness`
+// up so the remaining highlight is broad instead of a pinpoint, and add a dim self-lit
+// pass off the prop's own albedo.
+const METAL_FIX_EMISSIVE = 0.30 // self-lit scale on the prop's own albedo
+const METAL_FIX_METALLIC = 0.25 // was 0.6 (helmet) / 1.0 (guns) with nothing to reflect
+const METAL_FIX_ROUGHNESS = 0.55
+
+// De-metalize + self-light one PBR material so its albedo actually reads without IBL.
+// Guarded by a marker because these materials are SHARED with the warm-cache template
+// (root.clone() shares materials), so this costs one pass per material, not per player.
+export function _fixUnlitMetal(mat) {
+  if (!mat || mat._metalFixed) return
+  mat._metalFixed = true
+  if ('metallic' in mat && typeof mat.metallic === 'number') mat.metallic = METAL_FIX_METALLIC
+  if ('roughness' in mat && typeof mat.roughness === 'number') mat.roughness = Math.max(mat.roughness === 1 ? 0 : mat.roughness, METAL_FIX_ROUGHNESS)
+  // glTF ORM maps drive metalness per-texel and would re-blacken the surface; the
+  // scalar above only wins once the texture is out of the way.
+  if ('metallicTexture' in mat && mat.metallicTexture) mat.metallicTexture = null
+  // Leave anything that is ALREADY self-lit alone — the armour gem ships a deliberate
+  // purple emissive (KHR_materials_emissive_strength) and must keep its glow.
+  const alreadyGlows = mat.emissiveColor &&
+    (mat.emissiveColor.r + mat.emissiveColor.g + mat.emissiveColor.b) > 0.01
+  if ('emissiveTexture' in mat && !alreadyGlows) {
+    const src = mat.albedoTexture || mat.diffuseTexture
+    if (src && !mat.emissiveTexture) mat.emissiveTexture = src
+    // With no albedo map to re-drive (untextured props like the armour plates), fall back
+    // to a dim wash of the material's own base colour so it still lifts off the black.
+    if (mat.emissiveColor) {
+      const c = src ? null : mat.albedoColor
+      if (c) mat.emissiveColor.set(c.r * METAL_FIX_EMISSIVE, c.g * METAL_FIX_EMISSIVE, c.b * METAL_FIX_EMISSIVE)
+      else mat.emissiveColor.set(METAL_FIX_EMISSIVE, METAL_FIX_EMISSIVE, METAL_FIX_EMISSIVE)
+    }
+  }
+}
+
+// ---- POLISHED GOLD ARMOUR (why the plates do NOT take the _fixUnlitMetal path) ----
+// _fixUnlitMetal is the right rescue for a TEXTURED metal prop: de-metalize it and its
+// albedo map does the storytelling. The armour plates have NO albedo map — just a gold
+// baseColorFactor — so the same treatment leaves a single flat cream tone across every
+// plate, i.e. cream plastic. What sells metal is not its colour but the fact that it
+// MIRRORS something, and this scene's missing scene.environmentTexture is the whole
+// problem.
+//
+// Fix: give the gold material its OWN reflectionTexture. PBRMaterial falls back to
+// reflectionTexture whenever the scene has no environmentTexture, so one tiny stylized
+// equirect (scripts/make-armor-env.py -> armor_env.png, 256x128, dark floor / hot amber
+// horizon / cool sky / one elongated key window) buys real, camera-tracking reflections
+// on the armour and NOTHING ELSE in the scene changes. Deliberately not a scene-wide
+// environmentTexture: that would relight every map, every prop and every uniform.
+const ARMOR_ENV_URL = '/assets/props/armor_env.png'
+const ARMOR_ENV_CUBE_SIZE = 128 // faces built from a 256x128 source; more is wasted detail
+// Tuned in the playground against the shipped env (a 3-way A/B at 2 orbit angles).
+const ARMOR_METALLIC = 0.95     // near-pure metal now that there IS something to reflect.
+                                // Not a flat 1.0: the last 5% of diffuse is what still
+                                // ties the plates to the map's own lights instead of
+                                // making them look pasted on with a fixed studio look.
+const ARMOR_ROUGHNESS = 0.28    // polished, not chrome. Higher blurs the horizon band into
+                                // the ambient and the "polished" read dies; lower turns the
+                                // low-poly plate's flat facets into a crystal mosaic.
+const ARMOR_ENV_INTENSITY = 2.6 // the env is a deliberately DARK LDR png (contrast lives in
+                                // its band + windows, not its ambient), so it needs lifting.
+                                // Paired with the env's PEAK budget: hot spots clip in RED
+                                // only, staying saturated gold instead of blowing to white.
+const ARMOR_SELF_LIT = 0.06     // whisper of base-colour emissive: the void has no fill
+                                // light, and without this the shadow side crushes to black
+
+// One cube per scene, shared by every armour material and every player.
+const _armorEnvCache = new WeakMap() // scene -> EquiRectangularCubeTexture
+function _armorEnv(scene) {
+  if (!scene) return null
+  let env = _armorEnvCache.get(scene)
+  if (env) return env
+  try {
+    // gammaSpace=true: the PNG is authored/stored sRGB-encoded, so let Babylon linearize it.
+    env = new BABYLON.EquiRectangularCubeTexture(ARMOR_ENV_URL, scene, ARMOR_ENV_CUBE_SIZE)
+  } catch (e) { return null }
+  _armorEnvCache.set(scene, env)
+  return env
+}
+
+// Make ONE armour material read as polished metal. Same shared-material guard as
+// _fixUnlitMetal (and it sets that marker too, so a later _fixUnlitMetal call on the
+// same material is a no-op and can never de-metalize the plates behind our back).
+export function _makeArmorMetal(mat, scene) {
+  if (!mat || mat._metalFixed) return
+  // The chest gem ships a deliberate purple KHR_materials_emissive_strength glow. It is
+  // not metal and must not be reflective — hand it to the existing path unchanged.
+  const alreadyGlows = mat.emissiveColor &&
+    (mat.emissiveColor.r + mat.emissiveColor.g + mat.emissiveColor.b) > 0.01
+  if (alreadyGlows) { _fixUnlitMetal(mat); return }
+  if (!('metallic' in mat)) { _fixUnlitMetal(mat); return } // not a PBRMaterial -> old path
+  mat._metalFixed = true
+  mat._armorMetal = true
+
+  const env = _armorEnv(scene || mat.getScene())
+  if (!env) { _fixUnlitMetal(mat); return } // env failed to build -> never leave it black
+
+  mat.reflectionTexture = env
+  mat.environmentIntensity = ARMOR_ENV_INTENSITY
+  mat.metallic = ARMOR_METALLIC
+  mat.roughness = ARMOR_ROUGHNESS
+  // An ORM map would drive metalness per-texel and override the scalar above. The armour
+  // ships none, but stay defensive — the same trap _fixUnlitMetal guards against.
+  if ('metallicTexture' in mat && mat.metallicTexture) mat.metallicTexture = null
+  // A metal has no diffuse: albedoColor IS its reflectance tint (gold's F0). Keep the
+  // exporter's baseColorFactor exactly as authored and let the reflection carry the look.
+  if (mat.emissiveColor) {
+    const c = mat.albedoColor
+    if (c) mat.emissiveColor.set(c.r * ARMOR_SELF_LIT, c.g * ARMOR_SELF_LIT, c.b * ARMOR_SELF_LIT)
+    else mat.emissiveColor.set(0, 0, 0)
+  }
+  mat.emissiveTexture = null // no flat wash: the reflection is the whole point
+}
+
+// Apply the gunmetal skin uniformly to a mounted helmet's meshes. Idempotent via a
+// per-material marker (materials are shared across all helmet clones, so this runs at
+// most twice for the whole session). One Texture instance is shared by both materials.
+export function _skinHelmet(scene, meshes) {
+  const tex = (url) => new BABYLON.Texture(url, scene, false, false) // noMipmap=false, invertY=false (project convention)
+  let albedo = null, normal = null
+  for (const m of meshes) {
+    const mat = m.material
+    if (!mat || mat._helmetSkinned) continue
+    mat._helmetSkinned = true
+    albedo = albedo || tex(HELMET_SKIN_URL)
+    normal = normal || tex(HELMET_NORM_URL)
+    if ('albedoTexture' in mat) { mat.albedoTexture = albedo; if (mat.albedoColor) mat.albedoColor.set(1, 1, 1) }
+    else if ('diffuseTexture' in mat) mat.diffuseTexture = albedo
+    if ('bumpTexture' in mat) mat.bumpTexture = normal
+    if (mat.emissiveColor) mat.emissiveColor.set(0, 0, 0) // kill the GLB's stale near-black emissive
+    // metallic 0.6 with no environment to reflect was the "grey helmet" itself — see
+    // _fixUnlitMetal. It re-drives this same albedo through emissive, so the skin reads.
+    _fixUnlitMetal(mat)
+  }
+}
+
+// Is armour wanted this session? The manifest flag is the default; ?armor=1 / ?armor=0
+// in the URL overrides it, which is what makes an in-game fit pass possible at all (the
+// pieces mount on OTHER players, so they are only ever visible from a second client).
+function _armorWanted(spec) {
+  try {
+    const q = new URLSearchParams(window.location.search).get('armor')
+    if (q === '1' || q === 'true') return true
+    if (q === '0' || q === 'false') return false
+  } catch (e) { /* no window/search -> fall through to the manifest */ }
+  return !!spec.armorEnabled
+}
+
 const _teamTexCache = new Map() // url -> BABYLON.Texture
 function _teamTexture(scene, url) {
   const cached = _teamTexCache.get(url)
@@ -150,6 +323,13 @@ async function _claimBodyImport(scene, url) {
 // of dead-hold slack against the respawn. See _applyDeathClip.
 const DEATH_CLIP_SPEED = 1.8
 
+// How long the death clip gets to prove it is actually driving the rig before we give
+// up on it. setCorpse has already stopped locomotion by then, so a clip that never
+// evaluates leaves NOTHING animating the skeleton and the body stands frozen in BIND
+// POSE (arms out, gun horizontal) for the whole corpse window. See _applyDeathClip.
+const DEATH_CLIP_WATCHDOG_MS = 120
+const DEATH_CLIP_WATCHDOG_FRAMES = 4 // ...and this many frames, so a slow client can't trip it
+
 // HIT-STOP (client-cosmetic "impact freeze"): on taking damage a body's animation
 // near-freezes for a few dozen ms, the empirically top-leverage cue that a hit
 // landed. Purely visual — driven off the replicated hitpoints watch, never on the
@@ -157,6 +337,25 @@ const DEATH_CLIP_SPEED = 1.8
 const HIT_STOP_SPEED = 0.08 // speedRatio during the freeze (0.08 = near-frozen)
 const HIT_STOP_MAX_MS = 120 // cap so a burst of hits can't stack into a long freeze
 const KILL_STOP_MAX_MS = 140 // Doom kill-emphasis freeze on the victim body (NOT global slow-mo)
+
+// ---- LOCOMOTION STABILITY ---------------------------------------------------
+// A remote body's position is INTERPOLATED from network snapshots, so the per-frame
+// delta is uneven even while the player runs at a constant speed. The original clip
+// picker turned that noisy delta straight into a decision with a single speed
+// threshold and a bare |forward| >= |right| comparison — and because switching clips
+// calls group.start(), which restarts the stride from frame 0, every borderline frame
+// visibly reset the legs. Near a 45-degree diagonal (the common case: strafing while
+// running) the two axes trade places constantly, so the body twitched every few frames.
+// Three cheap guards fix it, in increasing order of bluntness:
+//   1. hysteresis   — separate enter/exit speeds instead of one threshold
+//   2. dominance    — the other axis must WIN by a margin to take the body
+//   3. dwell        — a hard floor on how often locomotion may change at all
+// Plus phase carry-over on the swap itself, so a legitimate change of clip keeps the
+// stride's cadence instead of snapping back to frame 0.
+const RUN_ENTER_SPEED = 0.55 // start jogging above this (units/s of smoothed motion)
+const RUN_EXIT_SPEED = 0.30  // ...and only fall back to idle below this
+const DIR_MARGIN = 1.30      // rival axis must beat the current one by 30% to take over
+const LOCO_DWELL_MS = 180    // minimum time on a locomotion clip before another swap
 
 function _loadProp(scene, url) {
   if (_propCache.has(url)) return _propCache.get(url)
@@ -280,9 +479,14 @@ export default class CharacterModel {
     this.current = null
     this._oneShot = null      // active overlay group (shoot/hit)
     this._oneShotToken = 0    // guards stale end-observable callbacks (stop() fires them)
+    this._usingDeathClip = false // death clip owns the corpse pose (blocks the procedural tip)
+    this._deathClipRunning = false // death clip has been seen evaluating past its first frame
+    this._deathClipSince = 0  // when the death clip was (re)started, for the watchdog below
+    this._deathClipFrames = 0 // frames rendered since then (the watchdog needs both)
     this._weaponIndex = null  // currently mounted tp weapon
     this._weaponRoot = null   // cloned prop root parented to the hand bone
     this._helmetRoot = null   // cloned helmet prop parented to the head bone
+    this._armorRoots = null   // cloned armor props parented to torso/limb bones (draft)
     // floating overhead nametag: a plain DOM div in #nametags, positioned each
     // frame by projecting the body's head-level world point to screen space.
     this._nameTag = null
@@ -429,7 +633,12 @@ export default class CharacterModel {
       this.setWeapon(0)
     }
     this._mountHelmet()
-    if (this._corpse) this._applyDeathClip()
+    this._mountArmor()
+    // A death that landed while we were still importing could only set the flag
+    // (setCorpse bails out when !ready). Re-enter corpse mode PROPERLY now, so the body
+    // also gets the tint snapshot + darken pass — and so the idle loop started just
+    // above is stopped instead of being left fighting the death clip over the rig.
+    if (this._corpse) { this._corpse = false; this.setCorpse(true) }
   }
 
   // find the Babylon TransformNode linked to a glTF joint by name. Babylon's glTF
@@ -489,7 +698,64 @@ export default class CharacterModel {
     ;[clone, ...clone.getChildMeshes()].forEach((m) => {
       m.metadata = Object.assign({}, m.metadata, { fragSurface: 'flesh' })
     })
+    // paint the tactical skin (fixes the grey helmet). Idempotent on the shared template
+    // materials, so every player's helmet gets it for one skinning cost.
+    _skinHelmet(this.scene, [clone, ...clone.getChildMeshes()])
     this._helmetRoot = clone
+  }
+
+  // resolve any skeleton bone's TransformNode by name (generalized _headNode).
+  _boneNode(name) {
+    if (!name || !this.skeleton) return null
+    const bone = this.skeleton.bones.find((b) => b.name === name)
+    if (!bone) return null
+    return (bone.getTransformNode && bone.getTransformNode()) || bone._linkedTransformNode || null
+  }
+
+  // ---- ARMOR --------------------------------------------------------------
+  // Mount the Saint Seiya-style armor pieces, each parented to its skeleton bone's
+  // TransformNode (same recipe as _mountHelmet), so they ride the animation. Data-driven
+  // from assets.playerBody.armor; a missing bone or failed load skips that ONE piece and
+  // never breaks the body. `mirror` flips X for the right-side limb (the piece is authored
+  // for the left). Tagged fragSurface:flesh so a shot on the armor books like a body hit,
+  // matching the helmet + body.
+  async _mountArmor() {
+    // The per-bone transforms were re-derived from measured anatomy and tuned in-engine
+    // on 2026-07-24 (scripts/fit-armor.mjs drives the playground's tuneArmor hook), so
+    // assets.playerBody.armorEnabled is now ON. The escape hatch stays: ?armor=1 forces
+    // it on, ?armor=0 forces it off, so the fit can still be judged side-by-side in the
+    // real renderer.
+    if (!_armorWanted(this.spec)) return
+    const specs = this.spec.armor
+    if (!Array.isArray(specs) || !specs.length) return
+    this._armorRoots = this._armorRoots || []
+    for (const s of specs) {
+      const bone = this._boneNode(s.bone)
+      if (!bone) continue
+      let root
+      try { ({ root } = await _loadProp(this.scene, s.url)) } catch (e) { continue }
+      if (this.disposed) return
+      const clone = root.clone('armor_' + s.name, bone)
+      if (!clone) continue
+      clone.setEnabled(true)
+      clone.getChildMeshes().forEach((m) => { m.setEnabled(true); m.isPickable = false })
+      const sx = s.scale * (s.mirror ? -1 : 1)
+      clone.scaling.set(sx, s.scale, s.scale)
+      clone.position.set(s.position.x, s.position.y, s.position.z)
+      clone.rotationQuaternion = null
+      clone.rotation.set(s.rotation.x, s.rotation.y, s.rotation.z)
+      ;[clone, ...clone.getChildMeshes()].forEach((m) => {
+        m.metadata = Object.assign({}, m.metadata, { fragSurface: 'flesh' })
+      })
+      // The gold plates ship with glTF's DEFAULT metallicFactor of 1.0 (the exporter
+      // wrote only baseColorFactor + roughnessFactor). Fully metallic with no scene
+      // environment = the same dark-grey blob the helmet and guns were. Unlike the
+      // textured props, the fix here is to GIVE them something to reflect rather than to
+      // de-metalize them — see _makeArmorMetal. The gem is routed back to the old path by
+      // the already-glows guard inside it.
+      ;[root, ...root.getChildMeshes()].forEach((m) => _makeArmorMetal(m.material, this.scene))
+      this._armorRoots.push(clone)
+    }
   }
 
   // ---- HELD WEAPON --------------------------------------------------------
@@ -522,6 +788,10 @@ export default class CharacterModel {
     clone.position.set(spec.position.x, spec.position.y, spec.position.z)
     clone.rotationQuaternion = null
     clone.rotation.set(spec.rotation.x, spec.rotation.y, spec.rotation.z)
+    // The sci-fi gun GLBs ship metallic=1 / roughness=1 with an ORM map. With no IBL in
+    // this scene that renders as a featureless dark blob — "the guns have no skins".
+    // Applied to the TEMPLATE's shared materials, so it is one pass per weapon type.
+    ;[root, ...root.getChildMeshes()].forEach((m) => _fixUnlitMetal(m.material))
     this._weaponRoot = clone
   }
 
@@ -545,6 +815,16 @@ export default class CharacterModel {
     // model's enabled state, so we stop driving pose here. The death CLIP itself
     // (played in setCorpse) drives the fall; position still follows the host.
     if (this._corpse) {
+      // WATCHDOG: the death clip is the ONLY thing animating the rig in corpse mode, so
+      // confirm it is really evaluating. If it never advances past its first frame we
+      // release it and let FragLayer's procedural tip take the body over, rather than
+      // leaving a bind-pose statue standing for the full corpse window.
+      if (this._usingDeathClip && !this._deathClipRunning) {
+        const anim = this.deathClip.animatables[0]
+        if (anim && anim.masterFrame > this.deathClip.from) this._deathClipRunning = true
+        else if (++this._deathClipFrames > DEATH_CLIP_WATCHDOG_FRAMES &&
+          performance.now() - this._deathClipSince > DEATH_CLIP_WATCHDOG_MS) this._abandonDeathClip()
+      }
       this.holder.setEnabled(!this._hidden)
       this.holder.position.set(p.x, p.y + bodyYOffset(this.spec), p.z)
       if (this._nameTag) this._nameTag.style.display = 'none'
@@ -593,24 +873,61 @@ export default class CharacterModel {
     // motion doesn't flicker between clips frame to frame.
     this._smDx = (this._smDx || 0) * 0.7 + dx * 0.3
     this._smDz = (this._smDz || 0) * 0.7 + dz * 0.3
+    // Decide off the SMOOTHED delta, not the raw one — see LOCOMOTION STABILITY above.
+    // (`speed` stays the raw estimate; nothing else reads it.)
+    const smSpeed = Math.hypot(this._smDx, this._smDz) / Math.max(delta, 1 / 240)
+
+    // 1) HYSTERESIS on moving/idle: between the two thresholds we keep doing whatever
+    //    we were already doing, so jitter around the boundary can't flip the clip.
+    this._moving = this._moving ? smSpeed > RUN_EXIT_SPEED : smSpeed > RUN_ENTER_SPEED
+
     let target = this.idle
-    if (speed > 0.4) {
+    if (this._moving) {
       const yaw = this.host.rotation.y
       const s = Math.sin(yaw)
       const c = Math.cos(yaw)
       const fwd = this._smDx * s + this._smDz * c   // + = forward
       const rgt = this._smDx * c - this._smDz * s   // + = right
-      if (Math.abs(fwd) >= Math.abs(rgt)) {
-        target = (fwd >= 0 ? this.run : this.runBack) || this.run
-      } else {
-        target = (rgt >= 0 ? this.runRight : this.runLeft) || this.run
-      }
+      // 2) DOMINANCE MARGIN: hand the body to the other axis only when it clearly wins.
+      //    A bare >= comparison flip-flops on every near-diagonal run.
+      const af = Math.abs(fwd), ar = Math.abs(rgt)
+      let axis = this._locoAxis || (af >= ar ? 'fb' : 'lr')
+      if (axis === 'fb') { if (ar > af * DIR_MARGIN) axis = 'lr' }
+      else if (af > ar * DIR_MARGIN) axis = 'fb'
+      this._locoAxis = axis
+      target = axis === 'fb'
+        ? (fwd >= 0 ? this.run : this.runBack) || this.run
+        : (rgt >= 0 ? this.runRight : this.runLeft) || this.run
       target = target || this.idle
+    } else {
+      this._locoAxis = null
     }
+
     if (target && target !== this.current) {
-      if (this.current) this.current.stop()
-      target.start(true, 1.0)
-      this.current = target
+      // 3) DWELL: whatever still slips through the guards above cannot machine-gun the
+      //    clip. One locomotion change per LOCO_DWELL_MS, at most.
+      const tNow = performance.now()
+      if (!this._locoAt || tNow - this._locoAt >= LOCO_DWELL_MS) {
+        // PHASE CARRY-OVER: group.start() rewinds to frame 0, so even a CORRECT swap
+        // (jog -> strafe) popped mid-stride. Re-enter the new clip at the same
+        // normalized position and the legs keep their cadence through the change.
+        const prev = this.current
+        let phase = 0
+        if (prev && prev.to > prev.from) {
+          const at = prev.animatables && prev.animatables[0]
+          if (at && typeof at.masterFrame === 'number') {
+            const t = (at.masterFrame - prev.from) / (prev.to - prev.from)
+            if (t >= 0 && t <= 1) phase = t
+          }
+        }
+        if (prev) prev.stop()
+        target.start(true, 1.0)
+        if (phase > 0 && target.to > target.from) {
+          try { target.goToFrame(target.from + phase * (target.to - target.from)) } catch (e) { /* non-fatal */ }
+        }
+        this.current = target
+        this._locoAt = tNow
+      }
     }
 
     // floating nametag: project head-level world position to screen
@@ -756,28 +1073,57 @@ export default class CharacterModel {
       this.holder.rotation.set(0, 0, 0)
       this.meshes.forEach((m) => { m.visibility = 1 })
       this.holder.setEnabled(this.host.isAlive !== false)
-      if (this.idle) { this.idle.start(true, 1.0); this.current = this.idle }
+      // play() not start(): start() is a silent no-op while the group still reads as
+      // started (see _applyDeathClip), which would hand the respawned body back with a
+      // frozen rig. play() re-runs stop+start and always leaves the clip evaluating.
+      if (this.idle) { this.idle.play(true); this.current = this.idle }
     }
   }
 
   // Play the death clip once and freeze on the last frame. FragLayer still owns
   // the corpse lifecycle (tint/persist/fade/reset); this just supplies the pose.
   // If the clip is missing we fall back to FragLayer's procedural tip (applyCorpsePose).
+  //
+  // Two Babylon 9 AnimationGroup quirks have to be survived here, because setCorpse has
+  // already stopped locomotion — a death clip that fails to run leaves NOTHING driving
+  // the skeleton, i.e. the body stands frozen in bind pose for the whole corpse window:
+  //   1. start() returns immediately while the group still reads _isStarted. A stop()
+  //      that finds no animatables to end never clears that flag, so the group can sit
+  //      "started" with ZERO animatables and every later start() is a silent no-op.
+  //      play() runs stop+start (or restarts a live group), which always clears it.
+  //   2. stop() fires onAnimationGroupEndObservable SYNCHRONOUSLY, so an end-handler
+  //      registered before the restart is eaten by our own restart. Register it after.
   _applyDeathClip() {
-    if (!this.deathClip) { this._usingDeathClip = false; return }
+    if (!this.deathClip) { this._abandonDeathClip(); return }
     this._usingDeathClip = true
+    this._deathClipRunning = false
+    this._deathClipFrames = 0
+    this._deathClipSince = performance.now()
     const clip = this.deathClip
     clip.onAnimationGroupEndObservable.clear()
+    // played faster than 1x so the ~2.375s fall completes well inside the 2.5s
+    // respawn window (see DEATH_CLIP_SPEED) instead of getting truncated by jitter.
+    clip.speedRatio = DEATH_CLIP_SPEED
+    clip.play(false)
     clip.onAnimationGroupEndObservable.addOnce(() => {
-      // freeze on the last frame (goToFrame the end) — only if still a corpse
+      // freeze on the last frame (goToFrame the end) — only if still a corpse. Babylon
+      // has usually already stopped the group by the time it raises this, in which case
+      // both calls no-op and the rig simply holds the last frame it evaluated.
       if (!this._corpse || this.disposed) return
       clip.pause()
       clip.goToFrame(clip.to)
     })
-    clip.stop()
-    // played faster than 1x so the ~2.375s fall completes well inside the 2.5s
-    // respawn window (see DEATH_CLIP_SPEED) instead of getting truncated by jitter.
-    clip.start(false, DEATH_CLIP_SPEED)
+    if (!clip.isPlaying || clip.animatables.length === 0) this._abandonDeathClip()
+  }
+
+  // The death clip could not be made to run. Hand the pose back to FragLayer's
+  // procedural tip (applyCorpsePose) and put a locomotion clip back on the rig, so the
+  // body tips over as a corpse instead of standing frozen in bind pose.
+  _abandonDeathClip() {
+    this._usingDeathClip = false
+    this._deathClipRunning = false
+    if (this.deathClip) { this.deathClip.onAnimationGroupEndObservable.clear(); this.deathClip.stop() }
+    if (this.idle) { this.idle.play(true); this.current = this.idle }
   }
 
   // hide the visible body outright (gib case: chunks replace the body)
@@ -820,6 +1166,7 @@ export default class CharacterModel {
     })
     if (this._weaponRoot) this._weaponRoot.dispose()
     if (this._helmetRoot) this._helmetRoot.dispose()
+    if (this._armorRoots) { this._armorRoots.forEach((r) => { try { r.dispose() } catch (e) {} }); this._armorRoots = null }
     if (this.meshes) this.meshes.forEach((m) => m.dispose())
     if (this.holder) this.holder.dispose()
   }

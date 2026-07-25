@@ -80,6 +80,39 @@ export const assets = {
       position: { x: 0, y: 0.078, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
     },
+    // Saint Seiya-style "Cloth" armor (scripts/build-armor.blender.py builds the GLBs).
+    // Each piece is a prop parented to a skeleton bone's TransformNode, exactly like the
+    // helmet. `bone` is the joint; scale/position(bone-local metres)/rotation(rad) are the
+    // mount. `mirror` flips X for the right-side limb. CharacterModel._mountArmor reads this.
+    //
+    // IN-ENGINE TUNED 2026-07-24 (scripts/fit-armor.mjs, via the playground's
+    // tuneArmor hook). The original Blender-fit numbers did NOT survive the
+    // Blender->Babylon bone-frame conversion — the elbow/knee caps rode high and the
+    // chest plate sat on the lower BACK — so every row below was re-derived from
+    // measured anatomy instead of nudged: each piece is a dome along its own +Y, and
+    // each bone's local axes were measured (scratch/probe-axes.mjs) plus the body
+    // surface in bone-local bind space (scratch/probe-bonelocal.mjs):
+    //   spine_03   +X left     +Y up        +Z anterior   chest surface z=+0.126
+    //   clavicle_l +X anterior +Y outboard  +Z up         shoulder joint at y=0.197
+    //   lowerarm_l +X down     +Y to wrist  +Z anterior   elbow at y=0, r~0.06
+    //   calf_l     +X left     +Y to ankle  +Z posterior  knee at y=0, patella z=-0.062
+    // The rotations are therefore exact axis mappings ("point the dome at the joint"),
+    // not hand-guessed radians. Right-side rows are the EXACT mirror of their left twin
+    // (px, ry, rz negated) — the rig is mirror-symmetric about x=0 at rest, verified to
+    // 0.00000, so the reflection identity is exact. Keep them in sync if you retune.
+    //
+    // ON: verified riding the bones through Idle_Loop / Jog_Fwd_Loop / Pistol_Shoot.
+    // ?armor=0 in the URL forces it off for a side-by-side.
+    armorEnabled: true,
+    armor: [
+      { name: 'chest',     url: '/assets/props/armor_chest.glb',    bone: 'spine_03',   scale: 0.78, position: { x: 0, y: 0.045, z: 0.072 }, rotation: { x: -1.571, y: 3.142, z: 0 }, mirror: false },
+      { name: 'pauldronL', url: '/assets/props/armor_pauldron.glb', bone: 'clavicle_l', scale: 0.88, position: { x: 0, y: 0.19, z: 0 }, rotation: { x: 0, y: 1.571, z: 0.55 }, mirror: false },
+      { name: 'pauldronR', url: '/assets/props/armor_pauldron.glb', bone: 'clavicle_r', scale: 0.88, position: { x: 0, y: 0.19, z: 0 }, rotation: { x: 0, y: -1.571, z: -0.55 }, mirror: true },
+      { name: 'elbowL',    url: '/assets/props/armor_elbow.glb',    bone: 'lowerarm_l', scale: 0.95, position: { x: 0.013, y: 0.01, z: -0.012 }, rotation: { x: -1.571, y: 0, z: 0 }, mirror: false },
+      { name: 'elbowR',    url: '/assets/props/armor_elbow.glb',    bone: 'lowerarm_r', scale: 0.95, position: { x: -0.013, y: 0.01, z: -0.012 }, rotation: { x: -1.571, y: 0, z: 0 }, mirror: true },
+      { name: 'kneeL',     url: '/assets/props/armor_knee.glb',     bone: 'calf_l',     scale: 0.80, position: { x: 0.009, y: 0.012, z: -0.012 }, rotation: { x: -1.571, y: 0, z: 0 }, mirror: false },
+      { name: 'kneeR',     url: '/assets/props/armor_knee.glb',     bone: 'calf_r',     scale: 0.80, position: { x: -0.009, y: 0.012, z: -0.012 }, rotation: { x: -1.571, y: 0, z: 0 }, mirror: true },
+    ],
   },
 
 }

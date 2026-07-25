@@ -204,8 +204,8 @@ try {
 	const morphMoved = audit.flags.every((f) => (influenceRange[f.nid] || 0) > 0.1)
 	const team0 = audit.flags.find((f) => f.team === 0)
 	const team1 = audit.flags.find((f) => f.team === 1)
-	const redOnTeam0 = !!(team0 && team0.albedo && /Prop_Flag_red/.test(team0.albedo))
-	const noRedOnTeam1 = !!(team1 && team1.albedo && !/Prop_Flag_red/.test(team1.albedo))
+	const redOnTeam0 = !!(team0 && team0.albedo && /Prop_Flag_bonk/.test(team0.albedo))
+	const noRedOnTeam1 = !!(team1 && team1.albedo && /Prop_Flag_wif/.test(team1.albedo))
 	const twoFlags = audit.count === 2
 	const allModels = audit.flags.every((f) => f.hasModel)
 	const allPlaying = audit.flags.every((f) => f.animPlaying)

@@ -5,8 +5,8 @@ Kd 0.8 0.8 0.8
 Ka 0.1 0.1 0.1
 Ks 0.0 0.0 0.0
 illum 1
-map_Kd textures/CTF_Crypt_C-rst-128-B.webp?v=sol1
-map_bump -bm 1.2 textures/CTF_Crypt_C-rst-128-B_n.webp
+map_Kd textures/CTF_Crypt_C-rst-128-B.webp?v=bonkwif1
+map_bump -bm 1.2 textures/CTF_Crypt_C-rst-128-B_n.webp?v=bonkwif1
 
 
 newmtl CTF_Crypt_C-st-128-R
@@ -14,8 +14,8 @@ Kd 0.8 0.8 0.8
 Ka 0.1 0.1 0.1
 Ks 0.0 0.0 0.0
 illum 1
-map_Kd textures/CTF_Crypt_C-st-128-R.webp?v=sol1
-map_bump -bm 1.2 textures/CTF_Crypt_C-st-128-R_n.webp
+map_Kd textures/CTF_Crypt_C-st-128-R.webp?v=bonkwif1
+map_bump -bm 1.2 textures/CTF_Crypt_C-st-128-R_n.webp?v=bonkwif1
 
 
 newmtl Crypt2_Deco_C_seal7

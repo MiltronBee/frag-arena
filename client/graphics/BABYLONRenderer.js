@@ -16,6 +16,17 @@ import { applyTextureVariants } from './textureVariants'
 // impact FX off it.
 const VM_LAYER_MASK = 0x10000000
 
+// VIEWMODEL FRAMING (see BABYLONRenderer._applyRenderScale's PORTRAIT FIX v2).
+// VM_FOV_BASE is the authored viewmodel fov — every hand-tuned weapon mount in
+// assetManifest was framed against it at landscape aspect.
+const VM_FOV_BASE = 1.0
+// Hard ceiling on the viewmodel camera's VERTICAL fov. Portrait tries to widen the
+// vertical frame to ~1.74 rad to hold the horizontal framing; past this the camera
+// starts showing the open end of the arms mesh. 1.30 rad (~74.5 deg) is the widest
+// that still hides it (measured with scripts/_probe-portrait-gun.mjs) while keeping
+// as much horizontal frame as possible for the gun.
+const VM_VFOV_MAX = 1.05
+
 // Blood/impact VFX — DISTINCT POOLED CLASSES (per FX consult), not one droplet
 // spray. The "dark core" rule: a bright crimson ADDITIVE mist puff sells the hot
 // atomized flash; dark-burgundy ALPHA streaks + drops carry the weight; floor
@@ -105,10 +116,46 @@ class BABYLONRenderer {
 			// frame entirely — "guns appear off screen in vertical mode". Fixing the
 			// HORIZONTAL fov on the vm camera in portrait keeps the authored gun
 			// framing at any aspect; the world camera is left alone (gameplay FOV).
+			//
+			// PORTRAIT FIX v2 (2026-07-24) — "on mobile I can see the ending of the arms
+			// model". FOVMODE_HORIZONTAL_FIXED solved the ORIGINAL portrait bug (a
+			// vertical-fixed fov collapses the horizontal frustum on a tall screen and the
+			// gun leaves frame), but it over-corrected: pinning the HORIZONTAL fov on a
+			// 390x844 phone inflates the implied VERTICAL fov to
+			//   2*atan(tan(0.5) / (390/844)) = 1.74 rad ~ 100 degrees
+			// — nearly double the authored 1.0 rad. The camera then sees far below the
+			// framing the viewmodel was authored for, and the player looks straight at the
+			// open, uncapped end of the arms/weapon mesh where the model simply stops.
+			//
+			// So: keep the horizontal framing intent, but CLAMP the vertical fov it implies.
+			// Expressed as VERTICAL_FIXED with an explicit fov, which is exactly equivalent
+			// to horizontal-fixed while the clamp is not binding, and stops widening once it
+			// is. Below the clamp point the horizontal frustum is narrower than the authored
+			// mount assumes, so _vmFraming (published for Viewmodel) pulls the mount back
+			// toward the view axis by the same ratio — the gun stays framed WITHOUT
+			// re-opening the vertical frame that exposed the mesh end.
 			if (this.vmCamera) {
-				this.vmCamera.fovMode = cssW < cssH
-					? BABYLON.Camera.FOVMODE_HORIZONTAL_FIXED
-					: BABYLON.Camera.FOVMODE_VERTICAL_FIXED
+				const aspect = Math.max(0.2, cssW / Math.max(1, cssH))
+				this.vmCamera.fovMode = BABYLON.Camera.FOVMODE_VERTICAL_FIXED
+				if (aspect >= 1) {
+					this.vmCamera.fov = VM_FOV_BASE
+					this._vmFraming = 1
+				} else {
+					// vertical fov that would hold the authored HORIZONTAL fov at this aspect
+					const vForH = 2 * Math.atan(Math.tan(VM_FOV_BASE / 2) / aspect)
+					const v = Math.min(vForH, VM_VFOV_MAX)
+					this.vmCamera.fov = v
+					// how much horizontal frustum we gave up by clamping (1 = none). The
+					// viewmodel multiplies its lateral/vertical mount offset by this so the
+					// gun sits at the same FRACTION of the frame as it does in landscape.
+					this._vmFraming = Math.tan(v / 2) / Math.tan(vForH / 2)
+				}
+				// publish for Viewmodel (which holds a scene, not a renderer ref) — the same
+				// channel the viewmodel light already travels on.
+				if (this.scene) {
+					this.scene.metadata = this.scene.metadata || {}
+					this.scene.metadata.vmFraming = this._vmFraming
+				}
 			}
 		}
 		this._applyRenderScale()
@@ -158,7 +205,7 @@ class BABYLONRenderer {
 
 		this.vmCamera = new BABYLON.TargetCamera('vmCamera', BABYLON.Vector3.Zero(), this.scene)
 		this.vmCamera.parent = this.camera
-		this.vmCamera.fov = 1.0 // Fixed viewmodel FOV
+		this.vmCamera.fov = VM_FOV_BASE // Fixed viewmodel FOV (see _applyRenderScale)
 		this.vmCamera.minZ = 0.01 // Prevent close clipping
 		this.vmCamera.maxZ = 10
 		this.vmCamera.layerMask = VM_LAYER_MASK // Renders only viewmodel meshes
@@ -1464,6 +1511,17 @@ class BABYLONRenderer {
 		// (~16x too slow). Babylon 4.0.3 stepped animations off absolute wall-clock
 		// time so the manual loop needed no bracket; 9.x is delta-based, hence this.
 		this.engine.beginFrame()
+
+		// ...and Babylon 9 gates ALL animation behind scene._pendingData: Scene._animate()
+		// returns BEFORE it seeds _animationTimeLast whenever anything is still loading, so
+		// until one frame renders with nothing pending, not a single AnimationGroup is ever
+		// stepped and every character renders in BIND POSE (arms straight out, gun
+		// horizontal). This game streams props/textures/uniforms for the whole match, so
+		// _pendingData is rarely empty early on and bodies stayed T-posed for seconds — the
+		// "enemy models have glitchy animations" report, and the bind-pose corpse (a death
+		// inside that window stops locomotion and the death clip never ticks either).
+		// Seed the timestamp ourselves once; Babylon maintains it from then on.
+		if (!this.scene._animationTimeLast) this.scene._animationTimeLast = performance.now()
 
 		// decay the muzzle light pulse back to its idle intensity 0 over the weapon's
 		// light.life. decayPow>1 front-loads the energy: peak*(1-t)^2 reads as a FLASH,

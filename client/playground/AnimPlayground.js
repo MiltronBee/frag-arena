@@ -1,5 +1,6 @@
 import * as BABYLON from '../babylon.js'
 import { assets, tpWeapons } from '../assets/assetManifest'
+import { _skinHelmet, _fixUnlitMetal, _makeArmorMetal } from '../graphics/CharacterModel'
 
 // ---------------------------------------------------------------------------
 // ANIM PLAYGROUND — a client-only clip inspector. No server, no netcode.
@@ -40,6 +41,10 @@ export default class AnimPlayground {
     this.speed = 1.0
     this.weaponIndex = -1         // -1 = none
     this._weaponRoot = null
+    this._armorRoots = new Map()  // armor piece name -> mounted root mesh
+    this._armorXform = new Map()  // armor piece name -> last-applied { scale, px..rz }
+    this._armorTwin = new Map()   // left piece name -> its mirrored right twin
+    this._boneNodes = new Map()   // bone name -> linked TransformNode (per model load)
     this._loadToken = 0
     // role -> clip name, seeded from the manifest so we can diff our picks
     this.mapping = Object.assign(
@@ -159,9 +164,11 @@ export default class AnimPlayground {
     this._weaponIndexApplied = -1
     this._cachedHeadNode = null
     this._helmetRoot = null
+    this._boneNodes = new Map()
     this._rebuildClipList()
     if (this.weaponIndex >= 0) this._mountWeapon(this.weaponIndex)
     this._mountHelmet()
+    this._mountArmor()
 
     // auto-play the currently-mapped idle so something moves on load
     const startClip = this.mapping.idle && this.byName.has(this.mapping.idle)
@@ -178,6 +185,10 @@ export default class AnimPlayground {
     this.byName = new Map()
     if (this._weaponRoot) { this._weaponRoot.dispose(); this._weaponRoot = null }
     if (this._helmetRoot) { this._helmetRoot.dispose(); this._helmetRoot = null }
+    this._armorRoots.forEach((r) => r.dispose())
+    this._armorRoots.clear()
+    this._armorXform.clear()
+    this._armorTwin.clear()
     if (this.meshes) this.meshes.forEach((m) => m.dispose())
     this.meshes = []
     if (this.holder) { this.holder.dispose(); this.holder = null }
@@ -263,6 +274,10 @@ export default class AnimPlayground {
     root.position.set(spec.position.x, spec.position.y, spec.position.z)
     root.rotationQuaternion = null
     root.rotation.set(spec.rotation.x, spec.rotation.y, spec.rotation.z)
+    // Same de-metalize pass CharacterModel.setWeapon applies to held guns. Without it
+    // this inspector would LIE about how the gun reads in-game (metallic 1.0 with no
+    // environmentTexture = flat grey), which is the one thing it exists not to do.
+    ;[root, ...root.getChildMeshes()].forEach((m) => _fixUnlitMetal(m.material))
     this._weaponRoot = root
   }
 
@@ -306,6 +321,9 @@ export default class AnimPlayground {
     root.position.set(spec.position.x, spec.position.y, spec.position.z)
     root.rotationQuaternion = null
     root.rotation.set(spec.rotation.x, spec.rotation.y, spec.rotation.z)
+    // same tactical skin the in-game CharacterModel applies (this inspector is where
+    // helmet mounts get tuned, so it must show the real material)
+    _skinHelmet(this.scene, [root, ...root.getChildMeshes()])
     this._helmetRoot = root
     // seed last-applied values so setHelmetTransform partial updates work
     this._helmetXform = {
@@ -330,6 +348,140 @@ export default class AnimPlayground {
     if (t.rz != null) x.rz = t.rz
     this._helmetRoot.rotationQuaternion = null
     this._helmetRoot.rotation.set(x.rx || 0, x.ry || 0, x.rz || 0)
+  }
+
+  // ---- ARMOR MOUNT (mirrors CharacterModel._mountArmor recipe) ------------
+  // Same data path as the game: every row of assets.playerBody.armor is a prop
+  // parented to its bone's TransformNode with a bone-local scale/pos/rot, and
+  // `mirror` flips X so one authored (left) piece serves both limbs. The
+  // playground mounts unconditionally (?armor=0 opts out) — the manifest's
+  // armorEnabled gate is a GAMEPLAY switch, and this inspector is where the fit
+  // gets tuned, so it must always show the pieces.
+
+  // resolve any skeleton bone's linked TransformNode by name — the generalized
+  // form of _handNode/_headNode (CharacterModel._boneNode is the same lookup).
+  _boneNode(name) {
+    if (!name || !this.skeleton) return null
+    if (this._boneNodes.has(name)) return this._boneNodes.get(name)
+    const bone = this.skeleton.bones.find((b) => b.name === name)
+    const node = bone
+      ? ((bone.getTransformNode && bone.getTransformNode()) || bone._linkedTransformNode || null)
+      : null
+    this._boneNodes.set(name, node)
+    return node
+  }
+
+  async _mountArmor() {
+    const specs = assets.playerBody.armor
+    if (!Array.isArray(specs) || !specs.length) return
+    try {
+      if (new URLSearchParams(window.location.search).get('armor') === '0') return
+    } catch (e) { /* no window/search -> mount anyway */ }
+
+    // pair each mirrored piece with the left twin it derives from, by name
+    // (fooL -> fooR). Only the LEFT of each pair is tuned; setArmorTransform
+    // pushes the reflection onto the right so 4 numbers drive 7 mounts.
+    this._armorTwin.clear()
+    for (const s of specs) {
+      if (!s.mirror || !/R$/.test(s.name)) continue
+      const left = s.name.replace(/R$/, 'L')
+      if (specs.some((o) => o.name === left)) this._armorTwin.set(left, s.name)
+    }
+
+    const token = this._loadToken
+    for (const s of specs) {
+      const bone = this._boneNode(s.bone)
+      if (!bone) { console.warn('[playground] no bone ' + s.bone + '; ' + s.name + ' not mounted'); continue }
+      const slash = s.url.lastIndexOf('/') + 1
+      let res
+      try {
+        res = await BABYLON.SceneLoader.ImportMeshAsync('', s.url.slice(0, slash), s.url.slice(slash), this.scene)
+      } catch (err) { console.warn('[playground] armor load failed ' + s.url, err); continue }
+      if (token !== this._loadToken) { res.meshes.forEach((m) => m.dispose()); continue }
+
+      const root = res.meshes[0]
+      root.name = 'armor_' + s.name
+      root.parent = bone
+      root.getChildMeshes().forEach((m) => { m.isPickable = false })
+      // the gold plates ship glTF's default metallic 1.0 and this scene has no
+      // IBL, so untreated they render as grey blobs (same hole the helmet and the
+      // tp guns fell into). Untextured gold cannot be rescued by de-metalizing, so
+      // the plates get their own reflection env instead — identical call to the
+      // game's _mountArmor, so what is tuned here is what ships. Gem unaffected.
+      ;[root, ...root.getChildMeshes()].forEach((m) => _makeArmorMetal(m.material, this.scene))
+      this._armorRoots.set(s.name, root)
+      this._armorXform.set(s.name, {
+        scale: s.scale, mirror: !!s.mirror,
+        px: s.position.x, py: s.position.y, pz: s.position.z,
+        rx: s.rotation.x, ry: s.rotation.y, rz: s.rotation.z,
+      })
+      this._applyArmorXform(s.name)
+    }
+  }
+
+  // push one piece's stored transform onto its mounted root. `mirror` is the
+  // manifest's negative-X-scale trick, kept identical to CharacterModel so what
+  // we tune here is what the game renders.
+  _applyArmorXform(name) {
+    const root = this._armorRoots.get(name)
+    const x = this._armorXform.get(name)
+    if (!root || !x) return
+    root.scaling.set(x.scale * (x.mirror ? -1 : 1), x.scale, x.scale)
+    root.position.set(x.px || 0, x.py || 0, x.pz || 0)
+    root.rotationQuaternion = null
+    root.rotation.set(x.rx || 0, x.ry || 0, x.rz || 0)
+  }
+
+  // Live armor fit tuning (for the probe scripts). name is a piece name from the
+  // manifest; t = { scale, px, py, pz, rx, ry, rz }, any subset — omitted axes
+  // keep their last-applied value.
+  //
+  // Tuning a LEFT piece also drives its right twin, so the pair stays exactly
+  // symmetric. The rig is mirror-symmetric about its own x=0 at rest (verified:
+  // rest(clavicle_r) == Mx*rest(clavicle_l)*Mx, and likewise for lowerarm/calf),
+  // which collapses the general reflection to a per-axis sign flip: reflecting a
+  // bone-local transform in the bone's own X negates the X offset, and
+  // conjugating a rotation by that reflection negates the Y and Z Euler terms
+  // (Babylon composes rotation as Ry*Rx*Rz and conjugation distributes over the
+  // product, so the identity is exact, not an approximation). The mesh handedness
+  // flip is the piece's own negative X scale.
+  setArmorTransform(name, t) {
+    const x = this._armorXform.get(name)
+    if (!x || !t) return
+    for (const k of ['scale', 'px', 'py', 'pz', 'rx', 'ry', 'rz']) {
+      if (t[k] != null) x[k] = t[k]
+    }
+    this._applyArmorXform(name)
+    const twin = this._armorTwin.get(name)
+    if (twin) {
+      const tw = this._armorXform.get(twin)
+      if (tw) {
+        Object.assign(tw, {
+          scale: x.scale, px: -x.px, py: x.py, pz: x.pz,
+          rx: x.rx, ry: -x.ry, rz: -x.rz,
+        })
+        this._applyArmorXform(twin)
+      }
+    }
+  }
+
+  // alias matching the probe scripts' vocabulary (setHelmetTransform's sibling)
+  tuneArmor(name, t) { this.setArmorTransform(name, t) }
+
+  // Emit the tuned pieces as assetManifest armor rows, ready to paste back.
+  dumpArmor() {
+    const n = (v) => Number((v || 0).toFixed(3))
+    const rows = (assets.playerBody.armor || []).map((s) => {
+      const x = this._armorXform.get(s.name) || {}
+      return "      { name: '" + s.name + "', url: '" + s.url + "', bone: '" + s.bone +
+        "', scale: " + n(x.scale) +
+        ', position: { x: ' + n(x.px) + ', y: ' + n(x.py) + ', z: ' + n(x.pz) + ' }' +
+        ', rotation: { x: ' + n(x.rx) + ', y: ' + n(x.ry) + ', z: ' + n(x.rz) + ' }' +
+        ', mirror: ' + (!!x.mirror) + ' },'
+    })
+    const text = rows.join('\n')
+    console.log('[playground] armor rows:\n' + text)
+    return text
   }
 
   // ---- UI ------------------------------------------------------------------

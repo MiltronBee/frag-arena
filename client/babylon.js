@@ -68,6 +68,11 @@ export { TargetCamera } from '@babylonjs/core/Cameras/targetCamera.js'
 export { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera.js'
 export { AnimationGroup } from '@babylonjs/core/Animations/animationGroup.js'
 export { MaterialPluginBase } from '@babylonjs/core/Materials/materialPluginBase.js' // mapMaterialPop hex-tile plugin (import registers the plugin base runtime)
+// Builds a real cubemap from one equirectangular PNG at load. Used ONLY by the gold
+// armour's private reflection environment (CharacterModel._makeArmorMetal) — this scene
+// still has no scene.environmentTexture, so nothing else is affected. The raw-cube
+// engine extension it needs is already registered by Engines/engine.js (node barrel).
+export { EquiRectangularCubeTexture } from '@babylonjs/core/Materials/Textures/equiRectangularCubeTexture.js'
 
 // ---- window.BABYLON (3 in-page harness scripts read it: probe-anim,
 // verify-fire-attachment, verify-helmet-anims; plus shot-objmap/shot-visage).

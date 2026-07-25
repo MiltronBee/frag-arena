@@ -23,7 +23,17 @@ const TRACKS = {
   match: '/assets/music/frag-grenade.mp3',
 }
 
-const DEFAULT_VOLUME = 0.35   // low by default — background bed, not foreground
+// MIX RETUNE (2026-07-24, "music is too loud"). 0.35 sat on top of the weapons and
+// the narrator; the bed belongs UNDER both. See WeaponAudio's MIX block for the two
+// matching levers (narrator bus gain, shot gain).
+const DEFAULT_VOLUME = 0.18   // low by default — background bed, not foreground
+// Bumping MIX_VERSION RE-BASELINES every existing player's saved 'musicVolume' to the
+// new default ONCE. Without this, changing DEFAULT_VOLUME would only affect brand-new
+// browsers: anyone who has already played has 0.35 persisted in localStorage (written
+// on first load) and would keep hearing the OLD, too-loud bed forever. A player who
+// deliberately moves the Settings slider AFTER this migration keeps their choice,
+// because the migration runs at most once per version.
+const MIX_VERSION = '2'
 const FADE_PER_SEC = 1.8      // volume units/sec while crossfading (~0.5s full fade)
 
 function clamp01(v) {
@@ -68,17 +78,63 @@ export default class MusicManager {
     this.unlocked = this._preUnlocked
     this._rafId = null
     this._lastTs = null
+    this._duckUntil = 0       // performance.now() ms at which the narrator duck releases
+    this._duckAmount = 1      // multiplier on baseVolume while ducked (1 = no duck)
   }
 
   _loadVolume() {
+    // ONE-TIME re-baseline to the new default when the mix version moves (see
+    // MIX_VERSION). Runs before the stored read, so the stored value is replaced,
+    // not merely ignored.
+    try {
+      if (localStorage.getItem('musicMixVersion') !== MIX_VERSION) {
+        localStorage.setItem('musicMixVersion', MIX_VERSION)
+        localStorage.setItem('musicVolume', String(DEFAULT_VOLUME))
+        return DEFAULT_VOLUME
+      }
+    } catch (e) { /* private-mode / storage-disabled: fall through to the default */ }
     const raw = parseFloat(localStorage.getItem('musicVolume'))
     return isNaN(raw) ? DEFAULT_VOLUME : clamp01(raw)
+  }
+
+  // ── DUCKING (narrator priority) ────────────────────────────────────────────────
+  // Push the bed down to `amount` (a multiplier on baseVolume) for `hold` seconds,
+  // then release back. Called by WeaponAudio.announce via the hook the Simulator
+  // wires up, so a callout is never fighting the music for the same space.
+  //
+  // Overlapping ducks take the DEEPEST level and the LATEST expiry, so a burst of
+  // callouts holds the bed down continuously instead of pumping it back up between
+  // them. The per-frame _ease already interpolates toward _targetFor(), so ducking is
+  // just a factor there — no second animation loop.
+  setDuck(amount, hold = 1.4) {
+    const a = clamp01(amount)
+    const until = (typeof performance !== 'undefined' ? performance.now() : Date.now()) + hold * 1000
+    if (this._duckUntil && this._duckUntil > until && this._duckAmount <= a) {
+      // an existing deeper/longer duck already covers this one
+      this._ensureRaf()
+      return
+    }
+    this._duckAmount = this._duckUntil && this._duckUntil > (typeof performance !== 'undefined' ? performance.now() : Date.now())
+      ? Math.min(this._duckAmount, a)
+      : a
+    this._duckUntil = Math.max(this._duckUntil || 0, until)
+    this._ensureRaf()
+  }
+
+  // current duck multiplier (1 = no duck). Expired ducks clear themselves here so
+  // there is no timer to leak.
+  _duckFactor() {
+    if (!this._duckUntil) return 1
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+    if (now >= this._duckUntil) { this._duckUntil = 0; this._duckAmount = 1; return 1 }
+    return this._duckAmount == null ? 1 : this._duckAmount
   }
 
   // the volume the CURRENT track eases toward (0 when muted); all others ease to 0.
   _targetFor(key) {
     if (key !== this.current) return 0
-    return this.muted ? 0 : this.baseVolume
+    if (this.muted) return 0
+    return this.baseVolume * this._duckFactor()
   }
 
   // Record the desired track and, if we're unlocked, start easing toward it. Safe
@@ -152,7 +208,10 @@ export default class MusicManager {
   // Ease every track toward its target volume. Returns true when everything has
   // settled (so the RAF can stop and we're idle until the next state change).
   _ease(dt) {
-    let settled = true
+    // A live duck must keep the RAF alive even once the fade has settled at the
+    // DUCKED level — otherwise the loop stops and the bed never eases back up when
+    // the duck expires. _duckFactor() self-clears on expiry, so this releases itself.
+    let settled = this._duckFactor() === 1
     const maxStep = FADE_PER_SEC * dt
     for (const key of Object.keys(this.tracks)) {
       const el = this.tracks[key]

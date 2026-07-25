@@ -163,6 +163,50 @@ function fitClone(clone, srcRoot, targetSize) {
 	}
 }
 
+// ── PICKUP READABILITY ("weapon pickups are grey") ───────────────────────────────
+// The tp_* weapon GLBs are NOT untextured — each ships a baked baseColour atlas. The
+// problem is the atlas is near-black gunmetal (tp_rifle's mean pixel is RGB 23,23,21),
+// and pickupConfig deliberately rests weapons FLAT on the floor with no spin and no bob
+// (REST_HEIGHT 0.1, design note #38). A black prop lying flat on a dark arena floor,
+// lit only by the scene's dim ambient, reads as an unlit grey smudge — which is exactly
+// what "grey" describes.
+//
+// Fix WITHOUT touching the flat-rest design decision or repainting the atlases: make the
+// pickup SELF-LIT off its own albedo. This is the same recipe CharacterModel uses for the
+// uniforms (emissiveTexture = the albedo texture, scaled by a dim emissiveColor), so the
+// prop's real detail survives darkness instead of being flattened to a silhouette. A tight
+// specular adds the metal glint that tells the eye "this is a weapon, pick it up".
+//
+// Materials are SHARED with the warm-cache template (root.clone() shares them), so this
+// runs once per material and is guarded by a marker — every later clone of the same
+// weapon inherits the already-lit material for free.
+const PICKUP_SELF_LIT = 0.34   // emissive scale on the prop's own albedo
+function litPickupMaterials(root) {
+  const meshes = [root, ...root.getChildMeshes()]
+  meshes.forEach((m) => {
+    const mat = m.material
+    if (!mat || mat._pickupLit) return
+    mat._pickupLit = true
+    // The self-lit pass below is not enough on its own for the weapon props: they ship
+    // metallic=1 from glTF, and with no scene environmentTexture a metal has nothing to
+    // reflect, so the albedo never reaches the screen. Drop the metalness first (see
+    // CharacterModel._fixUnlitMetal, same fix for the in-hand copy of these guns).
+    if ('metallic' in mat && typeof mat.metallic === 'number' && mat.metallic > 0.35) mat.metallic = 0.25
+    if ('metallicTexture' in mat && mat.metallicTexture) mat.metallicTexture = null
+    // PBR (glTF) path: re-use the albedo as the emissive so the self-lit pass keeps the
+    // painted detail rather than washing the prop to a flat colour.
+    if ('emissiveTexture' in mat) {
+      if (mat.albedoTexture) mat.emissiveTexture = mat.albedoTexture
+      if (mat.emissiveColor) mat.emissiveColor.set(PICKUP_SELF_LIT, PICKUP_SELF_LIT, PICKUP_SELF_LIT)
+      // a touch less rough so the sun actually glints off the barrel
+      if (typeof mat.roughness === 'number') mat.roughness = Math.min(mat.roughness, 0.55)
+    } else if (mat.emissiveColor) {
+      // StandardMaterial fallback (no PBR slots): flat self-lit wash
+      mat.emissiveColor.set(PICKUP_SELF_LIT, PICKUP_SELF_LIT, PICKUP_SELF_LIT)
+    }
+  })
+}
+
 // Attach a Pickup's real model (+ optional pedestal) to entity.mesh (the positioned
 // placeholder box). MIRRORS attachHealthModel: async warm-cache clone, async-delete
 // guard, auto-scale + center, hide the placeholder box. Stores the spinnable item model
@@ -193,16 +237,85 @@ async function attachPickupModel(entity, spec) {
 	clone.getChildMeshes().forEach((m) => { m.setEnabled(true); m.isPickable = false })
 	clone.isPickable = false
 	fitClone(clone, root, spec.size)
+	// make it read on a dark floor (see litPickupMaterials) — applied to the TEMPLATE's
+	// shared materials, so it costs one pass per weapon type, not one per pickup.
+	litPickupMaterials(root)
 	if (entity._disposed || entity.mesh.isDisposed()) { clone.dispose(false, true); return }
 	if (entity.mesh.material) entity.mesh.material.alpha = 0 // hide the placeholder box
 	entity._pickupModel = clone
 }
 
+// ── LIFT (Mover) SKIN ────────────────────────────────────────────────────────────
+// The Mover entity ships a plain grey StandardMaterial (common/entity/Mover.js) because
+// that file is SHARED with the headless server: `Texture` lives only in the CLIENT
+// Babylon barrel (client/babylon.js), and pulling it into common/babylon.node.js would
+// drag a render-only module into the server bundle — exactly what that barrel's header
+// forbids. So the lift's real skin is applied HERE, client-side, where Texture is legal.
+//
+// Assets: scripts/make-lift-texture.py authors a SEAMLESS industrial tread-plate albedo
+// + matching normal map (flat albedo — the scene owns lighting; the relief is carried by
+// the bump map, per the map-pipeline rule).
+const LIFT_ALBEDO_URL = '/assets/props/lift_deck.webp'
+const LIFT_NORMAL_URL = '/assets/props/lift_deck_n.webp'
+// World units per texture repeat. The plate is authored ~7 studs across, so 1.5 puts
+// roughly 5 studs per metre — reads as real tread plate at player scale instead of as
+// stretched wallpaper.
+const LIFT_TILE = 1.5
+
+// Materials are cached per QUANTIZED mover footprint. UV scale lives on the Texture (not
+// the material) in Babylon, so a per-mover tiling would mean a per-mover Texture — N GPU
+// uploads of the same image. Quantizing the footprint means every same-sized lift on a map
+// (the normal case: a map's lifts are built from one prefab) shares ONE material + ONE
+// texture, while a differently-sized lift still gets correct texel density.
+const _liftMats = new Map()
+
+function liftMaterial(scene, width, depth) {
+  // 0.5-unit buckets: fine enough that density never visibly drifts, coarse enough that
+  // near-identical lifts collapse to one entry.
+  const key = `${Math.round(width * 2) / 2}x${Math.round(depth * 2) / 2}`
+  const hit = _liftMats.get(key)
+  if (hit) return hit
+
+  const mat = new BABYLON.StandardMaterial('liftMat_' + key, scene)
+  const uScale = Math.max(1, width / LIFT_TILE)
+  const vScale = Math.max(1, depth / LIFT_TILE)
+
+  // noMipmap=false, invertY=false — the same convention CharacterModel._teamTexture and
+  // the flag skin swap use, so this texture orients like every other one in the project.
+  const alb = new BABYLON.Texture(LIFT_ALBEDO_URL, scene, false, false)
+  alb.uScale = uScale; alb.vScale = vScale
+  mat.diffuseTexture = alb
+
+  const nrm = new BABYLON.Texture(LIFT_NORMAL_URL, scene, false, false)
+  nrm.uScale = uScale; nrm.vScale = vScale
+  mat.bumpTexture = nrm
+  // the plate's relief is shallow machined tread, not deep rock — keep the normal subtle
+  // so the sun sculpts it without making the deck look like crumpled foil.
+  mat.bumpTexture.level = 0.6
+
+  // A lift is dirty painted steel: a tight, dim specular so the sun glints off the stud
+  // crowns without turning the deck into chrome.
+  mat.specularColor = new BABYLON.Color3(0.22, 0.23, 0.25)
+  mat.specularPower = 48
+  // Keep the v1 "powered lift" read: a dim self-lit floor so the platform stays legible
+  // in the dark shafts it runs in. Much lower than the old flat-grey emissive (0.12-0.18)
+  // because the albedo now carries the material — a high emissive would wash the tread out.
+  mat.emissiveColor = new BABYLON.Color3(0.05, 0.055, 0.065)
+  _liftMats.set(key, mat)
+  return mat
+}
+
 // Real UT99 CTF flag model (extracted glTF): a pole + morph-animated cloth that
-// waves via the ONE `flag_wave` animation group. Ships with the BLUE skin as the
-// material albedo; RED is a same-UV WebP swap. See attachFlagModel below.
+// waves via the ONE `flag_wave` animation group. The GLB ships an OLD blue skin in its
+// material; both teams now swap to a Solana meme-coin banner (same-UV WebP), so the
+// baked skin is never shown. Team 0 = BONK (orange), team 1 = WIF (pink). Assets are
+// composited from the REAL on-chain token logos by scripts/compose-memecoin-crest.py.
 const FLAG_MODEL_URL = '/assets/props/Prop_Flag.glb'
-const FLAG_RED_SKIN_URL = '/assets/props/Prop_Flag_red.webp'
+// index = teamId. team 0 (red base) flies BONK, team 1 (blue base) flies WIF.
+const FLAG_TEAM_SKIN_URL = [
+	'/assets/props/Prop_Flag_bonk.webp',
+	'/assets/props/Prop_Flag_wif.webp',
+]
 
 // Attach the real flag model to `entity.mesh` (the positioned placeholder box).
 // MIRRORS attachPickupModel (async warm import, async-delete guard, hide the box)
@@ -241,17 +354,18 @@ async function attachFlagModel(entity) {
 	// Leave the imported rotationQuaternion alone (cloth direction is cosmetic).
 	root.position.y = -1.0
 
-	// Team skin: the GLB ships BLUE. For RED, swap the PBR material's albedoTexture to
-	// the same-UV WebP, built with the SAME (noMipmap=false, invertY=false) convention
-	// CharacterModel._teamTexture uses for the same-pipeline uniform atlases.
-	if (entity.team === 0) {
-		result.meshes.forEach((m) => {
-			const mat = m.material
-			if (mat && mat.albedoTexture !== undefined) {
-				mat.albedoTexture = new BABYLON.Texture(FLAG_RED_SKIN_URL, scene, false, false)
-			}
-		})
-	}
+	// Team skin: swap the PBR material's albedoTexture to the team's meme-coin banner,
+	// built with the SAME (noMipmap=false, invertY=false) convention CharacterModel._teamTexture
+	// uses for the same-pipeline uniform atlases. BOTH teams swap now (the GLB's baked skin is
+	// the old UT blue, never wanted); an unexpected team id falls back to BONK so a flag is
+	// never left wearing the stale skin.
+	const skinUrl = FLAG_TEAM_SKIN_URL[entity.team] || FLAG_TEAM_SKIN_URL[0]
+	result.meshes.forEach((m) => {
+		const mat = m.material
+		if (mat && mat.albedoTexture !== undefined) {
+			mat.albedoTexture = new BABYLON.Texture(skinUrl, scene, false, false)
+		}
+	})
 
 	// Drive the seamless cloth wave (the ONE `flag_wave` group of morph animations).
 	const anim = result.animationGroups.find((g) => g.name === 'flag_wave') || result.animationGroups[0]
@@ -427,6 +541,18 @@ export default ({ simulator /* inject depenencies here */ }) => {
 				// a rider at rest AND carries them through the ride with no collision mesh.
 				entity.mesh.checkCollisions = false
 				entity.mesh.isPickable = false
+				// swap the shared grey placeholder for the real tread-plate skin, tiled to this
+				// lift's footprint. Dispose the per-entity placeholder material the Mover ctor
+				// made (it is NOT shared, so leaving it assigned-then-orphaned would leak one
+				// StandardMaterial per lift). Done AFTER the dims arrive on the create snapshot,
+				// so the tiling matches the real platform size.
+				try {
+					const placeholder = entity.mesh.material
+					entity.mesh.material = liftMaterial(
+						entity.mesh.getScene(), entity.width || 3, entity.depth || 3)
+					entity.mat = entity.mesh.material
+					if (placeholder && placeholder !== entity.mesh.material) placeholder.dispose()
+				} catch (e) { /* decorative — a skin miss must never break the lift's carry */ }
 				simulator.movers.set(entity.nid, entity)
 			},
 			delete({ nid, entity }) {
