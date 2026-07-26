@@ -44,7 +44,7 @@
          Preload so the digits never flash fallback-sans on first paint. -->
     <link rel="preload" href="assets/fonts/DSEG7Classic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-d58a29db34">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-f8b6e63edf">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -119,8 +119,35 @@
                  Toggled via #tdm-banner.is-visible by Simulator._updateMatchHud. -->
             <div id="tdm-banner" aria-live="assertive" aria-hidden="true">
                 <div id="tdm-banner-title">RED WINS</div>
-                <div id="tdm-banner-score">0 — 0</div>
+                <div id="tdm-banner-score"></div>
             </div>
+
+            <!-- POST-MATCH OVERLAY. Populated entirely by client/graphics/MatchEndOverlay.js
+                 from state the client already replicates (kills/deaths/teamId/nameIndex on
+                 PlayerCharacter + the broadcast Killed feed), so it adds nothing to the
+                 protocol. The stage-N classes are added on a timer by the overlay and CSS
+                 owns the reveal, so the intermission reads as a paced sequence rather than
+                 everything landing at once. -->
+            <section id="match-end" aria-hidden="true">
+                <div class="me-head">
+                    <div id="me-title" class="me-title">VICTORY</div>
+                    <div id="me-score" class="me-score"></div>
+                    <div id="me-sub" class="me-sub"></div>
+                </div>
+                <div class="me-board">
+                    <div class="me-cols" aria-hidden="true">
+                        <span class="me-rank">#</span><span class="me-name">COMBATANT</span>
+                        <span class="me-k">K</span><span class="me-d">D</span><span class="me-net">+/-</span>
+                    </div>
+                    <div id="me-rows" class="me-rows" role="table" aria-label="Final standings"></div>
+                </div>
+                <div id="me-stats" class="me-stats"></div>
+                <div id="me-nemesis" class="me-nemesis" hidden></div>
+                <div id="me-badges" class="me-badges" hidden></div>
+                <div id="me-session" class="me-session"></div>
+                <div id="me-next" class="me-next" hidden></div>
+                <div id="me-clock" class="me-clock" aria-live="polite"></div>
+            </section>
 
             <!-- Per-weapon, spread-reactive crosshair (see _work/ui/CROSSHAIR-proposal.md).
                  Dynamic SVG keeps the #crosshair id, centering anchor + death-fade CSS.
@@ -228,7 +255,7 @@
         <div id="damage-flash" aria-hidden="true"></div>
 
         <!-- GIT GUD — the death-screen taunt, ported from BonkGames (same studio, same
-             assets). A 333ms full-black takeover with a blown-signal sting that lands in
+             assets). A short full-black takeover with a blown-signal sting that lands in
              the QUIET GAP at the end of the death window: the death-cam gets its drop +
              roll first, then this hits as the punctuation immediately before you respawn.
              Two variants, rolled per death (see GITGUD_IMAGE_CHANCE in FragLayer):
@@ -257,7 +284,7 @@
                 overflow: hidden;
                 background: #000;
                 pointer-events: none;
-                /* the tick loop rewrites transforms ~11x in 333ms; containment keeps
+                /* the tick loop rewrites transforms every ~30ms while it holds; containment keeps
                    that off the HUD's layout/paint entirely */
                 contain: layout paint;
             }
@@ -711,14 +738,18 @@
              gesture: one click re-enters fullscreen (if we were in it before the
              rotation), takes pointer lock, and deploys. -->
         <section id="map-change" aria-hidden="true">
-            <div class="mc-title">CHANGING MAP</div>
-            <div class="mc-seg" aria-hidden="true"><span>8</span><span>8</span><span>8</span></div>
-            <div class="mc-sub">REJOINING ARENA…</div>
-            <div class="mc-next" aria-hidden="true">
-                <div class="mc-next-label">NEXT MAP</div>
-                <div id="mc-map-name" class="mc-map-name">—</div>
-                <div id="mc-mode-name" class="mc-mode-name">—</div>
+            <div class="mc-title">NEXT ARENA</div>
+            <!-- No placeholder digits and no em-dashes: a placeholder is a promise the
+                 screen breaks, and "8 8 8" / "—" over a black background was the loading
+                 half of the "bunch of zeros" complaint. Every field here is either
+                 hydrated synchronously from sessionStorage on the first frame
+                 (Simulator._showMapChangeReady) or stays hidden until it has real text. -->
+            <div class="mc-sub" id="mc-sub">PROVISIONING ARENA…</div>
+            <div class="mc-next">
+                <div id="mc-map-name" class="mc-map-name"></div>
+                <div id="mc-mode-name" class="mc-mode-name"></div>
             </div>
+            <div id="mc-session" class="mc-session" hidden></div>
             <button id="mc-drop" type="button" class="mc-drop">
                 <span class="mc-drop-label">DROP IN</span>
                 <span id="mc-drop-hint" class="mc-drop-hint">CLICK TO DEPLOY</span>
@@ -1296,7 +1327,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-d58a29db34";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-d58a29db34"></script>
+    <script>window.__BUILD_ID__="0.0.1-f8b6e63edf";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-f8b6e63edf"></script>
 </body>
 </html>

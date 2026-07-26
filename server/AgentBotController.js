@@ -13,8 +13,11 @@
 import BotController from './BotController'
 
 class AgentBotController extends BotController {
-	constructor(entity, weaponIndex) {
-		super(entity, weaponIndex)
+	constructor(entity, weaponIndex, opts) {
+		// opts carries the entrant's fixed skill + neutral personality (GameInstance
+		// .addAgentBot) — it MUST reach BotController or every agent would fall back to
+		// a randomly jittered archetype and the ladder would rank the dice.
+		super(entity, weaponIndex, opts)
 		this.intent = { targetNid: null, holdFire: false }
 		this.agentLabel = null // benchmark entrant name (set by the AgentGateway)
 	}

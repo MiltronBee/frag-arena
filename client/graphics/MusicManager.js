@@ -17,6 +17,17 @@
 //
 // Volume + mute persist to localStorage ('musicVolume' 0..1, 'musicMuted' '0'/'1')
 // and are surfaced in the Settings menu.
+//
+// iOS SAFARI HAS NO WRITABLE VOLUME. On iPhone/iPad, WebKit makes
+// HTMLMediaElement.volume read-only: the setter is silently ignored (no throw) and
+// the property keeps reading back 1, because the hardware volume buttons are the
+// only volume control Apple exposes. That does not merely disable the fade — it
+// BREAKS THE HANDOFF, because _ease() steers on el.volume: the diff never closes,
+// the settle branch that PAUSES the outgoing track is never reached, and both beds
+// play at once, at full level, forever, with the RAF spinning behind them.
+// (Field report 2026-07-26, iPhone 15 Pro / Safari: "the intro music and the game
+// music are still playing at the same time".) So we detect a writable volume once
+// and, where there isn't one, switch tracks by pause/play instead — a hard cut.
 
 const TRACKS = {
   menu: '/assets/music/arena-signal.mp3',
@@ -36,6 +47,18 @@ const DEFAULT_VOLUME = 0.18   // low by default — background bed, not foregrou
 const MIX_VERSION = '2'
 const FADE_PER_SEC = 1.8      // volume units/sec while crossfading (~0.5s full fade)
 
+// Is HTMLMediaElement.volume actually writable here? One probe element, once at
+// construction. Anything that fails or refuses to take the value is treated as
+// locked, so the safe hard-cut path is the fallback for every uncertain case.
+function volumeIsWritable() {
+  try {
+    if (typeof Audio === 'undefined') return false
+    const probe = new Audio()
+    probe.volume = 0.5
+    return probe.volume === 0.5
+  } catch (e) { return false }
+}
+
 function clamp01(v) {
   if (!(v >= 0)) return 0     // also catches NaN
   return v > 1 ? 1 : v
@@ -47,6 +70,9 @@ export default class MusicManager {
     // instant and never re-fetches. volume starts at 0 so the first fade-in is clean.
     this.tracks = {}
     this._preUnlocked = false
+    // iOS Safari: no writable volume => no crossfade, and _ease() switches to a hard
+    // cut. See the header block.
+    this._volumeLocked = !volumeIsWritable()
     for (const key of Object.keys(TRACKS)) {
       // Adopt an inline <audio id="bg-<key>"> if the page shipped one (the menu track
       // does). On mobile the splash gate may have already STARTED it off the first tap,
@@ -208,6 +234,26 @@ export default class MusicManager {
   // Ease every track toward its target volume. Returns true when everything has
   // settled (so the RAF can stop and we're idle until the next state change).
   _ease(dt) {
+    // HARD-CUT PATH (iOS Safari: volume is read-only — see the header). Nothing can be
+    // ramped, so the ONLY thing that matters is that exactly one track is rolling:
+    // start `current`, pause everything else. Playback is tied to `current` alone and
+    // NOT to the target volume, deliberately — routing mute/volume-0 through pause()
+    // would mean un-muting has to call play() from a RAF tick rather than from the tap
+    // that toggled it, which iOS would reject, stranding the music off. `muted` IS
+    // honored on iOS (it is a separate property from `volume`), so mute rides on that
+    // and the track keeps rolling silently underneath, ready to resume with no gesture.
+    // Returns settled immediately: there is no ramp to run, and leaving the RAF alive
+    // to re-test an unchanging condition every frame is a battery leak on a phone.
+    if (this._volumeLocked) {
+      for (const key of Object.keys(this.tracks)) {
+        const el = this.tracks[key]
+        el.muted = this.muted || !(this.baseVolume > 0)
+        if (key === this.current) { if (el.paused) this._start(key) }
+        else if (!el.paused) el.pause()
+      }
+      return true
+    }
+
     // A live duck must keep the RAF alive even once the fade has settled at the
     // DUCKED level — otherwise the loop stops and the bed never eases back up when
     // the duck expires. _duckFactor() self-clears on expiry, so this releases itself.

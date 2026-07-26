@@ -45,6 +45,7 @@ import {
 import { weapons, DEFAULT_ZONE_MULTIPLIERS, SPAWN_WEAPON_INDEX, ENABLED_WEAPON_INDICES } from '../common/weaponsConfig'
 import { PLAYER_NAMES } from '../common/playerNames'
 import BotController from './BotController'
+import { DifficultyDirector, personalityFor, NEUTRAL_PERSONALITY, SKILL_NAMES, MAX_SKILL } from './botSkill'
 import AgentBotController from './AgentBotController'
 import AgentGateway from './AgentGateway'
 import BloodLedger from './BloodLedger'
@@ -189,6 +190,12 @@ const VIEW_MARGIN = 16
 // still rejects genuine crawlspaces (dm_somnus authored six 1.33m points).
 // Verified by scripts/audit-map-runtime.ts, which measures the ACTUAL clearance by
 // raycast: the authored headroom field tracks it to ~0.2m on every point.
+// SPAWN RATING distances, world units (see _rateSpawn). BLOCKED is "they are standing
+// in it" — our ellipsoid radius is 0.5, so two players inside 1.6 are effectively
+// overlapping once jitter is applied. DANGER is "close enough that spawning here is a
+// coin flip on your life"; beyond it the spot is treated as safe.
+const SPAWN_BLOCKED_DIST = 1.6
+const SPAWN_DANGER_DIST = 18
 const SPAWN_MIN_HEADROOM = 2.0
 const SPAWN_REST = 0.5
 const SPAWN_PROBE_UP = 2.0
@@ -487,6 +494,22 @@ class GameInstance {
 		// smoothEntity are the SAME entity, so damagePlayer/respawnPlayer and the
 		// hitscan victim resolution work identically for bots and people.
 		this._nameCounter = 0
+		// BOT SKILL (server/botSkill.js — the UT99 model). Bots are dealt archetypes
+		// round-robin off this counter so a lobby is always a SPREAD of opponents
+		// rather than eight copies of one; the director then walks the whole roster's
+		// skill toward "you trade evenly with it" as the match runs.
+		//   BOT_SKILL=0..7    pin the starting level (default 3, mid of UT99's scale)
+		//   BOT_AUTO_SKILL=0  freeze it there — no adaptation
+		this._botPersonalityCounter = 0
+		// BOT_STATS=1 prints a shots/hits/kills line every 30s. Bot combat is only
+		// tunable if it is measurable: accuracy and FRAG PACE move independently, and
+		// a change that improves one while quietly killing the other (an aim model that
+		// makes every duel a stalemate) looks fine in a duel harness and terrible in a
+		// real match. Off by default; the counters cost two increments when on.
+		this._botStats = process.env.BOT_STATS === '1' ? { shots: 0, hits: 0, kills: 0, at: 0 } : null
+		const baseSkill = parseInt(process.env.BOT_SKILL, 10)
+		this._botDirector = new DifficultyDirector(Number.isNaN(baseSkill) ? 3 : baseSkill)
+		this._botAutoSkill = process.env.BOT_AUTO_SKILL !== '0' && process.env.BOT_AUTO_SKILL !== 'false'
 		// server-only: smooth nid -> human callsign (bots never appear here). Used to
 		// replay existing human names to late joiners and cleaned up on disconnect.
 		this._humanNames = new Map()
@@ -1490,10 +1513,56 @@ class GameInstance {
 		this.instance.addEntity(entity)
 
 		const handle = { bot: true, rawEntity: entity, smoothEntity: entity, respawnAt: null }
-		handle.controller = new BotController(entity, entity.currentWeaponIndex)
+		// PERSONALITY + SKILL. The archetype comes off a round-robin counter (a spread,
+		// not a dice roll) and carries a skill bias, so "the berserker" is reliably a
+		// half-step above "the grunt" at any difficulty the director settles on.
+		const personality = personalityFor(this._botPersonalityCounter++)
+		const skill = Math.max(0, Math.min(MAX_SKILL, this._botDirector.difficulty + personality.skillBias))
+		handle.controller = new BotController(entity, entity.currentWeaponIndex, { skill, personality })
 		entity.client = handle // hitscan victims resolve to their owner via .client
 		this.bots.push(handle)
-		console.log(`Bot ${entity.nid} joined with ${weapons[entity.currentWeaponIndex].name}`)
+		console.log(`Bot ${entity.nid} joined with ${weapons[entity.currentWeaponIndex].name}`
+			+ ` [${personality.label}, ${SKILL_NAMES[Math.round(skill)]}]`)
+	}
+
+	// DYNAMIC DIFFICULTY — port of UT99's ChallengeBotInfo.AdjustSkill.
+	//
+	// The brief is "make it too good and it becomes unplayable", and Epic's answer in
+	// 1999 was not to guess the right difficulty but to stop guessing: after every kill
+	// involving a human, walk the target level toward the point where that human trades
+	// evenly. The step is 2/min(n,10), so it moves in whole levels for the first few
+	// exchanges and in 0.2 steps after — fast to find the player, then stable instead of
+	// see-sawing around them.
+	//
+	// Only the bot ACTUALLY INVOLVED is re-levelled (Epic does the same), so the roster
+	// drifts into a spread around the target rather than snapping to one number, and the
+	// archetype bias rides along on top — the berserker stays the scary one.
+	_adjustBotDifficulty(attackerClient, victimClient) {
+		const attackerIsBot = !!attackerClient.bot
+		const victimIsBot = !!victimClient.bot
+		// Only human-vs-bot exchanges carry information about how the arena FEELS to a
+		// person. Bot-on-bot frags and human-on-human duels are both silent here.
+		if (attackerIsBot === victimIsBot) return
+		// A FragBench entrant is never re-levelled: its controller runs the same aim
+		// model, and silently retuning it mid-match would change the benchmark's
+		// conditions underneath the run. Agents are measured, not balanced.
+		if (attackerClient.agent || victimClient.agent) return
+
+		const retune = (handle, difficulty) => {
+			const c = handle.controller
+			if (!c || !c.personality) return
+			c.skill = Math.max(0, Math.min(MAX_SKILL, difficulty + c.personality.skillBias))
+		}
+
+		if (attackerIsBot) {
+			// A bot killed the player: ease off, and pull this bot down if it is ahead.
+			const d = this._botDirector.botScored()
+			if (attackerClient.controller && attackerClient.controller.skill > d) retune(attackerClient, d)
+		} else {
+			// The player killed a bot: push back, and raise that bot if it is behind.
+			const d = this._botDirector.humanScored()
+			if (victimClient.controller && victimClient.controller.skill < d) retune(victimClient, d)
+		}
 	}
 
 	// Retire one bot through the SAME teardown the human disconnect path uses: dispose
@@ -1625,7 +1694,14 @@ class GameInstance {
 		entity.nameIndex = this._nameCounter++ % PLAYER_NAMES.length
 		this.instance.addEntity(entity)
 		const handle = { bot: true, agent: true, rawEntity: entity, smoothEntity: entity, respawnAt: null }
-		handle.controller = new AgentBotController(entity, entity.currentWeaponIndex)
+		// A FragBench entrant gets a FIXED skill and a neutral, un-jittered personality:
+		// every agent must sit behind identical motor characteristics or the ladder is
+		// partly ranking the dice. FRAGBENCH_SKILL moves the whole field together.
+		const agentSkill = parseInt(process.env.FRAGBENCH_SKILL, 10)
+		handle.controller = new AgentBotController(entity, entity.currentWeaponIndex, {
+			skill: Number.isNaN(agentSkill) ? 4 : agentSkill,
+			personality: NEUTRAL_PERSONALITY,
+		})
 		handle.controller.agentLabel = label
 		entity.client = handle
 		this.bots.push(handle)
@@ -1818,6 +1894,61 @@ class GameInstance {
 		return Number.isFinite(dist) ? origin.y - dist : null
 	}
 
+	// Pick the best spawn out of a pool — a port of UT99's Game.FindPlayerStart
+	// scoring (read out of Botpack.u; the same source as the bot aim model).
+	//
+	// Epic's shape, in their numbers: every candidate starts at `3000 * FRand()` so the
+	// choice stays unpredictable; the point used for the LAST spawn scores -10000 so it
+	// cannot come up twice running; then for each living player, a candidate loses 1500
+	// for sharing their zone, 1000000 if they are close enough to be standing IN it, and
+	// `10000 - distance` if they are within range AND have line of sight to it.
+	//
+	// Ours keeps the structure and rescales the distances — one Unreal unit is not one
+	// of ours, and our arenas are far smaller than a UT map. The LoS ray is only cast
+	// for candidates already known to be near a living player, so a spawn costs a
+	// handful of rays at most, and only when someone actually respawns.
+	_rateSpawn(pool, sc) {
+		if (pool.length === 1) return pool[0]
+		const living = this.combatants(null)
+		const meshes = this.occluderMeshes
+		let best = null, bestScore = -Infinity
+		for (const cand of pool) {
+			const cx = cand.x * sc, cy = cand.y * sc, cz = cand.z * sc
+			// randomised base — two spawns in the same situation should not agree
+			let score = 3000 * Math.random()
+			// never the point we just used (Epic's LastStartSpot rule)
+			if (cand === this._lastSpawnPick) score -= 10000
+			for (const other of living) {
+				const d = Math.hypot(other.x - cx, other.y - cy, other.z - cz)
+				if (d < SPAWN_BLOCKED_DIST) {
+					// they are standing in it. moveWithCollisions cannot escape from
+					// inside another collider, so this is not merely unfair, it wedges.
+					score -= 1000000
+				} else if (d < SPAWN_DANGER_DIST) {
+					// close by: cost grows as they get nearer, and doubles if they can
+					// actually SEE the spot — being shot before the map has finished
+					// fading in is the single worst thing an arena shooter can do to you
+					const near = (SPAWN_DANGER_DIST - d) / SPAWN_DANGER_DIST
+					score -= 1500 + 6000 * near
+					if (meshes && meshes.length && this._spawnHasLoS(cx, cy, cz, other, d)) {
+						score -= 6000 * near
+					}
+				}
+			}
+			if (score > bestScore) { bestScore = score; best = cand }
+		}
+		this._lastSpawnPick = best
+		return best || pool[0]
+	}
+
+	// Clear line from a candidate spawn to a living player (Epic's FastTrace).
+	_spawnHasLoS(cx, cy, cz, other, dist) {
+		if (dist < 0.001) return true
+		const dir = new BABYLON.Vector3((other.x - cx) / dist, (other.y - cy) / dist, (other.z - cz) / dist)
+		const ray = new BABYLON.Ray(new BABYLON.Vector3(cx, cy + 0.6, cz), dir, dist)
+		return nearestWorldHit(this.occluderMeshes, ray, dist) >= dist
+	}
+
 	spawnPoint(teamId = null) {
 		if (this.useMeshMap) {
 			const sc = this.map.scale || 1
@@ -1855,7 +1986,13 @@ class GameInstance {
 					const teamPool = pool.filter(p => p.team === teamId)
 					if (teamPool.length) pool = teamPool
 				}
-				const p = pool[Math.floor(Math.random() * pool.length)]
+				// SPAWN RATING (was: uniform random). Picking blind put players down next
+				// to — sometimes inside — someone already holding that room, and let the
+				// same point come up twice in a row so a camper could farm it. Several of
+				// the authored PlayerStarts sit within a metre of each other (dm_hex2 has
+				// three inside one metre), so "random" regularly meant "on top of the guy
+				// who just spawned". See _rateSpawn.
+				const p = this._rateSpawn(pool, sc)
 				const wx = p.x * sc + (Math.random() - 0.5) * 1.2
 				const wz = p.z * sc + (Math.random() - 0.5) * 1.2
 				const floorY = this._dropProbeY(wx, p.y * sc, wz)
@@ -2161,6 +2298,12 @@ class GameInstance {
 			this.instance.message(new HitConfirmed(victimNid, Math.min(255, damage), wasKill, isHeadshot), attackerClient)
 		}
 
+		// PAIN STAMP (UT99's LastPainTime). A bot that has just been hit aims worse for
+		// a moment — see server/botSkill.js. This is what makes shooting back a real
+		// tactic against a bot that already has the drop on you, instead of a formality.
+		raw._lastPainAt = Date.now()
+		if (this._botStats && attackerClient && attackerClient.bot) this._botStats.hits++
+
 		if (wasKill) {
 			raw.isAlive = false
 			smooth.isAlive = false
@@ -2185,6 +2328,14 @@ class GameInstance {
 				const killerName = this._bloodName(attackerClient)
 				if (killerName) this.bloodLedger.recordHash(killerName, 100, 'kill')
 			}
+
+			// DYNAMIC DIFFICULTY (UT99 ChallengeBotInfo.AdjustSkill). Only kills where a
+			// HUMAN is on one end move the needle — bot-vs-bot frags say nothing about
+			// whether the arena is too hard for the person playing it.
+			if (this._botAutoSkill && attackerClient && attackerClient !== victimClient) {
+				this._adjustBotDifficulty(attackerClient, victimClient)
+			}
+			if (this._botStats && attackerClient && attackerClient.bot) this._botStats.kills++
 
 			// Mode-aware frag scoring (TDM team score / FFA individual). Also drives the
 			// frag-cap early-end and the SUDDEN_DEATH first-frag decision.
@@ -2973,9 +3124,15 @@ class GameInstance {
 				this.resetMatch(now)
 			}
 		}
-		// countdown: real time only during ACTIVE regulation; 0 in overtime / intermission.
+		// countdown. ACTIVE: real regulation time. MATCH_END: the INTERMISSION remainder,
+		// so the post-match screen can show an honest "NEXT MATCH IN 9S" instead of a clock
+		// frozen at 0:00 — that frozen zero was the single most-stared-at number on the
+		// end-of-match screen. SUDDEN_DEATH still has no clock: the client renders "OT" for
+		// that phase and never reads this value.
 		const remaining = this.matchPhase === MATCH_PHASE.ACTIVE
-			? Math.max(0, TIME_LIMIT_MS - (now - this.matchStartAt)) : 0
+			? Math.max(0, TIME_LIMIT_MS - (now - this.matchStartAt))
+			: this.matchPhase === MATCH_PHASE.MATCH_END
+				? Math.max(0, INTERMISSION_MS - (now - this.matchEndAt)) : 0
 		this.publishMatchState(now, remaining)
 	}
 
@@ -3049,6 +3206,15 @@ class GameInstance {
 		// activity refreshes the clock via the rate-limited heartbeat command
 		// (client._lastSpectatorActivityAt). Swept coarsely (~5s); collected
 		// first because instance.disconnect mutates the clients collection.
+		if (this._botStats && wallNow >= this._botStats.at) {
+			const st = this._botStats
+			if (st.at) {
+				const acc = st.shots ? (100 * st.hits / st.shots).toFixed(1) : '0.0'
+				console.log(`[bot-stats] shots ${st.shots} hits ${st.hits} (${acc}% accuracy) kills ${st.kills}`)
+			}
+			st.at = wallNow + 30000
+		}
+
 		if (!this._afkSweepAt || wallNow >= this._afkSweepAt) {
 			this._afkSweepAt = wallNow + SPECTATOR_AFK_SWEEP_MS
 			const stale = []
@@ -3125,6 +3291,7 @@ class GameInstance {
 			// zeroed in damagePlayer; this keeps the moment VISUALLY calm too).
 			if (this.matchPhase === MATCH_PHASE.MATCH_END) return
 			if (command.fireInput && !state.onCooldown && !state.reloading && state.magazineAmmo > 0) {
+				if (this._botStats) this._botStats.shots++
 				this.performShot(bot)
 			}
 		})

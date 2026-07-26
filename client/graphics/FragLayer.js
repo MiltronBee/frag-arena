@@ -41,7 +41,10 @@ const DAMAGE_ARC_LIFE = 500    // ms the directional damage arc holds
 // cam falls, world holds, then the taunt lands as punctuation and tears down as the
 // player comes back. Every knob below is one line to retune.
 const GITGUD_ENABLED = true          // master switch (false = never fires)
-const GITGUD_LIFE = 333              // ms the takeover holds (BonkGames: exactly 333)
+const GITGUD_LIFE = 600              // ms the takeover holds. BonkGames was 333, which is
+                                     // a once-per-run game-over card; here it is punctuation
+                                     // you see every death, and 333 was too short to read the
+                                     // plate. Everything else scales off this one number.
 const GITGUD_IMAGE_CHANCE = 0.3      // P(taunt plate); otherwise the giant "GIT GUD"
 const GITGUD_EVERY_N_DEATHS = 1      // fire on every Nth own death (1 = every death)
 // Total death->respawn window, in ms. Only a SEED: the real number is the server's
@@ -55,9 +58,12 @@ const GITGUD_PRE_RESPAWN_GAP = 140   // ms of clear air between the taunt ending
 const GITGUD_MIN_DELAY = 400         // ms floor after death — never start on top of the
                                      // death-cam (its drop+roll completes in 200ms)
 const GITGUD_TAUNT_TICK = 30         // ms per glitch tick, taunt-plate variant
-const GITGUD_TAUNT_TICKS = 11        // BonkGames: repeat:10 => 11 ticks
 const GITGUD_WORD_TICK = 50          // ms per glitch tick, word variant
-const GITGUD_WORD_TICKS = 6          // BonkGames: repeat:5 => 6 ticks
+// Tick COUNTS are derived, not authored: the glitch has to cover the whole hold or the
+// takeover freezes clean for its back half. (BonkGames hardcoded 11 and 6, which is
+// exactly ceil(333/30) and ceil(333/50) — same rule, written out.)
+const GITGUD_TAUNT_TICKS = Math.ceil(GITGUD_LIFE / GITGUD_TAUNT_TICK)
+const GITGUD_WORD_TICKS = Math.ceil(GITGUD_LIFE / GITGUD_WORD_TICK)
 
 export default class FragLayer {
   constructor(simulator) {
@@ -545,7 +551,7 @@ export default class FragLayer {
     this._gitGud.deathAt = performance.now()
     this._gitGud.deaths++
     if (GITGUD_EVERY_N_DEATHS > 1 && this._gitGud.deaths % GITGUD_EVERY_N_DEATHS !== 0) return
-    // land the 333ms so its LAST frame is GITGUD_PRE_RESPAWN_GAP short of the respawn,
+    // land the hold so its LAST frame is GITGUD_PRE_RESPAWN_GAP short of the respawn,
     // and never before the death-cam has finished falling.
     const delay = Math.max(
       GITGUD_MIN_DELAY,
@@ -594,7 +600,7 @@ export default class FragLayer {
     el.classList.add('gg-on')
     if (!taunt) this._gitGudFitWord()
 
-    // the sting, hard-cut to the same 333ms so audio and picture end together
+    // the sting, hard-cut to the same GITGUD_LIFE so audio and picture end together
     if (this.sim.audio && typeof this.sim.audio.interference === 'function') {
       this.sim.audio.interference(GITGUD_LIFE)
     }

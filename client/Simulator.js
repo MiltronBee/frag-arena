@@ -26,6 +26,7 @@ import FragLayer from './graphics/FragLayer'
 import MenuControls from './graphics/MenuControls'
 import ProgressReadout from './graphics/ProgressReadout'
 import IntrusionFeed from './graphics/IntrusionFeed'
+import MatchEndOverlay from './graphics/MatchEndOverlay'
 import { resolveWeaponFx } from './graphics/firingFx'
 import { assets, weapons } from './assets/assetManifest'
 import { SPAWN_WEAPON_INDEX } from '../common/weaponsConfig'
@@ -195,6 +196,10 @@ class Simulator {
 		// one 0..100 target, eases the shown value each frame, holds 99.99 while assets
 		// are done but server gates are pending, and mirrors onto the splash echo.
 		this._progress = new ProgressReadout(this)
+		// POST-MATCH: rankings + personal stats + accolades for the MATCH_END intermission.
+		// Everything it shows is derived from state the client already holds — see the
+		// module header for why it costs zero bytes on the wire.
+		this._matchEnd = new MatchEndOverlay(this)
 
 		// fake "hacking into a secure system" terminal feed (Part D). Pure flavor: appends
 		// invented intrusion-log lines while the gate is closed, climaxes green on READY /
@@ -382,6 +387,10 @@ class Simulator {
 			this.fragLayer.onKilled(message)
 			const myNid = this.mySmoothEntity ? this.mySmoothEntity.nid : null
 			const suicide = message.killerNid === message.victimNid
+			// Match-long frag log for the post-match screen (play of the match, headshot
+			// count, nemesis, best streak). Killed already carries weaponIndex + isHeadshot
+			// and is broadcast to every client, so this is free.
+			if (this._matchEnd) this._matchEnd.logKill(message, suicide)
 			const iKilled = myNid != null && message.killerNid === myNid && !suicide && message.victimNid !== myNid
 			const iDied = myNid != null && message.victimNid === myNid
 			// local-player death sting + medal reset (streak/multi-kill end on my death)
@@ -1145,6 +1154,29 @@ class Simulator {
 			const ended = phase === MATCH_PHASE.MATCH_END
 			board.classList.toggle('match-over', ended)
 			board.classList.toggle('sudden-death', phase === MATCH_PHASE.SUDDEN_DEATH)
+			// POST-MATCH OVERLAY. Driven off this same authoritative phase flip rather than
+			// the announcer block below, which is gated on `this.audio` existing — the
+			// scoreboard must not depend on whether audio initialised.
+			// GUARDED: this runs inside the render loop, so a throw here would freeze the
+			// frame loop and the player would just watch the match stop. Presentation must
+			// never be able to kill the sim — log it and carry on with the old banner.
+			if (this._matchEnd) {
+				try {
+					// Gated on _arenaEntered: #match-end sits at z-index 60, above the menu's
+					// #entry-overlay (40), so a match ending while the player is still on the
+					// menu must NOT paint a scoreboard over it.
+					if (ended && this._arenaEntered) {
+						this._matchEnd.show({ ffa, winner, myTeam, s0, s1, mode })
+						this._fetchNextMapInfo()
+					} else {
+						this._matchEnd.hide()
+						// a fresh match starts a fresh frag log
+						if (phase === MATCH_PHASE.ACTIVE) this._matchEnd.resetLog()
+					}
+				} catch (e) {
+					console.error('[matchend] overlay failed', e)
+				}
+			}
 			if (banner) {
 				banner.classList.toggle('is-visible', ended)
 				if (ended) {
@@ -2139,6 +2171,9 @@ class Simulator {
 		// target and paint the menu header + splash echo (runs every frame regardless
 		// of whether we've entered the arena; no-ops cheaply once READY).
 		if (this._progress) this._progress.update(delta)
+		if (this._matchEnd) {
+			try { this._matchEnd.update() } catch (e) { console.error('[matchend] overlay failed (update)', e) }
+		}
 		this.renderer.update()
 	}
 
@@ -2507,7 +2542,78 @@ class Simulator {
 			mc.classList.remove('mc-ready') // LOADING state across the reload
 			mc.classList.add('mc-visible')
 		}
-		setTimeout(() => location.reload(), 2500)
+		this._awaitNextServer()
+	}
+
+	// WAIT FOR THE NEXT SERVER, don't guess at it.
+	//
+	// This used to be `setTimeout(() => location.reload(), 2500)` — a flat guess at how
+	// long a rotation restart takes. The guess is wrong by an order of magnitude: the
+	// server needs to boot Node, load the map into the Babylon NullEngine, spawn pickups,
+	// build movers and derive the bot nav graph before it binds (measured ~18s on the dev
+	// box for DM-Hex][). Reloading early is not merely wasteful — GameClient calls
+	// client.connect() exactly ONCE with no retry, so a page that comes back before the
+	// port is open sits on 'disconnected' forever, burns one of the three rejoin strikes,
+	// and drops the player to the menu reading UPLINK LOST.
+	//
+	// /mapinfo is served by the SAME process on its own port and only answers once the map
+	// is actually built, so a 200 from it is the real "the next arena exists" signal. The
+	// first poll is deliberately delayed: the outgoing process calls process.exit(0), so
+	// for a moment its socket can still answer and we would reload onto a corpse.
+	_awaitNextServer() {
+		const url = this._mapInfoUrl()
+		const deadline = Date.now() + 45000
+		const sub = document.getElementById('mc-sub')
+		const tick = () => {
+			if (!this._rejoinPending) return   // cancelled (3-strike fallback) — stop polling
+			fetch(url, { cache: 'no-store' })
+				.then(r => (r.ok ? r.json() : null))
+				.catch(() => null)
+				.then(info => {
+					if (!this._rejoinPending) return
+					if (info && info.mapId) {
+						// Hand the incoming map's identity across the navigation so the card
+						// on the other side already knows where it is going — no dashes.
+						try {
+							sessionStorage.setItem('fa-next-map', JSON.stringify({
+								mapName: info.mapName || '', modeName: info.modeName || '',
+							}))
+						} catch (e) {}
+						location.reload()
+						return
+					}
+					if (Date.now() > deadline) {
+						// The arena never came back. Fall out to the menu rather than leaving
+						// the player on an interstitial that will never resolve.
+						this._cancelRejoin()
+						location.reload()
+						return
+					}
+					if (sub && sub.textContent !== 'PROVISIONING ARENA…') sub.textContent = 'PROVISIONING ARENA…'
+					setTimeout(tick, 400)
+				})
+		}
+		setTimeout(tick, 1000)
+	}
+
+	// Same endpoint the menu's NOW PLAYING readout polls: plain HTTP, CORS-open, proxied
+	// at /mapinfo in production and hit directly on :8078 in dev.
+	_mapInfoUrl() {
+		return location.protocol === 'https:'
+			? `https://${location.host}/mapinfo`
+			: `http://${location.hostname}:8078/mapinfo`
+	}
+
+	// What comes AFTER this match. /mapinfo already carries a `next` entry, so the
+	// post-match screen can name the incoming arena without any new server work. Fired
+	// once on MATCH_END; failures just leave the line hidden.
+	_fetchNextMapInfo() {
+		fetch(this._mapInfoUrl(), { cache: 'no-store' })
+			.then(r => (r.ok ? r.json() : null))
+			.catch(() => null)
+			.then(info => {
+				if (info && info.next && info.next.mapName) this._nextMapInfo = info.next
+			})
 	}
 
 	// Rotation reload has finished loading and the gates are open: switch the
@@ -2536,6 +2642,31 @@ class Simulator {
 				if (m && info.modeName) m.textContent = info.modeName
 			})
 			.catch(() => {})
+
+		// INSTANT HYDRATION. sessionStorage is the only thing that crosses the navigation,
+		// so the map name stashed by _awaitNextServer and the running session record are
+		// painted on the FIRST frame of this card — the fetch above only confirms them.
+		// Nothing on this screen is a placeholder waiting to be filled in.
+		try {
+			const stashed = JSON.parse(sessionStorage.getItem('fa-next-map') || 'null')
+			if (stashed && stashed.mapName) {
+				const n = document.getElementById('mc-map-name')
+				const m = document.getElementById('mc-mode-name')
+				if (n) n.textContent = stashed.mapName
+				if (m) m.textContent = stashed.modeName || ''
+			}
+			sessionStorage.removeItem('fa-next-map')
+		} catch (e) {}
+		const sess = MatchEndOverlay.readSession()
+		const sessEl = document.getElementById('mc-session')
+		if (sessEl) {
+			if (sess && (sess.m | 0) > 0) {
+				const net = (sess.k | 0) - (sess.d | 0)
+				sessEl.textContent = `SESSION ${sess.w}W · ${sess.l}L  ·  NET ${net > 0 ? '+' : ''}${net}`
+					+ ((sess.streak | 0) > 1 ? `  ·  ${sess.streak} WIN STREAK` : '')
+				sessEl.hidden = false
+			} else sessEl.hidden = true
+		}
 
 		// Touch devices have no pointer lock and usually no fullscreen affordance —
 		// keep the wording honest per platform.

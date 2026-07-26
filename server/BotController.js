@@ -5,7 +5,12 @@
 // GameInstance runs it through the exact same applyCommand physics and
 // performShot weapon authority. Everything that makes it beatable is here:
 //   * turn-rate-limited aim (it swings onto you, never snaps)
-//   * per-burst aim error (it misses like a mid-skill UT bot)
+//   * a LIVE aim-error model ported from UT99 (server/botSkill.js): the bot aims worse
+//     the faster you cross its view, worse while either of you is airborne, worse just
+//     after it is hit, and worse in the moment it first spots you — so movement, return
+//     fire and surprise are all real counters instead of decoration
+//   * a skill level (0-7, UT99's scale) and an archetype, so a lobby is a spread of
+//     opponents rather than eight copies of one
 //   * trigger discipline (bursts with pauses, only fires roughly on target)
 //   * line-of-sight checks against the REAL map geometry (it can't wallhack)
 //   * A* pathfinding over the map's OWN UT99 nav graph (it crosses the map like a
@@ -16,6 +21,7 @@ import { weapons } from '../common/weaponsConfig'
 import { USE_MESH_MAP, MAP_MESH } from '../common/mapMesh'
 import { nearestWorldHit } from './lagCompensatedHitscanCheck'
 import { getNavGraph, nearestNode, aStar } from './navGraph'
+import { aimError, angularVelocity, reactionMs, refireScale, personalityFor, MAX_SKILL } from './botSkill'
 
 const TURN_RATE = 3.4          // rad/s — swings onto a target in ~0.3-0.9s (aim: human-ish)
 const NAV_TURN_RATE = 12       // rad/s — steering (no visible target). The aim rate is
@@ -24,8 +30,17 @@ const NAV_TURN_RATE = 12       // rad/s — steering (no visible target). The ai
 // narrow floor into the void. When there is nothing to aim at, the bot may whip its view
 // around to face the next waypoint, so velocity stays glued to the path.
 const RETARGET_MS = 900        // how often it reconsiders who to fight
-const AIM_ERR_YAW = 0.055      // rad, re-rolled each burst (~±1.6°)
-const AIM_ERR_PITCH = 0.03
+// How long a bot remembers having fought someone. Swapping back to a face inside this
+// window is not a surprise, so it does not pay the full acquisition aim penalty (it
+// still pays a reduced one — see ACQUIRE_FORGIVE_MS).
+const TARGET_MEMORY_MS = 8000
+// How much of the acquisition window a remembered opponent starts already through.
+const ACQUIRE_FORGIVE_MS = 1200
+// (The old constant per-burst aim error lived here: AIM_ERR_YAW = 0.055 rad, re-rolled
+// once per burst and otherwise fixed. It is gone — a constant error means the player's
+// movement cannot change how often they are hit, which in an arena shooter throws away
+// the whole skill expression. Aim error now comes from server/botSkill.js and responds
+// to lateral motion, airtime, damage and acquisition. See the header there.)
 const FIRE_CONE = 0.13         // rad — only pulls the trigger this close to on-target
 // Combat orbit (strafe/advance/fire) is a CLOSE-range behaviour. Its strafing walks the
 // bot sideways with no floor awareness, which is fatal on a catwalk like Visage's central
@@ -333,13 +348,28 @@ const pickWander = (nav, meshes, me) => {
 }
 
 class BotController {
-	constructor(entity, weaponIndex) {
+	// `opts.skill` (0..7, UT99's scale) and `opts.personality` (server/botSkill.js) are
+	// what make one bot different from the next. Both are optional so every existing
+	// caller — the FragBench AgentBotController subclass, tests, the box-arena path —
+	// keeps working; a bot with no arguments gets a mid-skill grunt.
+	constructor(entity, weaponIndex, opts = {}) {
 		this.entity = entity
 		this.weaponIndex = weaponIndex
+		this.skill = opts.skill != null ? Math.max(0, Math.min(MAX_SKILL, opts.skill)) : 3
+		this.personality = opts.personality || personalityFor(3)
 		this.aimYaw = Math.random() * Math.PI * 2
 		this.aimPitch = 0
 		this.aimErrYaw = 0
 		this.aimErrPitch = 0
+		// Aim error is now a DIRECTION rolled per burst and a MAGNITUDE recomputed every
+		// tick (see botSkill.aimError). Splitting it this way is what makes the model
+		// legible in play: the bot commits to being wrong in one direction for a burst —
+		// so you can see it shooting past your left shoulder and step the other way —
+		// while the amount it is wrong by responds instantly to what you are doing.
+		this.aimErrDir = Math.random() * Math.PI * 2
+		this.acquiredAt = 0     // when the CURRENT target was acquired (aim + reaction)
+		this.seenTargets = new Map()  // nid -> last time we were pointed at them
+		this.fireReadyAt = 0    // reaction delay gate; no trigger before this
 		this.strafeDir = Math.random() < 0.5 ? -1 : 1
 		this.strafeFlipAt = 0
 		this.burstUntil = 0
@@ -431,10 +461,44 @@ class BotController {
 				// never shoot or path-to-attack a friendly (LoS/nav are unchanged otherwise).
 				if (candidate.teamId !== undefined && me.teamId !== undefined
 					&& candidate.teamId === me.teamId) return
-				const d = Math.hypot(candidate.x - me.x, candidate.z - me.z)
+				let d = Math.hypot(candidate.x - me.x, candidate.z - me.z)
+				// STICKINESS. Nearest-enemy with no hysteresis makes a bot in a crowd
+				// flip targets every time two opponents trade places, which looks
+				// indecisive AND (since every switch re-triggers the acquisition aim
+				// penalty) means a bot in a busy room is permanently half-blind. Measured:
+				// bot-vs-bot frags fell 16 -> 5 per 90s before this was added. The bot it
+				// is ALREADY fighting gets a 30% discount, so it takes a clearly better
+				// opportunity to pull it out of a duel — which is also how a person plays.
+				if (candidate === this.target) d *= 0.7
 				if (d < bestDist) { bestDist = d; best = candidate }
 			})
-			this.target = best
+			// ACQUISITION. A NEW face resets both the aim-settling window (2x error,
+			// decaying) and the reaction gate. Re-picking the SAME target must not, or a
+			// bot in a long duel would re-blind itself every RETARGET_MS and never land a
+			// shot — the penalty is for being surprised, not for still fighting.
+			//
+			// Nor should turning back to someone it was fighting seconds ago count as a
+			// surprise: in a 4v4 a bot swaps between the same two or three opponents
+			// constantly, and charging full price every time leaves it permanently
+			// settling. A short memory of who it has already been shooting at fixes that
+			// while keeping the penalty for a genuinely new face.
+			if (best !== this.target) {
+				this.target = best
+				if (best) {
+					const seenAt = this.seenTargets.get(best.nid) || 0
+					const familiar = now - seenAt < TARGET_MEMORY_MS
+					this.acquiredAt = familiar ? now - ACQUIRE_FORGIVE_MS : now
+					this.fireReadyAt = now + (familiar ? 0 : reactionMs(this.skill, this.personality.alertness))
+				}
+			}
+			// Remember whoever we are pointed at, and forget the stale entries so a long
+			// match cannot grow this map without bound.
+			if (this.target) this.seenTargets.set(this.target.nid, now)
+			if (this.seenTargets.size > 16) {
+				for (const [nid, t] of this.seenTargets) {
+					if (now - t > TARGET_MEMORY_MS) this.seenTargets.delete(nid)
+				}
+			}
 		}
 
 		const spec = weapons[this.weaponIndex]
@@ -468,28 +532,59 @@ class BotController {
 			wishYaw = Math.atan2(dx, dz)
 			wishPitch = Math.atan2(dy, dist)
 
-			// orbit at the weapon's preferred range: shotgun crowds in, the rest
-			// keep mid-range; strafe direction flips on a timer so it never circles
-			// predictably, with the occasional UT hop thrown in
+			// STRAFE CADENCE is a personality trait. A good strafer changes direction
+			// often and unpredictably (which is also what makes it hard to hit); a
+			// sniper mostly holds still. `jumpy` bots hop out of the flip, UT-style.
+			const p = this.personality
 			if (now >= this.strafeFlipAt) {
-				this.strafeFlipAt = now + 800 + Math.random() * 1500
+				const base = 1500 - 800 * p.strafing        // 0.7s (twitchy) .. 1.5s (static)
+				this.strafeFlipAt = now + base + Math.random() * (base + 400)
 				this.strafeDir = -this.strafeDir
-				if (Math.random() < 0.3) jump = true
+				if (p.jumpy && Math.random() < 0.25 + 0.25 * p.strafing) jump = true
 			}
-			const preferred = (spec.range || 50) < 40 ? 7 : 13
+			// PREFERRED RANGE follows combatStyle — Epic's charge probability. A
+			// berserker closes to shotgun distance whatever it is holding, a sniper
+			// backs off. The weapon still sets the baseline.
+			const weaponPref = (spec.range || 50) < 40 ? 7 : 13
+			const preferred = Math.max(5, weaponPref * (1.2 - 0.4 * p.combatStyle))
 			if (dist > preferred + 2) forwards = true
 			else if (dist < preferred - 3) backwards = true
 			left = this.strafeDir < 0
 			right = this.strafeDir > 0
 
-			// trigger discipline: burst, pause, re-roll this burst's aim error
+			// TRIGGER DISCIPLINE. Burst/pause lengths scale with skill (UT99 scales
+			// ReFireRate the same way), so a high-skill bot applies more PRESSURE and not
+			// merely better aim. The per-burst roll now sets only the DIRECTION of the
+			// error; its size is recomputed below, every tick, from what you are doing.
 			if (now >= this.pauseUntil && now >= this.burstUntil) {
 				this.burstUntil = now + 350 + Math.random() * 700
-				this.pauseUntil = this.burstUntil + 250 + Math.random() * 600
-				this.aimErrYaw = (Math.random() - 0.5) * 2 * AIM_ERR_YAW
-				this.aimErrPitch = (Math.random() - 0.5) * 2 * AIM_ERR_PITCH
+				this.pauseUntil = this.burstUntil + (250 + Math.random() * 600) * refireScale(this.skill)
+				this.aimErrDir = Math.random() * Math.PI * 2
 			}
-			wantsFire = dist < (spec.range || 50) * 0.9 && now < this.burstUntil
+
+			// THE AIM MODEL (server/botSkill.js, ported from UT99's Bot.AdjustAim).
+			// Recomputed per tick so accuracy tracks the fight as it happens: wider the
+			// instant you break laterally, wider while either of you is airborne, wider
+			// just after the bot was hit, wider in the moment it first spots you.
+			const mag = aimError({
+				skill: this.skill,
+				accuracy: p.accuracy,
+				hitscan: spec.type === 'hitscan',
+				angularVel: angularVelocity(me, target),
+				acquiredAgo: now - this.acquiredAt,
+				painAgo: now - (me._lastPainAt || -1e9),
+				airborne: !me.grounded || target.grounded === false,
+				rand: Math.random,
+			})
+			this.aimErrYaw = Math.cos(this.aimErrDir) * mag
+			// Pitch error is deliberately half of yaw: a shot that misses high or low
+			// reads as a whiff, while one that misses left or right reads as the player
+			// having dodged it. Same total error, better feedback.
+			this.aimErrPitch = Math.sin(this.aimErrDir) * mag * 0.5
+
+			// The reaction gate: no trigger until the bot has had time to react to a face
+			// it just acquired (see botSkill.reactionMs).
+			wantsFire = dist < (spec.range || 50) * 0.9 && now < this.burstUntil && now >= this.fireReadyAt
 			// a new wander target is chosen fresh next time it loses sight
 			this.wander = null
 

@@ -4046,3 +4046,184 @@ body.whoami-open #entry-overlay { pointer-events: none; }
     .whoami-frame { animation: none; }
     .whoami-plate:hover, .whoami-plate:focus-visible { transform: none; }
 }
+
+
+/* ============================================================================
+   POST-MATCH OVERLAY (#match-end) + swap-card additions.
+   Painted by client/graphics/MatchEndOverlay.js. Reveal is staged: the overlay
+   adds .stage-0 ... .stage-5 over the first 10s of the intermission and the rules
+   below opt each block in, so the beats are declarative rather than scripted.
+   ============================================================================ */
+#match-end {
+    position: fixed; inset: 0; z-index: 60;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    gap: clamp(6px, 1.2vh, 14px);
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    background: radial-gradient(ellipse at 50% 42%, rgba(4,7,11,0.72) 0%, rgba(2,4,7,0.93) 68%);
+    backdrop-filter: blur(2px);
+    font-family: var(--x30-font-ui, 'Chakra Petch', system-ui, sans-serif);
+    color: var(--x30-ink, #d7e2ee);
+    pointer-events: none;
+}
+#match-end.is-visible { display: flex; }
+
+/* Every block starts hidden and is opted in by its stage class, so a block whose
+   stage has not arrived occupies no space and cannot flash. */
+#match-end .me-head, #match-end .me-board, #match-end #me-stats,
+#match-end #me-nemesis, #match-end #me-badges,
+#match-end #me-session, #match-end #me-next {
+    opacity: 0; transform: translateY(6px);
+    transition: opacity 320ms ease, transform 320ms ease;
+}
+#match-end.stage-1 .me-head,
+#match-end.stage-2 .me-board,
+#match-end.stage-3 #me-stats, #match-end.stage-3 #me-nemesis,
+#match-end.stage-4 #me-badges,
+#match-end.stage-5 #me-session, #match-end.stage-5 #me-next {
+    opacity: 1; transform: none;
+}
+/* once a stage has passed, later stages must not re-hide earlier blocks */
+#match-end.stage-2 .me-head, #match-end.stage-3 .me-head, #match-end.stage-4 .me-head, #match-end.stage-5 .me-head,
+#match-end.stage-3 .me-board, #match-end.stage-4 .me-board, #match-end.stage-5 .me-board,
+#match-end.stage-4 #me-stats, #match-end.stage-5 #me-stats,
+#match-end.stage-4 #me-nemesis, #match-end.stage-5 #me-nemesis,
+#match-end.stage-5 #me-badges { opacity: 1; transform: none; }
+
+#match-end .me-title {
+    font-family: var(--x30-font-display, var(--x30-font-display, 'Teko', sans-serif));
+    font-size: clamp(38px, 7.2vw, 84px); line-height: 0.92; letter-spacing: 0.06em;
+    text-transform: uppercase; color: #fff;
+}
+#match-end[data-result="win"]  .me-title { color: #fff; text-shadow: 0 0 24px rgba(0,229,255,0.28); }
+#match-end[data-result="loss"] .me-title { color: #9fb0c2; }
+#match-end[data-result="draw"] .me-title { color: #c8d3e0; }
+#match-end .me-head::after {
+    content: ''; display: block; height: 2px; margin: 8px auto 0; width: 132px;
+    background: linear-gradient(90deg, transparent, var(--x30-feedback-gold, #e8b23a), transparent);
+}
+#match-end[data-result="loss"] .me-head::after {
+    background: linear-gradient(90deg, transparent, var(--tdm-red, #ff4d4d), transparent);
+}
+#match-end .me-score {
+    font-family: var(--x30-font-display, 'Teko', sans-serif); font-size: clamp(22px, 3.4vw, 40px);
+    letter-spacing: 0.1em; color: var(--x30-ink-hi, #eef4fb);
+}
+#match-end .me-sub {
+    font-size: clamp(10px, 1.1vw, 12px); letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--x30-ink-low, #7d8b9b);
+}
+
+/* ---- ranking table ---- */
+#match-end .me-board {
+    width: min(680px, 94vw);
+    border: 1px solid rgba(120,150,180,0.16);
+    background: rgba(6,10,15,0.62);
+}
+#match-end .me-cols, #match-end .me-row {
+    display: grid; grid-template-columns: 34px 1fr 44px 44px 52px;
+    align-items: center; gap: 8px; padding: 5px 12px;
+}
+#match-end .me-cols {
+    font-size: 9px; letter-spacing: 0.2em; color: var(--x30-ink-low, #6f7d8d);
+    border-bottom: 1px solid rgba(120,150,180,0.14);
+}
+#match-end .me-row {
+    font-size: clamp(12px, 1.3vw, 15px); letter-spacing: 0.04em;
+    border-bottom: 1px solid rgba(120,150,180,0.06);
+}
+#match-end .me-row:last-child { border-bottom: 0; }
+#match-end .me-row .me-k, #match-end .me-row .me-d, #match-end .me-row .me-net,
+#match-end .me-cols .me-k, #match-end .me-cols .me-d, #match-end .me-cols .me-net {
+    text-align: right; font-variant-numeric: tabular-nums;
+}
+#match-end .me-row .me-rank { color: var(--x30-ink-low, #7d8b9b); font-variant-numeric: tabular-nums; }
+#match-end .me-row .me-name { display: flex; align-items: center; gap: 7px; min-width: 0; }
+#match-end .me-row .me-net { color: var(--x30-ink-low, #8b98a8); }
+#match-end .me-row[data-team="red"]  .me-rank { color: var(--tdm-red, #ff4d4d); }
+#match-end .me-row[data-team="blue"] .me-rank { color: var(--tdm-blue, #4db8ff); }
+/* your own row has to be findable in well under a second */
+#match-end .me-row.is-me {
+    background: rgba(0,229,255,0.10);
+    box-shadow: inset 2px 0 0 var(--x30-accent, #00e5ff);
+}
+#match-end .me-row.is-me .me-name { color: #fff; }
+/* Silicon is labelled, and a human who placed behind bots is told their human rank
+   rather than having it hidden — this game is about learning to beat the agents. */
+#match-end .me-agent {
+    font-size: 8px; letter-spacing: 0.16em; padding: 1px 4px; border-radius: 2px;
+    color: #0b0d10; background: var(--x30-feedback-gold, #ffb000); flex: 0 0 auto;
+}
+#match-end .me-human {
+    font-size: 8px; letter-spacing: 0.16em; color: var(--x30-ink-low, #7d8b9b);
+    border: 1px solid rgba(120,150,180,0.28); padding: 1px 4px; border-radius: 2px; flex: 0 0 auto;
+}
+
+/* ---- personal stats ---- */
+#match-end .me-stats { display: flex; gap: clamp(10px, 2.4vw, 30px); align-items: flex-end; }
+#match-end .me-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+#match-end .me-stat-v {
+    font-family: var(--x30-font-display, 'Teko', sans-serif); font-size: clamp(20px, 2.8vw, 32px); line-height: 1;
+    color: var(--x30-ink-hi, #eef4fb); font-variant-numeric: tabular-nums;
+}
+#match-end .me-stat-l {
+    font-size: 8px; letter-spacing: 0.18em; color: var(--x30-ink-low, #6f7d8d); text-transform: uppercase;
+}
+
+#match-end .me-nemesis {
+    display: flex; align-items: center; gap: 9px; flex-wrap: wrap; justify-content: center;
+    font-size: clamp(10px, 1.1vw, 12px); letter-spacing: 0.1em;
+}
+#match-end .me-nem-label { color: var(--tdm-red, #ff4d4d); letter-spacing: 0.2em; font-size: 9px; }
+#match-end .me-nem-name { color: #fff; display: inline-flex; align-items: center; gap: 6px; }
+#match-end .me-nem-detail { color: var(--x30-ink-low, #7d8b9b); }
+
+/* ---- accolades: at most three, so a badge still means something ---- */
+#match-end .me-badges { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+#match-end .me-badge {
+    display: flex; flex-direction: column; gap: 2px; padding: 7px 13px;
+    border: 1px solid rgba(232,178,58,0.34); background: rgba(232,178,58,0.06);
+    min-width: 150px;
+}
+#match-end .me-badge.is-mine { border-color: var(--x30-feedback-gold, #e8b23a); background: rgba(232,178,58,0.13); }
+#match-end .me-badge[data-kind="carrier"] { border-color: rgba(160,180,200,0.34); background: rgba(160,180,200,0.06); }
+#match-end .me-badge-label { font-size: 8px; letter-spacing: 0.2em; color: var(--x30-feedback-gold, #e8b23a); }
+#match-end .me-badge[data-kind="carrier"] .me-badge-label { color: #b9c7d6; }
+#match-end .me-badge-who {
+    font-family: var(--x30-font-display, 'Teko', sans-serif); font-size: clamp(15px, 1.9vw, 21px); line-height: 1;
+    color: #fff; display: inline-flex; align-items: center; gap: 6px;
+}
+#match-end .me-badge-detail { font-size: 9px; letter-spacing: 0.12em; color: var(--x30-ink-low, #7d8b9b); }
+
+#match-end .me-session, #match-end .me-next {
+    font-size: clamp(9px, 1vw, 11px); letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--x30-ink-low, #7d8b9b);
+}
+#match-end .me-next { color: var(--x30-accent, #00e5ff); }
+#match-end .me-clock {
+    margin-top: 2px; font-size: 9px; letter-spacing: 0.24em; text-transform: uppercase;
+    color: var(--x30-ink-low, #5f6c7b);
+}
+
+/* The combat HUD is unmounted for the intermission: a crosshair, an ammo card and a
+   health plate over a match you can no longer affect is noise, and it was competing
+   with the only thing worth reading. */
+body.match-ended #crosshair,
+body.match-ended #health-panel,
+body.match-ended #weapon-panel,
+body.match-ended #grenade-panel,
+body.match-ended #hack-feed,
+body.match-ended #objective-hud,
+body.match-ended #tdm-scoreboard,
+body.match-ended #tdm-banner { opacity: 0; transition: opacity 260ms ease; pointer-events: none; }
+
+/* Running session record on the swap card. */
+.mc-session {
+    margin-top: 12px; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--x30-ink-low, #7d8b9b);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #match-end .me-head, #match-end .me-board, #match-end #me-stats,
+    #match-end #me-nemesis, #match-end #me-badges,
+    #match-end #me-session, #match-end #me-next { transition: none; }
+}
