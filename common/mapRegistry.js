@@ -33,6 +33,13 @@ export const REGISTRY_SCHEMA = 'runtime/v1'
 //   id         unique key (also the selection token)
 //   name       display name
 //   mode       'CTF' | 'DM' | 'DOM' | ...  (mode code keys off this later)
+//   sky        SKY VARIANT name — which worlds hang in the void behind this arena.
+//              Art direction, declared HERE next to name/mode rather than in a table
+//              inside the renderer, so a map's identity is one record. Valid names +
+//              what each one contains: SKY_VARIANTS in client/graphics/BABYLONRenderer.js.
+//              EVERY map in ROTATION states one (see the table above ROTATION); a record
+//              that omits it falls back to SKY_DEFAULT with a console warning, and
+//              ?sky=<name> in the URL overrides it per-session for a side-by-side.
 //   useMeshMap true  = artist OBJ is the world (real floors, fall-death, killY);
 //              false = analytic box arena (setupObstacles, plane floor at GROUND_Y=0)
 //   -- mesh-map loader fields (present when useMeshMap) --
@@ -71,6 +78,13 @@ const visage = mesh({
 	id: 'visage',
 	name: 'CTF-Visage',
 	mode: 'CTF',
+	// SKY: EARTH AND THE MOON, both of them, in the same sky. Facing Worlds' identity is
+	// "two towers in orbit over home" — Earth low beyond the west end with its upper limb
+	// over the horizon, the Moon riding high and west of it, both catchable in one look
+	// west along the bridge. This was the vista Visage got by FALLBACK before (the record
+	// declared nothing); now it is stated, and the Moon was re-framed from 145deg around
+	// the sky to 66deg from Earth so the pair actually reads as a pair.
+	sky: 'earth_moon',
 	// CTF-Visage = the classic CTF-Face (Facing Worlds), renamed to dodge Epic
 	// trademarks. Two towers + a central bridge, floating in the void: walk off = death.
 	dir: '/assets/maps/CTF-Visage/',
@@ -218,6 +232,11 @@ const grove = mesh({
 	id: 'grove',
 	name: 'DM-W-Grove',
 	mode: 'DM',
+	// SKY: the same home sky as Visage, deliberately shared rather than invented — Grove
+	// is the one terrestrial-looking map in the set (a wooded arena, not a station), and
+	// it is OUT of ROTATION anyway (kept registered so /map grove still resolves), so it
+	// gets no sky of its own.
+	sky: 'earth_moon',
 	// DM-W-Grove-2025: spawn/scale/killY calibrated against this geometry (10697 faces).
 	dir: '/assets/maps/DM-W-Grove/',
 	file: 'DM-W-Grove-2025.obj',
@@ -258,8 +277,9 @@ const dm_gantry162 = mesh({
 		id: 'dm_gantry162',
 		name: 'DM-Gantry16][',
 		mode: 'TDM',
-		// SKY VARIANT: Deck16 gets Mars (no moon) — a different world through the same
-		// industrial frame. See SKY_VARIANTS in client/graphics/BABYLONRenderer.js.
+		// SKY: Deck16 gets Mars, alone, no moon — a different world through the same
+		// industrial frame, and the only single-body rust-red sky in the set. See
+		// SKY_VARIANTS in client/graphics/BABYLONRenderer.js.
 		sky: 'mars',
 		dir: '/assets/maps/DM-Gantry16][/',
 		file: 'DM-Gantry16][.obj',
@@ -412,6 +432,12 @@ const dom_elder = mesh({
 		id: 'dom_elder',
 		name: 'DOM-Elder',
 		mode: 'DOM',
+		// SKY: an EMBER gas giant low in the sky with one cold pale moon high opposite it.
+		// Elder is the gothic/temple map — warm amber firelight on stone — so it gets the
+		// warmest sky in the set, and the pale moon is there purely as the cold note
+		// against it. Same jupiter.jpg bytes as DM-Somnus, tinted and re-framed into a
+		// different world. See SKY_VARIANTS in client/graphics/BABYLONRenderer.js.
+		sky: 'ember',
 		dir: '/assets/maps/DOM-Elder/',
 		file: 'DOM-Elder.obj',
 		lights: 'DOM-Elder.lights.json',
@@ -584,9 +610,10 @@ const dm_somnus = mesh({
 		id: 'dm_somnus',
 		name: 'DM-Somnus',
 		mode: 'FFA',
-		// SKY VARIANT (client/graphics/BABYLONRenderer.js SKY_VARIANTS): Morpheus' open
-		// tower tops show more sky than anything else in the rotation, so it gets the
-		// oversized Jupiter (no moon). ?sky=<name> overrides per-session for a compare.
+		// SKY (client/graphics/BABYLONRenderer.js SKY_VARIANTS): Morpheus' open tower tops
+		// show more sky than anything else in the rotation, so it gets the oversized
+		// Jupiter — 64deg of apparent radius, a single body that needs no companion because
+		// it already fills the view. ?sky=<name> overrides per-session for a compare.
 		sky: 'jupiter',
 		dir: '/assets/maps/DM-Somnus/',
 		file: 'DM-Somnus.obj',
@@ -695,6 +722,12 @@ const dm_baroque = mesh({
 		id: 'dm_baroque',
 		name: 'DM-Baroque',
 		mode: 'TDM',
+		// SKY: EARTH'S NIGHT SIDE — the Black Marble, continents dark, city lights burning
+		// in constellations, with one deliberately dim moon beside it. Baroque is the
+		// darkest, most ornate map in the rotation; this is the only sky in the set whose
+		// primary body is unlit, which is what makes it read as night rather than as a
+		// re-tinted Earth. See SKY_VARIANTS in client/graphics/BABYLONRenderer.js.
+		sky: 'nightside',
 		dir: '/assets/maps/DM-Baroque/',
 		file: 'DM-Baroque.obj',
 		lights: 'DM-Baroque.lights.json',
@@ -857,6 +890,12 @@ const dm_hex2 = mesh({
 		id: 'dm_hex2',
 		name: 'DM-Hex][',
 		mode: 'DM',
+		// SKY: IN LUNAR ORBIT — the Moon promoted to primary body, huge, grey and airless
+		// up close, with Earth a small blue marble 76deg across the sky. Hex][ (Curse][) is
+		// the tight, buried, bunker-like map that leads the rotation; putting the airless
+		// grey world outside it is the deliberate contrast with the home sky Visage gets at
+		// the other end. See SKY_VARIANTS in client/graphics/BABYLONRenderer.js.
+		sky: 'luna',
 		dir: '/assets/maps/DM-Hex][/',
 		file: 'DM-Hex][.obj',
 		lights: 'DM-Hex][.lights.json',
@@ -1012,6 +1051,18 @@ export function mapDisplayName(record) {
 	return String((record && (record.displayName || record.name || record.id)) || '').toUpperCase()
 }
 
+// SKY ASSIGNMENT TABLE (the `sky` field on each record above; variant contents live in
+// SKY_VARIANTS, client/graphics/BABYLONRenderer.js). Every map in ROTATION declares one,
+// so no map in the rotation can ever fall back to the generic default:
+//
+//   dm_hex2        luna        Moon huge + close, Earth a small marble across the sky
+//   dm_gantry162   mars        Mars alone, rust-red, no moon
+//   dm_somnus      jupiter     the oversized gas giant alone (64deg apparent radius)
+//   dm_baroque     nightside   Earth's dark side, cities burning, + one dim moon
+//   visage         earth_moon  Earth AND the Moon, both in one look west
+//   dom_elder      ember       amber gas giant + one cold pale moon
+//   grove          earth_moon  (out of rotation; shares Visage's home sky on purpose)
+//
 // The rotation itself: all 6 mesh maps. DM-Hex][ (UT's DM-Curse][) leads: it replaced
 // DM-W-Grove, a 2025 community map, with the most iconic stock UT deathmatch map not
 // already in the set (Deck16 -> Gantry16][ and Morpheus -> Somnus were already here).

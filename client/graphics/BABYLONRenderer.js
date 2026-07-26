@@ -17,64 +17,247 @@ import { applyTextureVariants } from './textureVariants'
 const VM_LAYER_MASK = 0x10000000
 
 // ---------------------------------------------------------------------------
-// SKY VARIANTS — which world hangs in the void behind the arena. A map picks one
-// with `sky: '<name>'` on its registry record (common/mapRegistry.js); ?sky=<name>
-// in the URL overrides it for a side-by-side. 'earth' is the default and is the
-// original Facing-Worlds vista, unchanged.
+// SKY VARIANTS — which worlds hang in the void behind the arena.
 //
-// HARD CONSTRAINT: the world camera's maxZ is 2000, so |pos| + radius must stay
-// under it or the planet gets sliced by the far plane. Each entry below is sized
-// against that budget (the number after each `diameter` is its far-limb distance).
+// A map DECLARES its sky with `sky: '<name>'` on its registry record (common/
+// mapRegistry.js) — same place its name and mode live, one source of truth, no lookup
+// table hidden in here keyed by map id. ?sky=<name> in the URL still wins over the
+// record, for a side-by-side. Every map in ROTATION declares one; SKY_DEFAULT exists
+// only so a record that forgets to (or typos) still gets a sky instead of a black void.
+//
+// A VARIANT IS AN ORDERED LIST OF BODIES (`bodies: [...]`), one or more. It used to be
+// `{ planet, moon: true|false }` — a single world plus a hardcoded on/off Moon that
+// always sat at the same fixed spot on the OPPOSITE side of the sky from the planet, so
+// "Earth AND Moon in the same view" (the CTF-Visage art direction) was not expressible.
+// N bodies costs exactly N of everything below and nothing per-frame.
+//
+// COST, per body, all of it paid ONCE during scene construction:
+//   1 draw call, 1 StandardMaterial, 1 UV sphere, + its textures. MEASURED tri counts
+//   (scripts/verify-sky.mjs reads them off the live meshes): segments 64 = 17.4k tris for
+//   a body that fills the frame, 32 = 4.6k, 24 = 2.7k for a small disc.
+//   Textures are keyed by URL in Babylon's internal texture cache, so a body using
+//   moon.jpg for BOTH diffuse and emissive, or two bodies sharing a map, uploads those
+//   bytes ONCE (2048x1024 RGBA = 8 MB + mips ~10.7 MB; moon.jpg is 1024x512 = ~2.7 MB).
+//   Every body is applyFog=false, isPickable=false, out of the shadow map's render list,
+//   and out of the hitscan/floor picks (_isSolidWorld's isPickable gate rejects them, so
+//   they cost one predicate call and zero triangle tests per pick).
+//   Nothing is animated, re-uploaded or reallocated after load — no per-frame anything.
+//
+// HARD CONSTRAINT: the world camera's maxZ is 2000, so |pos| + radius must stay under it
+// or the body gets sliced by the far plane. Every entry states its far limb.
+//
+// FRAMING: this.camera.fov is 1.0 rad at construction but Simulator immediately overwrites
+// it with the PLAYER'S FOV SETTING (index.html's slider: VERTICAL degrees, 70 to 120,
+// default 95). The frame is therefore 47.5deg up/down at the default and 35deg at the
+// narrowest a player can pick — and the narrow end is the one a sky has to fit inside. A
+// body's apparent RADIUS is asin(r / |pos|), NOT atan: the 900-radius Jupiter at |pos|
+// 1001 spans 64deg from its centre, not the 42deg the pre-N-body comment claimed. Two
+// bodies meant to be seen TOGETHER have to sit far enough apart that neither limb eats the
+// other (each pairing below states its measured centre separation and limb-to-limb GAP)
+// while staying inside ~80deg so one frame still holds both at fov 70.
+//
+// COLOUR: do not trust a tint you reasoned about in linear terms. The scene runs Babylon's
+// STANDARD (filmic) tone map with contrast 1.25 and exposure 1.20 desktop / 1.35 touch
+// (the imageProcessingConfiguration block in the constructor). That curve is strongly
+// compressive PER CHANNEL, so it flattens HUE as well as brightness: a diffuseColor ratio
+// of 1 : 0.46 : 0.20 came out of the renderer at roughly 1 : 0.93 : 0.63 — khaki, not the
+// amber it was on paper (measured off verify-sky.mjs shots). Tints have to be pushed
+// several times harder than they look like they should need, and the only way to know is
+// to render it. In the other direction, a >1 diffuseColor on a body that fills the frame
+// clips its whole sub-solar disc to flat white: the biggest bodies want LESS gain, not
+// more.
 //
 // Texture note: every map here is EQUIRECTANGULAR, and Babylon's sphere V runs the
-// opposite way, so _buildSkyVariant flips V on all of them (see the Earth fix).
+// opposite way, so _buildSkyBody flips V on all of them (see the Earth fix).
 // Sources: earth/moon from the three.js MIT repo (public-domain NASA imagery);
 // mars = Viking MDIM21 colour mosaic, jupiter = Cassini Dec-2000 cylindrical map
 // (both NASA/JPL/USGS, public domain, downscaled to 2048x1024).
-const SKY_VARIANTS = {
-	// The original: Earth low beyond the west end, its upper limb above the horizon,
-	// day/night terminator from the arena sun, city lights on the dark side.
-	earth: {
-		planet: {
-			name: 'earth', diameter: 1200, pos: [-360, -320, 820], // far limb ~1550
-			yaw: 2.1, tilt: 0.409,                                  // 23.4deg obliquity
-			diffuse: 'earth_day.jpg',
-			specular: 'earth_spec.jpg', specularColor: [0.42, 0.47, 0.58], specularPower: 96,
-			emissive: 'earth_lights.png', emissiveColor: [0.5, 0.45, 0.33],
-		},
-		moon: true,
-	},
-	// MARS, no moon. Smaller and further than Earth so it reads as another world
-	// rather than a re-skin: rust-red, matte (no ocean glint, so no specular map),
-	// no night-side lights — the dark limb genuinely goes black, which is the point.
-	// 25.2deg obliquity. Diffuse is lifted slightly because the Viking mosaic is a
-	// dim albedo map and the arena sun alone leaves it muddy.
-	mars: {
-		planet: {
-			name: 'mars', diameter: 1050, pos: [-380, -300, 860], // far limb ~1500
-			yaw: 2.6, tilt: 0.44,
-			diffuse: 'mars.jpg', diffuseColor: [1.25, 1.15, 1.08],
-			specularColor: [0.06, 0.04, 0.03], specularPower: 24,
-		},
-		moon: false,
-	},
-	// JUPITER, notably larger — it fills a large arc of the sky instead of sitting in
-	// it. Radius 900 at ~1000 away subtends ~42deg vs Earth's ~32deg, and the far limb
-	// lands at ~1900, just inside maxZ. No moon. Gas giant: no specular at all, 3.1deg
-	// obliquity (nearly upright), and a low self-emissive of its own map so the unlit
-	// limb reads as a dim banded edge rather than a hole cut out of the starfield.
-	jupiter: {
-		planet: {
-			name: 'jupiter', diameter: 1800, pos: [-330, -290, 900], // far limb ~1900
-			yaw: 1.2, tilt: 0.055,
-			diffuse: 'jupiter.jpg', diffuseColor: [1.15, 1.1, 1.02],
-			specularColor: [0, 0, 0],
-			emissive: 'jupiter.jpg', emissiveColor: [0.12, 0.1, 0.085],
-		},
-		moon: false,
-	},
+
+// --- BODIES ---------------------------------------------------------------
+// Named so variants can share them; spread + override to re-frame or re-tint one.
+// `pos` is WORLD (the arena is at the origin), `yaw` spins the globe to choose which
+// face we see, `tilt` is the AXIAL TILT — a world standing bolt upright reads as a prop,
+// the real obliquity is what sells it as a planet. We look at these roughly along +Z, so
+// a Z rotation tilts the poles within the screen plane, where the tilt is visible.
+
+// EARTH — the original Facing-Worlds vista, geometry untouched: low beyond the west end,
+// upper limb above the horizon, day/night terminator from the arena sun, city lights on
+// the dark side. |pos| 951, radius 600 -> apparent radius 39deg (it fills the lower view).
+const B_EARTH = {
+	name: 'earth', diameter: 1200, pos: [-360, -320, 820], // far limb ~1550
+	yaw: 2.1, tilt: 0.409, segments: 64,                    // 23.4deg obliquity
+	diffuse: 'earth_day.jpg',
+	// SUN GLINT, TIGHTENED (2026-07-26). specularColor 0.42/0.47/0.58 at specularPower 96
+	// spread the ocean highlight into three blown white patches the size of Indonesia — it
+	// read as a render fault, not as a glint (caught in scripts/verify-sky.mjs shots).
+	// Power up + colour down keeps a real glint on the water: 240 narrows the lobe, and
+	// 0.26/0.29/0.36 keeps its peak off the top of the tone map (measured: the glint now
+	// peaks at 220,206,200 instead of clipping to white).
+	specular: 'earth_spec.jpg', specularColor: [0.26, 0.29, 0.36], specularPower: 240,
+	emissive: 'earth_lights.png', emissiveColor: [0.5, 0.45, 0.33],
 }
-const SKY_DEFAULT = 'earth'
+
+// THE MOON, framed to hang HIGH AND WEST OF Earth's limb — the whole point of the
+// N-body rewrite. The old hardcoded [300, 700, -250] put it 61deg up and 145deg AROUND
+// the sky from Earth: you could only find it by looking almost straight up, and never
+// with Earth in the same frame. Here it sits 66deg from Earth's centre with an 18deg
+// limb-to-limb gap, pitched +20deg — above the horizon from anywhere on the map, and in
+// frame together with Earth's limb for anyone looking west along the bridge.
+// |pos| 1250, radius 190 -> apparent radius 8.7deg.
+const B_MOON = {
+	name: 'moon', diameter: 380, pos: [-1150, 420, 250], // far limb ~1440
+	yaw: 0.35, tilt: 0.05, segments: 32,
+	diffuse: 'moon.jpg', diffuseColor: [1.6, 1.6, 1.65], // overbright the sunlit face
+	// self-illuminate: the raw lunar albedo map is very dark, so drive the SAME texture
+	// through emissive too (one URL = one upload) — the Moon reads as a bright disc
+	// against the black void instead of a dim smudge, and keeps its crater detail.
+	emissive: 'moon.jpg', emissiveColor: [0.9, 0.9, 0.95],
+	specularColor: [0, 0, 0],
+}
+
+// MARS. Smaller and further than Earth so it reads as another world rather than a
+// re-skin: rust-red, matte (no ocean glint, so no specular map), no night-side lights —
+// the dark limb genuinely goes black, which is the point. 25.2deg obliquity. Diffuse is
+// lifted because the Viking mosaic is a dim albedo map and the arena sun alone leaves it
+// muddy. |pos| 987, radius 525 -> apparent radius 32deg.
+const B_MARS = {
+	name: 'mars', diameter: 1050, pos: [-380, -300, 860], // far limb ~1500
+	yaw: 2.6, tilt: 0.44, segments: 64,
+	diffuse: 'mars.jpg', diffuseColor: [1.25, 1.15, 1.08],
+	specularColor: [0.06, 0.04, 0.03], specularPower: 24,
+}
+
+// JUPITER, deliberately oversized — it fills a large arc of the sky instead of sitting
+// in it: |pos| 1001, radius 900 -> apparent radius 64deg, so its limb reaches most of
+// the way across the frame. Gas giant: no specular at all, 3.1deg obliquity (nearly
+// upright), and a low self-emissive of its own map so the unlit limb reads as a dim
+// banded edge rather than a hole cut out of the starfield.
+const B_JUPITER = {
+	name: 'jupiter', diameter: 1800, pos: [-330, -290, 900], // far limb ~1900
+	yaw: 1.2, tilt: 0.055, segments: 64,
+	// DIFFUSE PULLED DOWN from 1.15/1.1/1.02 (2026-07-26). On a body this large the sun's
+	// sub-solar point is a broad DISC, not a rim, so a >1 diffuseColor clipped the middle of
+	// the planet to flat white and ate the bands right where the eye looks: the widest body
+	// in the set has the LEAST brightness headroom, not the most. At 0.85 the limb and the
+	// banding both read (verified in scripts/verify-sky.mjs before/after shots).
+	diffuse: 'jupiter.jpg', diffuseColor: [0.85, 0.82, 0.76],
+	specularColor: [0, 0, 0],
+	emissive: 'jupiter.jpg', emissiveColor: [0.12, 0.1, 0.085],
+}
+
+// LUNA UP CLOSE — the Moon promoted to primary body: |pos| 875, radius 550 -> apparent
+// radius 39deg, the same screen presence as Earth but grey, cratered and airless. Note
+// the emissive is dialled WAY down vs B_MOON (0.22 vs 0.9): a small distant disc needs
+// self-illumination to read at all, but a body filling 39deg of frame at 0.9 emissive is
+// a flat white blob — at 0.22 the arena sun's terminator does the modelling and the
+// craters keep their relief.
+const B_LUNA_CLOSE = {
+	name: 'moon', diameter: 1100, pos: [-300, -260, 780], // far limb ~1425
+	yaw: 0.6, tilt: 0.03, segments: 64,
+	diffuse: 'moon.jpg', diffuseColor: [1.3, 1.3, 1.36],
+	emissive: 'moon.jpg', emissiveColor: [0.22, 0.22, 0.25],
+	specularColor: [0, 0, 0],
+}
+
+// EARTHRISE — Earth as the SMALL far body, on the other side of the sky from Luna:
+// |pos| 1200, radius 210 -> apparent radius 10deg, 76deg from Luna's centre for a 27deg
+// limb-to-limb gap, and both fit one frame aimed between them. Drops the specular MAP
+// (a 10deg disc cannot resolve an ocean glint — that is 10.7 MB of VRAM for nothing) but
+// keeps the city lights, which DO read at this size as a warm speckle on the dark limb.
+const B_EARTH_FAR = {
+	name: 'earth', diameter: 420, pos: [787, 450, 787], // far limb ~1410
+	yaw: 3.6, tilt: 0.409, segments: 32,
+	diffuse: 'earth_day.jpg',
+	specularColor: [0.18, 0.2, 0.26], specularPower: 64,
+	emissive: 'earth_lights.png', emissiveColor: [0.6, 0.54, 0.4],
+}
+
+// EARTH'S NIGHT SIDE — the NASA Black Marble mosaic, which already has the city lights
+// baked into it, driven through diffuse AND emissive from the SAME url (so it is ONE
+// 10.7 MB upload, the cheapest primary body in the set). The emissive is what makes it
+// a "nightside" at all: the arena sun is fixed and shared with the map lighting, we do
+// not get to move it per-map, so instead the globe is made to read nocturnal from every
+// angle — dark blue continents, amber city constellations — while diffuseColor keeps
+// just enough sun response that the lit limb still has some relief.
+// Same slot/size as B_EARTH: |pos| 951, radius 600 -> apparent radius 39deg.
+const B_EARTH_NIGHT = {
+	name: 'earth', diameter: 1200, pos: [-360, -320, 820], // far limb ~1550
+	yaw: 2.85, tilt: 0.409, segments: 64,
+	diffuse: 'earth_night.jpg', diffuseColor: [0.9, 0.9, 1.0],
+	emissive: 'earth_night.jpg', emissiveColor: [0.95, 0.92, 0.8],
+	specularColor: [0.1, 0.11, 0.14], specularPower: 48,
+}
+
+// A DIM CRESCENT MOON to pair with the night side — small (apparent radius 6.7deg) and
+// deliberately underdriven (emissive 0.45 vs B_MOON's 0.9) so it does not out-shine the
+// dark Earth it is meant to accompany. 56deg from Earth's centre, 10deg limb gap, and
+// both bodies land inside one frame aimed between them. |pos| 1288, radius 150.
+const B_MOON_DIM = {
+	name: 'moon', diameter: 300, pos: [-980, 560, 620], // far limb ~1438
+	yaw: 0.9, tilt: 0.05, segments: 24,
+	diffuse: 'moon.jpg', diffuseColor: [1.15, 1.15, 1.2],
+	emissive: 'moon.jpg', emissiveColor: [0.45, 0.45, 0.5],
+	specularColor: [0, 0, 0],
+}
+
+// AN EMBER GAS GIANT — jupiter.jpg's bands pushed into amber/rust by diffuseColor and
+// re-framed larger and lower than B_JUPITER (apparent radius 42deg at a different yaw, so
+// a different face of the banding is showing). Same texture bytes as B_JUPITER, a
+// different world: this is why bodies are data and not one hardcoded planet.
+// |pos| 1125, radius 750.
+//
+// Getting to amber took three renders (see the COLOUR note at the top of this block, which
+// this body is the reason for). 1.6/0.82/0.42 came out barely warmer than plain Jupiter —
+// R and G both clipped at the sub-solar point and the whole ratio was thrown away.
+// 0.95/0.46/0.20 stopped the clipping and came out KHAKI, because the filmic tone map
+// compresses a 1:0.46:0.20 input to about 1:0.93:0.63 on its own. Only near-monochrome-red
+// input survives the curve as amber; the bright ammonia bands still read cream, which is
+// what keeps it looking like a gas giant rather than a red ball.
+const B_EMBER_GIANT = {
+	name: 'jupiter', diameter: 1500, pos: [-420, -360, 980], // far limb ~1875
+	yaw: 4.4, tilt: 0.12, segments: 64,
+	diffuse: 'jupiter.jpg', diffuseColor: [1.0, 0.18, 0.05],
+	specularColor: [0, 0, 0],
+	emissive: 'jupiter.jpg', emissiveColor: [0.18, 0.035, 0.01],
+}
+
+// A PALE MOON high opposite the ember giant — cold white against all that amber, which
+// is the entire reason it is there. 75deg from the giant's centre for a 28deg limb gap;
+// both fit one frame. |pos| 1250, radius 130 -> apparent radius 6deg.
+const B_MOON_PALE = {
+	name: 'moon', diameter: 260, pos: [680, 587, 870], // far limb ~1380
+	yaw: 2.2, tilt: 0.04, segments: 24,
+	diffuse: 'moon.jpg', diffuseColor: [1.5, 1.5, 1.58],
+	emissive: 'moon.jpg', emissiveColor: [0.72, 0.72, 0.8],
+	specularColor: [0, 0, 0],
+}
+
+// --- VARIANTS -------------------------------------------------------------
+// Which maps fly under which sky lives on the MAP RECORDS, not here (grep `sky:` in
+// common/mapRegistry.js for the assignment table).
+const SKY_VARIANTS = {
+	// CTF-Visage. Earth AND the Moon, both up there, both catchable in one look west
+	// along the bridge. 2 draw calls, 4 textures (~34.8 MB VRAM).
+	earth_moon: { bodies: [B_EARTH, B_MOON] },
+	// Deck16's industrial frame over another world. 1 draw call, 1 texture (~10.7 MB).
+	mars: { bodies: [B_MARS] },
+	// The oversized gas giant, alone, for the map with the most open sky in the set.
+	// 1 draw call, 1 texture (~10.7 MB — diffuse and emissive share the url).
+	jupiter: { bodies: [B_JUPITER] },
+	// In LUNAR ORBIT, looking back: the Moon huge and close, Earth a small blue marble
+	// across the sky. 2 draw calls, 3 textures (~24 MB).
+	luna: { bodies: [B_LUNA_CLOSE, B_EARTH_FAR] },
+	// Over the DARK side of Earth, cities burning, one dim moon. 2 draw calls, 2
+	// textures (~13.4 MB) — the cheapest two-body sky here.
+	nightside: { bodies: [B_EARTH_NIGHT, B_MOON_DIM] },
+	// An amber gas giant and a cold pale moon. 2 draw calls, 2 textures (~13.4 MB).
+	ember: { bodies: [B_EMBER_GIANT, B_MOON_PALE] },
+}
+// Only reached by a record with no `sky` (or a typo'd one) — every ROTATION map declares.
+const SKY_DEFAULT = 'earth_moon'
+// Legacy names kept resolvable: 'earth' is what the registry/harnesses said before the
+// variant was renamed for what it actually contains (scripts/shot-earth.mjs SKY=earth).
+const SKY_ALIASES = { earth: 'earth_moon' }
 
 // MOBILE SHADOW LIFT (2026-07-24) — "it's too dark on mobile", after the grade retune
 // had already taken exposure to its ceiling (1.35 on touch; past ~1.4 the sky and light
@@ -426,11 +609,14 @@ class BABYLONRenderer {
 		const skyMesh = this.skydome && this.skydome.mesh
 		if (skyMesh) skyMesh.applyFog = false
 
-		// PLANET + MOON come from a SKY VARIANT (see SKY_VARIANTS at the bottom of this
-		// file). Which one a map flies over is the `sky` field on its registry record
-		// (common/mapRegistry.js); ?sky=<name> in the URL overrides it for a side-by-side,
-		// same convention as ?armor=0. Unknown/absent -> 'earth', the original vista.
-		this._buildSkyVariant(map)
+		// The CELESTIAL BODIES come from a SKY VARIANT (see SKY_VARIANTS at the top of this
+		// file) — one or more worlds, e.g. Earth AND the Moon over CTF-Visage. Which sky a
+		// map flies under is the `sky` field on its registry record (common/mapRegistry.js);
+		// ?sky=<name> in the URL overrides it for a side-by-side, same convention as
+		// ?armor=0. Unknown/absent -> SKY_DEFAULT. Pass this.map, not the ctor arg: harnesses
+		// construct the renderer with no argument and the ctor already resolved the active
+		// map for them, and a sky is the one thing that must never silently go generic.
+		this._buildSkyVariant(this.map)
 
 		// --- distance fog: dark slate, subtle. LINEAR fogStart 22 / fogEnd 78 was
 		// tried (2026-07-17) and reverted — in a ~60u arena it buried most of the view
@@ -645,47 +831,56 @@ class BABYLONRenderer {
 	// light actors baked into vertex colors. Server owns collision.
 	// Build the space vista for this map's SKY VARIANT (see SKY_VARIANTS). Resolution
 	// order: ?sky=<name> in the URL (side-by-side override) -> the map record's `sky`
-	// field -> 'earth'. An unknown name falls back to 'earth' rather than rendering an
-	// empty void, so a typo in a registry record can never ship a black sky.
-	// Everything built here is fog-off, shadow-off, non-pickable sky dressing.
+	// field -> SKY_DEFAULT. An unknown name falls back rather than rendering an empty
+	// void, so a typo in a registry record can never ship a black sky.
+	// Everything built here is fog-off, shadow-off, non-pickable sky dressing, built once.
 	_buildSkyVariant(map) {
 		let want = null
 		try {
 			want = new URLSearchParams(location.search).get('sky')
 		} catch (e) { /* no location (tests/headless) — fall through to the record */ }
 		if (!want) want = (map && map.sky) || null
+		if (want && SKY_ALIASES[want]) want = SKY_ALIASES[want]
 		const key = (want && SKY_VARIANTS[want]) ? want : SKY_DEFAULT
 		if (want && !SKY_VARIANTS[want]) console.warn(`[sky] unknown variant '${want}' — using ${SKY_DEFAULT}`)
-		const variant = SKY_VARIANTS[key]
+		else if (!want) console.warn(`[sky] map '${map && map.id}' declares no sky — using ${SKY_DEFAULT}`)
 		this.skyVariant = key
 
-		const p = variant.planet
-		const planet = BABYLON.MeshBuilder.CreateSphere(p.name, { diameter: p.diameter, segments: 64 }, this.scene)
-		planet.position.set(p.pos[0], p.pos[1], p.pos[2])
-		// rotation.y spins the globe to choose which face we see; rotation.z is the AXIAL
-		// TILT. A world standing bolt upright reads as a prop — the real obliquity is what
-		// sells it as a planet. We look at it roughly along +Z, so a Z rotation tilts the
-		// poles within the screen plane, where the tilt is actually visible.
-		planet.rotation.y = p.yaw
-		planet.rotation.z = p.tilt
-		planet.applyFog = false
-		planet.isPickable = false
+		// One mesh per body, in declaration order. Handles are kept for the shot/verify
+		// harnesses (scripts/verify-sky.mjs walks skyBodies; shot-earth.mjs and
+		// shot-live.mjs predate it and read skyPlanet/skyMoon/skyVariant).
+		this.skyBodies = SKY_VARIANTS[key].bodies.map(b => this._buildSkyBody(b))
+		this.skyPlanet = this.skyBodies[0] || null
+		this.skyMoon = this.skyBodies.find(m => m.name === 'moon') || null
+		console.log(`[sky] '${key}': ${this.skyBodies.map(m => m.name).join(' + ')}`)
+	}
 
-		const mat = new BABYLON.StandardMaterial(p.name + 'Mat', this.scene)
+	// One celestial body from a BODY spec (see the constants above SKY_VARIANTS).
+	// Returns the mesh. No caller-visible state beyond that: cheap enough that a variant
+	// can hold as many as its art direction needs, but each one IS a draw call, so don't.
+	_buildSkyBody(b) {
+		const body = BABYLON.MeshBuilder.CreateSphere(b.name, { diameter: b.diameter, segments: b.segments || 32 }, this.scene)
+		body.position.set(b.pos[0], b.pos[1], b.pos[2])
+		body.rotation.y = b.yaw || 0   // which face we see
+		body.rotation.z = b.tilt || 0  // axial tilt, in the screen plane (we look along +Z)
+		body.applyFog = false
+		body.isPickable = false
+
+		const mat = new BABYLON.StandardMaterial(b.name + 'Mat', this.scene)
 		const maps = []
-		mat.diffuseTexture = new BABYLON.Texture('/assets/space/' + p.diffuse, this.scene)
+		mat.diffuseTexture = new BABYLON.Texture('/assets/space/' + b.diffuse, this.scene)
 		maps.push(mat.diffuseTexture)
-		if (p.diffuseColor) mat.diffuseColor = new BABYLON.Color3(...p.diffuseColor)
-		if (p.specular) {
-			mat.specularTexture = new BABYLON.Texture('/assets/space/' + p.specular, this.scene)
+		if (b.diffuseColor) mat.diffuseColor = new BABYLON.Color3(...b.diffuseColor)
+		if (b.specular) {
+			mat.specularTexture = new BABYLON.Texture('/assets/space/' + b.specular, this.scene)
 			maps.push(mat.specularTexture)
 		}
-		if (p.specularColor) mat.specularColor = new BABYLON.Color3(...p.specularColor)
-		if (p.specularPower != null) mat.specularPower = p.specularPower
-		if (p.emissive) {
-			mat.emissiveTexture = new BABYLON.Texture('/assets/space/' + p.emissive, this.scene)
+		if (b.specularColor) mat.specularColor = new BABYLON.Color3(...b.specularColor)
+		if (b.specularPower != null) mat.specularPower = b.specularPower
+		if (b.emissive) {
+			mat.emissiveTexture = new BABYLON.Texture('/assets/space/' + b.emissive, this.scene)
 			maps.push(mat.emissiveTexture)
-			mat.emissiveColor = new BABYLON.Color3(...(p.emissiveColor || [1, 1, 1]))
+			mat.emissiveColor = new BABYLON.Color3(...(b.emissiveColor || [1, 1, 1]))
 		}
 		// UPSIDE-DOWN FIX (2026-07-24): Babylon's sphere V runs the opposite way to an
 		// equirectangular map's, so the raw texture rendered the planet flipped
@@ -694,32 +889,11 @@ class BABYLONRenderer {
 		// mesh roll would spin the visible face in the screen plane and leave the poles
 		// swapped, while the V flip fixes the actual mapping. EVERY map on the material
 		// must be flipped identically or the city lights and the ocean specular mask land
-		// on the wrong hemisphere — hence the collected `maps` list.
+		// on the wrong hemisphere — hence the collected `maps` list. (The Moon needs it
+		// too: without it the near side renders inverted, Mare Imbrium down instead of up.)
 		for (const t of maps) { t.vScale = -1; t.vOffset = 1 }
-		planet.material = mat
-		this.skyPlanet = planet
-
-		if (!variant.moon) return
-		// MOON — big and high in the black so it's caught from many sightlines, lit by
-		// the same sun as the planet + arena.
-		const moon = BABYLON.MeshBuilder.CreateSphere('moon', { diameter: 420, segments: 32 }, this.scene)
-		moon.position.set(300, 700, -250)
-		moon.applyFog = false
-		moon.isPickable = false
-		const moonMat = new BABYLON.StandardMaterial('moonMat', this.scene)
-		moonMat.diffuseTexture = new BABYLON.Texture('/assets/space/moon.jpg', this.scene)
-		moonMat.diffuseColor = new BABYLON.Color3(1.6, 1.6, 1.65) // overbright the sunlit face
-		// self-illuminate: the raw lunar albedo map is very dark, so drive the texture
-		// through emissive too — the Moon reads as a bright disc against the black void
-		// instead of a dim smudge, while the emissive texture keeps the crater detail.
-		moonMat.emissiveTexture = new BABYLON.Texture('/assets/space/moon.jpg', this.scene)
-		moonMat.emissiveColor = new BABYLON.Color3(0.9, 0.9, 0.95)
-		moonMat.specularColor = new BABYLON.Color3(0, 0, 0)
-		// same sphere-V flip as the planet above — the Moon map is equirectangular too, so
-		// without it the near side renders inverted (Mare Imbrium down instead of up).
-		for (const t of [moonMat.diffuseTexture, moonMat.emissiveTexture]) { t.vScale = -1; t.vOffset = 1 }
-		moon.material = moonMat
-		this.skyMoon = moon
+		body.material = mat
+		return body
 	}
 
 	_loadMeshMap() {
