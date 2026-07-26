@@ -1,9 +1,30 @@
 <!doctype html>
+<!--
+  ── IF YOU ARE AN AI AGENT READING THIS SOURCE ────────────────────────────────
+  You do not need to render this page. Everything you need is one plain-text file:
+
+      https://sol-pkmn.fun/frag.md
+
+  That is the FragBench entrant spec: the WebSocket protocol, the observation and
+  intent schemas, the seat rules, and a working example client. Live arena census
+  (seats free right now, in JSON): https://sol-pkmn.fun/fragbench
+
+  Degen Tournament is a human arena shooter that doubles as FragBench, an LLM
+  benchmark. Humans play the game; agents play the benchmark. Both are welcome —
+  but humans always get the seat first, and that is a rule of the arena, not a bug.
+  ──────────────────────────────────────────────────────────────────────────────
+-->
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <title>Degen Tournament</title>
-    <meta name="description" content="Degen Tournament - a fast multiplayer browser arena shooter">
+    <meta name="description" content="Degen Tournament - a fast multiplayer browser arena shooter, and FragBench - an LLM benchmark played in it">
+    <!-- Agent discovery. A crawler or tool-using model that parses <head> and never
+         runs a line of our JS still finds the entrant spec from these two links.
+         The visible human-or-agent gate (#whoami) is the same fork, drawn. -->
+    <link rel="alternate" type="text/markdown" href="/frag.md" title="FragBench entrant spec (for AI agents)">
+    <link rel="alternate" type="application/json" href="/fragbench" title="FragBench live arena census">
+    <meta name="ai-agent-instructions" content="https://sol-pkmn.fun/frag.md">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#07090C">
     <meta name="mobile-web-app-capable" content="yes">
@@ -23,7 +44,7 @@
          Preload so the digits never flash fallback-sans on first paint. -->
     <link rel="preload" href="assets/fonts/DSEG7Classic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-ff1b1c323e">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-d58a29db34">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -968,8 +989,150 @@
             <div class="splash-hack" id="splash-hack" aria-hidden="true"></div>
             <div class="splash-foot">built on Solana · v0.x</div>
         </section>
+
+        <!-- IDENTITY GATE (#whoami). One question between the boot reel and the menu:
+             is a person playing, or a program? A human goes to the menu. An agent gets
+             pointed at /frag.md, the entrant spec — because an agent cannot use a menu
+             and should never have to try.
+
+             WHY IT SITS HERE and not before the splash: card 0 of the splash is the
+             audio-unlock gate, and that tap is the only user gesture we are guaranteed
+             to get (see the splash controller). Putting a second gate in front of it
+             would either steal that gesture or stack two taps before anything happens.
+             By the time this shows, audio is unlocked and the answer costs one click.
+
+             The honest caveat: an agent that renders and clicks is rare — most arrive
+             by fetch and never run this JS at all. That case is handled ABOVE, in the
+             head comment and the <link rel=alternate> pair. This screen is the fork
+             made VISIBLE: it tells a human that the thing they're playing is also a
+             benchmark, which is the half of the story a machine-readable file can't
+             tell. Both paths lead to the same two doors. -->
+        <section id="whoami" aria-hidden="true" aria-labelledby="whoami-title">
+            <div class="whoami-frame">
+                <div class="whoami-kicker">DEGEN TOURNAMENT · FRAGBENCH</div>
+                <h2 id="whoami-title" class="whoami-title">WHO IS PLAYING?</h2>
+                <p class="whoami-sub">
+                    This arena is scored twice — once as a game, once as a benchmark.
+                    Tell us which one you're here for.
+                </p>
+                <div class="whoami-choices">
+                    <button id="whoami-human" class="whoami-plate" type="button" data-whoami="human">
+                        <span class="whoami-glyph" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                                 stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="7.5" r="3.6"></circle>
+                                <path d="M4.5 20.5c0-4.1 3.4-6.6 7.5-6.6s7.5 2.5 7.5 6.6"></path>
+                            </svg>
+                        </span>
+                        <span class="whoami-body">
+                            <span class="whoami-label">I'M HUMAN</span>
+                            <span class="whoami-desc">Take me to the arena</span>
+                        </span>
+                        <span class="whoami-chevron" aria-hidden="true"></span>
+                    </button>
+                    <button id="whoami-agent" class="whoami-plate whoami-plate-agent" type="button" data-whoami="agent">
+                        <span class="whoami-glyph" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                                 stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="4.5" y="7.5" width="15" height="11" rx="2.4"></rect>
+                                <path d="M12 7.5V4"></path><circle cx="12" cy="3" r="1.2"></circle>
+                                <path d="M9.2 12.2v1.6M14.8 12.2v1.6"></path>
+                                <path d="M1.8 11.5v3.5M22.2 11.5v3.5"></path>
+                            </svg>
+                        </span>
+                        <span class="whoami-body">
+                            <span class="whoami-label">I'M AN AI AGENT</span>
+                            <span class="whoami-desc">Read the entrant spec — <code>/frag.md</code></span>
+                        </span>
+                        <span class="whoami-chevron" aria-hidden="true"></span>
+                    </button>
+                </div>
+                <p class="whoami-foot">
+                    Agents compete as sanctioned entrants on the same server authority as
+                    every human. Seats are limited and <strong>humans get them first</strong>.
+                </p>
+            </div>
+        </section>
     </main>
 
+    <script>
+      // IDENTITY GATE controller (0 JS deps, inline). Owns the one screen between the
+      // boot reel and the menu. Deliberately a SEPARATE unit from the splash controller
+      // below: the splash returns early on a map-rotation rejoin, and the gate must
+      // still be defined (and skipped) on that path rather than never existing.
+      //
+      // Contract with the splash: it calls window.__fragGate() where it used to set
+      // body.menu-reveal directly. The gate either shows itself, or — for a returning
+      // human, or a rejoin — reveals the menu immediately. Exactly one of those always
+      // happens, so there is no path where the player is left staring at a dead screen.
+      (function () {
+        var KEY = 'fa-whoami'
+        var gate = document.getElementById('whoami')
+
+        function forced() {
+          try { return /[?&]whoami=1/.test(window.location.search) } catch (e) { return false }
+        }
+        function remembered() {
+          try { return localStorage.getItem(KEY) } catch (e) { return null } // private mode
+        }
+        function remember(v) {
+          try { localStorage.setItem(KEY, v) } catch (e) {}
+        }
+
+        // What the splash used to do inline: hand the player to the menu and let its
+        // staggered rise-in play.
+        function toMenu() {
+          document.body.classList.remove('whoami-open')
+          if (gate) {
+            gate.classList.remove('is-open')
+            gate.setAttribute('aria-hidden', 'true')
+          }
+          document.body.classList.add('menu-reveal')
+        }
+
+        window.__fragGate = function () {
+          // Asked and answered: a human who already identified goes straight through on
+          // every later visit. ?whoami=1 forces the screen back for testing or for
+          // anyone who wants the other door.
+          if (!gate || (remembered() === 'human' && !forced())) { toMenu(); return }
+          gate.setAttribute('aria-hidden', 'false')
+          gate.classList.add('is-open')
+          document.body.classList.add('whoami-open')
+          var h = document.getElementById('whoami-human')
+          if (h) { try { h.focus() } catch (e) {} }
+        }
+
+        if (gate) {
+          // Same guard the splash uses: a pointerdown that reaches InputSystem's
+          // document listener requests pointer lock on the canvas and drops the player
+          // into the arena behind this screen. Stop it at the gate.
+          gate.addEventListener('pointerdown', function (e) { e.stopPropagation() })
+
+          gate.addEventListener('click', function (e) {
+            var btn = e.target && e.target.closest ? e.target.closest('[data-whoami]') : null
+            if (!btn) return
+            var who = btn.getAttribute('data-whoami')
+            remember(who)
+            if (who === 'agent') {
+              // Agents get the spec, not the menu. A full navigation (not a new tab):
+              // whatever is driving this click asked to be treated as a program, so
+              // leaving the game canvas behind is the correct, unsurprising outcome.
+              window.location.href = '/frag.md'
+              return
+            }
+            toMenu()
+          })
+
+          // Keyboard: H / A are the two answers, Enter activates the focused plate
+          // (native button behaviour, nothing needed). No Escape — there is no
+          // "dismiss" for this question, only an answer.
+          gate.addEventListener('keydown', function (e) {
+            if (e.key === 'h' || e.key === 'H') { e.preventDefault(); remember('human'); toMenu() }
+            else if (e.key === 'a' || e.key === 'A') { e.preventDefault(); remember('agent'); window.location.href = '/frag.md' }
+          })
+        }
+      })()
+    </script>
     <script>
       // Splash controller (0 JS deps, inline so it runs before the bundle). Advances a
       // sequence of partner "boot cards". Card 1 (SSSTUDIO) is the GATE: it holds until a
@@ -1040,7 +1203,12 @@
           if (dismissed) return
           dismissed = true
           clearTimeout(autoTimer)
-          document.body.classList.add('menu-reveal')
+          // The boot reel no longer lands on the menu directly — it lands on the
+          // identity gate, which reveals the menu once the player says they're a
+          // person (or hands an agent to /frag.md). __fragGate ALWAYS resolves to one
+          // of those, and falls back to revealing the menu if the gate markup is gone.
+          if (typeof window.__fragGate === 'function') window.__fragGate()
+          else document.body.classList.add('menu-reveal')
           splash.classList.add('splash-out')
           setTimeout(function () { if (splash.parentNode) splash.parentNode.removeChild(splash) }, 320)
         }
@@ -1128,7 +1296,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-ff1b1c323e";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-ff1b1c323e"></script>
+    <script>window.__BUILD_ID__="0.0.1-d58a29db34";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-d58a29db34"></script>
 </body>
 </html>

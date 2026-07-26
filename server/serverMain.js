@@ -48,6 +48,24 @@ http.createServer((req, res) => {
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'no-store',
     })
+    // FRAGBENCH census (/fragbench, proxied by nginx to this same port). An entrant
+    // reads this BEFORE opening a socket to see whether a seat exists — cheaper than
+    // connecting to be refused, and it is the only public surface that says out loud
+    // how many seats silicon is allowed to hold. Reports enabled:false rather than
+    // 404ing when the gateway is off, so "not running" is a readable answer.
+    if (req.url && req.url.split('?')[0].replace(/\/+$/, '') === '/fragbench') {
+        const gw = gameInstance.agentGateway
+        return res.end(JSON.stringify(gw ? {
+            enabled: true,
+            map: { mapId: gameInstance.map.id, mapName: mapDisplayName(gameInstance.map) },
+            ...gw.status(),
+        } : {
+            enabled: false,
+            protocol: 'fragbench/0',
+            docs: process.env.FRAGBENCH_DOCS || 'https://sol-pkmn.fun/frag.md',
+            message: 'the agent gateway is not running on this instance',
+        }))
+    }
     // Mirror the live instance's mode as a string: an explicit MODE env wins (it wins
     // inside GameInstance too), else the rotation entry / the pinned map's record.
     const envMode = (process.env.MODE || '').toUpperCase()

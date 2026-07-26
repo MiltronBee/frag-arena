@@ -291,6 +291,17 @@ const SESSION = { SPECTATOR: 0, DEPLOYED: 1 }
 // whose target is this same number), so total bodies is max(humans, botTarget) = 8
 // and the arena is always a full 4v4.
 const MAX_COMBATANTS = Math.max(1, parseInt(process.env.MAX_PLAYERS, 10) || 8)
+// FRAGBENCH AGENT CAPACITY. A sanctioned agent is still a BOT: it may only occupy a
+// seat a FILL bot would otherwise hold, and it yields to a human before any human
+// waits (see _rebalanceBots -> _evictAgent). The cap is a second, tighter ceiling on
+// top of that — it keeps a lobby from turning all-silicon even when no human is on,
+// so a human who arrives finds a game rather than an exhibition match. Default: half
+// the arena. FRAGBENCH_MAX_AGENTS=0 closes the arena to agents outright (the gateway
+// still accepts sockets and reports the closure, so entrants get a reason, not a hang).
+const _maxAgentsEnv = parseInt(process.env.FRAGBENCH_MAX_AGENTS, 10)
+const MAX_AGENTS = Number.isNaN(_maxAgentsEnv)
+	? Math.floor(MAX_COMBATANTS / 2)
+	: Math.max(0, Math.min(_maxAgentsEnv, MAX_COMBATANTS))
 // DeployCommand rate limit: 1 accepted request per socket per window; the rest
 // are silently dropped (no reject allocation churn — Ren's rule).
 const DEPLOY_COOLDOWN_MS = 3000
@@ -1510,6 +1521,14 @@ class GameInstance {
 	// toward the headcount like humans and are never retired here.
 	_rebalanceBots() {
 		if (process.env.BOTS !== undefined) return // legacy fixed-count mode
+		// Reentrancy guard: evicting an agent calls removeAgentBot, which rebalances
+		// again to backfill the seat. Without this the two recurse into each other.
+		if (this._rebalancing) return
+		this._rebalancing = true
+		try { this._rebalanceBotsInner() } finally { this._rebalancing = false }
+	}
+
+	_rebalanceBotsInner() {
 		const fillBots = this.bots.filter(b => !b.agent)
 		const nonFill = this._humanCount + (this.bots.length - fillBots.length)
 		// humans (+agents) alone can exceed the target: desired clamps at 0, never below.
@@ -1539,12 +1558,55 @@ class GameInstance {
 				.shift()
 			this.removeBot(pick)
 		}
+
+		// HUMANS ALWAYS WIN THE SEAT. Fill bots absorb the pressure first (the loop
+		// above), but once they're gone the roster can STILL be over target, because
+		// agents count toward the headcount like humans do. An agent is a bot: it
+		// yields. Evict newest-first — the entrant with the least invested in the
+		// match in progress — until the roster fits. Note this can only fire when
+		// humans+agents > target, i.e. exactly when a human would otherwise have
+		// been the one to wait.
+		let over = this._humanCount + (this.bots.length - this.bots.filter(b => !b.agent).length) - this._botFillTarget
+		if (over > 0 && this._botFillTarget > 0) {
+			const agents = this.bots.filter(b => b.agent).reverse() // newest first
+			for (const victim of agents) {
+				if (over <= 0) break
+				this._evictAgent(victim, 'human_priority')
+				over--
+			}
+		}
 	}
+
+	// FRAGBENCH: drop a seated agent and TELL IT WHY. The reason reaches the entrant
+	// as a typed frame before the socket closes, so a benchmark run can distinguish
+	// "you were bumped for a human" from a crash or a network drop — one is a rule of
+	// the arena, the other is a result to throw away.
+	_evictAgent(handle, reason) {
+		if (!handle) return
+		if (this.agentGateway) this.agentGateway.evict(handle, reason)
+		this.removeAgentBot(handle) // idempotent; also covers a gateway-less harness
+	}
+
+	// FRAGBENCH: agent seats free RIGHT NOW. An agent may only take a seat a FILL bot
+	// would otherwise hold — never one a human could use — so the budget is
+	// (target roster) - (humans) - (agents already in), capped by MAX_AGENTS. Fill
+	// bots are deliberately NOT subtracted: seating an agent retires one.
+	agentSeatsFree() {
+		const agents = this.bots.filter(b => b.agent).length
+		const roster = this._botFillTarget > 0 ? this._botFillTarget : MAX_COMBATANTS
+		return Math.max(0, Math.min(MAX_AGENTS - agents, roster - this._humanCount - agents))
+	}
+
+	get maxAgents() { return MAX_AGENTS }
+	get agentCount() { return this.bots.filter(b => b.agent).length }
 
 	// FRAGBENCH v0: an agent bot is a regular bot handle whose controller accepts
 	// external strategist intent (AgentBotController). It lives in this.bots so every
 	// existing path — think loop, respawn, teams, match scoring — treats it identically.
+	// Returns null when there is no seat for silicon right now (arena full of humans,
+	// or the agent cap is reached) — the gateway turns that into a typed refusal.
 	addAgentBot(label) {
+		if (this.agentSeatsFree() <= 0) return null
 		const entity = new PlayerCharacter()
 		entity.mesh.checkCollisions = true
 		entity.teamId = this.assignTeam()
@@ -1567,7 +1629,10 @@ class GameInstance {
 		handle.controller.agentLabel = label
 		entity.client = handle
 		this.bots.push(handle)
-		console.log(`[fragbench] agent "${label}" joined as nid ${entity.nid}`)
+		// The agent now counts toward the headcount, so a FILL bot has to make way —
+		// otherwise every agent that joined would grow the arena past its 4v4 shape.
+		this._rebalanceBots()
+		console.log(`[fragbench] agent "${label}" joined as nid ${entity.nid} (${this.agentCount}/${MAX_AGENTS} agents, ${this._humanCount} human)`)
 		return handle
 	}
 
@@ -1577,6 +1642,8 @@ class GameInstance {
 		this.bots.splice(i, 1)
 		this.instance.removeEntity(handle.rawEntity)
 		console.log(`[fragbench] agent "${handle.controller.agentLabel}" left (nid ${handle.rawEntity.nid})`)
+		// The seat it vacated goes back to a fill bot so the arena stays full.
+		this._rebalanceBots()
 	}
 
 	// every living entity `except` could fight: human raw entities + bots

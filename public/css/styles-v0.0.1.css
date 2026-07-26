@@ -3879,3 +3879,170 @@ body.arena-entered #arena-hud::before {
     #entry-overlay::after, #splash::after, #map-change::after { animation: none !important; }
     .mc-seg span { animation: none !important; opacity: 1 !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   IDENTITY GATE (#whoami) — "who is playing?", between the boot reel and the
+   menu. Sits at z58: ABOVE the menu it is holding back, BELOW the splash
+   (z60) that is fading out over it, so the reel dissolves onto this screen
+   instead of cutting to it.
+
+   Colour law: the accent is the only interactive colour, so BOTH plates use
+   it for hover/focus — the human/agent difference is carried by the glyph and
+   the mono treatment of the path, not by a second accent. The violet hairline
+   on the agent plate is ambient identity (allowed), never a state.
+   ═══════════════════════════════════════════════════════════════════════════ */
+#whoami {
+    position: fixed;
+    inset: 0;
+    z-index: 58;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+    background:
+        radial-gradient(120% 90% at 50% 0%, rgba(20, 241, 149, 0.06), transparent 60%),
+        var(--x30-void);
+}
+#whoami.is-open { display: flex; }
+/* the gate owns the screen while open: nothing behind it should be reachable */
+body.whoami-open #entry-overlay { pointer-events: none; }
+
+.whoami-frame {
+    width: min(680px, 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+    animation: whoami-rise 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes whoami-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+}
+
+.whoami-kicker {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--x30-accent);
+    opacity: 0.85;
+}
+.whoami-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(28px, 6.4vw, 46px);
+    line-height: 1;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--x30-ink);
+}
+.whoami-sub {
+    margin: 0;
+    max-width: 46ch;
+    font-family: var(--x30-font-ui);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--x30-ink-mid);
+}
+
+.whoami-choices {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 8px;
+}
+@media (min-width: 640px) {
+    .whoami-choices { grid-template-columns: 1fr 1fr; }
+}
+
+.whoami-plate {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 16px;
+    text-align: left;
+    background: var(--x30-surface-1);
+    border: 1px solid var(--x30-hairline);
+    border-radius: var(--x30-r-2);
+    color: var(--x30-ink-hi);
+    cursor: pointer;
+    transition: background-color var(--x30-t-fast) ease,
+                border-color var(--x30-t-fast) ease,
+                transform var(--x30-t-fast) ease;
+}
+/* ambient identity stripe — the agent door reads as the other kind of thing */
+.whoami-plate-agent { border-left: 2px solid var(--x30-violet); }
+
+.whoami-plate:hover,
+.whoami-plate:focus-visible {
+    background: linear-gradient(0deg, var(--x30-accent-tint), var(--x30-accent-tint)), var(--x30-surface-1);
+    border-color: var(--x30-accent-dim);
+    outline: none;
+    transform: translateY(-1px);
+}
+.whoami-plate:active { transform: translateY(0); }
+
+.whoami-glyph {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    color: var(--x30-accent);
+}
+.whoami-glyph svg { width: 100%; height: 100%; display: block; }
+.whoami-plate-agent .whoami-glyph { color: var(--x30-ally); }
+
+.whoami-body { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.whoami-label {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 17px;
+    line-height: 1;
+    letter-spacing: var(--x30-track-display);
+    text-transform: uppercase;
+}
+.whoami-desc {
+    font-family: var(--x30-font-ui);
+    font-size: 12.5px;
+    line-height: 1.35;
+    color: var(--x30-ink-mid);
+}
+.whoami-desc code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--x30-ally);
+}
+
+.whoami-chevron {
+    flex: 0 0 auto;
+    width: 7px; height: 7px;
+    border-right: 2px solid var(--x30-ink-low);
+    border-top: 2px solid var(--x30-ink-low);
+    transform: rotate(45deg);
+    transition: border-color var(--x30-t-fast) ease, transform var(--x30-t-fast) ease;
+}
+.whoami-plate:hover .whoami-chevron,
+.whoami-plate:focus-visible .whoami-chevron {
+    border-color: var(--x30-accent);
+    transform: rotate(45deg) translate(1px, -1px);
+}
+
+.whoami-foot {
+    margin: 6px 0 0;
+    max-width: 52ch;
+    font-family: var(--x30-font-ui);
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--x30-ink-low);
+}
+.whoami-foot strong { color: var(--x30-ink-mid); font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+    .whoami-frame { animation: none; }
+    .whoami-plate:hover, .whoami-plate:focus-visible { transform: none; }
+}
