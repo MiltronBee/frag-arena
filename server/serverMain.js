@@ -3,6 +3,7 @@ import nengiConfig from '../common/nengiConfig';
 import { ROTATION, MODE_DISPLAY, mapDisplayName, effectiveMode } from '../common/mapRegistry';
 import { readRotationIndex, writeRotationIndex } from './rotation';
 import http from 'http';
+import { readOwned, isLikelyAddress, rateLimit } from './walletLink.js'
 
 // MAP SELECTION. Explicit MAP env overrides everything (dev/probes pin a map);
 // otherwise the persisted rotation index (.rotation-state.json, server/rotation.js)
@@ -43,6 +44,30 @@ const MAPINFO_PORT = parseInt(process.env.MAPINFO_PORT || '8078', 10)
 // env-pinned map is a rotation PAUSE, so "next" is where the cycle resumes.
 const nextEntry = mapOverride ? ROTATION[rotationIndex] : ROTATION[(rotationIndex + 1) % ROTATION.length]
 http.createServer((req, res) => {
+    // WALLET LINK (/wallet/<address>, proxied by nginx to this same port). READ-ONLY:
+    // the player pastes an address, we read which Degen Tournament NFTs it holds and
+    // report the weapons that grants. No connect, no signature, no key, no transaction.
+    // Handled BEFORE the writeHead(200) below because it is the one endpoint here that
+    // needs real status codes (400 bad address, 429 rate limit, 502 RPC down).
+    const walletPath = req.url && req.url.split('?')[0].match(/^\/wallet\/([^/]+)\/?$/)
+    if (walletPath) {
+        const address = decodeURIComponent(walletPath[1])
+        const ip = req.headers['x-real-ip'] || req.socket?.remoteAddress || ''
+        const send = (code, body) => {
+            res.writeHead(code, {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Cache-Control': 'no-store',
+            })
+            res.end(JSON.stringify(body))
+        }
+        if (!isLikelyAddress(address)) return send(400, { error: 'invalid address', weapons: [] })
+        if (!rateLimit('wallet:' + ip)) return send(429, { error: 'slow down', weapons: [] })
+        readOwned(address)
+            .then((r) => send(200, r))
+            .catch((e) => send(502, { error: 'wallet read failed: ' + e.message, weapons: [] }))
+        return
+    }
     res.writeHead(200, {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',

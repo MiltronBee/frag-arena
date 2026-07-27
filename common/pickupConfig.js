@@ -31,9 +31,15 @@ export const WEAPON = { RIFLE: 0, SMG: 1, SHOTGUN: 2, PISTOL: 3, PLASMA: 4, FLAK
 // null = OMIT (do not place).
 //
 // Visage ships 6 sniper_rifle spawns and has NO item that naturally maps to the SMG,
-// so the sniper spawns are SPLIT across Rifle(0) and SMG(1). That makes all five
-// pickup weapons (0,1,2,4,5 — every non-pistol) appear on the map. Pure design choice;
+// so the sniper spawns are SPLIT across Rifle(0) and SMG(1). Pure design choice;
 // re-point any of these to re-balance the map without touching code.
+//
+// SEASON 1 (2026-07-26): NONE of this currently places anything. Every weapon it maps to
+// is either `disabled` (Plasma, Flak) or `ownedOnly` (Rifle, SMG, Shotgun), and
+// resolvePickup() rejects both — so the maps ship with zero weapon pickups and the only
+// weapon you can pick up is one a dying player dropped. The table is kept whole so the
+// mapping survives the gate: clear `ownedOnly` in weaponsConfig.js and these spawn again
+// exactly as before, no edit here required.
 export const WEAPON_ITEM_MAP = {
 	sniper_rifle:    [WEAPON.RIFLE, WEAPON.SMG], // SPLIT: alternates Rifle / SMG per spawn
 	shock_rifle:     WEAPON.PLASMA,
@@ -134,15 +140,40 @@ export function resolvePickup(category, entry, occurrence = 0) {
 		const m = WEAPON_ITEM_MAP[entry.item]
 		if (m === null || m === undefined) return null
 		const weaponIndex = Array.isArray(m) ? m[occurrence % m.length] : m
+		const w = weapons[weaponIndex]
 		// disabled roster entries (Plasma + Flak, 2026-07-22) never spawn as pickups
-		if (weapons[weaponIndex] && weapons[weaponIndex].disabled) return null
+		if (w && w.disabled) return null
+		// SEASON 1 NO-FREE-PICKUPS (2026-07-26): an ownership-gated weapon may never be
+		// PLACED by a spawner. As of Season 1 that is every non-pistol weapon, so this
+		// returns null for every entry in WEAPON_ITEM_MAP and the maps ship with zero
+		// weapon pickups. The map→weapon table above is deliberately LEFT INTACT rather
+		// than emptied: it stays the tuning surface, and clearing `ownedOnly` on a weapon
+		// is all it takes to put it back on the floor.
+		//
+		// This gate is on PLACEMENT only. Drop-on-death (GameInstance.dropWeaponsOnDeath)
+		// builds its Pickups directly and never calls this — killing a holder still drops
+		// their gun, which is the one intended way to get one you do not own.
+		if (w && w.ownedOnly) return null
 		return { type: PICKUP_TYPE.WEAPON, weaponIndex }
 	}
 	if (category === 'ammo') {
 		const m = AMMO_ITEM_MAP[entry.item]
 		if (m === null || m === undefined) return null
-		if (weapons[m] && weapons[m].disabled) return null // no ammo for disabled weapons
-		return { type: PICKUP_TYPE.AMMO, weaponIndex: m }
+		// UNIVERSAL AMMO (2026-07-26): a box refills EVERY weapon its toucher owns
+		// (GameInstance.applyPickup), so the mapped index no longer decides who benefits —
+		// it only picks the pickup's model and keeps the wire format unchanged.
+		//
+		// Which is why `disabled` is no longer a reason to omit. It used to be: `rockets`
+		// and `shock_core` map to Flak and Plasma, both disabled since 2026-07-22, so they
+		// silently resolved to nothing and left SMG ammo as the ONLY resupply on any map.
+		// Harmless while weapons still spawned on the floor; a starvation bug the moment
+		// they stopped. Those placements are live ammo again.
+		//
+		// Ammo is likewise NOT gated on `ownedOnly` — a gated weapon is exactly the thing
+		// its holder needs to resupply. Nothing leaks: the grant skips weapons the toucher
+		// does not own.
+		const idx = weapons[m] ? m : 0
+		return { type: PICKUP_TYPE.AMMO, weaponIndex: idx }
 	}
 	if (category === 'health')  return { type: PICKUP_TYPE.HEALTH,  weaponIndex: 0 }
 	if (category === 'armor')   return { type: PICKUP_TYPE.ARMOR,   weaponIndex: 0 }

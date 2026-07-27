@@ -193,6 +193,22 @@ export const tpWeapons = [
     position: { x: 0.0, y: -0.03, z: 0.0 },
     rotation: { x: 0, y: 1.5708, z: -0.4 },
   },
+  { // 6 Sniper  (bolt-action, raw len 4.32 on Z)
+    // ODD ONE OUT: every prop above is authored barrel-along-+X, so they all take the
+    // base yaw 1.5708 that swings the barrel forward out of the hand. This mesh is
+    // authored barrel-along-+Z (measured extent 0.216 x 2.259 x 4.322), so it needs an
+    // EXTRA +90deg to land in the same frame — hence y = 3.1416, not 1.5708.
+    //
+    // scale solves raw * scale * 0.577 (the body bone scale) = target world length:
+    // 4.322 * 0.321 * 0.577 = 0.80u, deliberately longer than the Rifle's 0.70u.
+    //
+    // NOT yet visually tuned — pos/roll are the analytic starting point. Run
+    // scripts/tune-tp-mounts.mjs before shipping this third-person.
+    url: '/assets/weapons/tp_sniper.glb',
+    scale: 0.321,
+    position: { x: 0.0, y: -0.03, z: 0.0 },
+    rotation: { x: 0, y: 3.1416, z: 0.0 },
+  },
 ]
 
 // First-person weapons (parented to the camera). Converted from the Retro Weapon

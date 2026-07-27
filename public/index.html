@@ -44,7 +44,7 @@
          Preload so the digits never flash fallback-sans on first paint. -->
     <link rel="preload" href="assets/fonts/DSEG7Classic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-f8b6e63edf">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-cfcd04282f">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -58,6 +58,20 @@
         <canvas id="main-canvas" aria-label="Degen Tournament game view"></canvas>
 
         <div id="nametags" aria-hidden="true"></div>
+
+        <!-- IN-MATCH CHAT. ENTER opens the bar, ALT toggles TEAM/ALL, ENTER sends,
+             ESC cancels. Opening it exits pointer lock (the browser delivers no text
+             input while locked) which is also what stops WASD walking you into a wall
+             mid-sentence. The log stays visible but dims; the bar is hidden until used. -->
+        <div id="chat" aria-live="polite">
+            <div id="chat-log"></div>
+            <div id="chat-bar" class="chat-hidden">
+                <span id="chat-scope" data-scope="all">ALL</span>
+                <input id="chat-input" type="text" autocomplete="off" autocorrect="off"
+                       autocapitalize="off" spellcheck="false" aria-label="Chat message" />
+                <span class="chat-help">ALT scope · ENTER send · ESC cancel</span>
+            </div>
+        </div>
 
         <div id="arena-hud" aria-live="polite">
             <header id="top-hud">
@@ -468,6 +482,24 @@
                         <div class="np-next"><span class="np-kicker">NEXT —</span> <span id="np-next-text"></span></div>
                     </div>
                     <button class="menu-plate" type="button" role="menuitem"
+                            data-menu-plate data-action="loadout" data-reveal>
+                        <span class="plate-edge" aria-hidden="true"></span>
+                        <span class="plate-body">
+                            <span class="plate-label">LOADOUT</span>
+                            <span class="plate-sub" id="loadout-plate-sub">see what you deploy with</span>
+                        </span>
+                        <span class="plate-chevron" aria-hidden="true"></span>
+                    </button>
+                    <button class="menu-plate" type="button" role="menuitem"
+                            data-menu-plate data-action="link-wallet" data-reveal>
+                        <span class="plate-edge" aria-hidden="true"></span>
+                        <span class="plate-body">
+                            <span class="plate-label">LINK WALLET</span>
+                            <span class="plate-sub" id="wallet-plate-sub">read-only · unlock what you own</span>
+                        </span>
+                        <span class="plate-chevron" aria-hidden="true"></span>
+                    </button>
+                    <button class="menu-plate" type="button" role="menuitem"
                             data-menu-plate data-action="settings" data-reveal>
                         <span class="plate-edge" aria-hidden="true"></span>
                         <span class="plate-body">
@@ -553,6 +585,58 @@
                     <li><b>JUMP / RELOAD / SWAP</b> buttons</li>
                     <li><b>GEAR</b> settings</li>
                 </ul>
+            </div>
+        </section>
+
+        <!-- LINK WALLET — READ-ONLY. Paste an address, we read which Degen Tournament
+             NFTs it holds and unlock the matching weapons. Deliberately NOT a wallet
+             connect: no extension, no signature prompt, no key ever touches this page,
+             and nothing can be spent. The address is stored locally and sent with the
+             next join; the SERVER re-reads the chain and decides the grant itself, so a
+             pasted address can only ever unlock what it genuinely holds. -->
+        <!-- LOADOUT — what you are about to deploy carrying, and what you are not.
+             Season 1 gates every non-pistol weapon behind ownership and removed weapon
+             pickups from the arena floor, which is a rule the player cannot otherwise
+             SEE: without this panel a returning player just finds their rifle missing.
+             The figure is a live CharacterModel wearing only the armour the linked
+             wallet holds, so an empty shoulder is literally an unowned pauldron. -->
+        <section id="loadout-modal" class="info-modal info-closed" role="dialog" aria-modal="true" aria-labelledby="loadout-title">
+            <div class="howto-panel loadout-panel">
+                <div class="card-strip" aria-hidden="true"></div>
+                <button class="panel-close" type="button" aria-label="Close" data-modal-close>✕</button>
+                <div class="menu-kicker">DEPLOYMENT</div>
+                <h2 id="loadout-title">LOADOUT</h2>
+                <div class="loadout-grid">
+                    <div class="loadout-figure">
+                        <canvas id="loadout-canvas" aria-label="Your character with the armour you own"></canvas>
+                        <div class="loadout-hint" id="loadout-hint">drag to turn</div>
+                    </div>
+                    <div class="loadout-lists">
+                        <h3 class="loadout-h3">WEAPONS</h3>
+                        <ul class="info-rows loadout-rows" id="loadout-weapons"></ul>
+                        <h3 class="loadout-h3">CLOTH</h3>
+                        <ul class="info-rows loadout-rows" id="loadout-armor"></ul>
+                    </div>
+                </div>
+                <p class="info-note" id="loadout-note">Everyone spawns with the Pistol. Nothing else spawns on the arena floor — you carry what you own, and it drops where you die for whoever kills you.</p>
+            </div>
+        </section>
+
+        <section id="wallet-modal" class="info-modal info-closed" role="dialog" aria-modal="true" aria-labelledby="wallet-title">
+            <div class="howto-panel">
+                <div class="card-strip" aria-hidden="true"></div>
+                <button class="panel-close" type="button" aria-label="Close" data-modal-close>✕</button>
+                <div class="menu-kicker">READ-ONLY</div>
+                <h2 id="wallet-title">LINK WALLET</h2>
+                <p class="info-note">Paste your Solana address. We only read it — never connected, never signed, nothing spendable. Own the gear, carry the gear.</p>
+                <div class="wallet-row">
+                    <input id="wallet-input" type="text" spellcheck="false" autocomplete="off"
+                           placeholder="paste address…" aria-label="Solana address" />
+                    <button id="wallet-link-btn" type="button">LINK</button>
+                </div>
+                <div id="wallet-status" class="info-note" aria-live="polite"></div>
+                <ul class="info-rows" id="wallet-holdings"></ul>
+                <p class="info-note">Unlocks apply on your next join. Everyone spawns with the Pistol — there are no free pickups for anything else.</p>
             </div>
         </section>
 
@@ -1327,7 +1411,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-f8b6e63edf";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-f8b6e63edf"></script>
+    <script>window.__BUILD_ID__="0.0.1-cfcd04282f";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-cfcd04282f"></script>
 </body>
 </html>

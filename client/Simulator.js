@@ -9,6 +9,8 @@ import SwitchWeaponCommand from '../common/command/SwitchWeaponCommand'
 import DevUpdateWeaponConfigCommand from '../common/command/DevUpdateWeaponConfigCommand'
 import SetNameCommand from '../common/command/SetNameCommand'
 import { decodeName, sanitizeName } from '../common/playerNames'
+import ChatControls from './graphics/ChatControls'
+import { decodeChat } from '../common/chat'
 import { TELEPORT_KEEP_YAW } from '../common/message/Teleported'
 import createFactories from './factories/createFactories'
 import reconcilePlayer from './reconcilePlayer'
@@ -73,6 +75,9 @@ class Simulator {
 		this.map = getMapRecord((typeof window !== 'undefined' && window.__SERVER_MAP_ID__) || DEFAULT_MAP_ID)
 		setActiveMap(this.map)
 		this.renderer = new BABYLONRenderer(this.map)
+		// in-match chat: Enter to type, Alt to switch TEAM/ALL. Constructed here so the
+		// keydown capture hook exists before the first match starts.
+		this.chat = new ChatControls(this)
 		this.input = new InputSystem()
 		this.obstacles = new Map()
 		this.movers = new Map()          // nid -> Mover entity (UT lifts; client-side carry clamp reads these)
@@ -296,6 +301,14 @@ class Simulator {
 			this._nameRegistry.set(message.smoothNid, name)
 			const model = this.characterModels.get(message.smoothNid)
 			if (model) model.setName(name)
+		})
+
+		// Chat. The speaker is identified by smooth nid only — the callsign is resolved
+		// from the same registry the nametags and kill feed use, so a rename is reflected
+		// everywhere at once and chat never carries a stale copy of somebody's name.
+		client.on('message::ChatMessage', message => {
+			if (!this.chat) return
+			this.chat.addLine(this.getName(message.smoothNid), decodeChat(message), message.scope, message.source)
 		})
 
 		// ARENA FULL: we asked to deploy and the server put us in the line. position 0

@@ -70,6 +70,12 @@ export const weapons = [
   {
     index: 0,
     name: 'Rifle',
+    // SEASON 1 OWNERSHIP GATE (2026-07-26): every non-pistol weapon is `ownedOnly`.
+    // See the Sniper (index 6) for the full rationale — the flag keeps this weapon out
+    // of ENABLED_WEAPON_INDICES, every spawner and every default loadout, while leaving
+    // it fully playable for a player the server GRANTS it to (a verified NFT holder, or
+    // anyone who loots it off a corpse). Granted by 'Vector Rifle' in common/entitlements.js.
+    ownedOnly: true,
     url: '/assets/weapons/retro_rifle_arms.glb',
     ...authoredMount,
     // ADS gameplay: tighter base cone (-50%), -40% sustained bloom, -30% heat/shot
@@ -112,6 +118,8 @@ export const weapons = [
   {
     index: 1,
     name: 'SMG',
+    // SEASON 1 OWNERSHIP GATE — see index 0. Granted by 'Static Repeater'.
+    ownedOnly: true,
     url: '/assets/weapons/retro_smg_arms.glb',
     ...authoredMount,
     // ADS enabled via procedural viewmodel centering fallback.
@@ -140,6 +148,8 @@ export const weapons = [
   {
     index: 2,
     name: 'Shotgun',
+    // SEASON 1 OWNERSHIP GATE — see index 0. Granted by 'Breach Ward'.
+    ownedOnly: true,
     url: '/assets/weapons/retro_shotgun_arms.glb',
     ...authoredMount,
     // Full 17-clip retro GLB built from the pack's BONE-family gun actions (shotgun01_*):
@@ -312,17 +322,89 @@ export const weapons = [
     bounceCount: 1,
     range: 30,
     spreadBase: 0.05      // cone for the pellet burst
+  },
+  {
+    index: 6,
+    name: 'Sniper',
+    // OWNERSHIP-GATED, not disabled. `ownedOnly` keeps it out of ENABLED_WEAPON_INDICES
+    // — so it never spawns as a floor pickup and is never handed out by the default
+    // loadout — while still being a fully live weapon the server can GRANT to a player
+    // who holds the NFT. Season 1 rule: "no free pickups, you own it you use it."
+    //
+    // Deliberately NOT wired into pickupConfig: CTF-Visage ships 6 `sniper_rifle` spawn
+    // points (currently split Rifle/SMG, see pickupConfig.js:33). Mapping them to this
+    // weapon is the obvious move and is exactly what the no-free-pickups rule forbids.
+    ownedOnly: true,
+    url: '/assets/weapons/retro_sniper_arms.glb',
+    ...authoredMount,
+    // Numbers from the round-robin design panel (scratch/sniper-scope/, 2026-07-26):
+    // 4 seats (sandbox/netcode/UX/economy) + chair rulings. See 00-SUMMARY.md.
+    //
+    // ADS fov 40 is the FIRST weapon to break the >=75deg floor the rest of the rack
+    // keeps. That floor exists so you are never blind to flankers — breaking it IS the
+    // sniper's cost, and it is why the scope-in sound is load-bearing counterplay.
+    // Panel considered 30deg and rejected it: on a phone the thumb travel to cross the
+    // screen becomes unusable. inTime 0.24 / outTime 0.16 keeps out faster than in, like
+    // every other weapon here.
+    //
+    // `extra` mults are consumed in weapon.fire/firePattern/applyCommand scaled by
+    // entity.aimFactor. Scoped is pixel-perfect (spread mults 0); hip-fire is
+    // DELIBERATELY gutted via spreadBase 0.20 so this cannot double as a corridor
+    // shotgun — no-scoping is not a play, you swap to the spawn Pistol.
+    ...withAds(40, 0.24, 0.16, { spreadBaseMult: 0, spreadHeatMult: 0, heatMult: 1 }),
+    adsMount: { position: { x: 0, y: -0.02, z: 0.05 }, rotation: { x: 0, y: Math.PI / 2, z: 0 } },
+    muzzle: { x: 0.08, y: -0.13, z: 1.35 },
+    recoilForce: 3.0,
+    drawTime: 0.55,
+
+    // VERB: punish a sightline. 110 on a head (2.0x zone) is a one-shot kill at 100 HP;
+    // 55 on a body is a two-shot. The 1.5s cooldown IS the counterplay window — a
+    // Pistol-only player who hears the scope has a full beat to break the line.
+    type: 'hitscan',
+    fireCooldown: 1.5,
+    reloadTime: 2.2,
+    magazineCapacity: 5,
+    maxReserveAmmo: 15,
+    damage: 55,
+    range: 120,           // longest on the rack; caps the lag-comp rewind check distance
+    spreadBase: 0.20,     // HIP only — scoped zeroes this via the ADS mults above
+    spreadHeat: 0.40
   }
-  // Roster is 6 contiguous weapons (0-5): Rifle, SMG, Shotgun, Pistol are hitscan;
+  // Roster is 7 weapons (0-6): Rifle, SMG, Shotgun, Pistol, Sniper are hitscan;
   // Plasma (4) + Flak (5) are projectile. The projectile plumbing (Projectile
   // entity, factory, bolt rendering, plasmaImpact FX) is reused by both; their
   // slow/pellet/bounce mechanics land in Phase 2.
 ]
 
-// Roster indices that are actually IN PLAY (not `disabled`). Disabled entries keep
-// their slot (indices/protocol never shift) but every spawner/loot/loadout consumer
-// draws from this list. Currently excludes Plasma (energy weapons out, 2026-07-22).
+// Roster indices that are FREELY in play — not `disabled`, and not `ownedOnly`.
+// Disabled entries keep their slot (indices/protocol never shift) but every
+// spawner/loot/loadout consumer draws from this list.
+//
+// SEASON 1 (2026-07-26): this list is now JUST THE PISTOL. Plasma + Flak are disabled
+// (energy weapons out, 2026-07-22) and every remaining weapon is ownership-gated. That
+// is the whole "no free pickups" rule expressed as data: a spawner that draws from this
+// list CANNOT place a gated weapon, so the rule holds by construction and not by
+// remembering to check a flag at each call site.
+//
+// It is therefore normal — not a bug — for this to have length 1. Anything that needs
+// "every weapon a bot may actually hold" wants PLAYABLE_WEAPON_INDICES below; drawing a
+// bot loadout from THIS list would arm the whole arena with pistols.
 export const ENABLED_WEAPON_INDICES = weapons.reduce(
+	(list, w, i) => (w.disabled || w.ownedOnly ? list : (list.push(i), list)), [])
+
+// Every weapon that is LIVE at all — free or gated, excluding only `disabled` entries.
+// This is the "full arsenal" in the gameplay sense: what a bot may hold in a bot-only
+// match, and the ceiling any grant can reach. Distinct from ENABLED_WEAPON_INDICES
+// (which is about what may be FOUND) and from PlayerCharacter.ALL_WEAPONS (which
+// deliberately excludes ownedOnly so no default-loadout path can leak a gated weapon).
+export const PLAYABLE_WEAPON_INDICES = weapons.reduce(
 	(list, w, i) => (w.disabled ? list : (list.push(i), list)), [])
+
+// Live weapons that exist but must be EARNED, not found. They are fully playable — the
+// server grants them to a verified holder — but no spawner, loot table or default
+// loadout may draw from this list, which is what keeps "no free pickups" true by
+// construction rather than by remembering to check a flag at every call site.
+export const OWNED_ONLY_WEAPON_INDICES = weapons.reduce(
+	(list, w, i) => (!w.disabled && w.ownedOnly ? (list.push(i), list) : list), [])
 
 export default weapons

@@ -1,5 +1,23 @@
 import { CURRENCY } from '../config/currency'
 
+// NFT on-chain name -> how the loadout panel labels it. Keyed by the SAME on-chain names
+// common/entitlements.js grants on, so the panel can never claim a weapon the server
+// would not actually hand out. Order is the weapon-rack order, weakest first.
+const WEAPON_NFT_LABELS = [
+  ['Static Repeater', 'SMG'],
+  ['Vector Rifle', 'Rifle'],
+  ['Breach Ward', 'Shotgun'],
+  ['Long Debt', 'Sniper'],
+]
+const ARMOR_NFT_LABELS = [
+  ['Degen Helm', 'Helm'],
+  ['Cloth Cuirass', 'Cuirass'],
+  ['Cloth Pauldron', 'Pauldron'],
+  ['Cloth Joint Cap', 'Joint Cap'],
+  ['Cloth Sabaton', 'Sabaton'],
+]
+const WEAPON_NFTS = new Set(WEAPON_NFT_LABELS.map(([n]) => n))
+
 // Presentation wiring for the main menu (a place, not a progress dialog). Covers the
 // affordances that are NOT part of the enter-arena gate:
 //   - CALLSIGN input (persisted to localStorage)
@@ -142,6 +160,10 @@ export default class MenuControls {
     const target = typeof id === 'string' ? document.getElementById(id) : id
     if (!target || !this._modals) return
     for (const m of this._modals) m.classList.add(this._closedClass(m)) // one at a time
+    // This closes siblings by class directly rather than through closeModal(), so the
+    // preview teardown has to be repeated here — switching LOADOUT -> SETTINGS would
+    // otherwise strand a live WebGL context behind a hidden panel.
+    if (target.id !== 'loadout-modal') this._closeLoadout()
     target.classList.remove(this._closedClass(target))
     if (this._sim && this._sim.audio) this._sim.audio.menuOpen()
   }
@@ -149,6 +171,11 @@ export default class MenuControls {
   closeModal(modal) {
     if (!modal) return
     modal.classList.add(this._closedClass(modal))
+    // Release the preview's WebGL context and render loop. openModal also closes any
+    // other modal to open a new one, so this is routed through here rather than through
+    // the close button — otherwise switching straight from LOADOUT to SETTINGS would
+    // leave a second engine rendering behind a hidden panel forever.
+    if (modal.id === 'loadout-modal') this._closeLoadout()
     if (this._sim && this._sim.audio) this._sim.audio.menuClose()
   }
 
@@ -215,6 +242,154 @@ export default class MenuControls {
     if (tick && this._sim && this._sim.audio) this._sim.audio.uiHover()
   }
 
+  // LINK WALLET (read-only). Stores the pasted address locally; GameClient sends it in
+  // the next join handshake and the SERVER re-reads the chain to decide the grant. This
+  // page never connects a wallet, never asks for a signature and never sees a key — the
+  // preview below is purely so the player can confirm they pasted the right address.
+  _initWalletLink() {
+    if (this._walletWired) return
+    this._walletWired = true
+    const input = document.getElementById('wallet-input')
+    const btn = document.getElementById('wallet-link-btn')
+    const status = document.getElementById('wallet-status')
+    const rows = document.getElementById('wallet-holdings')
+    const sub = document.getElementById('wallet-plate-sub')
+    if (!input || !btn) return
+
+    const saved = (() => { try { return localStorage.getItem('degen.wallet') || '' } catch { return '' } })()
+    if (saved) { input.value = saved; this._walletLookup(saved) }
+
+    const go = () => {
+      const addr = (input.value || '').trim()
+      if (!addr) {
+        try { localStorage.removeItem('degen.wallet') } catch {}
+        if (status) status.textContent = 'unlinked.'
+        if (rows) rows.innerHTML = ''
+        if (sub) sub.textContent = 'read-only · unlock what you own'
+        return
+      }
+      try { localStorage.setItem('degen.wallet', addr) } catch {}
+      this._walletLookup(addr)
+    }
+    btn.addEventListener('click', go)
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go() } })
+  }
+
+  _walletLookup(addr) {
+    const status = document.getElementById('wallet-status')
+    const rows = document.getElementById('wallet-holdings')
+    const sub = document.getElementById('wallet-plate-sub')
+    if (status) status.textContent = 'reading chain…'
+    if (rows) rows.innerHTML = ''
+    // same origin in prod (nginx proxies /wallet); dev hits the mapinfo port directly
+    const base = location.protocol === 'https:' ? '' : `http://${location.hostname}:8078`
+    fetch(`${base}/wallet/${encodeURIComponent(addr)}`, { cache: 'no-store' })
+      .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+      .then(({ ok, j }) => {
+        if (!ok) { if (status) status.textContent = j.error || 'read failed'; return }
+        const n = j.count || 0
+        if (status) {
+          status.textContent = n
+            ? `${n} item${n === 1 ? '' : 's'} held · unlocks apply on next join`
+            : 'no Degen Tournament items in this wallet'
+        }
+        if (sub) sub.textContent = n ? `${addr.slice(0, 4)}…${addr.slice(-4)} · ${n} held` : 'read-only · unlock what you own'
+        if (rows) {
+          rows.innerHTML = ''
+          for (const name of (j.names || []).slice().sort()) {
+            const li = document.createElement('li')
+            const a = document.createElement('span'); a.textContent = name
+            const b = document.createElement('b')
+            // Was hardcoded to 'Long Debt' back when the Sniper was the only NFT that
+            // granted anything. All four weapon NFTs grant their weapon now, so ask the
+            // shared table instead of naming one item — otherwise a Vector Rifle holder
+            // is told their weapon is merely "OWNED".
+            b.textContent = WEAPON_NFTS.has(name) ? 'WEAPON UNLOCKED' : 'OWNED'
+            li.appendChild(a); li.appendChild(b); rows.appendChild(li)
+          }
+        }
+        // keep the loadout panel truthful the moment a wallet is (un)linked
+        this._lastHoldings = j.names || []
+        if (this._loadout) this._renderLoadout()
+      })
+      .catch((e) => { if (status) status.textContent = 'read failed: ' + e.message })
+  }
+
+  // ── LOADOUT ────────────────────────────────────────────────────────────────
+  // Opening the panel builds the 3D preview lazily (its own engine — see
+  // LoadoutPreview) and paints the two lists. Closing tears the engine down again.
+  async _openLoadout() {
+    const canvas = document.getElementById('loadout-canvas')
+    if (!canvas) return
+    // Read whatever the wallet panel last resolved; if the player linked in a previous
+    // session we still have the address, so re-read rather than showing them nothing.
+    if (!this._lastHoldings) {
+      const saved = (() => { try { return localStorage.getItem('degen.wallet') || '' } catch { return '' } })()
+      if (saved) this._walletLookup(saved)
+    }
+    this._renderLoadout()
+    if (!this._loadout) {
+      // Loaded on demand: the preview drags in CharacterModel and a second Babylon
+      // engine, and a player who never opens this panel should never pay for either.
+      const { default: LoadoutPreview } = await import('./LoadoutPreview.js')
+      this._loadout = new LoadoutPreview(canvas)
+    }
+    this._loadout.show(this._lastHoldings || [])
+  }
+
+  _closeLoadout() {
+    if (this._loadout) { this._loadout.dispose(); this._loadout = null }
+  }
+
+  // Paint the weapon rack and the Cloth list. Every gated weapon is listed whether or
+  // not it is owned — a LOCKED row is the entire point, because it tells an unlinked
+  // player what exists and what linking would give them.
+  _renderLoadout() {
+    const held = new Set(this._lastHoldings || [])
+    const wRows = document.getElementById('loadout-weapons')
+    const aRows = document.getElementById('loadout-armor')
+    const note = document.getElementById('loadout-note')
+    const sub = document.getElementById('loadout-plate-sub')
+
+    const row = (label, value, state) => {
+      const li = document.createElement('li')
+      if (state) li.setAttribute('data-state', state)
+      const s = document.createElement('span'); s.textContent = label
+      const b = document.createElement('b'); b.textContent = value
+      li.appendChild(s); li.appendChild(b)
+      return li
+    }
+
+    if (wRows) {
+      wRows.innerHTML = ''
+      // The Pistol is not in the collection and never can be — it is the free spawn
+      // weapon, so it is always listed as issued rather than as something to acquire.
+      wRows.appendChild(row('Pistol', 'ISSUED', 'issued'))
+      for (const [nft, label] of WEAPON_NFT_LABELS) {
+        wRows.appendChild(held.has(nft)
+          ? row(label, 'CARRIED', 'owned')
+          : row(label, 'LOCKED', 'locked'))
+      }
+    }
+
+    if (aRows) {
+      aRows.innerHTML = ''
+      for (const [nft, label] of ARMOR_NFT_LABELS) {
+        aRows.appendChild(held.has(nft)
+          ? row(label, 'WORN', 'owned')
+          : row(label, 'LOCKED', 'locked'))
+      }
+    }
+
+    const nWeapons = WEAPON_NFT_LABELS.filter(([n]) => held.has(n)).length
+    if (sub) sub.textContent = held.size ? `${held.size} held · ${nWeapons} weapon${nWeapons === 1 ? '' : 's'}` : 'see what you deploy with'
+    if (note) {
+      note.textContent = held.size
+        ? 'Everyone spawns with the Pistol. Nothing else spawns on the arena floor — you carry what you own, and it drops where you die for whoever kills you.'
+        : 'No wallet linked, so you deploy with the Pistol only. Nothing spawns on the arena floor any more: link a wallet to carry what you own, or take a weapon off someone you kill and keep it until you die.'
+    }
+  }
+
   _activate(plate, viaKeyboard) {
     if (!plate) return
     const action = plate.getAttribute('data-action')
@@ -230,6 +405,14 @@ export default class MenuControls {
         break
       case 'settings':
         if (this._sim && this._sim._openSettings) this._sim._openSettings()
+        break
+      case 'link-wallet':
+        this.openModal('wallet-modal')
+        this._initWalletLink()
+        break
+      case 'loadout':
+        this.openModal('loadout-modal')
+        this._openLoadout()
         break
       case 'issuance':
         this.openModal('issuance-modal')

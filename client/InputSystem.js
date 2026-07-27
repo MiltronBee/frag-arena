@@ -152,6 +152,20 @@ class InputSystem {
 				// aim must never stick across a lock loss (brief)
 				this._currentState.aimDown = false
 				this.frameState.aimDown = false
+				// NOR MUST MOVEMENT. keydown is gated on pointerLocked but keyup is not,
+				// so a key RELEASED while unlocked still clears — the hole is a key still
+				// HELD at the moment the lock drops. Opening chat (Enter) exits pointer
+				// lock, so holding W and pressing Enter used to leave you sprinting into a
+				// wall for the whole time you were typing. Clear every movement action on
+				// unlock; the next keydown after re-locking re-asserts whatever is held.
+				for (const action of ['forwards', 'backwards', 'left', 'right', 'jump', 'reload', 'throwInput']) {
+					this._currentState[action] = false
+					this.frameState[action] = false
+				}
+				// a half-finished double-tap must not become a dodge on re-lock
+				this._currentState.dodge = null
+				this.frameState.dodge = null
+				this._lastTap = null
 			}
 		})
 

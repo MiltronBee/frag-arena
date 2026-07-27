@@ -4227,3 +4227,201 @@ body.match-ended #tdm-banner { opacity: 0; transition: opacity 260ms ease; point
     #match-end #me-nemesis, #match-end #me-badges,
     #match-end #me-session, #match-end #me-next { transition: none; }
 }
+
+/* ── LINK WALLET (read-only) ──────────────────────────────────────────────────
+   Paste field inside the ghost-modal chrome. Deliberately plain: this is not a
+   wallet-connect button and should not look like one — nothing here signs. */
+.wallet-row { display: flex; gap: 8px; margin: 14px 0 6px; }
+.wallet-row input {
+    flex: 1 1 auto; min-width: 0;
+    background: rgba(0,0,0,.45);
+    border: 1px solid rgba(255,255,255,.18);
+    color: #e8ecf3;
+    font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .02em;
+    padding: 10px 12px; border-radius: 6px;
+}
+.wallet-row input:focus { outline: none; border-color: rgba(240,169,60,.75); }
+.wallet-row input::placeholder { color: #6d7789; }
+.wallet-row button {
+    flex: 0 0 auto;
+    background: rgba(240,169,60,.14);
+    border: 1px solid rgba(240,169,60,.55);
+    color: #f0a93c;
+    font: 700 12px/1 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .12em;
+    padding: 0 18px; border-radius: 6px; cursor: pointer;
+}
+.wallet-row button:hover { background: rgba(240,169,60,.24); }
+#wallet-holdings li b { color: #f0a93c; }
+
+/* ── LOADOUT PANEL ────────────────────────────────────────────────────────────
+   Two columns: a live 3D figure wearing the armour the linked wallet holds, and
+   the weapon/Cloth lists. The lists deliberately show LOCKED rows as well as
+   owned ones — Season 1 removed weapon pickups from the arena floor, so a player
+   who owns nothing needs to see what exists and what linking would unlock.
+   Collapses to one column on narrow screens; the figure keeps a fixed aspect so
+   it never squashes. */
+.loadout-panel { max-width: 860px; }
+.loadout-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 22px;
+    margin-top: 18px;
+    align-items: start;
+}
+.loadout-figure {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    min-height: 260px;
+    border: 1px solid var(--x30-hairline);
+    border-radius: var(--r-1);
+    /* faint floor-up wash so the figure is not floating in flat black */
+    background:
+        radial-gradient(ellipse 70% 45% at 50% 92%, rgba(255, 176, 46, 0.16), transparent 70%),
+        linear-gradient(180deg, rgba(7, 9, 12, 0.35), rgba(7, 9, 12, 0.75));
+    overflow: hidden;
+}
+#loadout-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    /* the camera has attachControl, so the canvas owns the drag gesture */
+    touch-action: none;
+    outline: none;
+}
+.loadout-hint {
+    position: absolute;
+    left: 0; right: 0; bottom: 8px;
+    text-align: center;
+    pointer-events: none;
+    font-family: var(--font-ui);
+    font-size: 10px;
+    letter-spacing: var(--x30-track-label);
+    text-transform: uppercase;
+    color: var(--x30-ink-mid);
+    opacity: 0.65;
+}
+.loadout-h3 {
+    margin: 0 0 2px;
+    font-family: var(--x30-font-display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--x30-ink-mid);
+}
+.loadout-h3 + .loadout-rows { margin-top: 4px; }
+.loadout-rows { margin-bottom: 18px; }
+.loadout-rows li { padding: 9px 0; }
+
+/* State colouring carries the whole message, so it must survive a greyscale
+   screenshot too — hence the differing weight/opacity, not colour alone. */
+.loadout-rows li[data-state="owned"] b { color: var(--sol-teal); }
+.loadout-rows li[data-state="issued"] b { color: var(--x30-ink-hi); opacity: 0.85; }
+.loadout-rows li[data-state="locked"] span,
+.loadout-rows li[data-state="locked"] b {
+    opacity: 0.42;
+    font-weight: 500;
+}
+.loadout-rows li[data-state="locked"] b::before {
+    content: "⌁ ";
+    letter-spacing: 0;
+}
+
+@media (max-width: 720px) {
+    .loadout-grid { grid-template-columns: minmax(0, 1fr); }
+    .loadout-figure { aspect-ratio: 4 / 3; min-height: 220px; }
+}
+
+/* ── IN-MATCH CHAT ────────────────────────────────────────────────────────────
+   Bottom-left, above the touch controls' left thumb zone. pointer-events stays
+   NONE on the log so chat can never swallow a click meant for the arena; only
+   the input bar takes events, and only while it is open. */
+#chat {
+    position: fixed;
+    left: 14px;
+    bottom: 96px;
+    z-index: 40;
+    width: min(46ch, 52vw);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+}
+#chat-log {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 30vh;
+    overflow: hidden;
+    pointer-events: none;
+}
+.chat-line {
+    font-family: var(--font-ui);
+    font-size: 13px;
+    line-height: 1.35;
+    /* the arena behind chat is arbitrary brightness — the shadow is what keeps it
+       readable over a white wall as well as a dark corridor */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.7);
+    word-break: break-word;
+    transition: opacity 900ms ease;
+}
+.chat-line.chat-stale { opacity: 0.38; }
+.chat-who { color: var(--bone); font-weight: 700; margin-right: 6px; }
+.chat-text { color: var(--bone); }
+.chat-tag { color: var(--sol-teal); font-weight: 700; margin-right: 5px; }
+.chat-line[data-scope="team"] .chat-who { color: var(--sol-teal); }
+
+#chat-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--scrim-heavy);
+    border: 1px solid var(--x30-hairline);
+    border-radius: var(--r-1);
+    pointer-events: auto;
+}
+#chat-bar.chat-hidden { display: none; }
+#chat-scope {
+    flex: 0 0 auto;
+    font-family: var(--x30-font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    padding: 2px 6px;
+    border-radius: 2px;
+    color: var(--ink);
+    background: var(--bone);
+}
+#chat-scope[data-scope="team"] { background: var(--sol-teal); }
+#chat-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    outline: none;
+    color: var(--bone);
+    font-family: var(--font-ui);
+    font-size: 13px;
+}
+.chat-help {
+    flex: 0 0 auto;
+    font-family: var(--font-ui);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--x30-ink-mid);
+    opacity: 0.6;
+}
+@media (max-width: 720px) {
+    /* phones: the touch sticks own the bottom corners, so sit chat higher and
+       drop the keyboard hint (there are no ALT/ESC keys to press) */
+    #chat { width: 78vw; bottom: 132px; }
+    .chat-help { display: none; }
+}
+/* bridged lines (Telegram / pump.fun) — visually distinct from arena chatter so a
+   voice from outside the match is never mistaken for a player standing next to you */
+.chat-line[data-source] .chat-src { color: var(--sol-purple); }
+.chat-line[data-source] .chat-text { color: var(--bone-dim); }

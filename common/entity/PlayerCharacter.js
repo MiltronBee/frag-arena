@@ -178,10 +178,17 @@ PlayerCharacter.protocol = {
 
 // Exposed so server code (GameInstance.respawnPlayer) resets to the same spawn loadout.
 PlayerCharacter.PISTOL_ONLY = PISTOL_ONLY
-// "ALL" = every ENABLED weapon. Disabled roster entries (weaponsConfig `disabled`,
-// e.g. Plasma since 2026-07-22) keep their index but are excluded here, so bots and
-// full-arsenal grants can never equip or fire them.
+// "ALL" = every FREELY AVAILABLE weapon. Two exclusions, both deliberate:
+//   `disabled`  — Plasma/Flak since 2026-07-22: keep their index, never equippable.
+//   `ownedOnly` — the Sniper since 2026-07-26: ownership-gated, GRANTED per player from
+//                 a verified wallet read. It must not leak in here, because this mask is
+//                 what bots and every "full arsenal" path get — without the exclusion
+//                 every bot in the arena spawns holding a one-shot sniper for free,
+//                 which is exactly the no-free-pickups rule inverted.
 PlayerCharacter.ALL_WEAPONS = weapons.reduce(
-	(mask, w, i) => (w.disabled ? mask : mask | (1 << i)), 0)
+	(mask, w, i) => (w.disabled || w.ownedOnly ? mask : mask | (1 << i)), 0)
+
+/** Bitmask for a list of weapon indices — used to turn a wallet read into a grant. */
+PlayerCharacter.maskFor = (indices) => (indices || []).reduce((m, i) => m | (1 << i), 0)
 
 export default PlayerCharacter

@@ -12,6 +12,14 @@ import HitConfirmed from '../common/message/HitConfirmed'
 import Killed from '../common/message/Killed'
 import DamageTaken from '../common/message/DamageTaken'
 import PlayerName from '../common/message/PlayerName'
+import ChatMessage from '../common/message/ChatMessage'
+import { decodeChat, sanitizeScope, CHAT_SCOPE, CHAT_SOURCE } from '../common/chat'
+import ChatBridge from './chatBridge'
+
+// Chat flood limit: a leaky bucket that halves every CHAT_BURST_DECAY_MS. Allows a real
+// back-and-forth (several lines in a row while typing fast) and clamps a spam loop.
+const CHAT_BURST_MAX = 6
+const CHAT_BURST_DECAY_MS = 2500
 import { HUMAN_NAME_SENTINEL, decodeName } from '../common/playerNames'
 import followPath from './followPath'
 import damagePlayer from './damagePlayer' // TODO
@@ -42,7 +50,7 @@ import {
 	REST_HEIGHT, ARMOR_PICKUP, ARMOR_CAP, ARMOR_ABSORB,
 	UDAMAGE_MULT, UDAMAGE_SECONDS, DROP_DESPAWN_SECONDS, DROP_JITTER,
 } from '../common/pickupConfig'
-import { weapons, DEFAULT_ZONE_MULTIPLIERS, SPAWN_WEAPON_INDEX, ENABLED_WEAPON_INDICES } from '../common/weaponsConfig'
+import { weapons, DEFAULT_ZONE_MULTIPLIERS, SPAWN_WEAPON_INDEX, PLAYABLE_WEAPON_INDICES } from '../common/weaponsConfig'
 import { PLAYER_NAMES } from '../common/playerNames'
 import BotController from './BotController'
 import { DifficultyDirector, personalityFor, NEUTRAL_PERSONALITY, SKILL_NAMES, MAX_SKILL } from './botSkill'
@@ -52,9 +60,15 @@ import BloodLedger from './BloodLedger'
 
 import * as BABYLON from '../common/babylon.node.js'
 import { OBJFileLoader } from '../common/babylon.node.js' // OBJ loader (server-side collision) via node barrel
+import { readOwned, isLikelyAddress } from './walletLink.js'
 
 //import 'babylonjs-loaders' // mutates something globally
 global.XMLHttpRequest = require('xhr2').XMLHttpRequest
+
+// Every weapon that is live at all, gated or not — the ceiling a bot-only arena arms to.
+// NOT PlayerCharacter.ALL_WEAPONS, which excludes `ownedOnly` and so means pistol-only
+// under the Season 1 gate. See GameInstance._botArsenalMask.
+const PLAYABLE_WEAPONS_MASK = PlayerCharacter.maskFor(PLAYABLE_WEAPON_INDICES)
 
 // Phase 3 frag-grenade tuning (locked design numbers). Server-only physics.
 const GRENADE = {
@@ -554,7 +568,7 @@ class GameInstance {
 			this.agentGateway = new AgentGateway(this)
 		}
 
-		this.instance.on('connect', ({ client, callback }) => {
+		this.instance.on('connect', ({ client, data, callback }) => {
 			// MENU SAFETY (v1): a fresh socket is a SPECTATOR — a stream subscription,
 			// not a body in the arena. NO PlayerCharacter pair is created, _humanCount
 			// is untouched and no fill bot retires until an explicit DeployCommand is
@@ -572,6 +586,32 @@ class GameInstance {
 
 			// accept the connection
 			callback({ accepted: true, text: 'Welcome!' })
+
+			// WALLET LINK (read-only). The client may paste a Solana address in the
+			// handshake; it is a HINT, never a claim. The server does its own chain read
+			// and derives the grant itself — a client that sends {wallet, weapons:[6]}
+			// gets the address used and the weapons list ignored. Async and
+			// non-blocking: the socket is already accepted, and a slow or failed RPC
+			// must never delay or refuse a join. Worst case the player deploys with the
+			// spawn pistol, which is the correct fallback.
+			client._grantedWeapons = 0
+			const paste = data && typeof data.wallet === 'string' ? data.wallet.trim() : ''
+			if (paste && isLikelyAddress(paste)) {
+				readOwned(paste)
+					.then((r) => {
+						client._grantedWeapons = PlayerCharacter.maskFor(r.weapons)
+						client._walletAddress = paste
+						if (r.weapons.length) {
+							console.log(`[wallet] ${paste.slice(0, 8)}… holds ${r.count} — grants weapons [${r.weapons}]`)
+						}
+						// The mainnet read can take ~25s (getProgramAccounts over mpl-core
+						// on a public RPC), so the player is very often already deployed
+						// and fighting by the time this resolves. Apply it to their live
+						// body immediately rather than making them wait for a death.
+						this._applyEntitlement(client)
+					})
+					.catch((e) => console.log('[wallet] read failed:', e.message))
+			}
 
 			// replay existing human players' names to the new joiner so their nametags
 			// resolve immediately once entities stream in after deploy (per-client
@@ -794,6 +834,54 @@ class GameInstance {
 			this._humanNames.set(nid, name)
 			this.instance.messageAll(new PlayerName(nid, name))
 		})
+
+		this.instance.on('command::ChatCommand', ({ command, client }) => {
+			// Server-authoritative on BOTH fields. The text is re-sanitized (the sender's
+			// copy proves nothing about what is in the packet) and the scope is re-decided
+			// against the real game mode, so a client cannot talk in TEAM during FFA or put
+			// control characters into everyone else's log.
+			if (!client.smoothEntity) return // spectators have no body and no voice
+			const text = decodeChat(command)
+			if (!text) return
+			const now = Date.now()
+
+			// Flood limit. Chat rides the same socket as movement at 40Hz, so an unbounded
+			// relay is an amplification vector: one client's spam becomes N clients' worth
+			// of traffic. A short floor plus a burst allowance lets real conversation
+			// through and stops a loop dead.
+			client._chatBurst = (client._chatBurst || 0) * Math.pow(0.5, (now - (client._chatAt || 0)) / CHAT_BURST_DECAY_MS)
+			if (client._chatBurst > CHAT_BURST_MAX) return
+			client._chatBurst += 1
+			client._chatAt = now
+
+			const teams = this.gameMode !== GAME_MODE.FFA
+			const scope = sanitizeScope(command.scope, teams)
+			const nid = client.smoothEntity.nid
+			const msg = new ChatMessage(nid, text, scope, CHAT_SOURCE.PLAYER)
+
+			if (scope === CHAT_SCOPE.ALL) {
+				this.instance.messageAll(msg)
+			} else {
+				// TEAM: only clients whose body shares the sender's teamId. Bots have no
+				// socket to message; agents are excluded for the same reason.
+				const team = client.rawEntity ? client.rawEntity.teamId : null
+				if (team === null || team === undefined) return
+				this.instance.clients.forEach((c) => {
+					if (c.bot || !c.rawEntity) return
+					if (c.rawEntity.teamId !== team) return
+					this.instance.message(msg, c)
+				})
+			}
+		})
+
+		// External chat (Telegram / pump.fun) piped in as ALL-scope lines with a source
+		// tag. One-way and read-only: nothing in the arena is relayed back out, so no
+		// player action can ever reach a token. Both feeds stay dark unless their env
+		// vars are set, and neither can fail the game.
+		this._chatBridge = new ChatBridge((line, source) => {
+			this.instance.messageAll(new ChatMessage(0, line, CHAT_SCOPE.ALL, source))
+		})
+		this._chatBridge.start(CHAT_SOURCE)
 	}
 
 	// MENU SAFETY (v1): validate a DeployCommand and spawn the client into the
@@ -947,6 +1035,14 @@ class GameInstance {
 		// and why it is per-axis and off-origin. Copied per client because nengi
 		// mutates the view object. (Replaces the tiny SPECTATOR_VIEW set on connect.)
 		client.view = { ...this.viewBox }
+
+		// SEASON 1: apply the wallet entitlement to the FIRST deploy, not just respawns.
+		// respawnPlayer was the only place reading _grantedWeapons, which meant a holder
+		// deployed with the spawn pistol and did not get the weapon they own until after
+		// they had died once. The chain read is async and may still be in flight here —
+		// whatever has resolved is applied now, and the read's own callback re-applies it
+		// if it lands later (see the WALLET LINK handler), so either ordering works.
+		this._applyEntitlement(client)
 
 		client._session = SESSION.DEPLOYED
 		// they hold a seat now — drop them from the FIFO and restate everyone else's
@@ -1351,8 +1447,17 @@ class GameInstance {
 	// Server-authoritative; drops render as ordinary WEAPON pickups (weaponIndex on the
 	// wire) so no client factory change is needed — the isDrop/carried*/despawnAt fields
 	// are server-only. Returns the count dropped (for the kill log). `now` is wall-clock ms.
-	dropWeaponsOnDeath(raw, now) {
+	dropWeaponsOnDeath(raw, now, victimClient = null) {
 		if (!raw || !raw.weaponsState) return 0
+		// SEASON 1 (2026-07-26): ONLY HUMANS DROP. Bots and FragBench agents are armed by
+		// _botArsenalMask(), not by ownership, so dropping their kit would hand out
+		// weapons nobody paid for — with map pickups gone, bot corpses would simply
+		// become the new floor spawner and the whole gate would be decorative. (This also
+		// closes a leak that predates the gate: bots held the Sniper via ALL_WEAPONS and
+		// dropped it on every death.)
+		//
+		// Human drops are untouched: kill a holder, take the gun, lose it when you die.
+		if (!victimClient || victimClient.bot) return 0
 		const despawnMs = DROP_DESPAWN_SECONDS * 1000
 		let count = 0
 		for (let wi = 0; wi < weapons.length; wi++) {
@@ -1433,13 +1538,35 @@ class GameInstance {
 			return true
 		}
 		if (pk.type === PICKUP_TYPE.AMMO) {
-			const wi = pk.weaponIndex
-			if (!(raw.ownedWeapons & (1 << wi))) return false // unowned weapon — ignore
-			const cfg = weapons[wi]
-			const st = raw.weaponsState && raw.weaponsState[wi]
-			if (!st || st.reserveAmmo >= cfg.maxReserveAmmo) return false // already full
-			st.reserveAmmo = cfg.maxReserveAmmo
-			return true
+			// UNIVERSAL AMMO (2026-07-26). A box tops up EVERY weapon the toucher owns,
+			// rather than the one weapon its UT item happened to map to.
+			//
+			// Why: with weapons gone from the arena floor, the per-weapon mapping left the
+			// maps carrying SMG ammo and nothing else — `rockets` and `shock_core` point at
+			// Plasma and Flak, which are disabled, so they resolved to nothing. A Rifle or
+			// Sniper holder had one magazine and no resupply anywhere on the map, and the
+			// old way to refill (walk over another copy of your gun) is exactly what the
+			// ownership gate removed.
+			//
+			// Universal also means the mapping can never go stale again: retire or gate a
+			// weapon and the ammo economy does not silently lose a supply point. pk.weaponIndex
+			// is left on the wire — the client keys its model/FX off it — it just no longer
+			// decides who benefits.
+			//
+			// Unowned weapons are still skipped, so this cannot leak firepower: a box is
+			// worthless to someone carrying only the pistol's default reserve, and it does
+			// not hand a looter ammo for a gun they never picked up.
+			if (!raw.weaponsState) return false
+			let gained = false
+			for (let i = 0; i < weapons.length; i++) {
+				if (!(raw.ownedWeapons & (1 << i))) continue
+				const cfg = weapons[i]
+				const st = raw.weaponsState[i]
+				if (!st || st.reserveAmmo >= cfg.maxReserveAmmo) continue
+				st.reserveAmmo = cfg.maxReserveAmmo
+				gained = true
+			}
+			return gained // nothing to gain — leave the box standing for someone who needs it
 		}
 		if (pk.type === PICKUP_TYPE.HEALTH) {
 			if (raw.hitpoints >= HEALTH_CAP) return false // full — leave it
@@ -1488,6 +1615,80 @@ class GameInstance {
 		this.bots.forEach(b => decay(b.rawEntity, b.smoothEntity))
 	}
 
+	// Grant a deployed human the weapons their wallet entitles them to, right now.
+	//
+	// Safe to call repeatedly and from either side of the async chain read: it only ever
+	// ADDS bits (pistol + entitlement), refills ammo for newly-granted slots, and leaves
+	// anything already owned — including a weapon looted off a corpse — untouched. A
+	// no-op for bots, spectators and unlinked players.
+	_applyEntitlement(client) {
+		if (!client || client.bot) return
+		const granted = client._grantedWeapons || 0
+		if (!granted) return
+		const raw = client.rawEntity
+		if (!raw || !raw.weaponsState) return
+		const before = raw.ownedWeapons
+		const mask = raw.ownedWeapons | PlayerCharacter.PISTOL_ONLY | granted
+		if (mask === before) return
+		raw.ownedWeapons = mask
+		if (client.smoothEntity) client.smoothEntity.ownedWeapons = mask
+		raw.weaponsState.forEach((state, i) => {
+			// only top up slots this call just unlocked — never refill a gun the player
+			// has been firing, or a pickup becomes a free reload
+			if (!(mask & (1 << i)) || (before & (1 << i))) return
+			state.magazineAmmo = weapons[i].magazineCapacity
+			state.reserveAmmo = weapons[i].maxReserveAmmo
+		})
+	}
+
+	// SEASON 1 BOT ARSENAL (2026-07-26). Bots scale to the gear that is actually in the
+	// lobby, so a fresh player is never dropped into a room of snipers holding a pistol.
+	//
+	//   no deployed humans -> the full playable arsenal. A bot-only arena has nobody to be
+	//                         unfair to, and this keeps demo/idle servers looking alive.
+	//   humans deployed    -> the pistol plus the UNION of every deployed human's wallet
+	//                         entitlement. Nobody has linked a wallet? Bots fight with
+	//                         pistols too. A sniper holder walks in? Bots may snipe back.
+	//
+	// Union rather than max: the ceiling is "what is in play in this room", so one holder
+	// arms the bots against everyone, which is what makes carrying a rare weapon feel
+	// like a real decision rather than a free win.
+	//
+	// Deliberately NOT PlayerCharacter.ALL_WEAPONS: that mask excludes `ownedOnly`, so as
+	// of Season 1 it means pistol-only. Using it here would silently disarm every bot.
+	_botArsenalMask() {
+		if (this._humanCount <= 0) return PLAYABLE_WEAPONS_MASK
+		let mask = PlayerCharacter.PISTOL_ONLY
+		this.instance.clients.forEach((c) => {
+			// deployed humans only — menu spectators hold no seat and set no ceiling
+			if (c.bot || !c.rawEntity) return
+			mask |= (c._grantedWeapons || 0)
+		})
+		return mask
+	}
+
+	// Pick the weapon a bot actually holds out of what it owns, preferring anything over
+	// the pistol and spreading `seed` across the options so a squad does not draw the same
+	// gun. Falls back to the pistol when the mask is pistol-only (an all-unlinked lobby).
+	_pickBotWeapon(mask, seed) {
+		const armed = PLAYABLE_WEAPON_INDICES.filter(
+			(i) => i !== SPAWN_WEAPON_INDEX && (mask & (1 << i)))
+		if (!armed.length) return SPAWN_WEAPON_INDEX
+		return armed[Math.abs(seed) % armed.length]
+	}
+
+	// Fill in ammo for exactly the weapons `mask` owns and zero the rest — the same
+	// contract respawnPlayer uses, so a bot never carries live rounds for a gun the
+	// ownership mask says it does not have.
+	_armFromMask(entity, mask) {
+		entity.ownedWeapons = mask
+		entity.weaponsState.forEach((state, i) => {
+			const owned = (mask & (1 << i)) !== 0
+			state.magazineAmmo = owned ? weapons[i].magazineCapacity : 0
+			state.reserveAmmo = owned ? weapons[i].maxReserveAmmo : 0
+		})
+	}
+
 	addBot(index) {
 		const entity = new PlayerCharacter()
 		entity.mesh.checkCollisions = true
@@ -1498,17 +1699,12 @@ class GameInstance {
 		entity.x = spawn.x
 		entity.y = spawn.y || 0
 		entity.z = spawn.z
-		// spread the loadouts across the ENABLED roster only (disabled entries —
-		// Plasma since 2026-07-22 — keep their index but never spawn in a hand)
-		entity.currentWeaponIndex = ENABLED_WEAPON_INDICES[index % ENABLED_WEAPON_INDICES.length]
-		// UT-STYLE OWNERSHIP (v1): bots own the FULL arsenal (they never pick weapons up)
-		// so they behave exactly as before this feature. Refill the ammo the constructor
-		// zeroed for the non-pistol slots.
-		entity.ownedWeapons = PlayerCharacter.ALL_WEAPONS
-		entity.weaponsState.forEach((state, i) => {
-			state.magazineAmmo = weapons[i].magazineCapacity
-			state.reserveAmmo = weapons[i].maxReserveAmmo
-		})
+		// SEASON 1: bots own whatever the lobby justifies (_botArsenalMask) rather than a
+		// fixed arsenal, and spread their held weapon across it. Re-evaluated on every
+		// respawn, so bots re-arm within one death of a holder joining or leaving.
+		const botMask = this._botArsenalMask()
+		this._armFromMask(entity, botMask)
+		entity.currentWeaponIndex = this._pickBotWeapon(botMask, index)
 		entity.nameIndex = this._nameCounter++ % PLAYER_NAMES.length
 		this.instance.addEntity(entity)
 
@@ -1683,14 +1879,18 @@ class GameInstance {
 		entity.x = spawn.x
 		entity.y = spawn.y || 0
 		entity.z = spawn.z
-		// same contract as addBot: agents own the full arsenal (they can't reach
-		// pickups reliably in v0 — pickup routing is a deferred intent verb)
-		entity.currentWeaponIndex = 0
-		entity.ownedWeapons = PlayerCharacter.ALL_WEAPONS
-		entity.weaponsState.forEach((state, i) => {
-			state.magazineAmmo = weapons[i].magazineCapacity
-			state.reserveAmmo = weapons[i].maxReserveAmmo
-		})
+		// same contract as addBot: agents draw from _botArsenalMask() (they can't reach
+		// pickups reliably in v0 — pickup routing is a deferred intent verb), so a
+		// FragBench run against an empty arena still gets the full arsenal while an agent
+		// sharing a room with humans is held to the same ceiling the bots are.
+		//
+		// NOTE for benchmark comparability: this makes an agent's loadout depend on who
+		// else is in the arena. Runs are only comparable within the same lobby shape —
+		// an agent-vs-bots run (full arsenal) is not scored against a run where an
+		// unlinked human was present (pistols).
+		const agentMask = this._botArsenalMask()
+		this._armFromMask(entity, agentMask)
+		entity.currentWeaponIndex = this._pickBotWeapon(agentMask, this.agentCount)
 		entity.nameIndex = this._nameCounter++ % PLAYER_NAMES.length
 		this.instance.addEntity(entity)
 		const handle = { bot: true, agent: true, rawEntity: entity, smoothEntity: entity, respawnAt: null }
@@ -2359,7 +2559,7 @@ class GameInstance {
 
 			// DROP-ON-DEATH: scatter the victim's owned non-pistol weapons (carrying their
 			// current ammo) at the death location. Armor is lost on death (not dropped).
-			const nDropped = this.dropWeaponsOnDeath(raw, Date.now())
+			const nDropped = this.dropWeaponsOnDeath(raw, Date.now(), victimClient)
 
 			console.log(`Player ${raw.nid} died from ${sourceName}! (dropped ${nDropped} weapon${nDropped === 1 ? '' : 's'})`)
 		}
@@ -2432,9 +2632,21 @@ class GameInstance {
 			entity.throwCooldown = 0
 			entity.rechargeAccum = 0
 			// UT-STYLE OWNERSHIP RESET (v1): a respawn returns the player to pistol-only
-			// (+ pistol ammo); every other weapon reverts to unowned with ZERO ammo. Bots
-			// keep the full arsenal so they still fight (they never pick weapons up).
-			const spawnOwned = client.bot ? PlayerCharacter.ALL_WEAPONS : PlayerCharacter.PISTOL_ONLY
+			// (+ pistol ammo); every other weapon reverts to unowned with ZERO ammo.
+			// Humans spawn with the pistol and NOTHING else; anything extra has to be
+			// earned. `_grantedWeapons` is whatever a verified wallet read entitled them
+			// to (0 for an unlinked player), so an owner keeps their sniper across every
+			// respawn without it ever entering a spawner or loot table.
+			//
+			// This reset is ALSO what makes looting temporary: a weapon taken off a corpse
+			// sets an ownership bit that survives exactly until you die, which is the
+			// Season 1 promise — kill a holder, use their gun until someone kills you.
+			//
+			// Bots re-roll against _botArsenalMask() every respawn (2026-07-26) rather than
+			// holding a fixed arsenal, so they track the lobby as holders come and go.
+			const spawnOwned = client.bot
+				? this._botArsenalMask()
+				: (PlayerCharacter.PISTOL_ONLY | (client._grantedWeapons || 0))
 			entity.ownedWeapons = spawnOwned
 			entity.weaponsState.forEach((state, i) => {
 				const owned = (spawnOwned & (1 << i)) !== 0
@@ -2448,7 +2660,16 @@ class GameInstance {
 			})
 			// a respawn always re-equips the pistol so a human never spawns holding a
 			// weapon they no longer own (which fire()/switch would then refuse).
-			if (!client.bot) entity.currentWeaponIndex = SPAWN_WEAPON_INDEX
+			//
+			// Bots need the same guarantee for a different reason: the lobby arsenal can
+			// SHRINK between deaths (the one sniper holder logs off), and a bot left
+			// holding a weapon it no longer owns is a statue — fire() refuses it and the
+			// bot never shoots again. Re-pick from the mask it just received.
+			if (!client.bot) {
+				entity.currentWeaponIndex = SPAWN_WEAPON_INDEX
+			} else if (!(spawnOwned & (1 << entity.currentWeaponIndex))) {
+				entity.currentWeaponIndex = this._pickBotWeapon(spawnOwned, entity.nid | 0)
+			}
 		}
 		// the client ignores server x/y/z for its own entity (it predicts them),
 		// so hand the teleport over explicitly — same contract as Identity's spawn.

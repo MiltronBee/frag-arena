@@ -8,10 +8,12 @@ import HitConfirmed from './message/HitConfirmed'
 import Killed from './message/Killed'
 import DamageTaken from './message/DamageTaken'
 import PlayerName from './message/PlayerName'
+import ChatMessage from './message/ChatMessage'
 import MoveCommand from './command/MoveCommand'
 import DeployCommand from './command/DeployCommand'
 import SpectatorHeartbeatCommand from './command/SpectatorHeartbeatCommand'
 import SetNameCommand from './command/SetNameCommand'
+import ChatCommand from './command/ChatCommand'
 import FireCommand from './command/FireCommand'
 import SwitchWeaponCommand from './command/SwitchWeaponCommand'
 import DevUpdateWeaponConfigCommand from './command/DevUpdateWeaponConfigCommand'
@@ -86,7 +88,8 @@ const config = {
             ['DamageTaken', DamageTaken],
             ['PlayerName', PlayerName],
             ['ObjectiveEvent', ObjectiveEvent],
-            ['QueueStatus', QueueStatus]
+            ['QueueStatus', QueueStatus],
+            ['ChatMessage', ChatMessage]
         ],
         commands: [
             ['MoveCommand', MoveCommand],
@@ -95,7 +98,8 @@ const config = {
             ['FireCommand', FireCommand],
             ['SwitchWeaponCommand', SwitchWeaponCommand],
             ['DevUpdateWeaponConfigCommand', DevUpdateWeaponConfigCommand],
-            ['SetNameCommand', SetNameCommand]
+            ['SetNameCommand', SetNameCommand],
+            ['ChatCommand', ChatCommand]
         ],
         basics: []
     }

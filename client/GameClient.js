@@ -24,7 +24,14 @@ class GameClient {
 		const wsUrl = location.protocol === 'https:'
 			? `wss://${location.host}/ws`
 			: `ws://${location.hostname}:8079`
-		this.client.connect(wsUrl)
+		// WALLET LINK (read-only). Whatever the player pasted on the menu rides along in
+		// the nengi handshake (plain JSON, no protocol/schema change). It is only a hint:
+		// the server re-reads the chain itself and derives the grant, so editing this in
+		// devtools buys nothing. Nothing is signed and no key is ever handled here.
+		const wallet = (() => {
+			try { return (localStorage.getItem('degen.wallet') || '').trim() } catch { return '' }
+		})()
+		this.client.connect(wsUrl, wallet ? { wallet } : undefined)
 	}
 
 	update(delta, tick, now) {
