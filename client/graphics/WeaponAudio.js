@@ -67,6 +67,9 @@ const ANNOUNCER_NAMES = [
   'fight', 'victory', 'defeat', 'draw',
   'team_deathmatch', 'capture_the_flag', 'domination',
   'flag_taken', 'flag_captured', 'flag_returned', 'point_captured',
+  // $BLOOD market callouts — same voice and the same monster chain as the combat
+  // medals, because the market IS part of the arena in this game.
+  'blood_acquired', 'blood_harvest', 'blood_tithe', 'blood_dumped', 'blood_drained',
 ]
 // ── MIX (2026-07-24 retune) ──────────────────────────────────────────────────────
 // Three complaints, three levers, all in ONE place so the mix is tunable as data:

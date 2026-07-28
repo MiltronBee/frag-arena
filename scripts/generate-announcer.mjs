@@ -98,6 +98,17 @@ const LINES = {
   capture_the_flag:'Capture the Flag!',
   domination:      'Domination!',
 
+  // ---- $BLOOD market callouts ----
+  // The token is $BLOOD and it is mined by killing, so the market and the arena share
+  // one vocabulary on purpose: a buy is blood ACQUIRED, a sell is blood SPILLED. Tiered
+  // by size, because a 5 SOL nibble and a 100 SOL whale must not land the same — the
+  // whole point of a callout is that its weight tells you something before the words do.
+  blood_acquired:  'Blood acquired!',            // buy,  tier I   (>= 5 SOL)
+  blood_harvest:   'Blood harvest!',             // buy,  tier II  (>= 25 SOL)
+  blood_tithe:     'The blood tithe is paid!',   // buy,  tier III (>= 100 SOL)
+  blood_dumped:    'Blood dumped!',              // sell, tier I/II
+  blood_drained:   'The vein runs dry!',         // sell, tier III
+
   // ---- Objective (for later CTF / DOM) ----
   flag_taken:      'Flag taken!',
   flag_captured:   'Flag captured!',

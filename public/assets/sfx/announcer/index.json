@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-21T06:48:52.901Z",
+  "generated_at": "2026-07-28T22:02:52.161Z",
   "voice_id": "bqtGibd9LR6cgGFVVu09",
   "model_id": "eleven_multilingual_v2",
   "chosen_variant": "v2",
@@ -208,6 +208,61 @@
         "announcer/candidates/domination_v2.mp3",
         "announcer/candidates/domination_v3.mp3",
         "announcer/candidates/domination_raw.mp3"
+      ]
+    },
+    "blood_acquired": {
+      "text": "Blood acquired!",
+      "file": "announcer/blood_acquired.mp3",
+      "duration": 0.993,
+      "candidates": [
+        "announcer/candidates/blood_acquired_v1.mp3",
+        "announcer/candidates/blood_acquired_v2.mp3",
+        "announcer/candidates/blood_acquired_v3.mp3",
+        "announcer/candidates/blood_acquired_raw.mp3"
+      ]
+    },
+    "blood_harvest": {
+      "text": "Blood harvest!",
+      "file": "announcer/blood_harvest.mp3",
+      "duration": 2.978,
+      "candidates": [
+        "announcer/candidates/blood_harvest_v1.mp3",
+        "announcer/candidates/blood_harvest_v2.mp3",
+        "announcer/candidates/blood_harvest_v3.mp3",
+        "announcer/candidates/blood_harvest_raw.mp3"
+      ]
+    },
+    "blood_tithe": {
+      "text": "The blood tithe is paid!",
+      "file": "announcer/blood_tithe.mp3",
+      "duration": 1.28,
+      "candidates": [
+        "announcer/candidates/blood_tithe_v1.mp3",
+        "announcer/candidates/blood_tithe_v2.mp3",
+        "announcer/candidates/blood_tithe_v3.mp3",
+        "announcer/candidates/blood_tithe_raw.mp3"
+      ]
+    },
+    "blood_dumped": {
+      "text": "Blood dumped!",
+      "file": "announcer/blood_dumped.mp3",
+      "duration": 0.731,
+      "candidates": [
+        "announcer/candidates/blood_dumped_v1.mp3",
+        "announcer/candidates/blood_dumped_v2.mp3",
+        "announcer/candidates/blood_dumped_v3.mp3",
+        "announcer/candidates/blood_dumped_raw.mp3"
+      ]
+    },
+    "blood_drained": {
+      "text": "The vein runs dry!",
+      "file": "announcer/blood_drained.mp3",
+      "duration": 1.306,
+      "candidates": [
+        "announcer/candidates/blood_drained_v1.mp3",
+        "announcer/candidates/blood_drained_v2.mp3",
+        "announcer/candidates/blood_drained_v3.mp3",
+        "announcer/candidates/blood_drained_raw.mp3"
       ]
     },
     "flag_taken": {

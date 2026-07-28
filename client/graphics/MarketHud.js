@@ -126,12 +126,34 @@ export default class MarketHud {
 		this._seen.add(t.id)
 		// Bounded: ids climb forever on a busy token.
 		if (this._seen.size > 400) this._seen = new Set([...this._seen].slice(-200))
-		// Only BUYS are celebrated. A sell alert mid-fight is a demoralising interruption
-		// that tells the player nothing they can act on; sells stay in the pressure gauge.
-		if (t.type !== 'BUY') return
-
 		const short = t.wallet ? `${t.wallet.slice(0, 4)}…${t.wallet.slice(-4)}` : 'anon'
 		const sol = Number(t.sol).toFixed(1)
+		const buy = t.type === 'BUY'
+
+		// VOICE. Same announcer and the same monster chain as the combat medals, because
+		// $BLOOD is mined by killing and the market is part of the arena.
+		//
+		// SELLS ARE VOICED TOO. The original rule here was buy-only, on the reasoning that
+		// a sell tells the player nothing they can act on. That is right for a BANNER and
+		// wrong for a voice: half a market is not a market, and a feed that only ever
+		// cheers is advertising rather than information. Sells stay out of the visual
+		// alert lane and speak instead.
+		//
+		// minGap 0 is NOT used: the announcer's global cooldown is exactly what stops a
+		// volley of fills from stacking into mush, and a market callout must never win
+		// that race against a headshot — the arena outranks the chart.
+		const audio = this._sim && this._sim.audio
+		if (audio && audio.announce) {
+			const clip = buy
+				? (t.sol >= TIER_3 ? 'blood_tithe' : t.sol >= TIER_2 ? 'blood_harvest' : 'blood_acquired')
+				: (t.sol >= TIER_3 ? 'blood_drained' : 'blood_dumped')
+			// Quieter than a combat medal: this is ambient colour, not a kill you earned.
+			audio.announce(clip, { gain: buy ? 0.85 : 0.7 })
+		}
+
+		// SELLS get no banner and no terminal line — the pressure gauge already carries
+		// them, and a red interruption mid-firefight buys the player nothing.
+		if (!buy) return
 
 		if (t.sol >= TIER_3) { this._archon(sol, short); return }
 		// Tiers I and II are terminal lines in the hack feed, which already exists, is
