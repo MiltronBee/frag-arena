@@ -16,6 +16,14 @@ import path from 'path'
 const ROOT = process.argv[2] || 'public'
 const PORT = Number(process.argv[3] || 8099)
 
+// Season 1 token art. In production nginx serves /nft/degen-s1/ straight from the mint
+// output; the files are deliberately NOT copied into public/ (6.5MB of PNGs that the game
+// itself never loads, only the ARMORY screen and the marketplaces' own metadata do).
+// Aliased here so a local run renders the same catalogue prod does instead of 24 broken
+// images. Override with NFT_ART_DIR if the mint output lives elsewhere.
+const NFT_PREFIX = '/nft/degen-s1/'
+const NFT_DIR = process.env.NFT_ART_DIR || '/mnt/echostore/frag-nft/out'
+
 const TYPES = {
 	'.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
 	'.json': 'application/json', '.webp': 'image/webp', '.png': 'image/png',
@@ -28,6 +36,18 @@ http.createServer((req, res) => {
 	const url = decodeURIComponent(req.url.split('?')[0])
 	// Contain the path inside ROOT: this serves a directory to a browser we do not control.
 	const rel = path.normalize(url).replace(/^(\.\.[/\\])+/, '')
+	if (rel.startsWith(NFT_PREFIX)) {
+		const name = path.basename(rel) // basename only — no traversal out of NFT_DIR
+		const art = path.join(NFT_DIR, name)
+		return fs.readFile(art, (err, buf) => {
+			if (err) { res.writeHead(404).end('not found'); return }
+			res.writeHead(200, {
+				'content-type': TYPES[path.extname(art).toLowerCase()] || 'application/octet-stream',
+				'cache-control': 'no-store',
+			})
+			res.end(buf)
+		})
+	}
 	let file = path.join(ROOT, rel)
 	if (file.endsWith('/') || rel === '/') file = path.join(file, 'index.html')
 	if (!path.resolve(file).startsWith(path.resolve(ROOT))) { res.writeHead(403).end(); return }

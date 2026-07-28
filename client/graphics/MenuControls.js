@@ -547,6 +547,9 @@ export default class MenuControls {
       case 'loadout':
         this._screens && this._screens.enter('character')
         break
+      case 'armory':
+        this._screens && this._screens.enter('armory')
+        break
       case 'issuance':
         this._screens && this._screens.enter('issuance')
         break

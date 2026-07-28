@@ -98,6 +98,43 @@ try {
 	check('issuance shows mined vs cap', /\d/.test(blood.mined) && /\d/.test(blood.cap), `mined=${blood.mined} cap=${blood.cap}`)
 	check('holder table populated from the ledger', blood.rows > 0, `rows=${blood.rows} holders=${blood.holders}`)
 
+	// ARMORY: catalogue renders, filters actually narrow it, marketplace links are real.
+	await page.evaluate(() => { location.hash = '#/armory' })
+	await sleep(1200)
+	const armAll = await page.evaluate(() => ({
+		open: !document.querySelector('[data-screen="armory"]').classList.contains('screen-closed'),
+		cards: document.querySelectorAll('#armory-grid .armory-card').length,
+		count: (document.getElementById('armory-count') || {}).textContent || '',
+		tensor: document.querySelectorAll('#armory-grid a[href*="tensor.trade"]').length,
+		me: document.querySelectorAll('#armory-grid a[href*="magiceden.io"]').length,
+		blank: Array.from(document.querySelectorAll('#armory-grid a')).every((a) => a.target === '_blank' && /noopener/.test(a.rel)),
+	}))
+	check('armory opens with the full catalogue', armAll.open && armAll.cards === 24, JSON.stringify({ open: armAll.open, cards: armAll.cards, count: armAll.count }))
+	check('every card links to BOTH marketplaces', armAll.tensor === 24 && armAll.me === 24, `tensor=${armAll.tensor} me=${armAll.me}`)
+	check('marketplace links open safely (_blank + noopener)', armAll.blank, 'blank+noopener=' + armAll.blank)
+
+	// Filter to weapons — 4 types, and the finish row must hide (weapons have no finish).
+	await page.evaluate(() => document.querySelector('[data-filter="kind:weapon"]').click())
+	await sleep(600)
+	const armW = await page.evaluate(() => ({
+		cards: document.querySelectorAll('#armory-grid .armory-card').length,
+		finishHidden: document.getElementById('armory-finishes').hidden,
+		names: Array.from(document.querySelectorAll('#armory-grid h4')).map((h) => h.textContent),
+	}))
+	check('WEAPONS filter narrows to the four weapons', armW.cards === 4, `cards=${armW.cards} ${armW.names.join('/')}`)
+	check('finish filter hides for weapons', armW.finishHidden, 'hidden=' + armW.finishHidden)
+
+	// Armour + a single finish — five slots make one set.
+	await page.evaluate(() => document.querySelector('[data-filter="kind:armor"]').click())
+	await sleep(500)
+	await page.evaluate(() => document.querySelector('[data-filter="finish:Solana"]').click())
+	await sleep(600)
+	const armS = await page.evaluate(() => ({
+		cards: document.querySelectorAll('#armory-grid .armory-card').length,
+		allSolana: Array.from(document.querySelectorAll('#armory-grid .armory-meta')).every((m) => /SOLANA/.test(m.textContent)),
+	}))
+	check('ARMOUR + SOLANA gives exactly one five-piece set', armS.cards === 5 && armS.allSolana, `cards=${armS.cards} allSolana=${armS.allSolana}`)
+
 	// Back out — the menu must come back, and no screen may be left open.
 	await page.evaluate(() => { location.hash = '' })
 	await sleep(800)

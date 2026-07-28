@@ -1,4 +1,6 @@
 import { CODEX_CATEGORIES, CODEX_ENTRIES, codexEntry, codexNarration } from '../config/codex'
+import { ARMORY_ITEMS, armoryArt, tensorItem, magicEdenItem } from '../config/armory'
+import { FINISHES } from '../../common/entitlements.js'
 
 // FULL SCREENS, not modals.
 //
@@ -96,6 +98,9 @@ export default class MenuScreens {
 		if (name === 'character') this._menu && this._menu.onCharacterScreenEnter(el)
 		if (name === 'issuance') this._startBloodPoll()
 		if (name === 'codex' && !this._codexId) this._selectCodex(CODEX_ENTRIES[0].id, false)
+		// Repaint on every entry rather than once: the OWNED badges come from the wallet
+		// panel's last chain read, which may have landed since the player was last here.
+		if (name === 'armory') this._renderArmory()
 	}
 
 	_onLeave(name) {
@@ -180,6 +185,134 @@ export default class MenuScreens {
 			const b = document.createElement('b'); b.textContent = right
 			li.appendChild(a); li.appendChild(b); ul.appendChild(li)
 		}
+	}
+
+	// ── ARMORY: the catalogue, and the way out to a marketplace ───────────────
+	// The collection is listed on Tensor and Magic Eden, and until now the game said so
+	// nowhere — a player who wanted the sniper had no path from "I want it" to "I own it".
+	//
+	// The filtering is the point. Eighty mints across twenty-four types is a wall, and the
+	// two questions anyone actually arrives with are "what weapons are there" and "what
+	// does a full set of one finish cost me". So: kind first, finish second.
+	_wireArmory() {
+		const bar = document.getElementById('armory-filters')
+		if (!bar) return
+		this._armoryKind = 'all'
+		this._armoryFinish = 'all'
+		bar.addEventListener('click', (e) => {
+			const btn = e.target.closest && e.target.closest('[data-filter]')
+			if (!btn) return
+			const [group, value] = btn.getAttribute('data-filter').split(':')
+			if (group === 'kind') {
+				this._armoryKind = value
+				// Leaving armour makes the finish filter meaningless; carrying a stale one
+				// over would silently hide most of the weapons behind an invisible rule.
+				if (value !== 'armor') this._armoryFinish = 'all'
+			}
+			if (group === 'finish') this._armoryFinish = value
+			if (this._sim && this._sim.audio) this._sim.audio.uiClick()
+			this._renderArmory()
+		})
+	}
+
+	_renderArmory() {
+		const grid = document.getElementById('armory-grid')
+		if (!grid) return
+		if (!this._armoryWired) { this._armoryWired = true; this._wireArmory() }
+
+		const owned = new Set((this._menu && this._menu._lastHoldings) || [])
+		const kind = this._armoryKind || 'all'
+		const finish = this._armoryFinish || 'all'
+
+		// The finish row only means anything for armour — weapons have no finish.
+		const finishRow = document.getElementById('armory-finishes')
+		if (finishRow) finishRow.hidden = kind === 'weapon'
+
+		for (const btn of document.querySelectorAll('#armory-filters [data-filter]')) {
+			const [g, v] = btn.getAttribute('data-filter').split(':')
+			btn.classList.toggle('is-active', (g === 'kind' && v === kind) || (g === 'finish' && v === finish))
+		}
+
+		const items = ARMORY_ITEMS.filter((it) => {
+			if (kind !== 'all' && it.kind !== kind) return false
+			if (finish !== 'all' && it.finish !== finish) return false
+			return true
+		})
+
+		const count = document.getElementById('armory-count')
+		if (count) {
+			const mints = items.reduce((n, i) => n + i.supply, 0)
+			count.textContent = `${items.length} TYPE${items.length === 1 ? '' : 'S'} · ${mints} MINTED`
+		}
+
+		grid.innerHTML = ''
+		for (const it of items) grid.appendChild(this._armoryCard(it, owned.has(it.name)))
+	}
+
+	_armoryCard(it, isOwned) {
+		const card = document.createElement('article')
+		card.className = 'armory-card'
+		card.setAttribute('data-rarity', (it.rarity || '').toLowerCase())
+		if (isOwned) card.classList.add('is-owned')
+
+		const fig = document.createElement('div')
+		fig.className = 'armory-art'
+		const img = document.createElement('img')
+		img.src = armoryArt(it.slug)
+		img.alt = it.name
+		// Off-screen cards are most of this grid on first paint; nothing here is above the
+		// fold except the first row, and the art is ~190kB apiece.
+		img.loading = 'lazy'
+		img.decoding = 'async'
+		fig.appendChild(img)
+		if (isOwned) {
+			const badge = document.createElement('span')
+			badge.className = 'armory-owned'
+			badge.textContent = 'OWNED'
+			fig.appendChild(badge)
+		}
+		card.appendChild(fig)
+
+		const head = document.createElement('div')
+		head.className = 'armory-card-head'
+		const h4 = document.createElement('h4')
+		h4.textContent = it.name
+		const rar = document.createElement('span')
+		rar.className = 'armory-rarity'
+		rar.textContent = it.rarity
+		head.appendChild(h4)
+		head.appendChild(rar)
+		card.appendChild(head)
+
+		const meta = document.createElement('div')
+		meta.className = 'armory-meta'
+		// Weapons say what they unlock, because that is the reason to buy one. Armour says
+		// where it sits and in which finish, because a set is assembled slot by slot.
+		meta.textContent = it.kind === 'weapon'
+			? `UNLOCKS THE ${String(it.label).toUpperCase()}`
+			: `${String(it.finish).toUpperCase()} · ${String(it.label).toUpperCase()}`
+		card.appendChild(meta)
+
+		const buy = document.createElement('div')
+		buy.className = 'armory-buy'
+		for (const [label, href] of [['TENSOR', tensorItem(it.mint)], ['MAGIC EDEN', magicEdenItem(it.mint)]]) {
+			const a = document.createElement('a')
+			a.className = 'armory-buy-btn'
+			a.href = href
+			a.target = '_blank'
+			// noopener: these are third-party tabs and window.opener would hand them a
+			// handle back into the game's window.
+			a.rel = 'noopener noreferrer'
+			a.textContent = label
+			buy.appendChild(a)
+		}
+		card.appendChild(buy)
+
+		const supply = document.createElement('div')
+		supply.className = 'armory-supply'
+		supply.textContent = `SUPPLY ${it.supply}`
+		card.appendChild(supply)
+		return card
 	}
 
 	// ── CODEX: the narrated whitepaper ────────────────────────────────────────

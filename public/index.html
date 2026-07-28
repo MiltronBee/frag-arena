@@ -44,7 +44,7 @@
          Preload so the digits never flash fallback-sans on first paint. -->
     <link rel="preload" href="assets/fonts/DSEG7Classic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-5a0a89d179">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-6b53396285">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -491,6 +491,15 @@
                         <span class="plate-chevron" aria-hidden="true"></span>
                     </button>
                     <button class="menu-plate" type="button" role="menuitem"
+                            data-menu-plate data-action="armory" data-reveal>
+                        <span class="plate-edge" aria-hidden="true"></span>
+                        <span class="plate-body">
+                            <span class="plate-label">ARMORY</span>
+                            <span class="plate-sub">buy weapons &amp; cloth</span>
+                        </span>
+                        <span class="plate-chevron" aria-hidden="true"></span>
+                    </button>
+                    <button class="menu-plate" type="button" role="menuitem"
                             data-menu-plate data-action="link-wallet" data-reveal>
                         <span class="plate-edge" aria-hidden="true"></span>
                         <span class="plate-body">
@@ -716,6 +725,43 @@
                         </div>
                     </div>
                     <p class="info-note">Frags are hashpower: every ten-minute block splits its reward by hash share, a mining-pool payout rather than a leaderboard prize. Rewards are computed live server-side today; on-chain settlement lands with the token. Tokens will never buy stats, weapons, or power.</p>
+                </div>
+            </section>
+
+            <!-- ARMORY — the shop front. The collection has been listed on Tensor and
+                 Magic Eden since launch and the game pointed at neither, so a player who
+                 wanted the sniper had no route from wanting it to owning it.
+                 Catalogue is GENERATED from the mint record (scripts/gen-armory.mjs). -->
+            <section class="menu-screen screen-closed" data-screen="armory" role="region" aria-labelledby="armory-title" tabindex="-1" data-screen-focus>
+                <header class="screen-head">
+                    <button class="screen-back" type="button" data-screen-back aria-label="Back to menu">
+                        <span class="screen-back-glyph" aria-hidden="true">←</span> MENU
+                    </button>
+                    <div class="screen-heading">
+                        <div class="menu-kicker">SEASON 1</div>
+                        <h2 id="armory-title">ARMORY</h2>
+                    </div>
+                    <div class="screen-state" id="armory-count"></div>
+                </header>
+                <div class="screen-body">
+                    <!-- Kind first, finish second: the two questions people arrive with are
+                         "what weapons are there" and "what completes a set". -->
+                    <div class="armory-filters" id="armory-filters">
+                        <div class="filter-row" role="group" aria-label="Filter by type">
+                            <button class="filter-chip is-active" type="button" data-filter="kind:all">ALL</button>
+                            <button class="filter-chip" type="button" data-filter="kind:weapon">WEAPONS</button>
+                            <button class="filter-chip" type="button" data-filter="kind:armor">ARMOUR</button>
+                        </div>
+                        <div class="filter-row filter-row-sub" id="armory-finishes" role="group" aria-label="Filter by finish">
+                            <button class="filter-chip is-active" type="button" data-filter="finish:all">ANY FINISH</button>
+                            <button class="filter-chip" type="button" data-filter="finish:Gold">GOLD</button>
+                            <button class="filter-chip" type="button" data-filter="finish:Silver">SILVER</button>
+                            <button class="filter-chip" type="button" data-filter="finish:Ebony">EBONY</button>
+                            <button class="filter-chip" type="button" data-filter="finish:Solana">SOLANA</button>
+                        </div>
+                    </div>
+                    <div class="armory-grid" id="armory-grid"></div>
+                    <p class="info-note">Buying is handled by the marketplace, not by this page — we never touch your wallet. Weapons unlock what you can carry; Cloth is cosmetic and always will be. Everyone spawns with the Pistol.</p>
                 </div>
             </section>
 
@@ -1496,7 +1542,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-5a0a89d179";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-5a0a89d179"></script>
+    <script>window.__BUILD_ID__="0.0.1-6b53396285";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-6b53396285"></script>
 </body>
 </html>
