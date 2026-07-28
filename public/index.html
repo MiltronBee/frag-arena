@@ -44,7 +44,7 @@
          Preload so the digits never flash fallback-sans on first paint. -->
     <link rel="preload" href="assets/fonts/DSEG7Classic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-cfcd04282f">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-5b79d1b012">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -614,7 +614,10 @@
                     <div class="loadout-lists">
                         <h3 class="loadout-h3">WEAPONS</h3>
                         <ul class="info-rows loadout-rows" id="loadout-weapons"></ul>
-                        <h3 class="loadout-h3">CLOTH</h3>
+                        <h3 class="loadout-h3">CLOTH — EQUIPPED SET</h3>
+                        <!-- A set is ONE finish. There is no per-slot picker on purpose:
+                             mixing finishes is not something the protocol can express. -->
+                        <div class="finish-picker" id="finish-picker" role="group" aria-label="Armour finish"></div>
                         <ul class="info-rows loadout-rows" id="loadout-armor"></ul>
                     </div>
                 </div>
@@ -622,7 +625,9 @@
             </div>
         </section>
 
-        <section id="wallet-modal" class="info-modal info-closed" role="dialog" aria-modal="true" aria-labelledby="wallet-title">
+                <!-- Wallet linking is reachable mid-match too: a player who joins, sees a pistol
+             and wonders why should not have to disconnect to link. ESC -> LINK WALLET. -->
+<section id="wallet-modal" class="info-modal info-closed" role="dialog" aria-modal="true" aria-labelledby="wallet-title">
             <div class="howto-panel">
                 <div class="card-strip" aria-hidden="true"></div>
                 <button class="panel-close" type="button" aria-label="Close" data-modal-close>✕</button>
@@ -762,6 +767,9 @@
             </div>
 
             <button id="resume-game" type="button"><span class="resume-label">RESUME</span></button>
+            <!-- Reachable MID-MATCH on purpose: a player who deploys, finds a pistol and
+                 wonders why should not have to disconnect to link a wallet. -->
+            <button id="settings-link-wallet" type="button"><span class="resume-label">LINK WALLET</span></button>
         </section>
 
         <section id="dev-inspector" class="dev-closed" aria-labelledby="dev-title">
@@ -1411,7 +1419,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-cfcd04282f";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-cfcd04282f"></script>
+    <script>window.__BUILD_ID__="0.0.1-5b79d1b012";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-5b79d1b012"></script>
 </body>
 </html>

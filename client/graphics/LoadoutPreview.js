@@ -38,16 +38,23 @@ export const HELMET_NFT = 'Degen Helm'
 // whole point is to show what ownership buys, and an empty shoulder has to read as
 // genuinely empty. Mutating assets.playerBody would leak into the match renderer, so
 // this never touches the original.
-export function specFor(ownedNames) {
+// Finish name -> the index CharacterModel and the wire both use.
+export const FINISH_INDEX = { Gold: 0, Silver: 1, Ebony: 2, Solana: 3 }
+
+// Which armour rows to mount. `finish` narrows it: only pieces the holder owns IN THAT
+// FINISH are worn, because a set is one finish and a half-worn Gold set should not fill
+// the gaps in a Silver one.
+export function specFor(ownedNames, finish) {
   const held = new Set(ownedNames || [])
+  const prefix = finish && finish !== 'Gold' ? finish + ' ' : ''
   const wanted = new Set()
   for (const [nft, rows] of Object.entries(ARMOR_BY_NFT)) {
-    if (held.has(nft)) rows.forEach((r) => wanted.add(r))
+    if (held.has(prefix + nft)) rows.forEach((r) => wanted.add(r))
   }
   const spec = { ...assets.playerBody }
   spec.armor = (assets.playerBody.armor || []).filter((row) => wanted.has(row.name))
   spec.armorEnabled = spec.armor.length > 0
-  if (!held.has(HELMET_NFT)) delete spec.helmet
+  if (!held.has(prefix + HELMET_NFT)) delete spec.helmet
   return spec
 }
 
@@ -75,7 +82,7 @@ export default class LoadoutPreview {
     if (hint) hint.style.display = 'none'
   }
 
-  async show(ownedNames) {
+  async show(ownedNames, finish) {
     this._ensureEngine()
     if (!this.engine) return
     this._disposeModel()
@@ -89,7 +96,9 @@ export default class LoadoutPreview {
       isAlive: true,
     }
 
-    this.model = new CharacterModel(this.scene, this.host, specFor(ownedNames))
+    this.model = new CharacterModel(this.scene, this.host, specFor(ownedNames, finish))
+    // preview the finish the player has equipped, not always the gold default
+    this.model.setArmorFinish(FINISH_INDEX[finish] || 0)
     // CharacterModel always creates an overhead nametag in #nametags. That belongs to
     // the arena HUD, not to a menu panel, so drop it immediately — otherwise a stray tag
     // floats over the menu for as long as the panel is open.

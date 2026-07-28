@@ -3483,7 +3483,9 @@ body.player-dead #touch-controls {
     opacity: 1;
     font-variant-numeric: tabular-nums;
 }
-/* own-team highlight: full-strength underline + tag to ink (no glow) */
+/* own-team highlight: the local player's side turns its RED/BLUE tag into a FILLED,
+   team-colored "· YOU" pill so there is never a doubt which side you are on — readable
+   at a glance mid-fight, not a faint 9px afterthought. */
 #tdm-scoreboard[data-myteam="red"] .tdm-side-red,
 #tdm-scoreboard[data-myteam="blue"] .tdm-side-blue {
     text-shadow: none;
@@ -3491,13 +3493,32 @@ body.player-dead #touch-controls {
 #tdm-scoreboard[data-myteam="red"] .tdm-side-red::after,
 #tdm-scoreboard[data-myteam="blue"] .tdm-side-blue::after { opacity: 1; height: 2px; }
 #tdm-scoreboard[data-myteam="red"] .tdm-side-red .tdm-tag,
-#tdm-scoreboard[data-myteam="blue"] .tdm-side-blue .tdm-tag { color: var(--x30-ink-hi); }
+#tdm-scoreboard[data-myteam="blue"] .tdm-side-blue .tdm-tag {
+    display: inline-block;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 700;
+    line-height: 1;
+    animation: myteam-pulse 1.8s ease-in-out infinite;
+}
+#tdm-scoreboard[data-myteam="red"] .tdm-side-red .tdm-tag {
+    background: var(--tdm-red); box-shadow: 0 0 12px -1px var(--tdm-red);
+}
+#tdm-scoreboard[data-myteam="blue"] .tdm-side-blue .tdm-tag {
+    background: var(--tdm-blue); box-shadow: 0 0 12px -1px var(--tdm-blue);
+}
 #tdm-scoreboard[data-myteam="red"] .tdm-side-red .tdm-tag::after,
 #tdm-scoreboard[data-myteam="blue"] .tdm-side-blue .tdm-tag::after {
     content: " · YOU";
     font-size: 9px;
     letter-spacing: var(--x30-track-label);
-    opacity: 0.9;
+    color: rgba(255, 255, 255, 0.9);
+}
+/* one gentle breath so the eye catches the badge on spawn, then it settles */
+@keyframes myteam-pulse {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.28); }
 }
 /* dim the strip a touch during the intermission (the banner takes over) */
 #tdm-scoreboard.match-over { opacity: 0.5; }
@@ -4425,3 +4446,34 @@ body.match-ended #tdm-banner { opacity: 0; transition: opacity 260ms ease; point
    voice from outside the match is never mistaken for a player standing next to you */
 .chat-line[data-source] .chat-src { color: var(--sol-purple); }
 .chat-line[data-source] .chat-text { color: var(--bone-dim); }
+
+
+/* ── EQUIP: armour finish picker ───────────────────────────────────────────────
+   A set is one finish, so these are radio-like: exactly one is pressed. The swatch
+   carries the identity — the Solana one is the only gradient on the page, which is
+   the point of that finish. */
+.finish-picker { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 14px; }
+.finish-btn {
+    display:flex; align-items:center; gap:7px;
+    padding:7px 11px; cursor:pointer;
+    background:transparent; color:var(--x30-ink-mid);
+    border:1px solid var(--x30-hairline); border-radius:var(--r-1);
+    font-family:var(--font-ui); font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+    transition:border-color .14s ease, color .14s ease;
+}
+.finish-btn:hover { border-color:var(--x30-ink-mid); color:var(--x30-ink-hi); }
+.finish-btn:focus-visible { outline:2px solid var(--sol-teal); outline-offset:2px; }
+.finish-btn[aria-pressed="true"] { border-color:var(--sol-teal); color:var(--x30-ink-hi); }
+.finish-btn b { font-weight:600; }
+.finish-btn .fstat { font-family:var(--x30-font-display); font-size:10px; opacity:.62; }
+.finish-btn .fsw {
+    width:13px; height:13px; border-radius:2px; flex:0 0 auto;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.4);
+}
+.finish-btn[data-finish="gold"]   .fsw { background:#E3B23C; }
+.finish-btn[data-finish="silver"] .fsw { background:#C6CDD6; }
+.finish-btn[data-finish="ebony"]  .fsw { background:#22252B; }
+.finish-btn[data-finish="solana"] .fsw { background:linear-gradient(160deg,#14F195,#9945FF); }
+.finish-none { font-family:var(--font-ui); font-size:12px; color:var(--x30-ink-mid); margin:2px 0 10px; }
+
+@media (prefers-reduced-motion: reduce) { .finish-btn { transition:none; } }

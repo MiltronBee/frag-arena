@@ -113,8 +113,14 @@ class InputSystem {
 			// touches are handled by TouchControls — never pointer-lock or fire
 			if (event.pointerType === 'touch') { return }
 
-			if (event.target.closest('#settings-menu') || event.target.closest('#dev-inspector')) {
-				return // Let user click sliders and dev inspector inputs
+			if (event.target.closest('#settings-menu') || event.target.closest('#dev-inspector') ||
+				event.target.closest('[role="dialog"]')) {
+				// Let the user click sliders, the dev inspector, and any OPEN modal (the
+				// wallet-link panel is reachable mid-match) without the pointer re-locking
+				// under their cursor. Without the [role="dialog"] guard, the first click into
+				// the wallet modal grabs the mouse and the player can neither paste an address
+				// nor hit LINK. Closed modals are display:none, so a canvas click never matches.
+				return
 			}
 
 			if (!this.pointerLocked) {
@@ -127,10 +133,21 @@ class InputSystem {
 				}
 				return // Don't shoot on the lock click
 			}
+			// NOTE: fire/aim button state is set in the `mousedown` handler below, NOT here.
+			// For a mouse, `pointerdown` fires only on the transition from no-buttons-held to
+			// the FIRST button down — pressing a SECOND button while one is already held
+			// dispatches `pointermove`, never a second `pointerdown`. Setting state here meant
+			// holding RMB (aim) and then pressing LMB (fire) — or the reverse — left the second
+			// button stuck false, so you could not ADS and shoot at once. `mousedown` fires per
+			// button, symmetric with the `mouseup` release handler.
+		})
 
-			// distinguish buttons EXPLICITLY: left (0) fires, right (2) aims. The old
-			// generic handler set mouseDown on any button, so right-click fired — ADS
-			// needs RMB, so fire must not steal it.
+		// distinguish buttons EXPLICITLY: left (0) fires, right (2) aims — ADS needs RMB,
+		// so fire must not steal it. Gated on pointerLocked: the click that ACQUIRES the
+		// lock reaches here with pointerLocked still false (the grant is async), so it can
+		// never fire a shot; only presses made while already in play set state.
+		document.addEventListener('mousedown', event => {
+			if (!this.pointerLocked) { return }
 			if (event.button === 2) {
 				this._currentState.aimDown = true
 				this.frameState.aimDown = true

@@ -1,4 +1,5 @@
 import * as BABYLON from '../babylon.js'
+import { armorUrlFor } from '../assets/assetManifest'
 import { tpWeapons } from '../assets/assetManifest'
 import { USE_MESH_MAP } from '../../common/mapMesh'
 
@@ -566,6 +567,26 @@ export default class CharacterModel {
     this._load()
   }
 
+  // Swap the whole Cloth to another finish. Called from the entity's armorFinish watch,
+  // so it fires on create AND whenever the wearer equips a different set — including on
+  // other players' bodies, which is the point of putting the finish on the wire.
+  //
+  // Disposes and re-mounts rather than re-skinning: each finish is a separate GLB with its
+  // own baked albedo, not a tint of one shared material.
+  setArmorFinish(finishIndex) {
+    const next = finishIndex | 0
+    if (this._finish === next) return
+    this._finish = next
+    if (!this.ready) return           // _load will pick it up when the body lands
+    if (this._armorRoots) {
+      this._armorRoots.forEach((r) => { try { r.dispose() } catch (e) {} })
+      this._armorRoots = null
+    }
+    if (this._helmetRoot) { try { this._helmetRoot.dispose() } catch (e) {} this._helmetRoot = null }
+    this._mountArmor()
+    this._mountHelmet()
+  }
+
   // set (or update) the overhead nametag text. Called from the player factory on
   // create + on the replicated nameIndex watch.
   setName(name) {
@@ -746,7 +767,7 @@ export default class CharacterModel {
     const head = this._headNode()
     if (!head) return // no bone -> no helmet (skeleton missing)
 
-    const { root } = await _loadProp(this.scene, this.spec.helmet.url)
+    const { root } = await _loadProp(this.scene, armorUrlFor(this.spec.helmet.url, this._finish | 0))
     if (this.disposed) return
 
     // drop any previous helmet
@@ -800,7 +821,12 @@ export default class CharacterModel {
       const bone = this._boneNode(s.bone)
       if (!bone) continue
       let root
-      try { ({ root } = await _loadProp(this.scene, s.url)) } catch (e) { continue }
+      // the finish decides WHICH variant of this row's mesh to load
+      const url = armorUrlFor(s.url, this._finish | 0)
+      try { ({ root } = await _loadProp(this.scene, url)) } catch (e) {
+        // a missing variant must never cost the player their armour — fall back to gold
+        try { ({ root } = await _loadProp(this.scene, s.url)) } catch (e2) { continue }
+      }
       if (this.disposed) return
       const clone = root.clone('armor_' + s.name, bone)
       if (!clone) continue

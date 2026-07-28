@@ -2341,6 +2341,22 @@ class Simulator {
 			}
 		}
 		if (resumeButton) resumeButton.addEventListener('click', dismissSettings)
+		// ESC -> LINK WALLET. Closes settings and opens the same read-only link panel the
+		// main menu uses, so there is one wallet flow rather than two that can drift.
+		const linkBtn = document.getElementById('settings-link-wallet')
+		if (linkBtn) linkBtn.addEventListener('click', () => {
+			// Just CLOSE the panel — never re-lock the pointer here. dismissSettings()
+			// re-grabs the mouse mid-match on desktop, which would leave the wallet modal
+			// open but uninteractable: no cursor to paste an address or hit LINK, so the
+			// link never completes and the player never gets their gear. The free cursor
+			// is the whole point of this panel; clicking the arena afterwards re-locks and
+			// resumes play.
+			this._closeSettings()
+			// this._menuControls, NOT this.menu — the latter is undefined, which is why
+			// this button silently did nothing on first ship.
+			const m = this._menuControls
+			if (m) { m.openModal('wallet-modal'); m._initWalletLink() }
+		})
 		// The ✕ is the always-reachable close (the RESUME button can scroll off-screen
 		// on phones). It ALWAYS just closes — even mid-match desktop, where re-locking
 		// the pointer would be a surprising outcome for an explicit "close" affordance.

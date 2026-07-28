@@ -14,6 +14,7 @@ import DeployCommand from './command/DeployCommand'
 import SpectatorHeartbeatCommand from './command/SpectatorHeartbeatCommand'
 import SetNameCommand from './command/SetNameCommand'
 import ChatCommand from './command/ChatCommand'
+import EquipCommand from './command/EquipCommand'
 import FireCommand from './command/FireCommand'
 import SwitchWeaponCommand from './command/SwitchWeaponCommand'
 import DevUpdateWeaponConfigCommand from './command/DevUpdateWeaponConfigCommand'
@@ -99,7 +100,8 @@ const config = {
             ['SwitchWeaponCommand', SwitchWeaponCommand],
             ['DevUpdateWeaponConfigCommand', DevUpdateWeaponConfigCommand],
             ['SetNameCommand', SetNameCommand],
-            ['ChatCommand', ChatCommand]
+            ['ChatCommand', ChatCommand],
+            ['EquipCommand', EquipCommand]
         ],
         basics: []
     }

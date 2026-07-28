@@ -106,6 +106,13 @@ class PlayerCharacter {
 		// mismatch just snaps). Bots are granted the full arsenal in GameInstance.addBot.
 		this.ownedWeapons = PISTOL_ONLY
 
+		// ARMOUR FINISH (index into entitlements.FINISHES: 0 Gold, 1 Silver, 2 Ebony,
+		// 3 Solana). Networked because every player sees every other player's Cloth —
+		// a client-local preference would show the wearer one set and everyone else
+		// another. Server-authoritative like ownedWeapons: the client asks, the server
+		// checks the request against what the wallet actually holds and decides.
+		this.armorFinish = 0
+
 		// Modular weapons state. Non-owned weapons start with ZERO ammo (magazine +
 		// reserve) so an ownership bug can never leak firepower; a weapon pickup refills
 		// its own weapon on grant (GameInstance.updatePickups).
@@ -169,6 +176,7 @@ PlayerCharacter.protocol = {
 	slowTimer: nengi.Float32,
 	currentWeaponIndex: nengi.UInt8,
 	ownedWeapons: nengi.UInt8,
+	armorFinish: nengi.UInt8,
 	grenadeCharges: nengi.UInt8,
 	kills: nengi.UInt8,
 	deaths: nengi.UInt8,

@@ -1,4 +1,6 @@
 import { CURRENCY } from '../config/currency'
+import EquipCommand from '../../common/command/EquipCommand'
+import { FINISHES, ownedFinishes } from '../../common/entitlements.js'
 
 // NFT on-chain name -> how the loadout panel labels it. Keyed by the SAME on-chain names
 // common/entitlements.js grants on, so the panel can never claim a weapon the server
@@ -126,8 +128,12 @@ export default class MenuControls {
   // (data-modal-close), click-outside, or ESC. Content differs desktop/touch via CSS
   // body classes already present; this only flips visibility.
   _wireModals() {
+    // wallet-modal + loadout-modal are in this list so they get the SAME close wiring
+    // (✕ / click-outside / ESC) as the info modals — without them the wallet panel opens
+    // but cannot be dismissed, which made linking feel broken from the main menu too.
+    // openModal/closeModal already special-case loadout's WebGL teardown.
     this._modals = Array.from(document.querySelectorAll(
-      '#howto-modal, #issuance-modal, #whitepaper-modal, #roadmap-modal'
+      '#howto-modal, #issuance-modal, #whitepaper-modal, #roadmap-modal, #wallet-modal, #loadout-modal'
     ))
     const openBtn = document.getElementById('how-to-play')
     if (openBtn) openBtn.addEventListener('click', () => this.openModal('howto-modal'))
@@ -334,7 +340,7 @@ export default class MenuControls {
       const { default: LoadoutPreview } = await import('./LoadoutPreview.js')
       this._loadout = new LoadoutPreview(canvas)
     }
-    this._loadout.show(this._lastHoldings || [])
+    this._loadout.show(this._lastHoldings || [], this._finish)
   }
 
   _closeLoadout() {
@@ -344,8 +350,57 @@ export default class MenuControls {
   // Paint the weapon rack and the Cloth list. Every gated weapon is listed whether or
   // not it is owned — a LOCKED row is the entire point, because it tells an unlinked
   // player what exists and what linking would give them.
+  // Build the finish selector from what the wallet holds. A finish the player owns no
+  // piece of is not offered at all — the server would refuse it anyway, and showing a
+  // button that silently does nothing is worse than showing none.
+  _renderFinishes(held) {
+    const box = document.getElementById('finish-picker')
+    if (!box) return
+    box.innerHTML = ''
+    const owned = ownedFinishes([...held])
+    if (!owned.length) {
+      const p = document.createElement('p')
+      p.className = 'finish-none'
+      p.textContent = 'No Cloth in this wallet — you deploy in the default kit.'
+      box.appendChild(p)
+      return
+    }
+    for (const o of owned) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.className = 'finish-btn'
+      b.setAttribute('data-finish', o.finish.toLowerCase())
+      if (this._finish === o.finish) b.setAttribute('aria-pressed', 'true')
+      else b.setAttribute('aria-pressed', 'false')
+      b.innerHTML = '<span class="fsw"></span><b>' + o.finish + '</b>' +
+        '<span class="fstat">' + (o.complete ? 'full set' : o.slots.length + '/5') + '</span>'
+      b.addEventListener('click', () => this._equip(o.finish))
+      box.appendChild(b)
+    }
+  }
+
+  // Send the request and repaint optimistically. The server re-checks it against the
+  // wallet and simply ignores anything the holder cannot wear, so a rejected swap just
+  // means the body never changes — no error state to handle.
+  _equip(finish) {
+    this._finish = finish
+    try { localStorage.setItem('degen.finish', finish) } catch (e) {}
+    const idx = FINISHES.indexOf(finish)
+    const s = this._sim
+    if (s && s.client && idx >= 0) s.client.addCommand(new EquipCommand(idx))
+    this._renderFinishes(new Set(this._lastHoldings || []))
+    if (this._loadout) this._loadout.show(this._lastHoldings || [], finish)
+  }
+
   _renderLoadout() {
     const held = new Set(this._lastHoldings || [])
+    if (!this._finish) {
+      try { this._finish = localStorage.getItem('degen.finish') || null } catch (e) { this._finish = null }
+    }
+    // default to the first finish they actually own
+    const own = ownedFinishes([...held])
+    if (!own.some((o) => o.finish === this._finish)) this._finish = own.length ? own[0].finish : null
+    this._renderFinishes(held)
     const wRows = document.getElementById('loadout-weapons')
     const aRows = document.getElementById('loadout-armor')
     const note = document.getElementById('loadout-note')

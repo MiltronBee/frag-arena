@@ -14,6 +14,7 @@ import DamageTaken from '../common/message/DamageTaken'
 import PlayerName from '../common/message/PlayerName'
 import ChatMessage from '../common/message/ChatMessage'
 import { decodeChat, sanitizeScope, CHAT_SCOPE, CHAT_SOURCE } from '../common/chat'
+import { FINISHES, resolveFinish } from '../common/entitlements.js'
 import ChatBridge from './chatBridge'
 
 // Chat flood limit: a leaky bucket that halves every CHAT_BURST_DECAY_MS. Allows a real
@@ -601,6 +602,8 @@ class GameInstance {
 					.then((r) => {
 						client._grantedWeapons = PlayerCharacter.maskFor(r.weapons)
 						client._walletAddress = paste
+						// keep the raw names: the equip check needs them, not just the mask
+						client._ownedNames = r.names || []
 						if (r.weapons.length) {
 							console.log(`[wallet] ${paste.slice(0, 8)}… holds ${r.count} — grants weapons [${r.weapons}]`)
 						}
@@ -609,6 +612,12 @@ class GameInstance {
 						// and fighting by the time this resolves. Apply it to their live
 						// body immediately rather than making them wait for a death.
 						this._applyEntitlement(client)
+						// NOTE: the armour finish is carried onto the body at deploy/respawn
+						// (see respawnPlayer, `entity.armorFinish = client._armorFinish`). It
+						// must NOT be set here — this runs at CONNECT (a menu spectator with no
+						// entity yet), where rawEntity/smoothEntity don't exist. The stray lines
+						// that used to be here threw a ReferenceError straight into the .catch
+						// below, so every SUCCESSFUL chain read logged "[wallet] read failed".
 					})
 					.catch((e) => console.log('[wallet] read failed:', e.message))
 			}
@@ -833,6 +842,19 @@ class GameInstance {
 			const nid = client.smoothEntity.nid
 			this._humanNames.set(nid, name)
 			this.instance.messageAll(new PlayerName(nid, name))
+		})
+
+		this.instance.on('command::EquipCommand', ({ command, client }) => {
+			// Server-authoritative. The client's request is checked against the names its
+			// wallet read actually returned — ask for a finish you do not hold and you keep
+			// the one you had, silently. Held on the CLIENT (not the entity) so it survives
+			// death: your Cloth is yours, it is not part of the loadout reset.
+			const want = FINISHES[command.finish | 0]
+			const ok = resolveFinish(client._ownedNames || [], want)
+			if (!ok) return
+			client._armorFinish = FINISHES.indexOf(ok)
+			if (client.rawEntity) client.rawEntity.armorFinish = client._armorFinish
+			if (client.smoothEntity) client.smoothEntity.armorFinish = client._armorFinish
 		})
 
 		this.instance.on('command::ChatCommand', ({ command, client }) => {
@@ -2666,6 +2688,8 @@ class GameInstance {
 			// holding a weapon it no longer owns is a statue — fire() refuses it and the
 			// bot never shoots again. Re-pick from the mask it just received.
 			if (!client.bot) {
+				// the Cloth is not part of the loadout reset — you keep the set you equipped
+				entity.armorFinish = client._armorFinish || 0
 				entity.currentWeaponIndex = SPAWN_WEAPON_INDEX
 			} else if (!(spawnOwned & (1 << entity.currentWeaponIndex))) {
 				entity.currentWeaponIndex = this._pickBotWeapon(spawnOwned, entity.nid | 0)

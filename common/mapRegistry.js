@@ -1069,7 +1069,13 @@ export function mapDisplayName(record) {
 // Grove's record + assets stay registered so a direct /map grove still resolves. Visage runs real CTF and dom_elder real
 // DOM now that those modes ship (effectiveMode un-coerces them); the other four stay
 // TDM/FFA. dom_elder re-enters the rotation as its native DOM.
-export const ROTATION = ['dm_hex2', 'dm_gantry162', 'dm_somnus', 'dm_baroque', 'visage', 'dom_elder']
+// TEMPORARY SINGLE-MAP LOCK (2026-07-27): pinned to CTF-Visage only while we focus
+// the game on one arena/mode. effectiveMode(visage) === 'CTF', so this runs real
+// Capture the Flag. To restore the full rotation, put the ids back:
+//   ['dm_hex2', 'dm_gantry162', 'dm_somnus', 'dm_baroque', 'visage', 'dom_elder']
+// A stale .rotation-state.json index is clamped to 0 (readRotationIndex), so shrinking
+// the list can never point out of range — no state reset needed.
+export const ROTATION = ['visage']
 	.map(id => {
 		const rec = mapRecords[id]
 		return {

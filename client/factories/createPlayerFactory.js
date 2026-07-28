@@ -84,6 +84,13 @@ export default ({ simulator }) => {
 			// every change (including the revocation/expiry back to 0, which
 			// restores solidity). Own entities excluded: own raw drives prediction
 			// (keeps its collisions), own smooth is hidden and never colliding.
+			// ARMOUR FINISH. Fires on create with the initial value and on every equip
+			// swap, for EVERY body including other players' — which is the whole reason
+			// the finish rides the wire instead of being a client-local preference.
+			armorFinish({ entity, value }) {
+				const model = simulator.characterModels.get(entity.nid)
+				if (model) model.setArmorFinish(value | 0)
+			},
 			spawnImmunity({ entity, value }) {
 				if (entity.nid === simulator.myRawId || entity.nid === simulator.mySmoothId) return
 				entity.mesh.checkCollisions = !(value > 0)

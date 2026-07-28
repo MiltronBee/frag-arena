@@ -224,3 +224,19 @@ import { weapons } from '../../common/weaponsConfig'
 
 export { weapons }
 export default assets
+
+
+// ── ARMOUR FINISHES ────────────────────────────────────────────────────────────
+// Gold is the base asset; every other finish is the same mesh with its own baked albedo,
+// staged alongside it as <name>_<finish>.glb. Deriving the path rather than listing 18
+// more urls means adding a finish is a bake plus a copy, with no manifest churn.
+//
+// Falls back to the base (gold) url for an unknown finish, so a bad index can never leave
+// a player with no armour at all — worst case they wear gold.
+export const ARMOR_FINISHES = ['Gold', 'Silver', 'Ebony', 'Solana']
+
+export function armorUrlFor(url, finishIndex) {
+  const f = ARMOR_FINISHES[finishIndex | 0]
+  if (!f || f === 'Gold') return url
+  return url.replace(/\.glb$/, '_' + f.toLowerCase() + '.glb')
+}
