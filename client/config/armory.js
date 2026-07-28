@@ -22,8 +22,23 @@ export const MAGIC_EDEN_COLLECTION = 'https://magiceden.io/marketplace/degen_tou
 export const tensorItem = (mint) => (mint ? `https://www.tensor.trade/item/${mint}` : TENSOR_COLLECTION)
 export const magicEdenItem = (mint) => (mint ? `https://magiceden.io/item-details/${mint}` : MAGIC_EDEN_COLLECTION)
 
-/** Art for an item, served from this origin (same files the token metadata points at). */
-export const armoryArt = (slug) => `/nft/degen-s1/${slug}.png`
+// ART COMES FROM PERMANENT STORAGE, NOT FROM US.
+//
+// This used to build /nft/degen-s1/<slug>.png against our own origin, and 15 of the 24
+// items were broken in production: only the original Gold set and the weapons had ever
+// been published there: every Silver, Ebony and Solana piece 404'd. The bytes have always
+// existed at their upload transaction — that is what the collection was minted against
+// and what the marketplaces render — so pointing at that source removes both the broken
+// images and the requirement to keep a second copy of the art in sync with the chain.
+//
+// gateway.irys.xyz 302-redirects to a CDN; browsers follow it transparently. NOTE: Irys
+// is NOT Arweave and arweave.net will NOT resolve these ids.
+const GATEWAY = 'https://gateway.irys.xyz/'
+export const armoryArt = (item) =>
+	item && item.art ? GATEWAY + item.art : `/nft/degen-s1/${item && item.slug}.png`
+
+/** The turntable MP4 for an item, or null if it has none. */
+export const armoryVideo = (item) => (item && item.video ? GATEWAY + item.video : null)
 
 export const ARMORY_ITEMS = [
 	{
@@ -35,7 +50,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": 1,
 		"rarity": "Common",
 		"supply": 10,
-		"mint": "76hpqdjv2x1wbHKUhQ7r4rjPX4ELvS7vQ2cyQSmxFFeS"
+		"mint": "76hpqdjv2x1wbHKUhQ7r4rjPX4ELvS7vQ2cyQSmxFFeS",
+		"art": "4KjVS7XQbqK3v1kEjm5LZxNvvzhQTKyKK87xpdpHnrDa",
+		"video": "EL41ZyN9GbcFCqZ9kdZFX9Lwezm4CYtKL8tzHU2MnzXr"
 	},
 	{
 		"slug": "rifle",
@@ -46,7 +63,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": 0,
 		"rarity": "Uncommon",
 		"supply": 10,
-		"mint": "9BDBMKg8CbDvs2sxBMnaLqTv499swSoh3eB9kkE8K31K"
+		"mint": "9BDBMKg8CbDvs2sxBMnaLqTv499swSoh3eB9kkE8K31K",
+		"art": "7h17zmCpMW5k19nGG6N8haGid5Xc613cSJMzrFjCBya7",
+		"video": "4Dtym4TisZAbSc56RLBoyWEp7xBZ9FD7KBVtvEnA6mce"
 	},
 	{
 		"slug": "shotgun",
@@ -57,7 +76,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": 2,
 		"rarity": "Uncommon",
 		"supply": 10,
-		"mint": "FL4N4bGaY6ZCnX3EWyAabH4YBiejERgYZmQ3sxNpHbDh"
+		"mint": "FL4N4bGaY6ZCnX3EWyAabH4YBiejERgYZmQ3sxNpHbDh",
+		"art": "G3NgbcEp8hBUf5NgtCttgdyQsxVmLAMVkiSPS8P28bTQ",
+		"video": "FRziv58tN9Yi9BXCnYQeMAveL3nJtfJ6t1ig5hGjpkMM"
 	},
 	{
 		"slug": "sniper",
@@ -68,7 +89,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": 6,
 		"rarity": "Legendary",
 		"supply": 10,
-		"mint": "6q65nqU7SheuUddQm52V7Qc4HvEEnSpo58gPMsGDBC1D"
+		"mint": "6q65nqU7SheuUddQm52V7Qc4HvEEnSpo58gPMsGDBC1D",
+		"art": "EN5mqdfMG2R3e93baLztieKrTB2fWrfHW74ouLAmAVK4",
+		"video": "7nVrerX3VeZSUPxVb676ak48F34xQ6gmJLCGRokBjFcK"
 	},
 	{
 		"slug": "helm",
@@ -79,7 +102,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Rare",
 		"supply": 2,
-		"mint": "3utaKyFj5HNCyYWpt3AMTsssQqUsdDsmxFcDS4DBXqJT"
+		"mint": "3utaKyFj5HNCyYWpt3AMTsssQqUsdDsmxFcDS4DBXqJT",
+		"art": "CUMoh4FVxKTWemDzrZRHzU4QdyePcJeWDgQjWLvdySyj",
+		"video": "7REt4pVuBq2x6iaZhShdUmuhAvLjQmB4wLQAxNUgwNn2"
 	},
 	{
 		"slug": "cuirass",
@@ -90,7 +115,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Legendary",
 		"supply": 2,
-		"mint": "CryRyH9XqbtEYER1XvUgbZytpUmN1J3D4FVqhU8Re33c"
+		"mint": "CryRyH9XqbtEYER1XvUgbZytpUmN1J3D4FVqhU8Re33c",
+		"art": "34BGnvDoa1ESfFbetcnDhdR3Q4jKio61Y2MNLVrorQkj",
+		"video": "Lks7A7FZrQjravHcTHfnvmwFtMWvRUWNPT37PKgH11f"
 	},
 	{
 		"slug": "pauldron",
@@ -101,7 +128,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Uncommon",
 		"supply": 2,
-		"mint": "BHUYjjKPJ1bRu5wXYFkPBC3qYktz6J7bn9Exa6fBx52o"
+		"mint": "BHUYjjKPJ1bRu5wXYFkPBC3qYktz6J7bn9Exa6fBx52o",
+		"art": "J3eNMuaEqZLyxnRM4k3Td4kqNvSnHryEgTkiWN81f1zT",
+		"video": "F9VCR6i5XSiBfnCyMFpFxFS7qy675drwB4femQrKUjd"
 	},
 	{
 		"slug": "caps",
@@ -112,7 +141,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Common",
 		"supply": 2,
-		"mint": "8zmYViCu4i23RsEwVS8a2spCZcqtK3aDRqDDrpa56P4V"
+		"mint": "8zmYViCu4i23RsEwVS8a2spCZcqtK3aDRqDDrpa56P4V",
+		"art": "HPWyrXe91X1xBD6GAGNY1jY3XSicJu7kxQF2bZ1WbTqM",
+		"video": "2bXpz4R9kT9cD9scJwqQbnZ2T44CaQbTkyJ4V6iCboyu"
 	},
 	{
 		"slug": "sabaton",
@@ -123,7 +154,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Uncommon",
 		"supply": 2,
-		"mint": "5X1m2kpq6HpMyYjT6ze5dV3k9eko5awVJ6NP25imJK6M"
+		"mint": "5X1m2kpq6HpMyYjT6ze5dV3k9eko5awVJ6NP25imJK6M",
+		"art": "JC8YLyP4JLct1yQp5wzaipPPHTnxXqRe4tPteBgaYPNT",
+		"video": "HA83FV3vDKK3m63Bb6u6xKMfTarNiu2VTYCTJXYnDEju"
 	},
 	{
 		"slug": "helm-silver",
@@ -134,7 +167,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Rare",
 		"supply": 2,
-		"mint": "DMobkBUpsCSMDRWP9sESkyMj5WDuRxkuMbDURa4wTvv"
+		"mint": "DMobkBUpsCSMDRWP9sESkyMj5WDuRxkuMbDURa4wTvv",
+		"art": "7ie5xdmnfvRkfWcwZbCSTDki8Eh4SHqGEHdWK8Hr3pVP",
+		"video": "5eh9viUpvQyRxC1Emi8YUeXNnEvnZyZET9NcFGNCfH3f"
 	},
 	{
 		"slug": "cuirass-silver",
@@ -145,7 +180,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Legendary",
 		"supply": 2,
-		"mint": "ECbXjUru8Tqb6b7PWNXtWP5jgmBNonXiNroT3RhBfH1v"
+		"mint": "ECbXjUru8Tqb6b7PWNXtWP5jgmBNonXiNroT3RhBfH1v",
+		"art": "5k5W35rm5mCEsfzWWLgzgnTZHL62JExos5LQdoaznCQ1",
+		"video": "5anStRwKFqkTW2H4SbkKQEdiSRot5CbvYQpKanSPFjRR"
 	},
 	{
 		"slug": "pauldron-silver",
@@ -156,7 +193,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Uncommon",
 		"supply": 2,
-		"mint": "Cu81Pz9fPnqN4yzkuMfxKLsF8TNZbtXX1VcbcfuXBtpY"
+		"mint": "Cu81Pz9fPnqN4yzkuMfxKLsF8TNZbtXX1VcbcfuXBtpY",
+		"art": "35zHzWPD6V5wZXmDY6NSeTHs6JZXjyv1BnXc9o8exdo6",
+		"video": "CyEfK7MKkYbxoWH2LjijwA6rU1PxUQQKgPbR4Kaxtiec"
 	},
 	{
 		"slug": "caps-silver",
@@ -167,7 +206,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Common",
 		"supply": 2,
-		"mint": "F7CYgWb7zzPDFjvZZQR5pF6T19XqzoTPLc5YsqXkjac2"
+		"mint": "F7CYgWb7zzPDFjvZZQR5pF6T19XqzoTPLc5YsqXkjac2",
+		"art": "9Dm2qwo9zCcW8qBstjrT5RezE5BVGRjuExmdiDf82dhT",
+		"video": "DgKxiKEk84gwLVSP72ro2g8cUe13ex3tWJcRZwa3vHVf"
 	},
 	{
 		"slug": "sabaton-silver",
@@ -178,7 +219,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Uncommon",
 		"supply": 2,
-		"mint": "BTXzfAVL7ae78oTMiZ4fa8YSbyXeRqickzDjh48PTFfX"
+		"mint": "BTXzfAVL7ae78oTMiZ4fa8YSbyXeRqickzDjh48PTFfX",
+		"art": "FrBDToQwvwWeoyBpFg2KvrLpCvBdX4FtDE4xAG4HCkmv",
+		"video": "BZw4vzfbrpJbuJuB65nkdaX33g6L1KWtvQWTR2tn7pTk"
 	},
 	{
 		"slug": "helm-ebony",
@@ -189,7 +232,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Rare",
 		"supply": 2,
-		"mint": "FveHu6dZkMjQ3JA8BdnSHLLLaK1d2av1i9GmkGRodnC7"
+		"mint": "FveHu6dZkMjQ3JA8BdnSHLLLaK1d2av1i9GmkGRodnC7",
+		"art": "7aTVmkVH4QYoX3bPYdLbV5A7tm8tUYRHC4ti4VeGpxEz",
+		"video": "37Mgmfmam6DDnpTQqneKCTMyDaEtj7qiNUTCtLfXaz1x"
 	},
 	{
 		"slug": "cuirass-ebony",
@@ -200,7 +245,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Legendary",
 		"supply": 2,
-		"mint": "CWF6QdvDFDJRbVpk6m446snV2KfSh61eF5eb7jk2TYzs"
+		"mint": "CWF6QdvDFDJRbVpk6m446snV2KfSh61eF5eb7jk2TYzs",
+		"art": "7vkZNB1dtE84pL7XBwBPQsyLSXAoGkwGB1M4anPdNcHK",
+		"video": "A6WGCaJZRU8nfxCCgxqkGfTjMGfRYu3XAVM6gBShquy2"
 	},
 	{
 		"slug": "pauldron-ebony",
@@ -211,7 +258,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Uncommon",
 		"supply": 2,
-		"mint": "B22dki1zfi3b2mydYp2n7pEBPUG6dm4aad7hsBbx77yw"
+		"mint": "B22dki1zfi3b2mydYp2n7pEBPUG6dm4aad7hsBbx77yw",
+		"art": "3hRQJQwbR9sKp3khmw1aS5724hVrtWpkCGD8ZJJU1ydq",
+		"video": "84aND98HBMDdCJxEFwJw5LaW4WBb9Tx3jdzHign6a9ZD"
 	},
 	{
 		"slug": "caps-ebony",
@@ -222,7 +271,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Common",
 		"supply": 2,
-		"mint": "4xpY1c8Y1T7gSSaZRAoLGkqGreKsHN4cw9XiETbzkWdy"
+		"mint": "4xpY1c8Y1T7gSSaZRAoLGkqGreKsHN4cw9XiETbzkWdy",
+		"art": "EsApKcF85rdEEWoqojzWHqFity6owjFWmwekKjaD3Mgv",
+		"video": "B5T9JXtUhSKjNwv8RG7RZ2m2iqo4akAmMN5jiZPyHXfG"
 	},
 	{
 		"slug": "sabaton-ebony",
@@ -233,7 +284,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Uncommon",
 		"supply": 2,
-		"mint": "948H5Mf6U7dfxENykbo48PK2Qs4xeaCBkx1YLidMuCc5"
+		"mint": "948H5Mf6U7dfxENykbo48PK2Qs4xeaCBkx1YLidMuCc5",
+		"art": "4i9WZKZLQiHTNG7vAkxVxuSaKxPmnfBQU65aDUCZLwGd",
+		"video": "4EMoznC9zxoAMB4WS7iprwvxGiGuQB2CezCS1SPysQQ3"
 	},
 	{
 		"slug": "helm-solana",
@@ -244,7 +297,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Rare",
 		"supply": 2,
-		"mint": "5PDJKG9YJozvqxZX4XZDVMGUkppXdC3wxZCX1uuC2NfZ"
+		"mint": "5PDJKG9YJozvqxZX4XZDVMGUkppXdC3wxZCX1uuC2NfZ",
+		"art": "6yxPzD3wv1zhAgkYzjyofXk1LMucGrihN19ooa7dPLXG",
+		"video": "BW93RJ7qDrPJ63aaimNLhSUWC1YTVyTTNtN3Dt7NxCEo"
 	},
 	{
 		"slug": "cuirass-solana",
@@ -255,7 +310,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Legendary",
 		"supply": 2,
-		"mint": "UfaBH8Qw82vH7d7ZMvFvyPW7nWGkRxrukK1pQnfGxw9"
+		"mint": "UfaBH8Qw82vH7d7ZMvFvyPW7nWGkRxrukK1pQnfGxw9",
+		"art": "HwKpLEJhfJBamehrVTviFY5KfgX7NCspJzJHgAgPK6sR",
+		"video": "7iDJJer9QZNJ3M1AJU5MTsxgfsTxaexDFuct5piRbf8p"
 	},
 	{
 		"slug": "pauldron-solana",
@@ -266,7 +323,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Uncommon",
 		"supply": 2,
-		"mint": "7kLEgVxqu1txZTx6YurJ1xo8iPr64uhtxd1EsqwCbTpQ"
+		"mint": "7kLEgVxqu1txZTx6YurJ1xo8iPr64uhtxd1EsqwCbTpQ",
+		"art": "AJ8mWZawf1PyTqBPebLJs3b7PzwHfc36s52fHMjBUcrT",
+		"video": "GWFcNf98msb6r3kLsJVyudqKvjyvVg1swLAmozPirw7W"
 	},
 	{
 		"slug": "caps-solana",
@@ -277,7 +336,9 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Common",
 		"supply": 2,
-		"mint": "FwJ92CZXqoGaFEW3Ze7Y6wzNwo9Lmgq5zbw7zxDrVnY"
+		"mint": "FwJ92CZXqoGaFEW3Ze7Y6wzNwo9Lmgq5zbw7zxDrVnY",
+		"art": "7RbJXhcbMs5HpDsE8YjnkroVinFg5L3Z4qwSziF7YCnU",
+		"video": "GcEGK2rdoXynv8Gf2Xtg12PP4J8QSVn1CcXuHnNkXDzA"
 	},
 	{
 		"slug": "sabaton-solana",
@@ -288,6 +349,8 @@ export const ARMORY_ITEMS = [
 		"weaponIndex": null,
 		"rarity": "Uncommon",
 		"supply": 2,
-		"mint": "HtvSEt1hFEYT47TqbHpSayyjpYF3FxGDwcan3L5TvCvB"
+		"mint": "HtvSEt1hFEYT47TqbHpSayyjpYF3FxGDwcan3L5TvCvB",
+		"art": "4m3aGMDxupPVz1UNi6LXoD2z3m8B33BKAk5Er6PxUpbC",
+		"video": "CEHpCbuKmLkD3FrRPwhBHdUW4dVynainveFv1VDU3CJT"
 	}
 ]

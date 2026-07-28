@@ -4750,7 +4750,7 @@ body.screen-open #entry-overlay { pointer-events: none; }
     border-radius: var(--x30-r-2);
     overflow: hidden;
 }
-.armory-art img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.armory-art img, .armory-art video { width: 100%; height: 100%; object-fit: contain; display: block; }
 .armory-owned {
     position: absolute;
     top: 8px; left: 8px;
@@ -5215,4 +5215,113 @@ body.in-combat #whale-alert-banner[data-on="1"] {
     .seg-mcap { font-size: 12px; }
     .pressure-legend { display: none; }
     #whale-alert-banner { font-size: 9px; padding: 5px 10px; gap: 7px; }
+}
+
+/* ══ SNIPER SCOPE ══════════════════════════════════════════════════════════════
+   From the round robin in _work/sniper-roundrobin/. Zero assets: the entire optic
+   is two radial gradients, four divs and a masked gradient pair for the mil ticks.
+
+   The load-bearing decision is OCCLUSION rather than vignette. Outside the tube is
+   not dimmed, it is solid --x30-void — a real scope's field is a tunnel and losing
+   your peripheral vision is what you PAY for the magnification. A darkened-but-
+   visible surround would hand the player the zoom for free, which is exactly the
+   videogame-scope-as-sticker the brief rejected. */
+
+#scope-viewport {
+    position: absolute;
+    inset: 0;
+    z-index: 12;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    /* Composited: the whole optic animates on transform + opacity only. */
+    transform: scale(1.15);
+    will-change: transform, opacity;
+    /* No transition — Simulator drives this per-frame off the ADS ramp, so a CSS
+       transition here would fight the JS and lag the iris behind the FOV. */
+}
+#scope-viewport.is-on { visibility: visible; }
+
+/* ---- the tube ---- */
+/* Percentages, not vh: on a short landscape phone a vh-sized tube overflows the
+   frame entirely and the player sees nothing but housing. min() keeps the optic
+   inside the SHORT axis whatever the aspect. */
+.scope-mask {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center,
+        transparent 0,
+        transparent calc(min(50vw, 50vh) * 0.62),
+        /* a whisper of coating bloom right at the glass edge */
+        rgba(20, 241, 149, 0.045) calc(min(50vw, 50vh) * 0.63),
+        /* the inner bevel of the tube, then solid housing */
+        rgba(5, 7, 8, 0.90) calc(min(50vw, 50vh) * 0.66),
+        var(--x30-void) calc(min(50vw, 50vh) * 0.70),
+        var(--x30-void) 100%);
+}
+
+/* ---- the eye box ---- */
+/* The crescent that creeps in when the cheek weld drifts. Oversized and inset so it
+   can travel without ever exposing a bare corner of the frame. */
+.scope-shadow {
+    position: absolute;
+    inset: -14%;
+    background: radial-gradient(circle at center,
+        transparent 0,
+        transparent calc(min(50vw, 50vh) * 0.50),
+        rgba(5, 7, 8, 0.95) calc(min(50vw, 50vh) * 0.64),
+        var(--x30-void) calc(min(50vw, 50vh) * 0.78));
+    transform: translate3d(0, 0, 0);
+    will-change: transform;
+}
+
+/* ---- the reticle ---- */
+/* Etched, not projected: ink white with a dark halo so it survives against both a
+   bright skybox and a black doorway. It is NOT the accent green — a reticle is not
+   an interactive element, and green here would read as UI floating in the world. */
+.scope-reticle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(100vw, 100vh);
+    height: min(100vw, 100vh);
+    transform: translate3d(-50%, -50%, 0);
+}
+.ret-line {
+    position: absolute;
+    background: var(--x30-ink);
+    box-shadow: 0 0 1px var(--x30-void);
+    opacity: 0.85;
+}
+/* A 3px gap at the centre. The crosshair must not cover the thing you are aiming at
+   — at 22 FOV a head is only a few px across and a solid cross hides it. */
+.ret-v-top    { left: 50%; top: 0;    width: 1.5px; height: calc(50% - 3px); transform: translateX(-50%); }
+.ret-v-bottom { left: 50%; bottom: 0; width: 1.5px; height: calc(50% - 3px); transform: translateX(-50%); }
+.ret-h-left   { top: 50%; left: 0;    height: 1.5px; width: calc(50% - 3px); transform: translateY(-50%); }
+.ret-h-right  { top: 50%; right: 0;   height: 1.5px; width: calc(50% - 3px); transform: translateY(-50%); }
+
+/* Mil ticks: two repeating gradients, masked to an annulus so the marks exist along
+   the crosshair arms and nowhere else. Cheap, and it reads as a ranging scale
+   rather than as decoration. */
+.scope-reticle::after {
+    content: "";
+    position: absolute;
+    inset: 34%;
+    background-image:
+        repeating-linear-gradient(0deg, transparent 0 18px, var(--x30-ink) 18px 19.5px),
+        repeating-linear-gradient(90deg, transparent 0 18px, var(--x30-ink) 18px 19.5px);
+    -webkit-mask: radial-gradient(circle at center, transparent 0 20px, #000 21px 96px, transparent 97px);
+    mask: radial-gradient(circle at center, transparent 0 20px, #000 21px 96px, transparent 97px);
+    opacity: 0.5;
+}
+
+/* The crosshair the rest of the game draws is redundant inside an optic and sits at
+   a different scale — two crosshairs at once is the clearest possible tell that the
+   scope is a sticker. */
+body.scoped #crosshair { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+    /* The eye-box drift is the one part of this that is pure motion. The tube, the
+       occlusion and the reticle all stay — they are information, not animation. */
+    .scope-shadow { transform: none !important; }
 }

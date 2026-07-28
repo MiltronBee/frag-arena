@@ -1,5 +1,5 @@
 import { CODEX_CATEGORIES, CODEX_ENTRIES, codexEntry, codexNarration } from '../config/codex'
-import { ARMORY_ITEMS, armoryArt, tensorItem, magicEdenItem } from '../config/armory'
+import { ARMORY_ITEMS, armoryArt, armoryVideo, tensorItem, magicEdenItem } from '../config/armory'
 import { FINISHES } from '../../common/entitlements.js'
 
 // FULL SCREENS, not modals.
@@ -317,8 +317,36 @@ export default class MenuScreens {
 			count.textContent = `${items.length} TYPE${items.length === 1 ? '' : 'S'} · ${mints} MINTED`
 		}
 
+		// Every filter change rebuilds the grid, so the previous cards' observations have
+		// to go with them — otherwise the observer accumulates detached <video> nodes and
+		// keeps decoding them.
+		if (this._armoryIO) { this._armoryIO.disconnect(); this._armoryIO = null }
 		grid.innerHTML = ''
 		for (const it of items) grid.appendChild(this._armoryCard(it, owned.has(it.name)))
+	}
+
+	// Play only what is visible. One shared IntersectionObserver for the whole grid
+	// rather than one per card, and the source is attached on FIRST reveal so a filter
+	// the player never scrolls through costs no bandwidth at all.
+	_observeArmoryVideo(el) {
+		if (typeof IntersectionObserver !== 'function') return
+		if (!this._armoryIO) {
+			this._armoryIO = new IntersectionObserver((entries) => {
+				for (const e of entries) {
+					const v = e.target
+					if (e.isIntersecting) {
+						if (!v.src && v.dataset.src) v.src = v.dataset.src
+						// play() rejects if the tab is backgrounded or autoplay is blocked;
+						// the poster stays up, which is a fine outcome, so swallow it.
+						const p = v.play()
+						if (p && p.catch) p.catch(() => {})
+					} else if (!v.paused) {
+						v.pause()
+					}
+				}
+			}, { rootMargin: '200px' })
+		}
+		this._armoryIO.observe(el)
 	}
 
 	_armoryCard(it, isOwned) {
@@ -329,14 +357,33 @@ export default class MenuScreens {
 
 		const fig = document.createElement('div')
 		fig.className = 'armory-art'
-		const img = document.createElement('img')
-		img.src = armoryArt(it.slug)
-		img.alt = it.name
-		// Off-screen cards are most of this grid on first paint; nothing here is above the
-		// fold except the first row, and the art is ~190kB apiece.
-		img.loading = 'lazy'
-		img.decoding = 'async'
-		fig.appendChild(img)
+		// THE TURNTABLE. Each item was minted with both a still and a rotating render, and
+		// the render is the one worth looking at. The still becomes the POSTER so a card
+		// is never empty while its video loads.
+		//
+		// Twenty-four autoplaying videos would be ~6.8MB and two dozen decoders, so
+		// nothing is fetched until the card is actually on screen (preload="none" plus the
+		// observer below), and a card that scrolls away pauses again.
+		const vsrc = armoryVideo(it)
+		let media
+		if (vsrc) {
+			media = document.createElement('video')
+			media.poster = armoryArt(it)
+			media.muted = true          // required for autoplay everywhere
+			media.loop = true
+			media.playsInline = true    // iOS: do NOT hijack into a fullscreen player
+			media.preload = 'none'
+			media.setAttribute('aria-label', it.name)
+			media.dataset.src = vsrc
+			this._observeArmoryVideo(media)
+		} else {
+			media = document.createElement('img')
+			media.src = armoryArt(it)
+			media.alt = it.name
+			media.loading = 'lazy'
+			media.decoding = 'async'
+		}
+		fig.appendChild(media)
 		if (isOwned) {
 			const badge = document.createElement('span')
 			badge.className = 'armory-owned'

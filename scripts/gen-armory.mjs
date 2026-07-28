@@ -13,9 +13,13 @@ import path from 'path'
 import { NFT_ENTITLEMENTS } from '../common/entitlements.js'
 
 const MINTS = '/mnt/echostore/frag-nft/out/mint-results-mainnet.json'
+// Permanent-storage transaction ids for every uploaded file, written by the mint. This is
+// where the CANONICAL art lives — the same bytes the marketplaces render.
+const URIS = '/mnt/echostore/frag-nft/out/arweave-uris.json'
 const OUT = path.resolve('client/config/armory.js')
 
 const record = JSON.parse(fs.readFileSync(MINTS, 'utf8'))
+const media = JSON.parse(fs.readFileSync(URIS, 'utf8')).media || {}
 
 // Weapon roster order — weakest first, matching the in-game rack rather than the mint
 // record's arbitrary key order.
@@ -47,6 +51,12 @@ for (const [slug, copies] of Object.entries(record.assets)) {
 		// exists. NOT a listing — whether this exact copy is for sale is the
 		// marketplace's business, and the item page is correct either way.
 		mint: copies[0].asset,
+		// Permanent-storage id for this item's art. See armoryArt() for why this is the
+		// canonical source rather than our own host.
+		art: media[slug + '.png'] || null,
+		// The turntable render. Same upload, different file — used as the card's moving
+		// image, with the still above as its poster.
+		video: media[slug + '.mp4'] || null,
 	})
 }
 
@@ -99,8 +109,23 @@ export const MAGIC_EDEN_COLLECTION = 'https://magiceden.io/marketplace/degen_tou
 export const tensorItem = (mint) => (mint ? \`https://www.tensor.trade/item/\${mint}\` : TENSOR_COLLECTION)
 export const magicEdenItem = (mint) => (mint ? \`https://magiceden.io/item-details/\${mint}\` : MAGIC_EDEN_COLLECTION)
 
-/** Art for an item, served from this origin (same files the token metadata points at). */
-export const armoryArt = (slug) => \`/nft/degen-s1/\${slug}.png\`
+// ART COMES FROM PERMANENT STORAGE, NOT FROM US.
+//
+// This used to build /nft/degen-s1/<slug>.png against our own origin, and 15 of the 24
+// items were broken in production: only the original Gold set and the weapons had ever
+// been published there: every Silver, Ebony and Solana piece 404'd. The bytes have always
+// existed at their upload transaction — that is what the collection was minted against
+// and what the marketplaces render — so pointing at that source removes both the broken
+// images and the requirement to keep a second copy of the art in sync with the chain.
+//
+// gateway.irys.xyz 302-redirects to a CDN; browsers follow it transparently. NOTE: Irys
+// is NOT Arweave and arweave.net will NOT resolve these ids.
+const GATEWAY = 'https://gateway.irys.xyz/'
+export const armoryArt = (item) =>
+	item && item.art ? GATEWAY + item.art : \`/nft/degen-s1/\${item && item.slug}.png\`
+
+/** The turntable MP4 for an item, or null if it has none. */
+export const armoryVideo = (item) => (item && item.video ? GATEWAY + item.video : null)
 
 export const ARMORY_ITEMS = ${JSON.stringify(items, null, '\t')}
 `

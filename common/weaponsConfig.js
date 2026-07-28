@@ -351,7 +351,16 @@ export const weapons = [
     // entity.aimFactor. Scoped is pixel-perfect (spread mults 0); hip-fire is
     // DELIBERATELY gutted via spreadBase 0.20 so this cannot double as a corridor
     // shotgun — no-scoping is not a play, you swap to the spawn Pistol.
-    ...withAds(40, 0.24, 0.16, { spreadBaseMult: 0, spreadHeatMult: 0, heatMult: 1 }),
+    // `scope` is the ONLY change made here by the 2026-07-28 optic work. Every other
+    // number in this block is a chair ruling from the 2026-07-26 panel
+    // (scratch/sniper-scope/00-SUMMARY.md) and was left alone deliberately — see the
+    // note above ADS fov, which considered and REJECTED a tighter zoom for mobile.
+    //
+    // It drives the tube overlay (client/graphics/ScopeOverlay.js) and nothing else:
+    // PRESENTATION ONLY. The aim ray, the spread mults and the MoveCommand are byte
+    // identical whether or not this flag is set, so an optic can never desync the
+    // client from the server.
+    ...withAds(40, 0.24, 0.16, { spreadBaseMult: 0, spreadHeatMult: 0, heatMult: 1, scope: true }),
     adsMount: { position: { x: 0, y: -0.02, z: 0.05 }, rotation: { x: 0, y: Math.PI / 2, z: 0 } },
     muzzle: { x: 0.08, y: -0.13, z: 1.35 },
     recoilForce: 3.0,

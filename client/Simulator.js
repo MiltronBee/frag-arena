@@ -28,6 +28,7 @@ import FragLayer from './graphics/FragLayer'
 import MenuControls from './graphics/MenuControls'
 import ProgressReadout from './graphics/ProgressReadout'
 import MarketHud from './graphics/MarketHud'
+import ScopeOverlay from './graphics/ScopeOverlay'
 import IntrusionFeed from './graphics/IntrusionFeed'
 import MatchEndOverlay from './graphics/MatchEndOverlay'
 import { resolveWeaponFx } from './graphics/firingFx'
@@ -215,6 +216,8 @@ class Simulator {
 		this._intrusionFeed.start()
 		// Market readout: its own 3s poll, off the render loop entirely.
 		this._marketHud = new MarketHud(this)
+		// The optic. Driven per-frame off the ADS ramp in _applyRecoilFov.
+		this._scope = new ScopeOverlay()
 
 		// SPLASH audio-unlock race (Part A). The inline splash controller can't reach
 		// audio.resume()/music.unlock() (they live here in the bundle). Expose a hook it
@@ -442,6 +445,10 @@ class Simulator {
 
 		// victim-only: directional damage arc + scaled red screen wash
 		client.on('message::DamageTaken', message => {
+			// DESCOPE. Taking meaningful fire rips you off the glass — a sniper must not
+			// be able to hold a scoped duel while being shot. Reuses the EXISTING
+			// dodge-descope latch rather than inventing a second way to leave ADS.
+			if ((message.damage | 0) >= 15) this._adsSuppressUntilRelease = true
 			// COMBAT WINDOW: the market HUD dims while this is open (see MarketHud and
 			// the combat-suppression block in the stylesheet). Taking fire or landing a
 			// hit both count — either way attention belongs on the arena, not the chart.
@@ -656,6 +663,11 @@ class Simulator {
 		const rollDeg = camKick.roll != null ? camKick.roll : (camKick.yawJitter || 0) * 0.6
 		const rollSign = Math.random() < 0.5 ? -1 : 1
 		this._recoilVel.z += rollSign * rollDeg * scale * this._springImpulseGain()
+
+		// SCOPE KICK: through glass, recoil costs you the sight picture — the exit pupil
+		// collapses and the tube blacks out for a beat before you re-find the target.
+		// A no-op on every weapon without an optic (ScopeOverlay ignores it unaimed).
+		if (this._scope) this._scope.kick()
 
 		// shotgun-only FOV concussion punch (world camera; the vmCamera has its own
 		// fixed fov so the gun never distorts). Does NOT touch rotation → aim-safe.
@@ -2092,6 +2104,14 @@ class Simulator {
 			// exactly what was applied (0 when the death-cam owns the roll) — see FIX 4.
 			// transient shotgun FOV concussion punch (world camera only; aim-safe).
 			this._applyRecoilFov()
+			// SCOPE: same eased ramp the FOV uses, so the tube irises exactly in step with
+			// the zoom instead of lagging it. Only weapons flagged ads.scope get an optic.
+			if (this._scope) {
+				const sc = !!(wcfg.ads && wcfg.ads.scope)
+				const t = this._adsEase(this._adsT || 0)
+				this._scope.update(t, sc, forwards || backwards || left || right)
+				document.body.classList.toggle('scoped', sc && t > 0.5)
+			}
 		}
 
 		// spatial-audio listener sync: place the WebAudio listener at the camera and

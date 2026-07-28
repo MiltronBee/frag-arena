@@ -44,7 +44,7 @@
          Preload so the digits never flash fallback-sans on first paint. -->
     <link rel="preload" href="assets/fonts/DSEG7Classic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-4ce7238623">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-b867051b22">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -313,6 +313,28 @@
 
         <!-- Low-HP peripheral vignette (Agent A CSS / Agent C JS). Empty layer that
              JS toggles .active on when health is critical (<=30%). -->
+        <!-- ══ SNIPER SCOPE ══════════════════════════════════════════════════
+             The optic, built from two radial gradients and four divs — no texture,
+             no sprite, no new animation clip. Design + judging in
+             _work/sniper-roundrobin/; behaviour in client/graphics/ScopeOverlay.js.
+
+             It OCCLUDES rather than vignettes: outside the tube is solid void, not
+             dimmed. Surrendering your peripheral vision is what you pay for the
+             magnification, and a see-through surround would hand you the zoom free.
+
+             Always in the DOM, never created per shot — it is toggled by opacity
+             and a class, and the whole thing animates on transform/opacity only. -->
+        <div id="scope-viewport" aria-hidden="true">
+            <div class="scope-mask"></div>
+            <div class="scope-reticle">
+                <div class="ret-line ret-v-top"></div>
+                <div class="ret-line ret-v-bottom"></div>
+                <div class="ret-line ret-h-left"></div>
+                <div class="ret-line ret-h-right"></div>
+            </div>
+            <div class="scope-shadow" id="scope-shadow"></div>
+        </div>
+
         <div id="low-hp-vignette" aria-hidden="true"></div>
 
         <div id="damage-flash" aria-hidden="true"></div>
@@ -1684,7 +1706,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-4ce7238623";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-4ce7238623"></script>
+    <script>window.__BUILD_ID__="0.0.1-b867051b22";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-b867051b22"></script>
 </body>
 </html>
