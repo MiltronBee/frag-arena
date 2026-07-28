@@ -29,7 +29,10 @@ export default class BloodLedger {
 
 		// persistent state
 		this.height = 0
-		this.balances = {} // name -> total $BLOOD earned
+		// All three are keyed on the SETTLEMENT ID (see recordHash), not on a callsign.
+		this.balances = {}     // id -> total $BLOOD ever earned (append-only record)
+		this.displayNames = {} // id -> last callsign seen, for the scoreboard only
+		this.unsettled = {}    // id -> earned but not yet paid on chain (wallet ids only)
 		this.blocks = [] // last ~50 block summaries {height, reward, totalHash, winners}
 		this.windowStart = Date.now()
 
@@ -62,14 +65,19 @@ export default class BloodLedger {
 		const height = this.height
 		const reward = this.blockReward(height)
 		const holders = Object.entries(this.balances)
-			.map(([name, amount]) => ({ name, amount }))
+			.map(([id, amount]) => ({
+				name: this.displayNames[id] || id.replace(/^name:/, ''),
+				amount,
+				// The scoreboard says who EARNED; this says who could actually be paid.
+				settleable: BloodLedger.isSettleable(id),
+			}))
 			.sort((a, b) => b.amount - a.amount)
 		let mined = 0
 		for (const h of holders) mined += h.amount
 
 		// hash mined so far in the window nobody has been paid for yet
 		const window = Object.entries(this.window)
-			.map(([name, hash]) => ({ name, hash }))
+			.map(([id, e]) => ({ name: e.name, hash: e.hash, settleable: BloodLedger.isSettleable(id) }))
 			.sort((a, b) => b.hash - a.hash)
 		let windowHash = 0
 		for (const w of window) windowHash += w.hash
@@ -91,6 +99,11 @@ export default class BloodLedger {
 			nextHalvingHeight,
 			blocksToHalving: nextHalvingHeight - height,
 			blockMs: this.blockMs,
+			// What on-chain settlement would owe RIGHT NOW, and to how many wallets. Zero
+			// until players link wallets — everything mined by a bot or an unlinked name
+			// is unowned by construction and can never be paid out.
+			unsettledTotal: Object.values(this.unsettled).reduce((n, v) => n + v, 0),
+			unsettledWallets: Object.keys(this.unsettled).length,
 			// where we are inside the open block — what makes the screen feel live
 			windowMs: Math.max(0, now - this.windowStart),
 			windowRemainingMs: Math.max(0, this.windowStart + this.blockMs - now),
@@ -122,13 +135,37 @@ export default class BloodLedger {
 		return Math.floor(GENESIS_REWARD / Math.pow(2, halvings))
 	}
 
-	// Accumulate hashpower into the current window. `reason` is advisory
-	// (kill/assist/flag_cap/...) — kept for future audit logging.
-	recordHash(name, amount, reason) { // eslint-disable-line no-unused-vars
+	/**
+	 * Accumulate hashpower into the current window.
+	 *
+	 * IDENTITY IS THE WHOLE PROBLEM HERE, so it is worth stating plainly. `name` is a
+	 * DISPLAY CALLSIGN: it arrives from SetNameCommand, which any client can send with
+	 * any string, it is not unique, and bots have them too. Keying earnings on it is fine
+	 * for a scoreboard and catastrophic for a payout — set your callsign to GHOST and you
+	 * would inherit GHOST's balance.
+	 *
+	 * So entries are keyed on a SETTLEMENT ID instead: the linked wallet when there is
+	 * one, and `name:<callsign>` when there is not. Both accrue and both appear on the
+	 * scoreboard; only the wallet-keyed ones are ever settleable on chain. A bot, an
+	 * agent, and an unlinked human all earn into the second class by construction, which
+	 * is correct — nobody can prove they own those.
+	 *
+	 * `reason` is advisory (kill/capture/...), kept for audit logging.
+	 */
+	recordHash(name, amount, reason, wallet) { // eslint-disable-line no-unused-vars
 		if (!name || typeof name !== 'string') return
 		if (!Number.isFinite(amount) || amount <= 0) return
-		this.window[name] = (this.window[name] || 0) + amount
+		const id = wallet ? String(wallet) : 'name:' + name
+		const e = this.window[id] || (this.window[id] = { hash: 0, name, wallet: wallet || null })
+		e.hash += amount
+		// A player who links a wallet MID-BLOCK keeps the hash they already mined under
+		// their unlinked id — moving it would let someone mine anonymously and then claim
+		// it, which is the same hole from the other direction.
+		e.name = name
 	}
+
+	/** Is this ledger key something we could actually pay out to? */
+	static isSettleable(id) { return typeof id === 'string' && !id.startsWith('name:') }
 
 	// Called every server tick. Closes the block when the window has run its
 	// course. Multi-block gaps (long sleeps / downtime carried in via persisted
@@ -162,22 +199,32 @@ export default class BloodLedger {
 	_closeBlock() {
 		const height = this.height
 		const reward = this.blockReward(height)
-		const names = Object.keys(this.window)
+		const ids = Object.keys(this.window)
 		let totalHash = 0
-		for (const name of names) totalHash += this.window[name]
+		for (const id of ids) totalHash += this.window[id].hash
 
 		const winners = {}
 		let topName = null
 		let topHash = 0
 		if (totalHash > 0 && reward > 0) {
-			for (const name of names) {
-				const hash = this.window[name]
-				const share = Math.floor((reward * hash) / totalHash)
+			for (const id of ids) {
+				const entry = this.window[id]
+				const share = Math.floor((reward * entry.hash) / totalHash)
 				if (share > 0) {
-					winners[name] = share
-					this.balances[name] = (this.balances[name] || 0) + share
+					winners[id] = share
+					this.balances[id] = (this.balances[id] || 0) + share
+					// Remember the last callsign this id fought under, for the scoreboard.
+					// Balances are keyed on the settlement id; the name is decoration.
+					this.displayNames[id] = entry.name
+					// SETTLEMENT DEBT. What a wallet has earned and NOT yet been paid on
+					// chain. Tracked separately from the balance so that paying out is a
+					// decrement of this and never a rewrite of the earnings record —
+					// the ledger of what was earned must stay append-only.
+					if (BloodLedger.isSettleable(id)) {
+						this.unsettled[id] = (this.unsettled[id] || 0) + share
+					}
 				}
-				if (hash > topHash) { topHash = hash; topName = name }
+				if (entry.hash > topHash) { topHash = entry.hash; topName = entry.name }
 			}
 		}
 
@@ -206,6 +253,23 @@ export default class BloodLedger {
 			if (typeof state !== 'object' || state === null) throw new Error('not an object')
 			if (Number.isFinite(state.height) && state.height >= 0) this.height = Math.floor(state.height)
 			if (state.balances && typeof state.balances === 'object') this.balances = state.balances
+			if (state.displayNames && typeof state.displayNames === 'object') this.displayNames = state.displayNames
+			if (state.unsettled && typeof state.unsettled === 'object') this.unsettled = state.unsettled
+			// MIGRATION (schema 1 -> 2). Everything earned before this change was keyed on a
+			// spoofable callsign, so it is re-keyed as name:<callsign> — i.e. explicitly NOT
+			// settleable. That is the honest outcome: those balances were mined by bots and
+			// by unauthenticated names, and nobody can prove they own them. Deliberately no
+			// `unsettled` is created for them, so the migration can never mint anything.
+			if (!state.schema) {
+				const migrated = {}
+				for (const [k, v] of Object.entries(this.balances)) {
+					migrated[k.startsWith('name:') ? k : 'name:' + k] = v
+					this.displayNames[k.startsWith('name:') ? k : 'name:' + k] = k.replace(/^name:/, '')
+				}
+				this.balances = migrated
+				this.unsettled = {}
+				console.log(`[blood] migrated ${Object.keys(migrated).length} legacy balance(s) to non-settleable name keys`)
+			}
 			if (Array.isArray(state.blocks)) this.blocks = state.blocks.slice(-MAX_BLOCK_SUMMARIES)
 			if (Number.isFinite(state.windowStart) && state.windowStart > 0) this.windowStart = state.windowStart
 			console.log(`[blood] ledger loaded: height=${this.height} holders=${Object.keys(this.balances).length}`)
@@ -223,8 +287,11 @@ export default class BloodLedger {
 		const state = {
 			height: this.height,
 			balances: this.balances,
+			displayNames: this.displayNames,
+			unsettled: this.unsettled,
 			blocks: this.blocks,
 			windowStart: this.windowStart,
+			schema: 2,
 		}
 		const tmpPath = this.filePath + '.tmp'
 		try {

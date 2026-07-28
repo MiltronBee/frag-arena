@@ -2606,7 +2606,7 @@ class GameInstance {
 				// mines nothing). Objective hashes (CTF/DOM) wire in when those
 				// modes exist; only DM/TDM/FFA are live today, so kills-only is v0.
 				const killerName = this._bloodName(attackerClient)
-				if (killerName) this.bloodLedger.recordHash(killerName, 100, 'kill')
+				if (killerName) this.bloodLedger.recordHash(killerName, 100, 'kill', attackerClient && attackerClient._walletAddress)
 			}
 
 			// DYNAMIC DIFFICULTY (UT99 ChallengeBotInfo.AdjustSkill). Only kills where a
@@ -3147,7 +3147,7 @@ class GameInstance {
 		// PROOF OF BLOOD: a capture is worth more than a frag (100). Mirrors the kill
 		// convention (self-gating via _bloodName), for humans and bots alike.
 		const name = this._bloodName(handle)
-		if (name) this.bloodLedger.recordHash(name, 500, 'capture')
+		if (name) this.bloodLedger.recordHash(name, 500, 'capture', handle && handle._walletAddress)
 		this._afterScore()
 	}
 
