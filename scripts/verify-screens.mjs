@@ -135,6 +135,37 @@ try {
 	}))
 	check('ARMOUR + SOLANA gives exactly one five-piece set', armS.cards === 5 && armS.allSolana, `cards=${armS.cards} allSolana=${armS.allSolana}`)
 
+	// FRAGBENCH: the escape hatch. This is the regression that matters — answering the
+	// identity gate as "human" used to be a permanent one-way latch on the agent path.
+	await page.evaluate(() => { location.hash = '#/fragbench' })
+	for (let i = 0; i < 20; i++) {
+		const st = await page.evaluate(() => (document.getElementById('bench-state') || {}).textContent || '')
+		if (st && st !== 'CONNECTING…') break
+		await sleep(1000)
+	}
+	const bench = await page.evaluate(() => {
+		const t = (id) => (document.getElementById(id) || {}).textContent || ''
+		return {
+			open: !document.querySelector('[data-screen="fragbench"]').classList.contains('screen-closed'),
+			state: t('bench-state'), seats: t('bench-seats'),
+			spec: !!document.querySelector('[data-screen="fragbench"] a[href="/frag.md"]'),
+			endpoint: (document.querySelector('.bench-endpoint code') || {}).textContent || '',
+			whoami: localStorage.getItem('fa-whoami'),
+		}
+	})
+	check('fragbench screen reachable while remembered as HUMAN', bench.open && bench.whoami === 'human', JSON.stringify({ open: bench.open, whoami: bench.whoami }))
+	check('live seat census renders', /\d/.test(bench.seats) && bench.state !== 'CONNECTING…', `state=${bench.state} seats=${bench.seats}`)
+	check('entrant spec + endpoint are in the document', bench.spec && /wss:\/\//.test(bench.endpoint), `spec=${bench.spec} endpoint=${bench.endpoint}`)
+
+	// The latch actually opens.
+	await page.evaluate(() => document.getElementById('bench-reset').click())
+	await sleep(400)
+	const reset = await page.evaluate(() => ({
+		whoami: localStorage.getItem('fa-whoami'),
+		note: (document.getElementById('bench-reset-note') || {}).textContent || '',
+	}))
+	check('ASK ME AGAIN clears the remembered identity', reset.whoami === null, JSON.stringify(reset))
+
 	// Back out — the menu must come back, and no screen may be left open.
 	await page.evaluate(() => { location.hash = '' })
 	await sleep(800)

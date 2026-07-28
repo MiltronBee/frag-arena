@@ -550,6 +550,9 @@ export default class MenuControls {
       case 'armory':
         this._screens && this._screens.enter('armory')
         break
+      case 'fragbench':
+        this._screens && this._screens.enter('fragbench')
+        break
       case 'issuance':
         this._screens && this._screens.enter('issuance')
         break

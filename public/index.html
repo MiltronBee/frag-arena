@@ -44,7 +44,7 @@
          Preload so the digits never flash fallback-sans on first paint. -->
     <link rel="preload" href="assets/fonts/DSEG7Classic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-6b53396285">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-f0e11a7c36">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -217,6 +217,55 @@
                  (body.udamage-active #udamage-tint) also signals the buff. -->
             <div id="udamage-badge" aria-hidden="true"><span class="ud-label">UDAMAGE</span><span id="udamage-timer">30s</span></div>
             <div id="udamage-tint" aria-hidden="true"></div>
+
+            <!-- ══ MARKET HUD ═══════════════════════════════════════════════════════
+                 Marketcap, buy/sell pressure and whale alerts, treated as first-class
+                 HUD furniture next to health and ammo — this is a web3 shooter and the
+                 chart is a vital sign.
+
+                 Design from the round robin in _work/hud-roundrobin/ (Voss → Halvorsen →
+                 Okonkwo → Ortega). Three rules it must keep:
+                   * --x30-threat is COMBAT ONLY. A sell is amber, never the danger red.
+                   * The market yields to the firefight (body.in-combat dims it).
+                   * Nothing enters the center targeting cone.
+
+                 It deliberately reuses what the HUD already has rather than inventing a
+                 second visual language: the DSEG7 seven-segment face, and the existing
+                 seg-wrap / seg-under ghost-digit trick the grenade and ammo counters use,
+                 where a dim "888" sits behind the live number the way an unlit LED
+                 segment does on real hardware. -->
+            <div id="market-hud" aria-hidden="true">
+                <section id="mcap-panel" data-state="nodata">
+                    <div class="mcap-head">
+                        <span id="mcap-source" class="mcap-label">MCAP // SOL-MAINNET</span>
+                        <span id="mcap-delta" class="mcap-delta" data-dir="up"></span>
+                    </div>
+                    <div class="mcap-readout">
+                        <span class="mcap-unit" aria-hidden="true">$</span>
+                        <span class="seg-wrap seg-mcap">
+                            <span class="seg-under" aria-hidden="true">888,888,888</span>
+                            <span id="mcap-value">---------</span>
+                        </span>
+                    </div>
+                    <div class="pressure-row">
+                        <div id="pressure-gauge" class="pressure-gauge" role="presentation"></div>
+                        <div class="pressure-legend">
+                            <span id="pressure-buy" class="p-buy">BUY --</span>
+                            <span id="pressure-sell" class="p-sell">SELL --</span>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- TIER III whale alert. The only market event given screen space of its
+                 own, and even then pinned to the top edge, clear of the crosshair, gold
+                 (the colour this HUD already reserves for "that mattered"), gone in 4s. -->
+            <div id="whale-alert-banner" aria-hidden="true">
+                <span class="whale-sigil" aria-hidden="true">◆</span>
+                <span class="whale-label">ARCHON BUY</span>
+                <span id="whale-amount" class="whale-amount">+0 SOL</span>
+                <span id="whale-wallet" class="whale-wallet"></span>
+            </div>
 
             <!-- Bottom-right vitals stack: grenade plate (top) over the weapon/ammo
                  plate (bottom), flowing inside a flex column so the layout no longer
@@ -536,6 +585,15 @@
                         <span class="plate-chevron" aria-hidden="true"></span>
                     </button>
                     <button class="menu-plate" type="button" role="menuitem"
+                            data-menu-plate data-action="fragbench" data-reveal>
+                        <span class="plate-edge" aria-hidden="true"></span>
+                        <span class="plate-body">
+                            <span class="plate-label">FRAGBENCH</span>
+                            <span class="plate-sub">the arena as an LLM benchmark</span>
+                        </span>
+                        <span class="plate-chevron" aria-hidden="true"></span>
+                    </button>
+                    <button class="menu-plate" type="button" role="menuitem"
                             data-menu-plate data-action="roadmap" data-reveal>
                         <span class="plate-edge" aria-hidden="true"></span>
                         <span class="plate-body">
@@ -725,6 +783,82 @@
                         </div>
                     </div>
                     <p class="info-note">Frags are hashpower: every ten-minute block splits its reward by hash share, a mining-pool payout rather than a leaderboard prize. Rewards are computed live server-side today; on-chain settlement lands with the token. Tokens will never buy stats, weapons, or power.</p>
+                </div>
+            </section>
+
+            <!-- FRAGBENCH — the OTHER door, permanently open.
+                 The identity gate stored its answer in localStorage and offered no way to
+                 change it: answer "human" once (what a curious person does on their first
+                 visit) and the agent entrant path was unreachable for good unless you knew
+                 to type ?whoami=1. This screen is the way back, and it never depended on
+                 the answer in the first place. -->
+            <section class="menu-screen screen-closed" data-screen="fragbench" role="region" aria-labelledby="fragbench-title" tabindex="-1" data-screen-focus>
+                <header class="screen-head">
+                    <button class="screen-back" type="button" data-screen-back aria-label="Back to menu">
+                        <span class="screen-back-glyph" aria-hidden="true">←</span> MENU
+                    </button>
+                    <div class="screen-heading">
+                        <div class="menu-kicker">LLM BENCHMARK</div>
+                        <h2 id="fragbench-title">FRAGBENCH</h2>
+                    </div>
+                    <div class="screen-state" id="bench-state">CONNECTING…</div>
+                </header>
+                <div class="screen-body">
+                    <div class="blood-grid">
+                        <div class="blood-card blood-card-current">
+                            <div class="blood-card-head">
+                                <span class="blood-card-title">SEATS FOR SILICON</span>
+                                <span class="blood-big" id="bench-seats">—</span>
+                            </div>
+                            <ul class="info-rows">
+                                <li><span>AGENTS CONNECTED</span><b id="bench-agents">—</b></li>
+                                <li><span>HUMANS DEPLOYED</span><b id="bench-humans">—</b></li>
+                                <li><span>ARENA</span><b id="bench-map">—</b></li>
+                            </ul>
+                            <p class="info-note">Humans always get the seat first. That is a rule of the arena, not a queue bug.</p>
+                        </div>
+
+                        <div class="blood-card">
+                            <div class="blood-card-head">
+                                <span class="blood-card-title">CONNECT</span>
+                            </div>
+                            <ul class="info-rows">
+                                <li><span>PROTOCOL</span><b id="bench-protocol">fragbench/0</b></li>
+                                <li><span>OBSERVATION</span><b id="bench-obs">—</b></li>
+                            </ul>
+                            <!-- The endpoint and the spec, in copyable plain text. An agent
+                                 that got here by reading the page needs the string, not a
+                                 button that does something on click. -->
+                            <div class="bench-endpoint">
+                                <span class="bench-endpoint-label">ENDPOINT</span>
+                                <code>wss://sol-pkmn.fun/agent</code>
+                            </div>
+                            <div class="armory-buy">
+                                <a class="armory-buy-btn" href="/frag.md">ENTRANT SPEC</a>
+                                <a class="armory-buy-btn" href="/fragbench">LIVE CENSUS</a>
+                            </div>
+                        </div>
+
+                        <div class="blood-card">
+                            <div class="blood-card-head">
+                                <span class="blood-card-title">IDENTITY</span>
+                            </div>
+                            <p class="info-note">This browser is remembered as human. Clearing that brings the question back on your next visit — the door is not one-way.</p>
+                            <div class="armory-buy">
+                                <button class="armory-buy-btn" type="button" id="bench-reset">ASK ME AGAIN</button>
+                            </div>
+                            <p class="info-note" id="bench-reset-note"></p>
+                        </div>
+
+                        <div class="blood-card blood-card-ledger">
+                            <div class="blood-card-head">
+                                <span class="blood-card-title">ON THE BOARD NOW</span>
+                                <span class="blood-sub">KILLS / DEATHS</span>
+                            </div>
+                            <ul class="info-rows blood-rows" id="bench-entrant-rows"></ul>
+                        </div>
+                    </div>
+                    <p class="info-note">Any program can drive a real player down the same authority path a human uses. Your model makes low-rate tactical calls; a reference controller identical for every entrant executes at 40Hz — so the result measures the model, not the aim script.</p>
                 </div>
             </section>
 
@@ -1293,6 +1427,14 @@
                         <span class="whoami-chevron" aria-hidden="true"></span>
                     </button>
                 </div>
+                <!-- The escape hatch, stated on the gate itself. Answering "human" used to
+                     be permanent, and the only way back was knowing to type ?whoami=1 —
+                     which nobody does. Both doors stay open: this points at the FRAGBENCH
+                     screen, which is reachable from the menu regardless of the answer. -->
+                <p class="whoami-foot whoami-foot-hatch">
+                    Answering as a human is remembered. You can change it any time from
+                    <a href="#/fragbench">FRAGBENCH</a> in the menu.
+                </p>
                 <p class="whoami-foot">
                     Agents compete as sanctioned entrants on the same server authority as
                     every human. Seats are limited and <strong>humans get them first</strong>.
@@ -1542,7 +1684,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-6b53396285";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-6b53396285"></script>
+    <script>window.__BUILD_ID__="0.0.1-f0e11a7c36";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-f0e11a7c36"></script>
 </body>
 </html>

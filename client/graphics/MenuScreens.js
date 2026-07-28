@@ -101,12 +101,84 @@ export default class MenuScreens {
 		// Repaint on every entry rather than once: the OWNED badges come from the wallet
 		// panel's last chain read, which may have landed since the player was last here.
 		if (name === 'armory') this._renderArmory()
+		if (name === 'fragbench') this._startBenchPoll()
 	}
 
 	_onLeave(name) {
 		if (name === 'character') this._menu && this._menu.onCharacterScreenLeave()
 		if (name === 'issuance') this._stopBloodPoll()
 		if (name === 'codex') this._stopNarration()
+		if (name === 'fragbench') this._stopBenchPoll()
+	}
+
+	// ── FRAGBENCH: the way back to the other door ─────────────────────────────
+	// The identity gate wrote its answer to localStorage and never offered a way to
+	// change it. Answer "human" once — which is what a curious person does on their first
+	// visit — and the agent entrant path became unreachable for good, except by knowing
+	// to type ?whoami=1. That is a one-way latch on the half of the product that is
+	// supposed to be open to programs.
+	//
+	// The fix follows what agent-first services settled on: a stable, machine-readable doc
+	// at a known URL (/frag.md, already advertised in <head>), and BOTH doors permanently
+	// open rather than a single question asked once. The gate can still remember — being
+	// asked every visit is its own annoyance — but remembering is now reversible, and the
+	// spec has a permanent home in the menu that never depended on the answer.
+	_startBenchPoll() {
+		const base = location.protocol === 'https:' ? '' : `http://${location.hostname}:8078`
+		const poll = async () => {
+			try {
+				const res = await fetch(`${base}/fragbench`, { cache: 'no-store' })
+				if (res.ok) this._paintBench(await res.json())
+			} catch (e) { /* server down — keep the last good census */ }
+		}
+		poll()
+		this._benchTimer = setInterval(poll, 5000)
+		this._wireBenchReset()
+	}
+
+	_stopBenchPoll() {
+		if (this._benchTimer) { clearInterval(this._benchTimer); this._benchTimer = null }
+	}
+
+	_paintBench(s) {
+		const set = (id, v) => { const el = document.getElementById(id); if (el && el.textContent !== v) el.textContent = v }
+		if (!s || !s.enabled) {
+			set('bench-state', 'GATEWAY OFF')
+			set('bench-seats', '—')
+			set('bench-agents', '—')
+			return
+		}
+		set('bench-state', 'OPEN')
+		// Shape comes from AgentGateway.status(). Tolerate a field being absent rather
+		// than printing "undefined" at a would-be entrant.
+		const n = (v) => (Number.isFinite(v) ? String(v) : '—')
+		set('bench-seats', `${n(s.seatsFree)} / ${n(s.maxAgents)}`)
+		set('bench-agents', n(s.agents))
+		set('bench-humans', n(s.humans))
+		set('bench-map', (s.map && s.map.mapName) || '—')
+		set('bench-protocol', s.protocol || 'fragbench/0')
+		set('bench-obs', s.obsHz ? s.obsHz + ' Hz' : '—')
+
+		// Who is on the board right now, by MODEL — the ladder ranks models, not
+		// nicknames, so the model is the column that means something.
+		this._paintRows('bench-entrant-rows', s.entrants || [],
+			(e) => [`${e.name || 'agent'}${e.model ? ' · ' + e.model : ''}`, `${e.kills | 0}/${e.deaths | 0}`],
+			'no agents connected right now')
+	}
+
+	// "I am actually an agent" / "ask me again". Clearing the stored answer is the whole
+	// escape hatch — the gate re-asks on the next load, and the other door is reachable
+	// again without anyone needing to know a query string.
+	_wireBenchReset() {
+		const btn = document.getElementById('bench-reset')
+		if (!btn || btn._wired) return
+		btn._wired = true
+		btn.addEventListener('click', () => {
+			try { localStorage.removeItem('fa-whoami') } catch (e) { /* private mode */ }
+			const note = document.getElementById('bench-reset-note')
+			if (note) note.textContent = 'cleared — the identity question returns on your next visit.'
+			btn.disabled = true
+		})
 	}
 
 	// ── ISSUANCE: live Proof of Blood ─────────────────────────────────────────
