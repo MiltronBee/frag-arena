@@ -180,12 +180,18 @@ export default class MenuControls {
     // otherwise strand a live WebGL context behind a hidden panel.
     if (target.id !== 'loadout-modal') this._closeLoadout()
     target.classList.remove(this._closedClass(target))
+    // Stand the touch layer down. Without this the panel is visible and untappable
+    // on a phone — see the stacking-context note in the stylesheet.
+    document.body.classList.add('modal-open')
     if (this._sim && this._sim.audio) this._sim.audio.menuOpen()
   }
 
   closeModal(modal) {
     if (!modal) return
     modal.classList.add(this._closedClass(modal))
+    // Only hand the touch layer back once NOTHING is open — closing one panel while
+    // another is still up must not re-arm the joystick underneath it.
+    if (!this._anyModalOpen()) document.body.classList.remove('modal-open')
     // Release the preview's WebGL context and render loop. openModal also closes any
     // other modal to open a new one, so this is routed through here rather than through
     // the close button — otherwise switching straight from LOADOUT to SETTINGS would

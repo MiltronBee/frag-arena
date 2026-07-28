@@ -2483,8 +2483,20 @@ body.menu-open #game-shell::before {
     z-index: 30;
     transition: opacity 160ms ease;
 }
+/* WHY modal-open AND screen-open ARE HERE.
+   #game-shell is position:fixed, which creates a STACKING CONTEXT — so every z-index
+   inside it (the wallet modal's 50, the screens' 60) is scoped to that subtree, while
+   #touch-controls sits at z-index 30 in the ROOT context as a direct child of body.
+   30 therefore beats the entire shell, and the touch zones paint over a modal that is
+   perfectly visible. Mid-match that made the wallet panel untappable on a phone: you
+   could see the field and every tap landed on #touch-move-zone instead.
+   Raising #game-shell above 30 would fix the modal and bury the touch controls under
+   the HUD, so the layer stands down instead — the same thing menu-open already does
+   for the settings panel. */
 body:not(.arena-entered) #touch-controls,
 body.menu-open #touch-controls,
+body.modal-open #touch-controls,
+body.screen-open #touch-controls,
 body.player-dead #touch-controls {
     opacity: 0;
     pointer-events: none;
