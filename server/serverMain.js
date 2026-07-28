@@ -7,6 +7,7 @@ import { ROTATION, MODE_DISPLAY, mapDisplayName, effectiveMode } from '../common
 import { readRotationIndex, writeRotationIndex } from './rotation';
 import http from 'http';
 import { readOwned, isLikelyAddress, rateLimit } from './walletLink.js'
+import { startMarketFeed, marketStatus } from './marketFeed.js'
 
 // MAP SELECTION. Explicit MAP env overrides everything (dev/probes pin a map);
 // otherwise the persisted rotation index (.rotation-state.json, server/rotation.js)
@@ -90,6 +91,17 @@ http.createServer((req, res) => {
             : { enabled: false, symbol: 'BLOOD', message: 'the blood ledger is not running on this instance' }))
     }
 
+    // MARKET (/market, proxied by nginx to this same port). Feeds the HUD's marketcap
+    // readout, buy/sell pressure gauge and whale alerts.
+    //
+    // Served straight from memory — the feed polls on its own timers, so a 40Hz simulation
+    // tick never waits on DexScreener. `live:false` with a reason is a real answer: with no
+    // contract address configured the HUD draws its no-data state rather than a number
+    // nobody can stand behind.
+    if (req.url && req.url.split('?')[0].replace(/\/+$/, '') === '/market') {
+        return res.end(JSON.stringify(marketStatus()))
+    }
+
     // FRAGBENCH census (/fragbench, proxied by nginx to this same port). An entrant
     // reads this BEFORE opening a socket to see whether a seat exists — cheaper than
     // connecting to be refused, and it is the only public surface that says out loud
@@ -127,6 +139,10 @@ http.createServer((req, res) => {
         next: { mapId: nextEntry.mapId, mapName: nextEntry.mapName, modeName: nextEntry.modeName },
     }))
 }).listen(MAPINFO_PORT, () => console.log(`[map] /mapinfo on :${MAPINFO_PORT} -> ${gameInstance.map.id}`))
+
+// Off the game tick entirely: its own unref'd timers, so it neither delays a frame nor
+// holds the process open when the rotation exits.
+startMarketFeed()
 
 const hrtimeMs = function() {
     let time = process.hrtime()

@@ -27,6 +27,7 @@ import MusicManager from './graphics/MusicManager'
 import FragLayer from './graphics/FragLayer'
 import MenuControls from './graphics/MenuControls'
 import ProgressReadout from './graphics/ProgressReadout'
+import MarketHud from './graphics/MarketHud'
 import IntrusionFeed from './graphics/IntrusionFeed'
 import MatchEndOverlay from './graphics/MatchEndOverlay'
 import { resolveWeaponFx } from './graphics/firingFx'
@@ -212,6 +213,8 @@ class Simulator {
 		// randomized cadence timers (stopped on arena entry). aria-hidden theater only.
 		this._intrusionFeed = new IntrusionFeed(this)
 		this._intrusionFeed.start()
+		// Market readout: its own 3s poll, off the render loop entirely.
+		this._marketHud = new MarketHud(this)
 
 		// SPLASH audio-unlock race (Part A). The inline splash controller can't reach
 		// audio.resume()/music.unlock() (they live here in the bundle). Expose a hook it
@@ -402,6 +405,10 @@ class Simulator {
 
 		// attacker-only: upgrade the predicted hitmarker to the confirmed/kill marker
 		client.on('message::HitConfirmed', message => {
+			// COMBAT WINDOW: the market HUD dims while this is open (see MarketHud and
+			// the combat-suppression block in the stylesheet). Taking fire or landing a
+			// hit both count — either way attention belongs on the arena, not the chart.
+			this._combatUntil = Date.now() + 3500
 			this.fragLayer.onHitConfirmed(message)
 		})
 
@@ -435,6 +442,10 @@ class Simulator {
 
 		// victim-only: directional damage arc + scaled red screen wash
 		client.on('message::DamageTaken', message => {
+			// COMBAT WINDOW: the market HUD dims while this is open (see MarketHud and
+			// the combat-suppression block in the stylesheet). Taking fire or landing a
+			// hit both count — either way attention belongs on the arena, not the chart.
+			this._combatUntil = Date.now() + 3500
 			this.fragLayer.onDamageTaken(message)
 		})
 
@@ -2807,6 +2818,7 @@ class Simulator {
 		document.body.classList.add('arena-entered')
 		// kill the intrusion-feed timers — the overlay is going away, no perpetual work.
 		if (this._intrusionFeed) this._intrusionFeed.stop()
+		if (this._marketHud) this._marketHud.dispose()
 		this._closeSettings()
 
 		const overlay = document.getElementById('entry-overlay')
@@ -3052,6 +3064,9 @@ class Simulator {
 
 		const dead = this.myRawEntity.isAlive === false
 		document.body.classList.toggle('player-dead', dead)
+		// Market furniture yields to the firefight. Toggled here because this pass
+		// already runs once per HUD update, so it costs one classList call.
+		document.body.classList.toggle('in-combat', Date.now() < (this._combatUntil || 0))
 		const combatState = document.getElementById('combat-state')
 		if (combatState) combatState.classList.toggle('combat-state-hidden', !dead)
 		if (dead !== this._wasDead) {

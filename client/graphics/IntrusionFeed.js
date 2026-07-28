@@ -175,6 +175,14 @@ export default class IntrusionFeed {
     return { text: fill(pick.t), tone }
   }
 
+  // PUBLIC: write an externally-sourced line into the feed. The market HUD routes
+  // whale buys here rather than building a second terminal — this one is already in the
+  // right place, already the right typographic voice, and already trims itself.
+  push(text, tone) {
+    if (!text) return
+    this._emit({ text: String(text), tone: tone || "" })
+  }
+
   // write a line to the menu panel (scrolling) + the splash ticker (single line).
   _emit(line) {
     if (!line) return
