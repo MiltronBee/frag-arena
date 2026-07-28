@@ -1,0 +1,5 @@
+{
+  "_comment": "The live $BLOOD contract address. The swap page locks its BUY side to this mint and shows it on screen so buyers can check they are not on an impersonator. Leave as PENDING (or empty) until the token actually launches — the page detects that and says so plainly rather than pretending. To go live: paste the mint here and copy this one file to prod. No rebuild.",
+  "mint": "PENDING",
+  "symbol": "BLOOD"
+}

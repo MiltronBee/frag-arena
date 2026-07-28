@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>THE BLOODWORKS — Swap · Degen Tournament</title>
+  <meta name="description" content="Swap into $BLOOD on Solana. Best-price routing by Jupiter." />
+  <meta property="og:title" content="THE BLOODWORKS — Swap · Degen Tournament" />
+  <meta property="og:description" content="Swap into $BLOOD on Solana. Mined by killing." />
+  <link rel="icon" href="/assets/brand/favicon-32.png" />
+
+  <!-- Jupiter's official embed. It brings its own RPC, so no key is exposed in this
+       static page and nothing here can move money on its own — the swap is signed in
+       the user's wallet, by the plugin, exactly as on jup.ag. -->
+  <script src="https://plugin.jup.ag/plugin-v1.js" data-preload defer></script>
+
+  <style>
+    /* The X30 tokens the game uses, inlined — this page is standalone and must not
+       depend on the game bundle or on a webfont host. Same palette, same colour law:
+       accent green is the interactive colour, the ONLY red is threat. */
+    :root {
+      --void: #050708;
+      --surface-1: rgba(14, 17, 22, 0.84);
+      --surface-3: #161B22;
+      --ink: #F4F7F9;
+      --ink-mid: rgba(244, 247, 249, 0.62);
+      --ink-low: rgba(244, 247, 249, 0.38);
+      --hairline: rgba(244, 247, 249, 0.10);
+      --hairline-strong: rgba(244, 247, 249, 0.20);
+      --accent: #14F195;
+      --accent-dim: rgba(20, 241, 149, 0.55);
+      --violet-tint: rgba(153, 69, 255, 0.10);
+      --accent-tint: rgba(20, 241, 149, 0.09);
+      --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: var(--font-ui);
+      color: var(--ink);
+      background: var(--void);
+      background-image:
+        radial-gradient(120% 80% at 0% 0%, var(--violet-tint), transparent 60%),
+        radial-gradient(90% 70% at 100% 100%, var(--accent-tint), transparent 55%);
+      display: flex; flex-direction: column; align-items: center;
+      padding: 28px 16px 40px;
+    }
+    header { text-align: center; max-width: 560px; }
+    .mark { width: 64px; height: 64px; image-rendering: auto; }
+    .kicker {
+      margin-top: 10px; font-size: 10px; font-weight: 600;
+      letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-low);
+    }
+    h1 {
+      margin: 6px 0 4px; font-size: clamp(24px, 5vw, 36px); font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink);
+    }
+    .sub { margin: 0; font-size: 13px; color: var(--ink-mid); line-height: 1.6; }
+    .sub b { color: var(--accent); }
+
+    /* The contract, shown and copyable. An impersonator token is the single most
+       common way people get robbed around a launch, so the real one is on screen. */
+    #contract {
+      display: inline-flex; align-items: center; gap: 8px; margin-top: 14px;
+      padding: 7px 12px; background: var(--surface-3);
+      border: 1px solid var(--hairline-strong); border-radius: 8px;
+      font-size: 11px; letter-spacing: 0.08em; color: var(--ink-mid); cursor: pointer;
+    }
+    #contract:hover { border-color: var(--accent-dim); color: var(--accent); }
+    #contract.copied { border-color: var(--accent); color: var(--accent); }
+    #ca-text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); }
+
+    #jupiter-plugin {
+      width: min(460px, 100%); margin-top: 22px; min-height: 520px;
+      background: var(--surface-1); border: 1px solid var(--hairline); border-radius: 14px;
+      overflow: hidden;
+    }
+    .loading {
+      display: grid; place-items: center; height: 520px;
+      font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-low);
+    }
+    #note {
+      max-width: 460px; margin-top: 16px; font-size: 12px; line-height: 1.7;
+      color: var(--ink-mid); text-align: center;
+    }
+    .back {
+      margin-top: 22px; padding: 9px 16px; display: inline-block;
+      background: var(--surface-3); border: 1px solid var(--hairline-strong); border-radius: 8px;
+      color: var(--ink-mid); text-decoration: none;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+    }
+    .back:hover { color: var(--accent); border-color: var(--accent-dim); }
+  </style>
+</head>
+<body>
+  <header>
+    <img class="mark" src="/assets/brand/d-logo.png" alt="Degen Tournament" />
+    <div class="kicker">DEGEN TOURNAMENT</div>
+    <h1 id="headline">THE BLOODWORKS</h1>
+    <p class="sub" id="subline">Swap into <b>$BLOOD</b> on Solana · best price routed by Jupiter</p>
+    <div id="contract" hidden>
+      <span>CONTRACT</span><span id="ca-text"></span><span id="ca-copy">copy</span>
+    </div>
+  </header>
+
+  <div id="jupiter-plugin"><div class="loading">opening the exchange…</div></div>
+  <p id="note">$BLOOD is mined by fighting — every ten-minute block splits its reward among whoever did the killing. Swapping is the other way in.</p>
+  <a class="back" href="/">← Back to the arena</a>
+
+  <script>
+    const SOL_MINT = 'So11111111111111111111111111111111111111112';
+
+    // The mint lives in a SIBLING JSON rather than in this file, so pointing the page at
+    // the real token after launch is a one-line edit and a copy — no rebuild, and no
+    // chance of a stale mint baked into a cached bundle.
+    async function resolveMint() {
+      try {
+        const r = await fetch('./config.json', { cache: 'no-store' });
+        if (!r.ok) return null;
+        const j = await r.json();
+        const m = (j && j.mint || '').trim();
+        // Guard the placeholder explicitly: an empty string and the word "PENDING" must
+        // both resolve to "not launched", never to a swap against garbage.
+        return m && !/^pending$/i.test(m) ? m : null;
+      } catch (_) { return null; }
+    }
+
+    function showContract(ca) {
+      const el = document.getElementById('contract');
+      if (!el) return;
+      document.getElementById('ca-text').textContent = ca.slice(0, 4) + '…' + ca.slice(-4);
+      el.hidden = false;
+      el.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(ca); } catch (_) {}
+        const c = document.getElementById('ca-copy'), orig = c.textContent;
+        el.classList.add('copied'); c.textContent = 'copied ✓';
+        setTimeout(() => { el.classList.remove('copied'); c.textContent = orig; }, 1600);
+      });
+    }
+
+    // Our placeholder sits UNDER the plugin until it mounts; pull it once something real
+    // is there, or the form renders stacked on top of a spinner that never leaves.
+    function dropLoaderWhenReady(tries) {
+      const loader = document.querySelector('#jupiter-plugin .loading');
+      const mounted = document.querySelector('#jupiter-plugin iframe, #jupiter-plugin > div:not(.loading)');
+      if (mounted && loader) { loader.remove(); return; }
+      if ((tries || 0) < 80) setTimeout(() => dropLoaderWhenReady((tries || 0) + 1), 200);
+      else if (loader) loader.remove();
+    }
+
+    async function boot() {
+      const OUT = await resolveMint();
+      const formProps = { initialInputMint: SOL_MINT };
+      if (OUT) {
+        formProps.initialOutputMint = OUT;
+        formProps.fixedMint = OUT;   // lock the bought side to OUR token
+        showContract(OUT);
+      } else {
+        // PRE-LAUNCH IS STATED, NOT FAKED. The same rule the in-game market HUD follows:
+        // with no contract configured we never imply a token exists. The page stays
+        // useful as a general best-price swap and says plainly what it will become.
+        document.getElementById('subline').innerHTML = 'Best-price token swaps on Solana · <b>$BLOOD</b> not launched yet';
+        document.getElementById('note').textContent =
+          '$BLOOD has not launched. This is a live best-price swap in the meantime — the moment the token exists, this page locks to it and shows the official contract.';
+      }
+      (function initJup() {
+        if (!window.Jupiter || !window.Jupiter.init) { setTimeout(initJup, 120); return; }
+        window.Jupiter.init({
+          displayMode: 'integrated',
+          integratedTargetId: 'jupiter-plugin',
+          formProps,
+          branding: { name: 'The Bloodworks', logoUri: '/assets/brand/d-logo.png' },
+        });
+        dropLoaderWhenReady(0);
+      })();
+    }
+    window.addEventListener('load', boot);
+  </script>
+</body>
+</html>
