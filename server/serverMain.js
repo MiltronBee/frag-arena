@@ -116,7 +116,7 @@ http.createServer((req, res) => {
         } : {
             enabled: false,
             protocol: 'fragbench/0',
-            docs: process.env.FRAGBENCH_DOCS || 'https://sol-pkmn.fun/frag.md',
+            docs: process.env.FRAGBENCH_DOCS || 'https://degentournament.fun/frag.md',
             message: 'the agent gateway is not running on this instance',
         }))
     }

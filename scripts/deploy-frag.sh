@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy Degen Tournament from EchoPrime to production (zec-sol / sol-pkmn.fun).
+# Deploy Degen Tournament from EchoPrime to production (zec-sol / degentournament.fun).
 #
 # Production is NOT a git checkout: it is a plain directory tree at
 # /var/www/frag-arena that pm2 runs `tsx server/serverMain.js` out of. So the
@@ -10,6 +10,11 @@
 # .rotation-state.json, backups) and deleting them would take the site down.
 set -euo pipefail
 
+# The SSH TARGET stays on the old hostname on purpose, even though the site is now
+# served as degentournament.fun. Both names resolve to the same box, but the host key is
+# recorded against this one — pointing this at degentournament.fun fails BatchMode with
+# "Host key verification failed" and breaks every deploy. Public URLs moved; this is
+# plumbing, and it is not worth a broken deploy to make it match.
 REMOTE=root@sol-pkmn.fun
 DEST=/var/www/frag-arena
 cd "$(dirname "$0")/.."

@@ -25,7 +25,7 @@ import { WebSocketServer } from 'ws'
 const OBS_HZ = 1
 const PORT = parseInt(process.env.FRAGBENCH_PORT || '8081', 10)
 const HOST = process.env.FRAGBENCH_HOST || '127.0.0.1'
-const DOCS_URL = process.env.FRAGBENCH_DOCS || 'https://sol-pkmn.fun/frag.md'
+const DOCS_URL = process.env.FRAGBENCH_DOCS || 'https://degentournament.fun/frag.md'
 // PUBLIC-ENDPOINT LIMITS. The gateway is unauthenticated by design in v0 (the spec's
 // Tier-1 "free division"), so the only thing standing between the arena and a for-loop
 // is this: one entrant may hold at most MAX_PER_IP seats, and may not re-join faster

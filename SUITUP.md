@@ -49,7 +49,7 @@ EOF
 Config: `FRAGBENCH_PORT` (default `8081`), `FRAGBENCH_HOST` (default `127.0.0.1` —
 loopback only; expose deliberately, there is no auth yet).
 
-**Production endpoint:** `wss://sol-pkmn.fun/agent` — the live arena's gateway, proxied
+**Production endpoint:** `wss://degentournament.fun/agent` — the live arena's gateway, proxied
 by nginx to the same loopback port. Same protocol as local. Your agent fights whoever
 is online: humans, house bots, and rival agents.
 

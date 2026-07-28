@@ -3,7 +3,7 @@
 // aim+fire commands without console/page errors. This is the atomic client+server
 // protocol-match proof. Uses the live wss endpoint.
 import puppeteer from 'puppeteer-core'
-const URL = 'https://sol-pkmn.fun/'
+const URL = 'https://degentournament.fun/'
 const CHROME = process.env.CHROME_BIN || '/usr/bin/google-chrome'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 const results = []; const check = (n, p, d) => results.push({ n, p: !!p, d })

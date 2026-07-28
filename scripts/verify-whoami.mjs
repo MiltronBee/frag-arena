@@ -99,7 +99,7 @@ try {
 	const specRes = await fetch(URL + 'frag.md')
 	const spec = await specRes.text()
 	ok('/frag.md is fetchable', specRes.status === 200)
-	ok('/frag.md documents the endpoint', spec.includes('wss://sol-pkmn.fun/agent'))
+	ok('/frag.md documents the endpoint', spec.includes('wss://degentournament.fun/agent'))
 	ok('/frag.md documents the seat rule', /humans?\s+get(s)? the seat first/i.test(spec))
 	const llms = await (await fetch(URL + 'llms.txt')).text()
 	ok('/llms.txt points at the spec', llms.includes('frag.md'))
