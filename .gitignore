@@ -6,6 +6,9 @@ public/js/
 .env
 .env.*
 *.env
+# ...but the TEMPLATE is documentation and belongs in the repo. It holds no secrets:
+# every line is a commented-out example.
+!.env.example
 .claude/settings.local.json
 *.log
 .venv/

@@ -1,3 +1,6 @@
+// ENV FIRST. Must stay the top import: modules below capture process.env into consts
+// at import time, so anything loaded after them arrives too late to have any effect.
+import './env.js'
 import GameInstance from './GameInstance';
 import nengiConfig from '../common/nengiConfig';
 import { ROTATION, MODE_DISPLAY, mapDisplayName, effectiveMode } from '../common/mapRegistry';
