@@ -1,6 +1,7 @@
 import { CURRENCY } from '../config/currency'
 import EquipCommand from '../../common/command/EquipCommand'
-import { FINISHES, ownedFinishes } from '../../common/entitlements.js'
+import LinkWalletCommand from '../../common/command/LinkWalletCommand'
+import { FINISHES, ownedFinishes, NFT_ENTITLEMENTS } from '../../common/entitlements.js'
 
 // NFT on-chain name -> how the loadout panel labels it. Keyed by the SAME on-chain names
 // common/entitlements.js grants on, so the panel can never claim a weapon the server
@@ -272,13 +273,68 @@ export default class MenuControls {
         if (status) status.textContent = 'unlinked.'
         if (rows) rows.innerHTML = ''
         if (sub) sub.textContent = 'read-only · unlock what you own'
+        this._sendWalletLink('')
         return
       }
       try { localStorage.setItem('degen.wallet', addr) } catch {}
       this._walletLookup(addr)
+      // TELL THE GAME SERVER, not just the HTTP lookup. localStorage alone only reaches
+      // the server through the handshake, which already happened at page load — so
+      // before this existed, linking a wallet for the first time granted nothing until
+      // the player happened to reload. See common/command/LinkWalletCommand.js.
+      this._sendWalletLink(addr)
     }
     btn.addEventListener('click', go)
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go() } })
+  }
+
+  // The server finished its chain read and applied (or declined) a grant. This is the
+  // authoritative line — it reports what the GAME will actually hand you, which is a
+  // different question from what the chain says you hold, and the one that was quietly
+  // wrong before. Names the weapons rather than counting them: "SNIPER, SMG READY" tells
+  // a player what to press; "2 weapons" does not.
+  onWalletLinked(count, weaponMask) {
+    const status = document.getElementById('wallet-status')
+    if (!status) return
+    if (!count) { status.textContent = 'no Degen Tournament items in this wallet'; return }
+    const armed = WEAPON_NFT_LABELS
+      .filter(([name]) => {
+        const e = NFT_ENTITLEMENTS[name]
+        return e && (weaponMask & (1 << e.weaponIndex))
+      })
+      .map(([, label]) => label.toUpperCase())
+    status.textContent = armed.length
+      ? `${armed.join(', ')} READY · ${count} item${count === 1 ? '' : 's'} held`
+      : `${count} item${count === 1 ? '' : 's'} held · armour only, no weapon NFT`
+  }
+
+  // Push the linked address down the game socket. Separate from _walletLookup on purpose:
+  // that one asks the CHAIN what is held (and paints the list), this one tells the GAME
+  // to re-derive the grant. They used to be the same call, which is exactly how the panel
+  // ended up able to show you a wallet full of weapons you could not draw.
+  //
+  // The menu is reachable before the socket finishes connecting, so a send can arrive too
+  // early. Rather than drop it — which would put us straight back in the silent-failure
+  // hole this fixes — the address is held and re-sent until it lands.
+  _sendWalletLink(addr) {
+    this._pendingWalletLink = addr
+    if (this._walletLinkTimer) { clearInterval(this._walletLinkTimer); this._walletLinkTimer = null }
+    let tries = 0
+    const attempt = () => {
+      const s = this._sim
+      if (s && s.client && typeof s.client.addCommand === 'function') {
+        s.client.addCommand(new LinkWalletCommand(this._pendingWalletLink))
+        if (this._walletLinkTimer) { clearInterval(this._walletLinkTimer); this._walletLinkTimer = null }
+        return true
+      }
+      // ~10s of grace, then give up quietly: the address is in localStorage regardless,
+      // so the next page load carries it in the handshake and nothing is permanently lost.
+      if (++tries > 20 && this._walletLinkTimer) {
+        clearInterval(this._walletLinkTimer); this._walletLinkTimer = null
+      }
+      return false
+    }
+    if (!attempt()) this._walletLinkTimer = setInterval(attempt, 500)
   }
 
   _walletLookup(addr) {
@@ -295,8 +351,13 @@ export default class MenuControls {
         if (!ok) { if (status) status.textContent = j.error || 'read failed'; return }
         const n = j.count || 0
         if (status) {
+          // NOT "unlocks apply on next join" any more. That was written when the address
+          // only ever reached the server via the handshake, and it was a promise the game
+          // could not keep — there is no next join without a reload. The grant is now
+          // pushed live (see _sendWalletLink), and the server confirms what it actually
+          // applied via the WalletLinked message, which overwrites this line.
           status.textContent = n
-            ? `${n} item${n === 1 ? '' : 's'} held · unlocks apply on next join`
+            ? `${n} item${n === 1 ? '' : 's'} held · arming…`
             : 'no Degen Tournament items in this wallet'
         }
         if (sub) sub.textContent = n ? `${addr.slice(0, 4)}…${addr.slice(-4)} · ${n} held` : 'read-only · unlock what you own'

@@ -15,6 +15,8 @@ import PlayerName from '../common/message/PlayerName'
 import ChatMessage from '../common/message/ChatMessage'
 import { decodeChat, sanitizeScope, CHAT_SCOPE, CHAT_SOURCE } from '../common/chat'
 import { FINISHES, resolveFinish } from '../common/entitlements.js'
+import { decodeWallet } from '../common/walletAddress'
+import WalletLinked from '../common/message/WalletLinked'
 import ChatBridge from './chatBridge'
 
 // Chat flood limit: a leaky bucket that halves every CHAT_BURST_DECAY_MS. Allows a real
@@ -596,31 +598,7 @@ class GameInstance {
 			// must never delay or refuse a join. Worst case the player deploys with the
 			// spawn pistol, which is the correct fallback.
 			client._grantedWeapons = 0
-			const paste = data && typeof data.wallet === 'string' ? data.wallet.trim() : ''
-			if (paste && isLikelyAddress(paste)) {
-				readOwned(paste)
-					.then((r) => {
-						client._grantedWeapons = PlayerCharacter.maskFor(r.weapons)
-						client._walletAddress = paste
-						// keep the raw names: the equip check needs them, not just the mask
-						client._ownedNames = r.names || []
-						if (r.weapons.length) {
-							console.log(`[wallet] ${paste.slice(0, 8)}… holds ${r.count} — grants weapons [${r.weapons}]`)
-						}
-						// The mainnet read can take ~25s (getProgramAccounts over mpl-core
-						// on a public RPC), so the player is very often already deployed
-						// and fighting by the time this resolves. Apply it to their live
-						// body immediately rather than making them wait for a death.
-						this._applyEntitlement(client)
-						// NOTE: the armour finish is carried onto the body at deploy/respawn
-						// (see respawnPlayer, `entity.armorFinish = client._armorFinish`). It
-						// must NOT be set here — this runs at CONNECT (a menu spectator with no
-						// entity yet), where rawEntity/smoothEntity don't exist. The stray lines
-						// that used to be here threw a ReferenceError straight into the .catch
-						// below, so every SUCCESSFUL chain read logged "[wallet] read failed".
-					})
-					.catch((e) => console.log('[wallet] read failed:', e.message))
-			}
+			this._linkWallet(client, data && data.wallet)
 
 			// replay existing human players' names to the new joiner so their nametags
 			// resolve immediately once entities stream in after deploy (per-client
@@ -855,6 +833,17 @@ class GameInstance {
 			client._armorFinish = FINISHES.indexOf(ok)
 			if (client.rawEntity) client.rawEntity.armorFinish = client._armorFinish
 			if (client.smoothEntity) client.smoothEntity.armorFinish = client._armorFinish
+		})
+
+		this.instance.on('command::LinkWalletCommand', ({ command, client }) => {
+			// LINK MID-SESSION. The handshake path only ever fires at page load, which is
+			// before a first-time player has pasted anything — so without this, linking a
+			// wallet in the menu did nothing at all until the page was reloaded.
+			//
+			// Deliberately allowed for menu SPECTATORS as well as deployed players: linking
+			// is the thing you do BEFORE you hit PLAY, and _applyEntitlement is a no-op
+			// until a body exists (deployPlayer calls it again).
+			this._linkWallet(client, decodeWallet(command))
 		})
 
 		this.instance.on('command::ChatCommand', ({ command, client }) => {
@@ -1643,6 +1632,75 @@ class GameInstance {
 	// ADDS bits (pistol + entitlement), refills ammo for newly-granted slots, and leaves
 	// anything already owned — including a weapon looted off a corpse — untouched. A
 	// no-op for bots, spectators and unlinked players.
+	// WALLET LINK (read-only). `paste` is a HINT from the client — from the handshake at
+	// connect, or from a LinkWalletCommand when the player links mid-session. It is never a
+	// claim: the server does its own chain read and derives the grant itself, so a client
+	// that sends {wallet, weapons:[6]} gets the address used and the weapons list ignored.
+	//
+	// Async and non-blocking on BOTH paths. At connect the socket is already accepted and a
+	// slow or failed RPC must never delay or refuse a join; from the command there is
+	// nothing waiting on it either. Worst case the player deploys with the spawn pistol,
+	// which is the correct fallback.
+	_linkWallet(client, paste) {
+		if (!client || client.bot) return
+		const addr = typeof paste === 'string' ? paste.trim() : ''
+
+		// UNLINK. An empty address is meaningful, not a no-op: a player who clears the
+		// field is disowning the wallet, and keeping the grant would let them lend one
+		// wallet around a lobby and leave everyone armed. Weapons already on the body stay
+		// until they die — _applyEntitlement only ever adds — which is the same rule a
+		// dropped weapon follows, and avoids yanking a gun out of someone's hands mid-fight.
+		if (!addr) {
+			client._grantedWeapons = 0
+			client._walletAddress = ''
+			client._ownedNames = []
+			return
+		}
+		if (!isLikelyAddress(addr)) return
+
+		// Re-linking the SAME address is the common case (the menu re-sends on open), and
+		// the read costs ~25s on mainnet, so skip it. walletLink caches for 60s anyway;
+		// this also avoids clobbering a resolved grant with an in-flight duplicate.
+		if (client._walletAddress === addr) return
+		// Claim the address BEFORE the await so two rapid clicks cannot both fire a read.
+		// It is overwritten with the same value on success and rolled back on failure.
+		const prev = client._walletAddress
+		client._walletAddress = addr
+
+		readOwned(addr)
+			.then((r) => {
+				// The player may have unlinked or switched wallets during the ~25s read.
+				// Applying a stale result here would re-grant a wallet they just dropped.
+				if (client._walletAddress !== addr) return
+				client._grantedWeapons = PlayerCharacter.maskFor(r.weapons)
+				// keep the raw names: the equip check needs them, not just the mask
+				client._ownedNames = r.names || []
+				if (r.weapons.length) {
+					console.log(`[wallet] ${addr.slice(0, 8)}… holds ${r.count} — grants weapons [${r.weapons}]`)
+				}
+				// The mainnet read can take ~25s (getProgramAccounts over mpl-core on a
+				// public RPC), so the player is very often already deployed and fighting by
+				// the time this resolves. Apply it to their live body immediately rather
+				// than making them wait for a death.
+				this._applyEntitlement(client)
+				// Tell the client what actually landed, so the menu can stop saying
+				// "unlocks apply on next join" — a promise that used to be a lie.
+				this.instance.message(new WalletLinked(r.count, client._grantedWeapons), client)
+				// NOTE: the armour finish is carried onto the body at deploy/respawn (see
+				// respawnPlayer, `entity.armorFinish = client._armorFinish`). It must NOT be
+				// set here — on the connect path this runs for a menu spectator with no
+				// entity yet, where rawEntity/smoothEntity don't exist. The stray lines that
+				// used to be here threw a ReferenceError straight into the .catch below, so
+				// every SUCCESSFUL chain read logged "[wallet] read failed".
+			})
+			.catch((e) => {
+				// Release the claim so a retry is possible — a transient RPC failure must
+				// not permanently pin this client to an address that never resolved.
+				if (client._walletAddress === addr) client._walletAddress = prev
+				console.log('[wallet] read failed:', e.message)
+			})
+	}
+
 	_applyEntitlement(client) {
 		if (!client || client.bot) return
 		const granted = client._grantedWeapons || 0

@@ -311,6 +311,16 @@ class Simulator {
 			this.chat.addLine(this.getName(message.smoothNid), decodeChat(message), message.scope, message.source)
 		})
 
+		// WALLET LINKED: the server finished its chain read and is telling us what it
+		// actually granted. This is the only trustworthy confirmation the menu has — the
+		// panel's own /wallet lookup proves the CHAIN agrees, not that the GAME was ever
+		// told. Routed to MenuControls, which owns that surface.
+		// this._menuControls, NOT this.menu — the latter is undefined (see the note at the
+		// Escape handler below; same trap, already paid for once).
+		client.on('message::WalletLinked', message => {
+			if (this._menuControls) this._menuControls.onWalletLinked(message.count, message.weaponMask)
+		})
+
 		// ARENA FULL: we asked to deploy and the server put us in the line. position 0
 		// is the exit signal (we're being spawned now); anything else is a live wait.
 		client.on('message::QueueStatus', message => {

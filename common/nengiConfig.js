@@ -15,6 +15,7 @@ import SpectatorHeartbeatCommand from './command/SpectatorHeartbeatCommand'
 import SetNameCommand from './command/SetNameCommand'
 import ChatCommand from './command/ChatCommand'
 import EquipCommand from './command/EquipCommand'
+import LinkWalletCommand from './command/LinkWalletCommand'
 import FireCommand from './command/FireCommand'
 import SwitchWeaponCommand from './command/SwitchWeaponCommand'
 import DevUpdateWeaponConfigCommand from './command/DevUpdateWeaponConfigCommand'
@@ -29,6 +30,7 @@ import ControlPoint from './entity/ControlPoint'
 import Mover from './entity/Mover'
 import ObjectiveEvent from './message/ObjectiveEvent'
 import QueueStatus from './message/QueueStatus'
+import WalletLinked from './message/WalletLinked'
 
 // CLIENT INTERPOLATION DELAY (ms). How far in the past remote entities are drawn,
 // so a late/lost snapshot has buffer to be covered by.
@@ -90,7 +92,8 @@ const config = {
             ['PlayerName', PlayerName],
             ['ObjectiveEvent', ObjectiveEvent],
             ['QueueStatus', QueueStatus],
-            ['ChatMessage', ChatMessage]
+            ['ChatMessage', ChatMessage],
+            ['WalletLinked', WalletLinked]
         ],
         commands: [
             ['MoveCommand', MoveCommand],
@@ -101,7 +104,8 @@ const config = {
             ['DevUpdateWeaponConfigCommand', DevUpdateWeaponConfigCommand],
             ['SetNameCommand', SetNameCommand],
             ['ChatCommand', ChatCommand],
-            ['EquipCommand', EquipCommand]
+            ['EquipCommand', EquipCommand],
+            ['LinkWalletCommand', LinkWalletCommand]
         ],
         basics: []
     }
