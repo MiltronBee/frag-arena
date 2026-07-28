@@ -4477,3 +4477,367 @@ body.match-ended #tdm-banner { opacity: 0; transition: opacity 260ms ease; point
 .finish-none { font-family:var(--font-ui); font-size:12px; color:var(--x30-ink-mid); margin:2px 0 10px; }
 
 @media (prefers-reduced-motion: reduce) { .finish-btn { transition:none; } }
+
+
+/* ══ SCREENS ═══════════════════════════════════════════════════════════════════
+   Routed destinations (#/character, #/issuance, #/codex) that REPLACE the menu.
+
+   The distinction from .info-modal above is deliberate and visual, not just
+   structural: a modal is a lit panel on a dark scrim, floating and dismissible.
+   A screen is opaque, edge to edge, and has a back affordance instead of a ✕ —
+   it should feel like somewhere you went, not something that opened on top of
+   what you were doing. */
+#menu-screens { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+
+.menu-screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    pointer-events: auto;
+    background: var(--x30-void);
+    /* Faint brand wash from the top-left so a full-bleed dark surface still has a
+       light source, rather than reading as a void with text on it. */
+    background-image:
+        radial-gradient(120% 80% at 0% 0%, var(--x30-violet-tint), transparent 60%),
+        radial-gradient(90% 70% at 100% 100%, var(--x30-accent-tint), transparent 55%);
+    opacity: 1;
+    transition: opacity var(--x30-t-base) var(--x30-ease-out), transform var(--x30-t-base) var(--x30-ease-out);
+}
+.menu-screen.screen-closed {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    /* Slides down on exit — the menu is conceptually "above", so leaving a screen
+       drops it away rather than fading it in place. */
+    transform: translateY(12px);
+    transition-duration: var(--x30-t-exit);
+}
+.menu-screen:focus { outline: none; }
+
+/* While a screen is up the menu behind it must not be reachable by tab or by a
+   stray click landing in a gap. */
+body.screen-open #entry-overlay { pointer-events: none; }
+
+.screen-head {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex: 0 0 auto;
+    padding: 22px clamp(20px, 5vw, 56px) 18px;
+    border-bottom: 1px solid var(--x30-hairline);
+}
+.screen-heading h2 {
+    margin: 2px 0 0;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(22px, 3.4vw, 34px);
+    line-height: 1;
+    letter-spacing: var(--x30-track-display);
+    text-transform: uppercase;
+    color: var(--x30-ink-hi);
+}
+.screen-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    background: var(--x30-surface-3);
+    border: 1px solid var(--x30-hairline-strong);
+    border-radius: var(--x30-r-2);
+    color: var(--x30-ink-mid);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: var(--x30-track-label);
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color var(--x30-t-fast), border-color var(--x30-t-fast);
+}
+.screen-back:hover, .screen-back:focus-visible {
+    color: var(--x30-accent);
+    border-color: var(--x30-accent-dim);
+}
+.screen-back-glyph { font-size: 14px; line-height: 1; }
+.screen-state {
+    margin-left: auto;
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: var(--x30-track-label);
+    text-transform: uppercase;
+    color: var(--x30-accent);
+}
+.screen-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: clamp(18px, 3vw, 32px) clamp(20px, 5vw, 56px) 40px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--x30-surface-3) transparent;
+}
+
+/* ---- ISSUANCE ------------------------------------------------------------- */
+/* A DELIBERATE four-column layout, not auto-fit. auto-fit resolved to three columns
+   at desktop width, so the two `span 2` cards each left a third of the row empty and
+   the whole screen sat in its left two-thirds. The composition is fixed instead:
+
+     row 1  [ CURRENT BLOCK        ][ REWARD ][ MINED ]
+     row 2  [ LEDGER — full width                    ]
+
+   The ledger is full-bleed because a holder table is a wide object; cramping it into
+   half the row was what pushed it into a second column of dead space. */
+.blood-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    max-width: 1280px;
+}
+.blood-card-current { grid-column: span 2; }
+.blood-card-ledger { grid-column: 1 / -1; }
+@media (max-width: 1080px) {
+    .blood-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .blood-card-current { grid-column: span 2; }
+}
+@media (max-width: 640px) {
+    .blood-grid { grid-template-columns: minmax(0, 1fr); }
+    .blood-card-current { grid-column: span 1; }
+}
+
+.blood-card {
+    padding: 18px 18px 16px;
+    background: var(--x30-surface-1);
+    border: 1px solid var(--x30-hairline);
+    border-radius: var(--x30-r-3);
+}
+.blood-card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    /* The narrow cards cannot fit "BLOCK REWARD" and "5,000 BLOOD" on one line, and
+       letting the VALUE wrap split it as "5,000 / BLOOD". Wrapping the head instead
+       drops the whole value onto its own line, intact. */
+    flex-wrap: wrap;
+}
+.blood-card-title {
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: var(--x30-track-label);
+    text-transform: uppercase;
+    color: var(--x30-ink-mid);
+}
+.blood-big {
+    /* Tabular so a ticking height does not shuffle the layout every ten minutes. */
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(20px, 2.6vw, 28px);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.05;
+    white-space: nowrap;
+    color: var(--x30-ink);
+}
+.blood-sub {
+    font-family: var(--font-ui);
+    font-size: 10px;
+    letter-spacing: var(--x30-track-label);
+    text-transform: uppercase;
+    color: var(--x30-ink-mid);
+}
+.blood-sub b { color: var(--x30-ink-hi); }
+
+.blood-bar {
+    position: relative;
+    height: 6px;
+    margin: 14px 0 8px;
+    background: var(--x30-surface-3);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.blood-bar-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 3px;
+    background: var(--x30-grad-brand);
+    transition: width var(--x30-t-base) var(--x30-ease-out);
+}
+/* The open block reads as ally-cyan rather than brand-green: it is a clock, not a
+   quantity, and it should not look like more supply being mined. */
+.blood-bar-fill.blood-window { background: var(--x30-ally); box-shadow: var(--x30-emit-ally); }
+
+.blood-card-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-family: var(--font-ui);
+    font-variant-numeric: tabular-nums;
+    font-size: 10px;
+    letter-spacing: var(--x30-track-label);
+    text-transform: uppercase;
+    color: var(--x30-ink-mid);
+}
+.blood-card-foot b { color: var(--x30-ink-hi); }
+.blood-rows { max-height: 210px; overflow-y: auto; scrollbar-width: thin; }
+.blood-rows li b { font-variant-numeric: tabular-nums; }
+.rows-empty {
+    display: block;
+    padding: 12px 0;
+    border: 0;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--x30-ink-low);
+}
+
+/* ---- CODEX ---------------------------------------------------------------- */
+.codex-grid {
+    display: grid;
+    grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+    gap: clamp(16px, 3vw, 36px);
+    max-width: 1100px;
+    align-items: start;
+}
+@media (max-width: 720px) { .codex-grid { grid-template-columns: 1fr; } }
+
+.codex-list { display: flex; flex-direction: column; gap: 2px; }
+.codex-cat {
+    margin: 16px 0 6px;
+    font-family: var(--font-ui);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--x30-ink-low);
+}
+.codex-cat:first-child { margin-top: 0; }
+
+.codex-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    /* The active marker is a left edge rather than a fill: a list of filled rows
+       reads as a set of buttons, and this is a table of contents. */
+    border: 0;
+    border-left: 2px solid transparent;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    transition: background var(--x30-t-fast), border-color var(--x30-t-fast);
+}
+.codex-item:hover { background: var(--x30-surface-1); }
+.codex-item.is-active {
+    background: var(--x30-accent-tint);
+    border-left-color: var(--x30-accent);
+}
+.codex-item-title {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--x30-ink-mid);
+}
+.codex-item.is-active .codex-item-title { color: var(--x30-ink-hi); }
+.codex-item-kicker {
+    font-family: var(--font-ui);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--x30-ink-low);
+}
+
+.codex-reader {
+    padding: clamp(18px, 2.4vw, 28px);
+    background: var(--x30-surface-1);
+    border: 1px solid var(--x30-hairline);
+    border-radius: var(--x30-r-3);
+    /* Hold a constant height across entries. Without it the panel shrink-wraps its
+       prose, so a two-paragraph entry leaves most of the screen empty and switching
+       entries resizes the card under the cursor. */
+    min-height: min(62vh, 560px);
+    display: flex;
+    flex-direction: column;
+}
+.codex-reader-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--x30-hairline);
+}
+.codex-reader-head h3 {
+    margin: 4px 0 0;
+    font-family: var(--font-display);
+    font-size: clamp(18px, 2.4vw, 24px);
+    font-weight: 600;
+    letter-spacing: var(--x30-track-display);
+    text-transform: uppercase;
+    color: var(--x30-ink-hi);
+}
+.codex-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    margin-top: 14px;
+    padding-right: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--x30-surface-3) transparent;
+}
+.codex-body p {
+    margin: 14px 0 0;
+    /* Longer measure and looser leading than the modals used: this is the one
+       surface in the product meant to be READ rather than scanned. */
+    max-width: 68ch;
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 1.72;
+    color: var(--x30-ink-mid);
+}
+.codex-body p:first-child { margin-top: 0; color: var(--x30-ink-hi); }
+
+.codex-narrate {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    flex: 0 0 auto;
+    padding: 9px 15px;
+    background: var(--x30-surface-3);
+    border: 1px solid var(--x30-hairline-strong);
+    border-radius: var(--x30-r-2);
+    color: var(--x30-ink-mid);
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: var(--x30-track-label);
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color var(--x30-t-fast), border-color var(--x30-t-fast);
+}
+.codex-narrate:hover, .codex-narrate:focus-visible {
+    color: var(--x30-accent);
+    border-color: var(--x30-accent-dim);
+}
+/* Triangle at rest, twin bars while speaking — the control states what it will do
+   next, so one button covers play and stop without a label change. */
+.codex-narrate-glyph {
+    width: 0; height: 0;
+    border-left: 8px solid currentColor;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+}
+.codex-narrate.is-playing { color: var(--x30-accent); border-color: var(--x30-accent-dim); }
+.codex-narrate.is-playing .codex-narrate-glyph {
+    width: 8px; height: 10px;
+    border: 0;
+    background: linear-gradient(to right, currentColor 0 3px, transparent 3px 5px, currentColor 5px 8px);
+}
+.codex-narrate.is-playing .codex-narrate-label::after {
+    content: 'ING…';
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .menu-screen, .blood-bar-fill { transition: none; }
+}

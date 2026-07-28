@@ -1,6 +1,7 @@
 import { CURRENCY } from '../config/currency'
 import EquipCommand from '../../common/command/EquipCommand'
 import LinkWalletCommand from '../../common/command/LinkWalletCommand'
+import MenuScreens from './MenuScreens'
 import { FINISHES, ownedFinishes, NFT_ENTITLEMENTS } from '../../common/entitlements.js'
 
 // NFT on-chain name -> how the loadout panel labels it. Keyed by the SAME on-chain names
@@ -40,6 +41,10 @@ export default class MenuControls {
     this._wireModals()
     this._wirePlates()
     this._wireNowPlaying()
+    // Screens come last: MenuScreens reads the hash on construction and may open a screen
+    // straight away (a shared #/codex/proof-of-blood link), which needs the plates and
+    // modals already wired so the surface it reveals is a finished one.
+    this._screens = new MenuScreens(simulator, this)
   }
 
   // NOW PLAYING readout under the PLAY plate: poll /mapinfo (~10s) while the menu
@@ -129,12 +134,15 @@ export default class MenuControls {
   // (data-modal-close), click-outside, or ESC. Content differs desktop/touch via CSS
   // body classes already present; this only flips visibility.
   _wireModals() {
-    // wallet-modal + loadout-modal are in this list so they get the SAME close wiring
-    // (✕ / click-outside / ESC) as the info modals — without them the wallet panel opens
-    // but cannot be dismissed, which made linking feel broken from the main menu too.
-    // openModal/closeModal already special-case loadout's WebGL teardown.
+    // wallet-modal is in this list so it gets the SAME close wiring (✕ / click-outside /
+    // ESC) as the info modals — without it the wallet panel opens but cannot be dismissed,
+    // which made linking feel broken from the main menu too.
+    //
+    // LOADOUT, ISSUANCE and WHITEPAPER are no longer here: they are screens now, and
+    // MenuScreens owns their open/close. What remains are the genuine interruptions —
+    // things you return FROM, rather than places you go.
     this._modals = Array.from(document.querySelectorAll(
-      '#howto-modal, #issuance-modal, #whitepaper-modal, #roadmap-modal, #wallet-modal, #loadout-modal'
+      '#howto-modal, #roadmap-modal, #wallet-modal'
     ))
     const openBtn = document.getElementById('how-to-play')
     if (openBtn) openBtn.addEventListener('click', () => this.openModal('howto-modal'))
@@ -408,6 +416,13 @@ export default class MenuControls {
     if (this._loadout) { this._loadout.dispose(); this._loadout = null }
   }
 
+  // The CHARACTER screen's lifecycle hooks, called by MenuScreens on enter/leave. Same
+  // work _openLoadout/_closeLoadout did for the modal — the WebGL context and its render
+  // loop are built on arrival and released on departure, because a second Babylon engine
+  // idling behind a hidden surface is a real cost on the machines this has to run on.
+  onCharacterScreenEnter() { this._openLoadout() }
+  onCharacterScreenLeave() { this._closeLoadout() }
+
   // Paint the weapon rack and the Cloth list. Every gated weapon is listed whether or
   // not it is owned — a LOCKED row is the entire point, because it tells an unlinked
   // player what exists and what linking would give them.
@@ -526,15 +541,17 @@ export default class MenuControls {
         this.openModal('wallet-modal')
         this._initWalletLink()
         break
+      // These three are SCREENS, not modals — routed destinations that replace the menu
+      // (see MenuScreens). Everything used to be a panel floating over the same surface,
+      // which is what made the product read as one big menu.
       case 'loadout':
-        this.openModal('loadout-modal')
-        this._openLoadout()
+        this._screens && this._screens.enter('character')
         break
       case 'issuance':
-        this.openModal('issuance-modal')
+        this._screens && this._screens.enter('issuance')
         break
       case 'whitepaper':
-        this.openModal('whitepaper-modal')
+        this._screens && this._screens.enter('codex')
         break
       case 'roadmap':
         this.openModal('roadmap-modal')

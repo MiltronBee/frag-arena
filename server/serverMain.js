@@ -73,6 +73,20 @@ http.createServer((req, res) => {
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'no-store',
     })
+    // PROOF OF BLOOD state (/blood, proxied by nginx to this same port). Drives the
+    // ISSUANCE screen: block height, the current reward after halvings, what has actually
+    // been mined, the open window, and the top holders.
+    //
+    // Read-only and derived — see BloodLedger.status(). Reports enabled:false rather than
+    // 404ing when the ledger is off, matching /fragbench: "not running" is an answer the
+    // screen can render, a 404 is one it has to guess at.
+    if (req.url && req.url.split('?')[0].replace(/\/+$/, '') === '/blood') {
+        const ledger = gameInstance.bloodLedger
+        return res.end(JSON.stringify(ledger
+            ? { enabled: true, symbol: 'BLOOD', ...ledger.status() }
+            : { enabled: false, symbol: 'BLOOD', message: 'the blood ledger is not running on this instance' }))
+    }
+
     // FRAGBENCH census (/fragbench, proxied by nginx to this same port). An entrant
     // reads this BEFORE opening a socket to see whether a seat exists — cheaper than
     // connecting to be refused, and it is the only public surface that says out loud

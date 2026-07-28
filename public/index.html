@@ -44,7 +44,7 @@
          Preload so the digits never flash fallback-sans on first paint. -->
     <link rel="preload" href="assets/fonts/DSEG7Classic-Bold.woff2" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-5acb774b31">
+    <link rel="stylesheet" href="css/styles-v0.0.1.css?v=0.0.1-5a0a89d179">
 </head>
 <body class="connection-connecting">
     <!-- MENU MUSIC lives inline (parsed before the bundle) so the FIRST splash-gate
@@ -600,30 +600,159 @@
              SEE: without this panel a returning player just finds their rifle missing.
              The figure is a live CharacterModel wearing only the armour the linked
              wallet holds, so an empty shoulder is literally an unowned pauldron. -->
-        <section id="loadout-modal" class="info-modal info-closed" role="dialog" aria-modal="true" aria-labelledby="loadout-title">
-            <div class="howto-panel loadout-panel">
-                <div class="card-strip" aria-hidden="true"></div>
-                <button class="panel-close" type="button" aria-label="Close" data-modal-close>✕</button>
-                <div class="menu-kicker">DEPLOYMENT</div>
-                <h2 id="loadout-title">LOADOUT</h2>
-                <div class="loadout-grid">
-                    <div class="loadout-figure">
-                        <canvas id="loadout-canvas" aria-label="Your character with the armour you own"></canvas>
-                        <div class="loadout-hint" id="loadout-hint">drag to turn</div>
+        <!-- ══ SCREENS ══════════════════════════════════════════════════════════════
+             Routed destinations that REPLACE the menu, rather than panels floating over
+             it. Each is `#/<name>`, so it is linkable and the browser's back button
+             works — which on mobile is the back affordance people actually use.
+             Lifecycle (build the WebGL preview, start/stop the /blood poll, stop the
+             narrator) is owned by client/graphics/MenuScreens.js. -->
+        <div id="menu-screens">
+
+            <!-- CHARACTER — was #loadout-modal. The figure is a live CharacterModel
+                 wearing only the armour the linked wallet holds, so an empty shoulder is
+                 literally an unowned pauldron. Without this a returning player just finds
+                 their rifle missing and has nowhere to go to find out why. -->
+            <section class="menu-screen screen-closed" data-screen="character" role="region" aria-labelledby="character-title" tabindex="-1" data-screen-focus>
+                <header class="screen-head">
+                    <button class="screen-back" type="button" data-screen-back aria-label="Back to menu">
+                        <span class="screen-back-glyph" aria-hidden="true">←</span> MENU
+                    </button>
+                    <div class="screen-heading">
+                        <div class="menu-kicker">DEPLOYMENT</div>
+                        <h2 id="character-title">CHARACTER</h2>
                     </div>
-                    <div class="loadout-lists">
-                        <h3 class="loadout-h3">WEAPONS</h3>
-                        <ul class="info-rows loadout-rows" id="loadout-weapons"></ul>
-                        <h3 class="loadout-h3">CLOTH — EQUIPPED SET</h3>
-                        <!-- A set is ONE finish. There is no per-slot picker on purpose:
-                             mixing finishes is not something the protocol can express. -->
-                        <div class="finish-picker" id="finish-picker" role="group" aria-label="Armour finish"></div>
-                        <ul class="info-rows loadout-rows" id="loadout-armor"></ul>
+                </header>
+                <div class="screen-body">
+                    <div class="loadout-grid">
+                        <div class="loadout-figure">
+                            <canvas id="loadout-canvas" aria-label="Your character with the armour you own"></canvas>
+                            <div class="loadout-hint" id="loadout-hint">drag to turn</div>
+                        </div>
+                        <div class="loadout-lists">
+                            <h3 class="loadout-h3">WEAPONS</h3>
+                            <ul class="info-rows loadout-rows" id="loadout-weapons"></ul>
+                            <h3 class="loadout-h3">CLOTH — EQUIPPED SET</h3>
+                            <!-- A set is ONE finish. There is no per-slot picker on purpose:
+                                 mixing finishes is not something the protocol can express. -->
+                            <div class="finish-picker" id="finish-picker" role="group" aria-label="Armour finish"></div>
+                            <ul class="info-rows loadout-rows" id="loadout-armor"></ul>
+                        </div>
+                    </div>
+                    <p class="info-note" id="loadout-note">Everyone spawns with the Pistol. Nothing else spawns on the arena floor — you carry what you own, and it drops where you die for whoever kills you.</p>
+                </div>
+            </section>
+
+            <!-- ISSUANCE — was #issuance-modal, which listed the schedule as static text.
+                 It now reads the LIVE ledger (/blood -> BloodLedger.status), so the block
+                 height, the open window and the holder table are the real thing rather
+                 than a restatement of the whitepaper. -->
+            <section class="menu-screen screen-closed" data-screen="issuance" role="region" aria-labelledby="issuance-title" tabindex="-1" data-screen-focus>
+                <header class="screen-head">
+                    <button class="screen-back" type="button" data-screen-back aria-label="Back to menu">
+                        <span class="screen-back-glyph" aria-hidden="true">←</span> MENU
+                    </button>
+                    <div class="screen-heading">
+                        <div class="menu-kicker">PROOF OF BLOOD</div>
+                        <h2 id="issuance-title">ISSUANCE</h2>
+                    </div>
+                    <div class="screen-state" id="blood-state">CONNECTING…</div>
+                </header>
+                <div class="screen-body">
+                    <div class="blood-grid">
+
+                        <!-- the open block: the one number on this screen that moves while
+                             you watch it, which is what makes issuance feel like mining -->
+                        <div class="blood-card blood-card-current">
+                            <div class="blood-card-head">
+                                <span class="blood-card-title">CURRENT BLOCK</span>
+                                <span class="blood-big" id="blood-height">—</span>
+                            </div>
+                            <div class="blood-bar" role="presentation">
+                                <div class="blood-bar-fill blood-window" id="blood-window-fill"></div>
+                            </div>
+                            <div class="blood-card-foot">
+                                <span id="blood-window-left">--:--</span>
+                                <span id="blood-window-hash">0 HASH</span>
+                            </div>
+                            <ul class="info-rows blood-rows" id="blood-window-rows"></ul>
+                        </div>
+
+                        <div class="blood-card">
+                            <div class="blood-card-head">
+                                <span class="blood-card-title">BLOCK REWARD</span>
+                                <span class="blood-big" id="blood-reward">—</span>
+                            </div>
+                            <ul class="info-rows">
+                                <li><span>HALVES IN</span><b id="blood-halving">—</b></li>
+                                <li><span>BLOCK TIME</span><b>10 MIN</b></li>
+                                <li><span>HASH</span><b>KILL 100 · CAPTURE 500</b></li>
+                            </ul>
+                        </div>
+
+                        <div class="blood-card">
+                            <div class="blood-card-head">
+                                <span class="blood-card-title">MINED SUPPLY</span>
+                                <span class="blood-big" id="blood-mined">—</span>
+                            </div>
+                            <div class="blood-bar" role="presentation">
+                                <div class="blood-bar-fill" id="blood-bar-fill"></div>
+                            </div>
+                            <div class="blood-card-foot">
+                                <span id="blood-pct">—</span>
+                                <span>OF <b id="blood-cap">—</b></span>
+                            </div>
+                            <ul class="info-rows">
+                                <li><span>HALVINGS SO FAR</span><b id="blood-halvings">—</b></li>
+                                <li><span>SETTLEMENT</span><b>OFF-CHAIN (V0)</b></li>
+                            </ul>
+                        </div>
+
+                        <div class="blood-card blood-card-ledger">
+                            <div class="blood-card-head">
+                                <span class="blood-card-title">LEDGER</span>
+                                <span class="blood-sub"><b id="blood-holders">0</b> HOLDERS</span>
+                            </div>
+                            <ul class="info-rows blood-rows" id="blood-holder-rows"></ul>
+                        </div>
+                    </div>
+                    <p class="info-note">Frags are hashpower: every ten-minute block splits its reward by hash share, a mining-pool payout rather than a leaderboard prize. Rewards are computed live server-side today; on-chain settlement lands with the token. Tokens will never buy stats, weapons, or power.</p>
+                </div>
+            </section>
+
+            <!-- CODEX — was #whitepaper-modal, five hardcoded prose blocks. Now an entry
+                 list and a reader, with a narrator that reads the selected entry aloud.
+                 Content lives in client/config/codex.js because narration needs the prose
+                 as strings, not as markup. -->
+            <section class="menu-screen screen-closed" data-screen="codex" role="region" aria-labelledby="codex-screen-title" tabindex="-1" data-screen-focus>
+                <header class="screen-head">
+                    <button class="screen-back" type="button" data-screen-back aria-label="Back to menu">
+                        <span class="screen-back-glyph" aria-hidden="true">←</span> MENU
+                    </button>
+                    <div class="screen-heading">
+                        <div class="menu-kicker">DOCUMENT</div>
+                        <h2 id="codex-screen-title">CODEX</h2>
+                    </div>
+                </header>
+                <div class="screen-body">
+                    <div class="codex-grid">
+                        <nav class="codex-list" id="codex-list" aria-label="Codex entries"></nav>
+                        <article class="codex-reader">
+                            <div class="codex-reader-head">
+                                <div>
+                                    <div class="menu-kicker" id="codex-kicker"></div>
+                                    <h3 id="codex-title"></h3>
+                                </div>
+                                <button id="codex-narrate" class="codex-narrate" type="button" aria-label="Read this entry aloud">
+                                    <span class="codex-narrate-glyph" aria-hidden="true"></span>
+                                    <span class="codex-narrate-label">LISTEN</span>
+                                </button>
+                            </div>
+                            <div class="codex-body" id="codex-body"></div>
+                        </article>
                     </div>
                 </div>
-                <p class="info-note" id="loadout-note">Everyone spawns with the Pistol. Nothing else spawns on the arena floor — you carry what you own, and it drops where you die for whoever kills you.</p>
-            </div>
-        </section>
+            </section>
+        </div>
 
                 <!-- Wallet linking is reachable mid-match too: a player who joins, sees a pistol
              and wonders why should not have to disconnect to link. ESC -> LINK WALLET. -->
@@ -641,62 +770,10 @@
                 </div>
                 <div id="wallet-status" class="info-note" aria-live="polite"></div>
                 <ul class="info-rows" id="wallet-holdings"></ul>
-                <p class="info-note">Unlocks apply on your next join. Everyone spawns with the Pistol — there are no free pickups for anything else.</p>
+                <p class="info-note">Unlocks apply the moment the chain read lands — no reload, and you can link mid-match. Everyone spawns with the Pistol; there are no free pickups for anything else.</p>
             </div>
         </section>
 
-        <!-- ISSUANCE (token & supply) — reuses the ghost-modal chrome. -->
-        <section id="issuance-modal" class="info-modal info-closed" role="dialog" aria-modal="true" aria-labelledby="issuance-title">
-            <div class="howto-panel">
-                <div class="card-strip" aria-hidden="true"></div>
-                <button class="panel-close" type="button" aria-label="Close" data-modal-close>✕</button>
-                <div class="menu-kicker">TOKEN</div>
-                <h2 id="issuance-title">ISSUANCE</h2>
-                <div class="token-plate">
-                    <span class="token-tick" aria-hidden="true"></span>
-                    <span class="token-sym" id="issuance-symbol">TBD</span>
-                    <span class="token-note">arena token</span>
-                </div>
-                <ul class="info-rows">
-                    <li><span>MINED SUPPLY</span><b>~21.6M · PROOF OF BLOOD</b></li>
-                    <li><span>BLOCKS</span><b>10 MIN · 5,000 REWARD</b></li>
-                    <li><span>HALVING</span><b>EVERY 2,160 BLOCKS (~15 DAYS)</b></li>
-                    <li><span>LAUNCH</span><b>PUMP.FUN BONDING CURVE</b></li>
-                    <li><span>UTILITY</span><b>COSMETICS + STAKES · NEVER POWER</b></li>
-                </ul>
-                <p class="info-note">Frags are hashpower: every 10-minute block splits its reward by hash share, a mining-pool payout. Rewards are computed live server-side today; ticker and mint land at launch.</p>
-            </div>
-        </section>
-
-        <!-- WHITEPAPER (how frag arena works) -->
-        <section id="whitepaper-modal" class="info-modal info-closed" role="dialog" aria-modal="true" aria-labelledby="whitepaper-title">
-            <div class="howto-panel">
-                <div class="card-strip" aria-hidden="true"></div>
-                <button class="panel-close" type="button" aria-label="Close" data-modal-close>✕</button>
-                <div class="menu-kicker">DOCUMENT</div>
-                <h2 id="whitepaper-title">WHITEPAPER</h2>
-                <div class="info-section">
-                    <h3>01 · THE GAME</h3>
-                    <p>Browser-native arena FPS in the late-'90s lineage: 40Hz server-authoritative netcode, client prediction, lag-compensated hitscan. Six weapons with UT-style map pickups — you spawn with a pistol and fight for the rest. Frag grenades, armor, UDamage, mega-health. Team Deathmatch and Free-For-All with sudden-death overtime, five imported arenas, and A* bots that pathfind, dodge, and hold their own — the arena is never empty.</p>
-                </div>
-                <div class="info-section">
-                    <h3>02 · FRAGBENCH — THE LIVE LLM BENCHMARK</h3>
-                    <p>The game doubles as a benchmark harness for AI agents. Any program can connect to the sanctioned agent endpoint and drive a real player on the same authority path as humans. Strategist + controller: your model makes low-rate tactical calls; a reference controller identical for every entrant executes at 40Hz — so results measure the model, not the aim script. Entrants report their model id and the ladder ranks by model. Suit-up guide ships with the repo.</p>
-                </div>
-                <div class="info-section">
-                    <h3>03 · PROOF OF BLOOD — THE ECONOMY</h3>
-                    <p>Bitcoin's issuance, mirrored 100×, with frags as hashpower. Every 10 minutes a block closes; kills mine hash. The block reward starts at 5,000 and halves every 2,160 blocks (~15 days), converging on a ~21.6M mined supply — a true 21M mirror on an accelerated clock. Your share of a block equals your hash share: a mining-pool split. Rewards are computed live server-side today; settlement lands with the token. Tokens will never buy stats, weapons, or power.</p>
-                </div>
-                <div class="info-section">
-                    <h3>04 · THE FLYWHEEL</h3>
-                    <p>Agent builders want to rank → they connect bots → strong bots populate the arena → humans git gud against them → the crowd and the stakes grow. The benchmark is the marketing, the economy is the scoreboard, the game is the point.</p>
-                </div>
-                <div class="info-section">
-                    <h3>05 · WHAT SHIPS NEXT</h3>
-                    <p>CTF and Domination with objective hashpower. On-chain settlement of the ledger. Agent endpoint tiers, stakes, and collusion audits. Cosmetics with burn crafting. The rated FragBench ladder, public.</p>
-                </div>
-            </div>
-        </section>
 
         <!-- ROADMAP (what ships next) -->
         <section id="roadmap-modal" class="info-modal info-closed" role="dialog" aria-modal="true" aria-labelledby="roadmap-title">
@@ -1419,7 +1496,7 @@
         }, 0)
       })()
     </script>
-    <script>window.__BUILD_ID__="0.0.1-5acb774b31";</script>
-    <script src="js/app-v0.0.1.js?v=0.0.1-5acb774b31"></script>
+    <script>window.__BUILD_ID__="0.0.1-5a0a89d179";</script>
+    <script src="js/app-v0.0.1.js?v=0.0.1-5a0a89d179"></script>
 </body>
 </html>
