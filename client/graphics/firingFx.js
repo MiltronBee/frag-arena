@@ -58,6 +58,8 @@ const WEAPON_FX = {
     tracer: { color: [1.0, 0.80, 0.34], core: [1.0, 0.96, 0.72], width: 0.018, life: 50, chance: 1.0 },
     muzzle: { color: [1.0, 0.80, 0.42], scale: 0.24, glowScale: 0.40, life: 42 },
     impact: { scale: 0.22 },
+    // Rifle — the reference weight; everything else is relative to this.
+    bloodScale: 1.0,
     recoil: { back: 0.040, rise: 0.020, shake: 0.55 },
     // disciplined punch: small climb, subtle right drift, quick 220ms settle.
     camKick: { pitch: 0.45, yawDrift: 0.06, yawJitter: 0.05, climb: 0.15, climbMax: 1.8,
@@ -77,6 +79,8 @@ const WEAPON_FX = {
     tracer: { color: [1.0, 0.66, 0.28], core: [1.0, 0.88, 0.60], width: 0.010, life: 30, chance: 0.5 },
     muzzle: { color: [1.0, 0.82, 0.45], scale: 0.17, glowScale: 0.26, life: 26 },
     impact: { scale: 0.18 },
+    // SMG — high rate of fire, so each hit has to stay light or a burst floods it.
+    bloodScale: 0.7,
     recoil: { back: 0.024, rise: 0.012, shake: 0.34 },
     // rattly climb: lower per-shot pitch but higher heat bias + left drift; fast 160ms
     // recovery keeps the picture honest between the SMG's tight bursts.
@@ -98,6 +102,8 @@ const WEAPON_FX = {
     tracer: { color: [1.0, 0.72, 0.36], core: [1.0, 0.92, 0.7], width: 0.010, life: 34, chance: 1.0, pelletTracers: 6 },
     muzzle: { color: [1.0, 0.72, 0.36], scale: 0.42, glowScale: 0.66, life: 55 },
     impact: { scale: 0.30 },
+    // Shotgun — PER PELLET, and there are 8. Small on purpose; see above.
+    bloodScale: 0.4,
     recoil: { back: 0.090, rise: 0.048, shake: 1.15 },
     // heavy single shove: big one-shot pitch, no heat/climb term (single-shot cadence),
     // a wide random yaw jar, slow 380ms recovery + a small pump dip at 350ms so the
@@ -121,6 +127,8 @@ const WEAPON_FX = {
     tracer: { color: [1.0, 0.96, 0.82], core: [1.0, 1.0, 0.96], width: 0.012, life: 44, chance: 1.0 },
     muzzle: { color: [1.0, 0.82, 0.45], scale: 0.20, glowScale: 0.32, life: 34 },
     impact: { scale: 0.20 },
+    // Pistol — the spawn sidearm. Reads as a real wound, not a rifle hit.
+    bloodScale: 0.75,
     recoil: { back: 0.050, rise: 0.030, shake: 0.62 },
     // snappy flick: one sharp upward crack per shot — every shot is a "first shot"
     // (no climb/heat term), tight yaw jitter, and a ~110ms critically-damped (ζ≈1.0)
@@ -143,6 +151,8 @@ const WEAPON_FX = {
     tracer: { color: [0.45, 0.85, 1.0], core: [0.85, 0.98, 1.0], width: 0.013, life: 30, chance: 0.0 }, // bolt carries the visual; keep chance 0 so no hitscan tracer
     muzzle: { color: [0.45, 0.85, 1.0], scale: 0.20, glowScale: 0.34, life: 34 },
     impact: { scale: 0.20 },
+    // Plasma — cauterises; less spray than a solid round of the same class.
+    bloodScale: 0.85,
     recoil: { back: 0.030, rise: 0.016, shake: 0.40 },
     camKick: { pitch: 0.30, yawDrift: 0.03, yawJitter: 0.15, climb: 0.10, climbMax: 0.8,
                heatBias: 0.3, tension: 1100, damping: 60 },
@@ -160,6 +170,11 @@ const WEAPON_FX = {
     tracer: { color: [0.6, 1.0, 0.5], core: [0.9, 1.0, 0.8], width: 0.014, life: 34, chance: 0.0 },
     muzzle: { color: [0.6, 1.0, 0.5], scale: 0.40, glowScale: 0.62, life: 46 },
     impact: { scale: 0.24 },
+    // Flak — PER PELLET, and there are 5. Same trap as the shotgun: a per-hit weight
+    // chosen for how a shell FEELS gets multiplied by the pellet count, and 1.6 x 5
+    // would have thrown eight times a rifle hit off one trigger pull. 0.55 x 5 lands
+    // it just under a shotgun blast, which is right for shrapnel.
+    bloodScale: 0.55,
     recoil: { back: 0.080, rise: 0.042, shake: 1.0 },
     camKick: { pitch: 1.20, yawDrift: 0, yawJitter: 0.20, climb: 0, climbMax: 1.2,
                heatBias: 0, tension: 380, damping: 39,
@@ -182,6 +197,12 @@ const REMOTE_FX = {
   tracer: { color: [1.0, 0.74, 0.48], core: [1.0, 0.95, 0.8], width: 0.016, life: 42, chance: 1.0 },
   muzzle: { color: [1.0, 0.76, 0.42], scale: 0.25, glowScale: 0.38, life: 42 },
   impact: { scale: 0.22 },
+  // The SNIPER (weapon index 6) has no WEAPON_FX entry and lands here BY DESIGN: it
+  // has no muzzle theatre of its own because its identity is the SCOPE, not the flash.
+  // Do not give it a preset to "fix" this — a tracer and a report would be taking the
+  // weapon away from what it is. It inherits this neutral blood weight along with the
+  // neutral tracer, which is the intended outcome.
+  bloodScale: 1.0,
   recoil: { back: 0, rise: 0, shake: 0 },
   vmKick: null,
   camKick: null, // remote players never recoil the local camera (see REMOTE_FX note)
@@ -203,7 +224,11 @@ const REMOTE_FX = {
 // wall is part of its identity, so marks must persist long enough to read the
 // pattern. Pool recycling (BABYLONRenderer POOLS.impact) caps sustained-fire cost.
 const SURFACE_FX = {
-  flesh:    { color: [0.5, 0.02, 0.02],  sprite: 'blood_splat', additive: false, scaleMul: 1.5, life: 480, spark: false, smoke: false, blood: true },
+  // `life` was 480ms — the shortest mark in the table, on the ONE surface whose mark
+  // players care about. A wall keeps a scorch for 3.2s but a body kept its blood for
+  // half a second, so a hit read as a flash rather than as a wound. 2600 sits it in
+  // the same register as the hard-surface marks without out-living the corpse.
+  flesh:    { color: [0.5, 0.02, 0.02],  sprite: 'blood_splat', additive: false, scaleMul: 1.5, life: 2600, spark: false, smoke: false, blood: true },
   stone:    { color: [0.10, 0.09, 0.08], sprite: 'scorch', additive: false, scaleMul: 1.55, life: 3200, spark: true,  smoke: true },
   metal:    { color: [0.08, 0.08, 0.09], sprite: 'scorch', additive: false, scaleMul: 1.25, life: 3000, spark: true,  smoke: true },
   concrete: { color: [0.09, 0.09, 0.10], sprite: 'scorch', additive: false, scaleMul: 1.55, life: 3200, spark: true,  smoke: true },
@@ -212,6 +237,8 @@ const SURFACE_FX = {
 
 // Resolve a weapon's FX preset. `spec` is a weaponsConfig entry (or null for the
 // remote/unknown case). Always returns a fully-populated object.
+// Every entry carries a `bloodScale` (see WEAPON_FX). A preset without one is read as
+// 1.0 by BABYLONRenderer._spawnImpact, so REMOTE_FX degrades to the rifle weight.
 function resolveWeaponFx(spec) {
   if (!spec) return REMOTE_FX
   return WEAPON_FX[spec.index] || REMOTE_FX

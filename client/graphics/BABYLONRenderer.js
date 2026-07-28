@@ -323,6 +323,16 @@ const DROP_GRAVITY = 9.8
 const DROP_LIFE = 600         // ms
 const DROP_SIZE_MUL = 0.55, DROP_SIZE_JITTER = 0.4
 
+// WALL SPLATTER — downrange spatter painted on whatever is behind the victim. The
+// one blood class that marks the ARENA rather than the air, so it is tuned to persist:
+// a firefight should leave evidence. HIGH TIER ONLY (it costs one raycast per hit).
+const WALL_SPLAT_RANGE = 4.0    // m — spatter further than this reads as unrelated
+const WALL_SPLAT_EXTRA = 3      // extra satellite marks at point-blank (0 at max range)
+const WALL_SPLAT_SCATTER = 0.45 // m — spread of the satellites around the primary
+const WALL_SPLAT_COLOR = [0.28, 0.015, 0.015] // darker than the wound mark
+const WALL_SPLAT_SIZE = 1.35    // x base impact scale
+const WALL_SPLAT_LIFE = 9000    // ms — outlasts the corpse; the room remembers
+
 // GROUND POOLS — a separate capped pool of flat floor quads (no mesh decals).
 // A drop/streak that reaches the floor leaves one: grow, hold, fade, recycle.
 // BOX ARENAS ONLY. This is the arenaDressing floor height — valid when the level is
@@ -1473,7 +1483,10 @@ class BABYLONRenderer {
 		if (hitValid) {
 			surface = classifySurface(hit.pickedMesh)
 			const normal = hit.getNormal ? hit.getNormal(true) : null
-			this._spawnImpact(end, normal, surface, fx)
+			// `dir` is the round's travel direction. Blood needs it because exit spatter
+			// goes DOWNRANGE, behind the victim — the surface normal alone only ever
+			// points back toward the shooter.
+			this._spawnImpact(end, normal, surface, fx, dir)
 		}
 		return { hit: hitValid, surface, mesh: hitValid ? hit.pickedMesh : null, point: hitValid ? end.clone() : null }
 	}
@@ -1501,7 +1514,7 @@ class BABYLONRenderer {
 		mesh.rotationQuaternion = null
 	}
 
-	_spawnImpact(point, normal, surfaceKey, fx) {
+	_spawnImpact(point, normal, surfaceKey, fx, dir) {
 		const s = surfaceFx(surfaceKey)
 		const impact = this._next('impact')
 		impact.billboardMode = BABYLON.Mesh.BILLBOARDMODE_NONE
@@ -1541,7 +1554,70 @@ class BABYLONRenderer {
 		}
 		// flesh: a burst of ballistic blood droplets sprayed off the hit (the diegetic
 		// "meat" read, layered under the base wet mark). Pooled + simulated in update().
-		if (s.blood) this._spawnBloodBurst(impact.position, normal, base)
+		if (s.blood) {
+			// A sniper round and a pistol tap threw IDENTICAL blood before this: `base` is
+			// the impact sprite scale and carries nothing about how hard the hit landed.
+			// bloodScale is per-weapon (see resolveWeaponFx) so the heavy guns read heavy.
+			const bw = fx && fx.bloodScale ? fx.bloodScale : 1
+			this._spawnBloodBurst(impact.position, normal, base, bw)
+			// and the wall behind them wears it
+			if (dir) this._spawnWallSplat(impact.position, dir, base * bw)
+		}
+	}
+
+	// WALL SPLATTER — the mark a body throws onto whatever is behind it.
+	//
+	// The blood system already had mist, streaks, drops and floor pools, but every one of
+	// them died in mid-air or on the FLOOR: shoot someone standing against a wall and the
+	// wall stayed clean. Downrange spatter is the read that makes a hit feel like it went
+	// THROUGH someone, and it was the one thing missing.
+	//
+	// COST: one pickWithRay per flesh hit, on the same predicate _floorYBelow uses (which
+	// measures ~860us there). That is why it is HIGH TIER ONLY and why the ray is short —
+	// 4m, because spatter that lands further away than that is not readably connected to
+	// the victim anyway, and a short ray rejects most of the map cheaply.
+	//
+	// Reuses the 'impact' pool rather than adding one: it is 224 entries, splats recycle
+	// oldest-first under sustained fire, and that self-limiting behaviour is exactly right
+	// — a firefight should not be able to paint the map into a solid red sheet.
+	_spawnWallSplat(point, dir, base) {
+		if (this._fxTier === 'low') return
+		const from = new BABYLON.Vector3(point.x, point.y, point.z)
+		const ray = new BABYLON.Ray(from, dir, WALL_SPLAT_RANGE)
+		const hit = this.scene.pickWithRay(ray, (m) => this._isSolidWorld(m))
+		if (!hit || !hit.hit || !hit.pickedPoint) return
+		const n = hit.getNormal ? hit.getNormal(true) : null
+		if (!n) return
+
+		// Distance falloff: spatter thins out the further the wall is, the way it actually
+		// does. Without this a wall 4m back wore the same mark as one pressed against them.
+		const dist = BABYLON.Vector3.Distance(from, hit.pickedPoint)
+		const near = 1 - Math.min(1, dist / WALL_SPLAT_RANGE)
+		const count = 1 + Math.round(near * WALL_SPLAT_EXTRA)
+
+		for (let i = 0; i < count; i++) {
+			const m = this._next('impact')
+			this._reclaim(m)
+			m.billboardMode = BABYLON.Mesh.BILLBOARDMODE_NONE
+			this._setImpactSprite(m, 'blood_splat', false)
+			// Darker than the wound mark: this is blood that has left the body and hit cold
+			// stone, and it should not glow next to the hot crimson of the hit itself.
+			this._setColor(m, WALL_SPLAT_COLOR)
+			m.position.copyFrom(hit.pickedPoint)
+			// Scatter the satellite marks around the primary, ON the wall plane.
+			if (i > 0) {
+				m.position.x += (Math.random() - 0.5) * WALL_SPLAT_SCATTER
+				m.position.y += (Math.random() - 0.5) * WALL_SPLAT_SCATTER
+				m.position.z += (Math.random() - 0.5) * WALL_SPLAT_SCATTER
+			}
+			// Lift off the surface or it z-fights with the wall it is painted on.
+			m.position.addInPlace(n.scale(0.02))
+			m.lookAt(m.position.add(n))
+			// Random roll so repeated hits on one wall do not stamp the same sprite twice.
+			m.rotate(BABYLON.Axis.Z, Math.random() * Math.PI * 2, BABYLON.Space.LOCAL)
+			const sz = base * WALL_SPLAT_SIZE * (0.6 + Math.random() * 0.8) * (0.5 + near)
+			this._track(m, WALL_SPLAT_LIFE, 'impact', 0.85, sz, sz, sz)
+		}
 	}
 
 	// Blood off a flesh hit, in DISTINCT CLASSES (see the tunables block): a bright
@@ -1549,8 +1625,12 @@ class BABYLONRenderer {
 	// gravity-bound DROPS — all pooled from the impact pool and simulated in update()'s
 	// blood loop. Drops/streaks leave a floor pool where they land. `point` is the
 	// (already normal-lifted) hit position; `base` the base impact scale.
-	_spawnBloodBurst(point, normal, base) {
+	_spawnBloodBurst(point, normal, base, weight = 1) {
 		const low = this._fxTier === 'low'
+		// `weight` scales COUNT as well as size. Scaling size alone just makes bigger
+		// droplets; what reads as a heavier wound is MORE of them.
+		const wN = (n) => Math.max(n ? 1 : 0, Math.round(n * weight))
+		base = base * (0.75 + 0.25 * weight)
 		const nx = normal ? normal.x : 0
 		const ny = normal ? normal.y : 0
 		const nz = normal ? normal.z : 0
@@ -1563,7 +1643,7 @@ class BABYLONRenderer {
 		const canPool = floorY !== null
 
 		// --- MIST: bright additive puff(s) that expand + fade fast ---
-		const mistN = low ? MIST_COUNT_LO : MIST_COUNT_HI
+		const mistN = wN(low ? MIST_COUNT_LO : MIST_COUNT_HI)
 		for (let i = 0; i < mistN; i++) {
 			const m = this._next('impact')
 			this._reclaim(m)
@@ -1580,7 +1660,7 @@ class BABYLONRenderer {
 		}
 
 		// --- STREAKS: fast, high-drag, velocity-stretched (skipped on low tier) ---
-		const streakN = low ? STREAK_COUNT_LO : STREAK_COUNT_HI
+		const streakN = wN(low ? STREAK_COUNT_LO : STREAK_COUNT_HI)
 		for (let i = 0; i < streakN; i++) {
 			const st = this._next('impact')
 			this._reclaim(st)
@@ -1604,7 +1684,7 @@ class BABYLONRenderer {
 		}
 
 		// --- DROPS: heavier gravity-bound droplets (thinned, not removed, on low) ---
-		const dropN = low ? DROP_COUNT_LO : DROP_COUNT_HI
+		const dropN = wN(low ? DROP_COUNT_LO : DROP_COUNT_HI)
 		for (let i = 0; i < dropN; i++) {
 			const d = this._next('impact')
 			this._reclaim(d)
