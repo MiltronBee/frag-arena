@@ -5312,19 +5312,22 @@ body.in-combat #whale-alert-banner[data-on="1"] {
 .ret-h-left   { top: 50%; left: 0;    height: 1.5px; width: calc(50% - 3px); transform: translateY(-50%); }
 .ret-h-right  { top: 50%; right: 0;   height: 1.5px; width: calc(50% - 3px); transform: translateY(-50%); }
 
-/* Mil ticks: two repeating gradients, masked to an annulus so the marks exist along
-   the crosshair arms and nowhere else. Cheap, and it reads as a ranging scale
-   rather than as decoration. */
+/* Centre aiming dot. Replaces the old mil-tick grid: those two repeating gradients
+   were meant to be masked into thin ranging ticks along the arms, but when the annulus
+   mask doesn't take (browser/compositor) the FULL square grid shows through — the "weird
+   grid" bug. A fast arcade sniper wants a clean aim point, not a ranging scale. */
 .scope-reticle::after {
     content: "";
     position: absolute;
-    inset: 34%;
-    background-image:
-        repeating-linear-gradient(0deg, transparent 0 18px, var(--x30-ink) 18px 19.5px),
-        repeating-linear-gradient(90deg, transparent 0 18px, var(--x30-ink) 18px 19.5px);
-    -webkit-mask: radial-gradient(circle at center, transparent 0 20px, #000 21px 96px, transparent 97px);
-    mask: radial-gradient(circle at center, transparent 0 20px, #000 21px 96px, transparent 97px);
-    opacity: 0.5;
+    top: 50%;
+    left: 50%;
+    width: 2px;
+    height: 2px;
+    transform: translate3d(-50%, -50%, 0);
+    border-radius: 50%;
+    background: var(--x30-ink);
+    box-shadow: 0 0 2px var(--x30-void), 0 0 4px rgba(5, 7, 8, 0.85);
+    opacity: 0.95;
 }
 
 /* The crosshair the rest of the game draws is redundant inside an optic and sits at
