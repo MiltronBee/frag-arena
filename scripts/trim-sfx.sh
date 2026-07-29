@@ -28,6 +28,8 @@ trim() { # trim <file> [cap_seconds]
 for g in rifle smg pistol plasma; do trim "${g}_fire.mp3" 0.55; done
 trim shotgun_fire.mp3 0.7
 trim flak_fire.mp3 0.7
+# sniper: keep a long tail (1.1s) — it fires every 1.5s so the echo can't smear/overlap
+trim sniper_fire.mp3 1.1
 trim weapon_swap.mp3 0.45
 
 # everything else: leading-silence strip only (their tails/timing are content)

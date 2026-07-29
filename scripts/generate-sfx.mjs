@@ -42,6 +42,11 @@ const MANIFEST = {
   pistol_fire:   { text: 'heavy handgun single gunshot, loud sharp metallic crack, punchy slide snap, aggressive, dry, close up', duration: 0.5, influence: 0.8 },
   plasma_fire:   { text: 'sci-fi plasma rifle single shot, hot energy bolt zap, punchy electric discharge crack, aggressive, dry, close up, arcade shooter', duration: 0.5, influence: 0.8 },
   flak_fire:     { text: 'massive flak cannon single blast, explosive shrapnel burst, deep booming concussion, heavy mechanical clank, loud, dry, arcade shooter', duration: 0.8, influence: 0.85 },
+  // SNIPER (weapon index 6): a precision rifle's identity is the CRACK + TAIL, not a spammy
+  // muzzle. Dry supersonic snap at t=0, then a long echo rolling off the arena walls. Longer
+  // duration than the other fires (it cadences at 1.5s, so the tail can't smear). WebAudio
+  // layers SUB_THUMP.sniper (deep chest punch) + the crack synth under this AI clip.
+  sniper_fire:   { text: 'high-powered sniper rifle single gunshot, sudden sharp supersonic crack, massive punchy transient snap, long echoing reverb tail cracking away into the distance, powerful, loud, dry close-up crack with distant echo tail, arcade shooter', duration: 1.1, influence: 0.8 },
 
   // ---- RELOAD (one full reload per weapon; duration ≈ weaponsConfig reloadTime) ----
   rifle_reload:  { text: 'assault rifle reloading, magazine out, fresh magazine in, charging handle racked', duration: 1.5, influence: 0.4 },

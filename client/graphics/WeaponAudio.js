@@ -26,7 +26,7 @@ import { distanceGain } from './firingFx'
 const SFX_NAMES = [
   'rifle_fire', 'smg_fire', 'shotgun_fire', 'pistol_fire',
   'rifle_reload', 'smg_reload', 'shotgun_reload', 'pistol_reload',
-  'plasma_fire', 'flak_fire', 'plasma_reload', 'flak_reload',
+  'plasma_fire', 'flak_fire', 'sniper_fire', 'plasma_reload', 'flak_reload',
   'grenade_explosion', 'weapon_swap', 'death', 'respawn',
   'impact_flesh', 'pain_grunt', 'kill_confirm',
   // 'interference': the dead-air TV-static sting under the GIT GUD death screen
@@ -96,7 +96,7 @@ const SHOT_GAIN = 1.15
 // Any other index has no prefix -> procedural path. Plasma/Flak reloads were
 // previously SILENT (no prefix) and their fire was procedural-only; adding them
 // here routes fire()/reload() to the new AI clips.
-const WEAPON_PREFIX = ['rifle', 'smg', 'shotgun', 'pistol', 'plasma', 'flak']
+const WEAPON_PREFIX = ['rifle', 'smg', 'shotgun', 'pistol', 'plasma', 'flak', 'sniper']
 
 // Per-weapon synthesized SUB-THUMP (FX consult): a sine sweep layered under the
 // AI clip supplies the physical low-end punch that mp3 generation can't. f0->f1
@@ -108,6 +108,7 @@ const SUB_THUMP = {
   pistol:  { f0: 110, f1: 42, gain: 1.0, dur: 0.09 },
   plasma:  { f0: 90,  f1: 50, gain: 0.6, dur: 0.08 }, // energy zap, light punch
   flak:    { f0: 125, f1: 28, gain: 1.5, dur: 0.13 }, // heaviest gun, deep chest thump
+  sniper:  { f0: 130, f1: 26, gain: 1.5, dur: 0.15 }, // high-powered rifle: deep, heavy, long punch under the crack
 }
 
 // Pure, testable: map a weapon's report preset + distance to bounded synth params.
