@@ -36,7 +36,7 @@ export default defineConfig(({ command }) => {
       outDir: path.resolve(ROOT, 'public/js'),
       emptyOutDir: false,
       target: 'es2019',
-      sourcemap: true,
+      sourcemap: false,
       minify: 'esbuild',
       rollupOptions: {
         input: ENTRY,

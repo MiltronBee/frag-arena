@@ -55,7 +55,6 @@ http.createServer((req, res) => {
     // needs real status codes (400 bad address, 429 rate limit, 502 RPC down).
     const walletPath = req.url && req.url.split('?')[0].match(/^\/wallet\/([^/]+)\/?$/)
     if (walletPath) {
-        const address = decodeURIComponent(walletPath[1])
         const ip = req.headers['x-real-ip'] || req.socket?.remoteAddress || ''
         const send = (code, body) => {
             res.writeHead(code, {
@@ -64,6 +63,14 @@ http.createServer((req, res) => {
                 'Cache-Control': 'no-store',
             })
             res.end(JSON.stringify(body))
+        }
+        // A malformed percent-encoding (e.g. /wallet/%C0%AF) makes decodeURIComponent
+        // throw URIError; uncaught it would kill the request handler -> pm2 restart.
+        let address
+        try {
+            address = decodeURIComponent(walletPath[1])
+        } catch (e) {
+            return send(400, { error: 'invalid encoding', weapons: [] })
         }
         if (!isLikelyAddress(address)) return send(400, { error: 'invalid address', weapons: [] })
         if (!rateLimit('wallet:' + ip)) return send(429, { error: 'slow down', weapons: [] })

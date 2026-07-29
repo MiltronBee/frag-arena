@@ -58,6 +58,7 @@ export { RenderTargetTexture } from '@babylonjs/core/Materials/Textures/renderTa
 export { ImageProcessingConfiguration } from '@babylonjs/core/Materials/imageProcessingConfiguration.js'
 export { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.js'
 export { GlowLayer } from '@babylonjs/core/Layers/glowLayer.js'
+export { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline.js' // FXAA + whisper of bloom (desktop post-processing, BABYLONRenderer._post2030)
 export { PhotoDome } from '@babylonjs/core/Helpers/photoDome.js'
 export { Light } from '@babylonjs/core/Lights/light.js'
 export { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js'
