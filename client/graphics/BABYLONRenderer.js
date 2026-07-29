@@ -510,9 +510,20 @@ class BABYLONRenderer {
 		// grading above; a fullscreen post chain is exactly the fill-rate jank the
 		// 2026-07-17 renderer reverts taught us to avoid on phones. Threshold is high and
 		// weight low: bloom lifts muzzle flashes, coronas and emissives, never the walls.
+		// DISABLED 2026-07-29 — do not re-enable without the multi-camera pipeline fix.
+		// A DefaultRenderingPipeline attached to BOTH cameras of the
+		// activeCameras = [camera, vmCamera] setup blacks the WORLD camera's output on
+		// desktop (players saw "hands in an empty void"). This pipeline was a silent
+		// no-op for its ENTIRE life on prod: BABYLON.DefaultRenderingPipeline was absent
+		// from the curated barrel, so `new` threw and was swallowed by the catch below —
+		// prod's known-good look has never had post-processing. The H1 hardening restored
+		// the export, which accidentally activated this broken path. Same root cause
+		// blocks the RTT sniper scope (also a pipeline on these two cameras). Keep the
+		// flag so re-enabling after the fix is a one-liner.
+		const POST2030_ENABLED = false
 		try {
 			// isTouch is hoisted above (shared with the grade) — same heuristic, one source.
-			if (!isTouch) {
+			if (POST2030_ENABLED && !isTouch) {
 				const post = new BABYLON.DefaultRenderingPipeline('post2030', false, this.scene, [this.camera, this.vmCamera])
 				post.fxaaEnabled = true
 				post.bloomEnabled = true
