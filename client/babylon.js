@@ -49,6 +49,11 @@ import '@babylonjs/core/Meshes/Builders/planeBuilder.js'            // MeshBuild
 import '@babylonjs/core/Cameras/Inputs/arcRotateCameraPointersInput.js'
 import '@babylonjs/core/Cameras/Inputs/arcRotateCameraMouseWheelInput.js'
 import '@babylonjs/core/Cameras/Inputs/arcRotateCameraKeyboardMoveInput.js'
+// Sniper-scope RTT optic (BABYLONRenderer.initScopePipeline + ScopeShader.js). The
+// PostProcess class + its screen-space pass; the RenderPipeline manager the composite
+// is attached to is the SAME one DefaultRenderingPipeline (post2030) already uses, so
+// its scene-component getter is registered the first time either pipeline is built.
+import '@babylonjs/core/PostProcesses/postProcess.js'
 
 // ---- RENDER NAMED RE-EXPORTS (client-only classes; sim classes — incl.
 // StandardMaterial — come via `export *` from the node barrel above) ----
@@ -59,6 +64,13 @@ export { ImageProcessingConfiguration } from '@babylonjs/core/Materials/imagePro
 export { ShadowGenerator } from '@babylonjs/core/Lights/Shadows/shadowGenerator.js'
 export { GlowLayer } from '@babylonjs/core/Layers/glowLayer.js'
 export { DefaultRenderingPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/defaultRenderingPipeline.js' // FXAA + whisper of bloom (desktop post-processing, BABYLONRenderer._post2030)
+// Sniper-scope RTT optic (BABYLONRenderer.initScopePipeline). Effect.ShadersStore holds
+// the composite shader; PostProcess is the pass; the RenderPipeline + Effect wrap it so
+// it composites over the COMBINED main+viewmodel frame (same mechanism as post2030).
+export { Effect } from '@babylonjs/core/Materials/effect.js'
+export { PostProcess } from '@babylonjs/core/PostProcesses/postProcess.js'
+export { PostProcessRenderPipeline } from '@babylonjs/core/PostProcesses/RenderPipeline/postProcessRenderPipeline.js'
+export { PostProcessRenderEffect } from '@babylonjs/core/PostProcesses/RenderPipeline/postProcessRenderEffect.js'
 export { PhotoDome } from '@babylonjs/core/Helpers/photoDome.js'
 export { Light } from '@babylonjs/core/Lights/light.js'
 export { HemisphericLight } from '@babylonjs/core/Lights/hemisphericLight.js'
