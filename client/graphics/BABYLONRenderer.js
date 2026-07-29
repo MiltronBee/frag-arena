@@ -3,7 +3,6 @@ import { resolveWeaponFx, classifySurface, surfaceFx, fadeAlpha } from './firing
 import { OBJFileLoader } from '../babylon.js' // OBJ loader (mesh maps) via curated barrel
 
 import ArenaDressing from './arenaDressing'
-import { registerScopeShader, SCOPE_FRAGMENT_NAME } from './ScopeShader'
 import { getActiveMap } from '../../common/mapMesh'
 import { pairPortals } from '../../common/teleporterData'
 import { bakeVertexColors } from './mapLights'
@@ -16,25 +15,6 @@ import { applyTextureVariants } from './textureVariants'
 // recognise "this is the local player's own gun" — used by _isHitscanTarget to keep
 // impact FX off it.
 const VM_LAYER_MASK = 0x10000000
-
-// ---------------------------------------------------------------------------
-// SNIPER SCOPE V2 (RTT optical scope). See initScopePipeline + ScopeShader.js.
-// Feature-flagged & self-disabling: on ANY init/render/compile failure the whole
-// path is dropped for the session and the legacy DOM overlay (ScopeOverlay.js) takes
-// over — a bad GPU must never black-screen a match.
-const SCOPE_V2_DEFAULT = true   // new RTT scope on by default; ?scope=old forces legacy
-const SCOPE_RTT_SIZE = 512      // fixed unsigned-byte RTT, no mipmaps (perf budget)
-const SCOPE_RTT_SIZE_LOW = 256  // stage-1 downscale target (>14.5ms scoped avg)
-const SCOPE_CAM_FOV_DEG = 25    // scope camera optical zoom (≈2.8x vs the 70° periphery)
-// Perf ladder measures the scope's MARGINAL cost — scoped rolling-avg frame time
-// MINUS the unscoped baseline — so a display's vsync interval (16.7ms @60Hz) cancels
-// out and only real scope overhead degrades tier. Steps HIGH(512²) -> MEDIUM(256²) ->
-// legacy overlay; there is deliberately NO zoomless single-camera tier (it read as a
-// sniper that can't zoom, so a genuine perf failure falls back to the DOM overlay).
-const SCOPE_PERF_WINDOW = 30       // scoped samples per eval (~0.5s; dilutes single hitches)
-const SCOPE_PERF_OVERHEAD_MS = 8.0 // scoped avg must exceed the unscoped baseline by this to step down
-const SCOPE_EYE_DECAY = 0.82       // per-frame decay of the recoil eye-box shear
-const SCOPE_EYE_KICK_Y = 0.12      // vertical eye-box shove on a scoped shot (judge Step 4)
 
 // ---------------------------------------------------------------------------
 // SKY VARIANTS — which worlds hang in the void behind the arena.
@@ -542,20 +522,6 @@ class BABYLONRenderer {
 				post.bloomScale = 0.5
 			}
 		} catch (e) { console.warn('[post] pipeline unavailable', e) }
-
-		// SNIPER SCOPE V2 (RTT optical scope). Fully wrapped: any failure here leaves
-		// scopeV2Ok=false and the Simulator drives the legacy DOM overlay instead.
-		this._scopeState = { scoped: false, adsT: 0 }
-		this._scopeEye = { x: 0, y: 0 }
-		this._scopeActive = false          // is the composite pass currently attached?
-		this.scopeLowRes = false           // reserved single-cam flag; unused (perf drops to legacy)
-		this._scopeTier = 'HIGH'           // HIGH(512²) -> MEDIUM(256²) -> legacy overlay
-		this._scopePerfSamples = []
-		this._scopeBaselineMs = 0          // EMA of UNSCOPED frame time (the vsync reference)
-		this._scopeLastFrameAt = 0
-		this._scopeWarned = false
-		this.scopeV2Ok = false
-		this._initScopePipeline()
 
 		// --- lighting: UT99-style dusk arena — a dim cool ambient so shadow sides
 		// stay dark and readable, under a hard warm key light (low sun / sodium
@@ -1938,216 +1904,6 @@ class BABYLONRenderer {
 		}
 	}
 
-	// ---- SNIPER SCOPE V2 (RTT optical scope) ----------------------------------
-	// A second camera at 25° renders the zoomed sight picture into a 512² RTT; a
-	// screen-space PostProcess composites it as a glass disc with bezel/dimming/
-	// reticle over the COMBINED main+viewmodel frame (so the raised gun shows in the
-	// dimmed periphery while the disc reads as "through the scope"). PRESENTATION
-	// ONLY — the aim ray, spread and netcode are never touched. Every step is wrapped;
-	// any failure flips scopeV2Ok=false and the legacy DOM overlay takes over.
-	_initScopePipeline() {
-		// Feature flag: SCOPE_V2_DEFAULT, overridable by ?scope=new / ?scope=old.
-		let want = SCOPE_V2_DEFAULT
-		try {
-			const q = new URLSearchParams(location.search).get('scope')
-			if (q === 'old') want = false
-			else if (q === 'new') want = true
-		} catch (e) { /* no location — leave default */ }
-		this.scopeV2Wanted = want
-		if (!want) return
-
-		try {
-			registerScopeShader()
-
-			// Scope camera: a CHILD of the main camera (like vmCamera) so it inherits
-			// the exact eye position + look orientation automatically, but keeps its own
-			// narrow optical FOV. World layer mask (0x0FFFFFFF) excludes the viewmodel
-			// (0x10000000) from the RTT — the gun is composited separately in the periphery.
-			this.scopeCam = new BABYLON.TargetCamera('scopeCam', BABYLON.Vector3.Zero(), this.scene)
-			this.scopeCam.parent = this.camera
-			this.scopeCam.fov = (SCOPE_CAM_FOV_DEG * Math.PI) / 180
-			this.scopeCam.minZ = this.camera.minZ
-			this.scopeCam.maxZ = this.camera.maxZ
-			this.scopeCam.layerMask = 0x0FFFFFFF
-
-			// 512² unsigned-byte RTT, no mipmaps, MANUAL refresh (rendered only while
-			// scoped). renderList=null -> the scene's active meshes, filtered by the
-			// scope camera's layer mask at draw time (viewmodel & HUD excluded).
-			// 5th arg doNotChangeAspectRatio=false: with =true a 16:9 frustum bakes into
-			// the square RTT and the sight picture is squashed ~1.78x horizontally.
-			this.scopeRTT = new BABYLON.RenderTargetTexture(
-				'scopeRTT', { width: SCOPE_RTT_SIZE, height: SCOPE_RTT_SIZE }, this.scene, false, false)
-			this.scopeRTT.activeCamera = this.scopeCam
-			this.scopeRTT.renderList = null
-			// CLAMP: barrel distortion + chroma push rim UVs past 1.0; the RTT's default
-			// REPEAT wrap would fold a sliver of the opposite edge into the glass rim.
-			this.scopeRTT.wrapU = BABYLON.Texture.CLAMP_ADDRESSMODE
-			this.scopeRTT.wrapV = BABYLON.Texture.CLAMP_ADDRESSMODE
-			// Manual-render only: we call .render() while scoped and never add it to
-			// scene.customRenderTargets, so it never auto-refreshes.
-			this.scopeRTT.refreshRate = BABYLON.RenderTargetTexture.REFRESHRATE_RENDER_ONCE
-			this.scopeRTT.clearColor = new BABYLON.Color4(0.02, 0.027, 0.031, 1.0)
-			// Strip shadows from the scope pass (Tomas' perf budget): the arena's static
-			// shadow map is frozen, so this only skips the sampling cost for the pass.
-			this.scopeRTT.onBeforeRenderObservable.add(() => { this.scene.shadowsEnabled = false })
-			this.scopeRTT.onAfterRenderObservable.add(() => { this.scene.shadowsEnabled = true })
-
-			// Composite PostProcess. camera=null: it is driven by the render pipeline so
-			// it composites over the COMBINED multi-camera frame (identical to post2030).
-			const pp = new BABYLON.PostProcess(
-				'scopePP', SCOPE_FRAGMENT_NAME,
-				['uAdsT', 'uAspect', 'uEyeOffset', 'uLowResFallback'],
-				['scopeSampler'], 1.0, null, 2 /* BILINEAR */, this.engine, false)
-			pp.onApply = (effect) => {
-				const s = this._scopeState
-				effect.setFloat('uAdsT', s.adsT)
-				effect.setFloat('uAspect', this.engine.getRenderWidth() / Math.max(1, this.engine.getRenderHeight()))
-				effect.setFloat2('uEyeOffset', this._scopeEye.x, this._scopeEye.y)
-				effect.setFloat('uLowResFallback', this.scopeLowRes ? 1.0 : 0.0)
-				effect.setTexture('scopeSampler', this.scopeRTT)
-			}
-			this.scopePP = pp
-			// Shader-compile watchdog: async compile errors don't throw, so hook the
-			// effect's error observable and fall back to the legacy overlay if the GLSL
-			// ever fails to build (bad driver, missing WebGL feature, etc.).
-			pp.onEffectCreatedObservable.add((effect) => {
-				if (effect && effect.onErrorObservable) {
-					effect.onErrorObservable.add((err) => this._scopeShaderFailed(err))
-				}
-			})
-
-			// Wrap the PostProcess in a pipeline attached to BOTH cameras — this is the
-			// SAME machinery post2030 uses to run a fullscreen pass over world + gun.
-			const pipeline = new BABYLON.PostProcessRenderPipeline(this.engine, 'scopePipeline')
-			const effect = new BABYLON.PostProcessRenderEffect(this.engine, 'scopeEffect', () => pp, true)
-			pipeline.addEffect(effect)
-			this.scene.postProcessRenderPipelineManager.addPipeline(pipeline)
-			this.scene.postProcessRenderPipelineManager.attachCamerasToRenderPipeline(
-				'scopePipeline', [this.camera, this.vmCamera])
-			// Detach the pass until actually scoped: zero fullscreen cost during normal play.
-			this.scene.postProcessRenderPipelineManager.disableEffectInPipeline(
-				'scopePipeline', 'scopeEffect', [this.camera, this.vmCamera])
-			this._scopePipeline = pipeline
-			this._scopeActive = false
-			this.scopeV2Ok = true
-		} catch (e) {
-			this._disableScopeV2('init failed', e)
-		}
-	}
-
-	_disableScopeV2(reason, err) {
-		this.scopeV2Ok = false
-		// Belt-and-braces: if we're tearing down mid-pass, make sure the scope RTT's
-		// shadow-strip observer didn't leave scene shadows disabled.
-		try { this.scene.shadowsEnabled = true } catch (e) { /* scene may be gone */ }
-		if (!this._scopeWarned) {
-			this._scopeWarned = true
-			console.warn('[scope] v2 disabled (' + reason + ') — using legacy overlay', err || '')
-		}
-		try {
-			if (this._scopePipeline && this._scopeActive) {
-				this.scene.postProcessRenderPipelineManager.disableEffectInPipeline(
-					'scopePipeline', 'scopeEffect', [this.camera, this.vmCamera])
-			}
-		} catch (e) { /* best-effort */ }
-		this._scopeActive = false
-	}
-
-	_scopeShaderFailed(errors) {
-		this._disableScopeV2('shader compile error', errors)
-	}
-
-	// Whether the RTT scope should drive the frame this session (flag on + init ok +
-	// no runtime failure). The Simulator reads this to choose RTT scope vs DOM overlay.
-	scopeV2Active() { return !!this.scopeV2Ok }
-
-	// Called each frame by the Simulator with the eased ADS ramp; presentation state
-	// only. `scoped` = the equipped weapon carries ads.scope AND is aiming.
-	updateScope(scoped, adsT) {
-		this._scopeState.scoped = !!scoped
-		this._scopeState.adsT = adsT || 0
-	}
-
-	// A scoped shot shoves the eye-box (recoil), decayed back to centre in update().
-	scopeKick() { if (this.scopeV2Ok) this._scopeEye.y += SCOPE_EYE_KICK_Y }
-
-	// Per-frame scope work: gate the composite pass, render the RTT while scoped, and
-	// run the frame-time safety net. Called from update() BEFORE scene.render() so the
-	// RTT is fresh for the composite. All wrapped — a throw drops to the legacy overlay.
-	_renderScopePass(now) {
-		if (!this.scopeV2Ok) return
-		const active = this._scopeState.scoped && this._scopeState.adsT > 0.001
-		if (active !== this._scopeActive) {
-			try {
-				const mgr = this.scene.postProcessRenderPipelineManager
-				if (active) mgr.enableEffectInPipeline('scopePipeline', 'scopeEffect', [this.camera, this.vmCamera])
-				else mgr.disableEffectInPipeline('scopePipeline', 'scopeEffect', [this.camera, this.vmCamera])
-				this._scopeActive = active
-			} catch (e) { this._disableScopeV2('pass toggle failed', e); return }
-		}
-		// Frame-to-frame interval, tracked every frame (scoped AND unscoped) so the
-		// unscoped value is a vsync baseline the scoped cost is measured against.
-		const dt = this._scopeLastFrameAt ? now - this._scopeLastFrameAt : 0
-		this._scopeLastFrameAt = now
-
-		if (!active) {
-			this._scopeEye.x *= SCOPE_EYE_DECAY
-			this._scopeEye.y *= SCOPE_EYE_DECAY
-			// EMA of the UNSCOPED frame time — the vsync/idle reference. Ignore absurd
-			// gaps (tab switch, GC pause) so they don't poison the baseline.
-			if (dt > 0 && dt < 100) {
-				this._scopeBaselineMs = this._scopeBaselineMs
-					? this._scopeBaselineMs * 0.9 + dt * 0.1
-					: dt
-			}
-			this._scopePerfSamples.length = 0
-			return
-		}
-
-		// decay the recoil eye-box shear back to centre
-		this._scopeEye.x *= SCOPE_EYE_DECAY
-		this._scopeEye.y *= SCOPE_EYE_DECAY
-
-		// Render the 25° sight picture into the RTT for this frame's composite.
-		try {
-			this.camera.computeWorldMatrix(true)
-			this.scopeCam.computeWorldMatrix(true)
-			this.scopeRTT.render()
-		} catch (e) {
-			// A scoped render threw: restore shadows (the onBeforeRender observer turned
-			// them off; its onAfterRender restore never ran) and fall all the way back to
-			// the known-good legacy overlay — never a zoomless window or a black screen.
-			this.scene.shadowsEnabled = true
-			this._disableScopeV2('rtt render failed', e)
-			return
-		}
-
-		// Perf ladder: compare the scoped rolling avg to the UNSCOPED baseline — only the
-		// marginal overhead counts, so a 60Hz display's 16.7ms interval never degrades a
-		// GPU that's actually idle. Sustained overhead steps 512² -> 256² -> legacy.
-		if (dt > 0 && dt < 200 && this._scopeBaselineMs) {
-			const s = this._scopePerfSamples
-			s.push(dt)
-			if (s.length >= SCOPE_PERF_WINDOW) {
-				let sum = 0
-				for (let i = 0; i < s.length; i++) sum += s[i]
-				const overhead = sum / s.length - this._scopeBaselineMs
-				if (overhead > SCOPE_PERF_OVERHEAD_MS) {
-					if (this._scopeTier === 'HIGH') {
-						console.warn('[scope] +' + overhead.toFixed(1) + 'ms over baseline — RTT 256²')
-						try { this.scopeRTT.resize({ width: SCOPE_RTT_SIZE_LOW, height: SCOPE_RTT_SIZE_LOW }) } catch (e) { /* non-fatal */ }
-						this._scopeTier = 'MEDIUM'
-					} else {
-						console.warn('[scope] +' + overhead.toFixed(1) + 'ms over baseline at 256² — dropping to legacy overlay')
-						this._disableScopeV2('perf budget')
-						return
-					}
-				}
-				s.length = 0 // fresh window after each evaluation
-			}
-		}
-	}
-
 	// advance every active FX one frame (framerate-independent via wall clock), then
 	// render. Finished effects are hidden and reclaimed — the pool never grows.
 	update() {
@@ -2308,10 +2064,6 @@ class BABYLONRenderer {
 			const fadeStart = g.life - GROUND_FADE
 			g.mesh.visibility = age > fadeStart ? Math.max(0, 1 - (age - fadeStart) / GROUND_FADE) : 1
 		}
-
-		// Render the scope RTT + gate the composite pass BEFORE the main render, so the
-		// sight picture is fresh this frame. No-op unless the RTT scope is scoped-active.
-		try { this._renderScopePass(now) } catch (e) { this._disableScopeV2('scope pass threw', e) }
 
 		this.scene.render()
 		this.engine.endFrame()

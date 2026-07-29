@@ -35,24 +35,6 @@ const withAds = (fov, inTime, outTime, extra = {}) => ({
   ads: { fov, inTime, outTime, ...extra }
 })
 
-// ── SNIPER GUN-RAISE ("bring the scope to the eye") ────────────────────────────
-// The Sniper GLB has no baked raise clip, so — unlike the iron-sight weapons, whose
-// adsMount only fine-tunes an animated raise — the Sniper's whole "scope comes up to
-// your eye" motion is PROCEDURAL: Viewmodel.update() blends the holder from its hip
-// mount to this adsMount by the SAME eased _adsT that drives the FOV lerp + the scope
-// disc (0.24s in / 0.16s out cubic), so gun, FOV and glass arrive together.
-//
-// PRESENTATION ONLY — the holder is parented under the camera and never touches the
-// aim ray. TUNABLE (a human has to eyeball these; the sight picture itself is the RTT
-// disc, so these govern the *body swing* seen dimmed in the scope periphery):
-//   RAISE_Y : + lifts the receiver/scope UP toward the camera centreline.
-//   PULL_Z  : − pulls the gun BACK toward the face (toward camera). Keep small: too far
-//             back can clip the near plane. Flip the sign to push it forward instead.
-//   PITCH_X : small +x nose-down settle so the optic levels as it arrives.
-const SNIPER_ADS_RAISE_Y = 0.055
-const SNIPER_ADS_PULL_Z = -0.035
-const SNIPER_ADS_PITCH_X = 0.03
-
 // ── Body-zone damage multipliers (server-authoritative body-part hit detection) ──
 // The server classifies each CONFIRMED hitscan hit into head / torso / legs with a
 // lightweight 3-sphere pose model (server/lagCompensatedHitscanCheck.js) and applies
@@ -379,12 +361,7 @@ export const weapons = [
     // identical whether or not this flag is set, so an optic can never desync the
     // client from the server.
     ...withAds(40, 0.24, 0.16, { spreadBaseMult: 0, spreadHeatMult: 0, heatMult: 1, scope: true }),
-    // GUN-RAISE pose — see SNIPER_ADS_* constants above (tunable). Base rotation.y is
-    // Math.PI/2 to match authoredMount; PITCH_X adds the small nose-down settle on top.
-    adsMount: {
-      position: { x: 0, y: SNIPER_ADS_RAISE_Y, z: SNIPER_ADS_PULL_Z },
-      rotation: { x: SNIPER_ADS_PITCH_X, y: Math.PI / 2, z: 0 }
-    },
+    adsMount: { position: { x: 0, y: -0.02, z: 0.05 }, rotation: { x: 0, y: Math.PI / 2, z: 0 } },
     muzzle: { x: 0.08, y: -0.13, z: 1.35 },
     recoilForce: 3.0,
     drawTime: 0.55,

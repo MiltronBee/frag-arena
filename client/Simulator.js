@@ -48,18 +48,6 @@ import { OBJECTIVE_EVENT } from '../common/message/ObjectiveEvent'
 // readability / cause sickness in a fast shooter. Set to 0 to disable entirely.
 const CONFIRM_KICK = 0.05
 
-// SNIPER SCOPE V2 (RTT optical scope) — presentation only, never touches the aim ray.
-// With the real optical scope the PERCEIVED zoom comes from the 25° scope camera inside
-// the disc, so the MAIN camera no longer needs to crush to the config's ads.fov (40°).
-// It lerps only to 70° — a much brighter/wider periphery (answers "too dark/blinding"),
-// while the disc carries the magnification. When v2 is OFF (legacy DOM overlay) the main
-// camera still uses the config ads.fov (40°) exactly as before.
-const SCOPE_V2_MAIN_FOV = 70   // main-camera ADS target (deg) while the RTT scope is active
-// Look-speed while scoped stays FOCAL-MATCHED to what you actually aim through — the 25°
-// scope camera, NOT the 70° main FOV — so it feels like turning a scoped rifle (a bit
-// slower than the old 40° match). Raise toward 40 if it reads too slow on a phone.
-const SCOPE_V2_SENS_FOV = 25   // deg; the scope camera's optical FOV (see BABYLONRenderer)
-
 // Phase 4: the mega-health CHARGING lead (ms) — mirrors GameInstance MEGA.CHARGE_LEAD
 // (5s). Drives the client scale-in + hum ramp duration so the tell tracks the server's
 // state=CHARGING window.
@@ -680,8 +668,6 @@ class Simulator {
 		// collapses and the tube blacks out for a beat before you re-find the target.
 		// A no-op on every weapon without an optic (ScopeOverlay ignores it unaimed).
 		if (this._scope) this._scope.kick()
-		// Same beat for the RTT scope: shove the shader's eye-box (decays to centre).
-		if (this.renderer && this.renderer.scopeKick) this.renderer.scopeKick()
 
 		// shotgun-only FOV concussion punch (world camera; the vmCamera has its own
 		// fixed fov so the gun never distorts). Does NOT touch rotation → aim-safe.
@@ -870,18 +856,8 @@ class Simulator {
 		const ads = weapons[this.weaponIndex] && weapons[this.weaponIndex].ads
 		if (!ads || !this._adsT) return 1
 		const t = this._adsEase(this._adsT)
-		// With the RTT scope active the felt magnification is the 25° scope camera, not
-		// the (now 70°) main FOV — match look-speed to THAT so it turns like a scoped
-		// rifle. Legacy overlay keeps the config ads.fov (40°) focal match unchanged.
-		const targetFov = this._scopeV2ActiveFor(ads) ? SCOPE_V2_SENS_FOV : ads.fov
-		const curFov = this.fov + (targetFov - this.fov) * t
+		const curFov = this.fov + (ads.fov - this.fov) * t
 		return Math.tan((curFov * Math.PI) / 360) / Math.tan((this.fov * Math.PI) / 360)
-	}
-
-	// True when the equipped weapon should use the RTT optical scope (flag on + init ok +
-	// this weapon carries ads.scope). Everything gated on it is PRESENTATION ONLY.
-	_scopeV2ActiveFor(ads) {
-		return !!(ads && ads.scope && this.renderer && this.renderer.scopeV2Active && this.renderer.scopeV2Active())
 	}
 
 	_applyRecoilFov() {
@@ -891,10 +867,7 @@ class Simulator {
 		// of it → the aim ray + MoveCommand stay byte-identical whether aimed or not.
 		const ads = weapons[this.weaponIndex] && weapons[this.weaponIndex].ads
 		const t = this._adsEase(this._adsT || 0)
-		// RTT scope: main camera only lerps to 70° (bright/wide periphery) — the 25° scope
-		// camera inside the disc carries the zoom. Legacy overlay uses the config ads.fov.
-		const adsFovTarget = this._scopeV2ActiveFor(ads) ? SCOPE_V2_MAIN_FOV : (ads && ads.fov)
-		const fovDeg = ads ? (this.fov + (adsFovTarget - this.fov) * t) : this.fov
+		const fovDeg = ads ? (this.fov + (ads.fov - this.fov) * t) : this.fov
 		const base = (fovDeg * Math.PI) / 180
 		const p = this._recoilFov
 		if (!p) { if (cam.fov !== base) cam.fov = base; return }
@@ -2131,24 +2104,12 @@ class Simulator {
 			// exactly what was applied (0 when the death-cam owns the roll) — see FIX 4.
 			// transient shotgun FOV concussion punch (world camera only; aim-safe).
 			this._applyRecoilFov()
-			// SCOPE: same eased ramp the FOV uses, so the optic irises exactly in step with
+			// SCOPE: same eased ramp the FOV uses, so the tube irises exactly in step with
 			// the zoom instead of lagging it. Only weapons flagged ads.scope get an optic.
-			// Two mutually-exclusive paths: the RTT optical scope (v2, shader-composited in
-			// BABYLONRenderer) or the legacy DOM overlay (fallback). scopeV2Active() flips
-			// to false on any GPU/shader failure, so this never leaves the player blind.
-			{
+			if (this._scope) {
 				const sc = !!(wcfg.ads && wcfg.ads.scope)
 				const t = this._adsEase(this._adsT || 0)
-				const v2 = sc && this.renderer && this.renderer.scopeV2Active && this.renderer.scopeV2Active()
-				if (v2) {
-					// RTT scope drives the frame; keep the DOM overlay fully hidden (scoped=false).
-					this.renderer.updateScope(sc, t)
-					if (this._scope) this._scope.update(t, false, forwards || backwards || left || right)
-				} else {
-					if (this.renderer && this.renderer.updateScope) this.renderer.updateScope(false, 0)
-					if (this._scope) this._scope.update(t, sc, forwards || backwards || left || right)
-				}
-				// Hide the default HUD crosshair while the optic is up, either path.
+				this._scope.update(t, sc, forwards || backwards || left || right)
 				document.body.classList.toggle('scoped', sc && t > 0.5)
 			}
 		}
